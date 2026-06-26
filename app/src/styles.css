@@ -1,0 +1,426 @@
+:root {
+  color-scheme: light;
+  font-family: "Aptos", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.5;
+  color: #17211e;
+  background: #f7f7f2;
+  --ink: #17211e;
+  --muted: #66736e;
+  --surface: #ffffff;
+  --line: #dfe5df;
+  --teal: #0f766e;
+  --teal-deep: #0b4f49;
+  --saffron: #c77d1a;
+  --rose: #b94a48;
+  --leaf: #3f7f4c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button {
+  font: inherit;
+}
+
+.appShell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: #0d2f2b;
+  color: #f5fbf8;
+  padding: 24px;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: #174f48;
+  font-size: 24px;
+}
+
+.brand small,
+.metricCard small,
+.rosterRow small,
+.outboxStrip small {
+  color: var(--muted);
+}
+
+.brand small {
+  display: block;
+  color: #a7c4bd;
+}
+
+.navList {
+  display: grid;
+  gap: 8px;
+}
+
+.navItem,
+.iconTextButton,
+.primaryAction,
+.statusButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.navItem {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 11px 12px;
+  color: #eef8f5;
+  background: transparent;
+}
+
+.navItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.navItem.active,
+.navItem[aria-current="page"] {
+  background: #f5fbf8;
+  color: #0d2f2b;
+}
+
+.workspace {
+  padding: 28px;
+  min-width: 0;
+}
+
+.topbar,
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.eyebrow {
+  color: var(--teal-deep);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+h1,
+h2 {
+  margin: 4px 0 0;
+  letter-spacing: 0;
+}
+
+.iconTextButton,
+.primaryAction,
+.secondaryAction,
+.tableAction {
+  min-height: 40px;
+  padding: 0 14px;
+  background: var(--ink);
+  color: white;
+}
+
+.secondaryAction,
+.tableAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #f7f7f2;
+  color: var(--ink);
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.metricCard {
+  min-height: 136px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.metricCard svg {
+  color: var(--teal);
+}
+
+.metricCard strong {
+  font-size: 1.45rem;
+}
+
+.attendancePanel,
+.modulePanel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.modulePanel {
+  margin-top: 22px;
+}
+
+.moduleHeader {
+  margin-bottom: 18px;
+}
+
+.roster {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.rosterRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.rosterRow small {
+  display: block;
+}
+
+.statusButtons {
+  display: grid;
+  grid-template-columns: repeat(3, 86px);
+  gap: 8px;
+}
+
+.statusButton {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  background: #f7f7f2;
+  color: var(--ink);
+}
+
+.statusButton.active.present {
+  background: #e8f4ec;
+  color: var(--leaf);
+  border-color: #9bc7a9;
+}
+
+.statusButton.active.absent {
+  background: #faeceb;
+  color: var(--rose);
+  border-color: #e2aaa8;
+}
+
+.statusButton.active.leave {
+  background: #fff3df;
+  color: var(--saffron);
+  border-color: #e7bd79;
+}
+
+.outboxStrip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.dataTable {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dataRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.dataRow:first-child {
+  border-top: 0;
+}
+
+.dataRow.header {
+  background: #f2f7f6;
+  color: var(--teal-deep);
+  font-weight: 800;
+}
+
+.dataRow span {
+  min-width: 0;
+  padding: 12px;
+  border-inline-start: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.dataRow span:first-child {
+  border-inline-start: 0;
+}
+
+.settingsGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.moduleToolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.searchBox,
+.inlineForm label,
+.settingsGrid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.inlineForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcf8;
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.searchBox input,
+.inlineForm input,
+.settingsGrid select {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.notice {
+  margin: 0;
+  color: var(--teal-deep);
+  font-weight: 700;
+}
+
+.emptyState {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+html[dir="rtl"] body {
+  font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Segoe UI", sans-serif;
+}
+
+@media (max-width: 960px) {
+  .appShell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    padding: 16px;
+  }
+
+  .navList {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .navItem {
+    justify-content: center;
+  }
+
+  .navItem span {
+    display: none;
+  }
+
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace {
+    padding: 16px;
+  }
+
+  .topbar,
+  .panelHeader,
+  .rosterRow {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .metricGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .statusButtons {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .moduleToolbar {
+    grid-template-columns: 1fr;
+  }
+}
