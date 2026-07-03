@@ -61,6 +61,8 @@ services:
       POSTGRES_DB: mms
     volumes:
       - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     restart: unless-stopped
 
   redis:

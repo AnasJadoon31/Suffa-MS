@@ -13,7 +13,8 @@ class AttendanceStatus(StrEnum):
 
 class AttendanceEntry(BaseModel):
     subject_type: str = Field(pattern="^(student|teacher)$")
-    subject_id: UUID | str
+    subject_id: UUID
+    session_id: UUID
     attendance_date: date
     status: AttendanceStatus
     captured_at: datetime

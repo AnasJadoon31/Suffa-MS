@@ -1,23 +1,50 @@
 from enum import StrEnum
 from uuid import UUID
+from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class Role(StrEnum):
-    principal = "principal"
+    superadmin = "superadmin"
+    admin = "admin"
     teacher = "teacher"
     student = "student"
+    parent = "parent"
 
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=3, max_length=80)
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=6)
 
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    username: str
+    role: str
+    status: str
+    preferred_language: str
+    created_at: datetime
+
+
+class MadrasaRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    slug: str
+    name: str
+    created_at: datetime
+
+
+class CurrentUserResponse(BaseModel):
+    user: UserRead
+    madrasa: MadrasaRead | None = None
+    permissions: list[str] = []
 
 
 class ProvisionUserRequest(BaseModel):
