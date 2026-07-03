@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import date
 from uuid import UUID
 
@@ -50,3 +51,22 @@ class AcademicSession(Base, IdMixin, TenantMixin, TimestampMixin):
     gregorian_end: Mapped[date] = mapped_column(Date)
     hijri_span: Mapped[str] = mapped_column(String(80))
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Enrollment(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "enrollments"
+
+    student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"), index=True)
+    session_id: Mapped[UUID] = mapped_column(ForeignKey("academic_sessions.id"), index=True)
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id"))
+    class_id: Mapped[UUID] = mapped_column(ForeignKey("classes.id"))
+    section_id: Mapped[UUID] = mapped_column(ForeignKey("sections.id"))
+
+
+class TeacherAssignment(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "teacher_assignments"
+
+    teacher_id: Mapped[UUID] = mapped_column(ForeignKey("teacher_profiles.id"), index=True)
+    session_id: Mapped[UUID] = mapped_column(ForeignKey("academic_sessions.id"), index=True)
+    class_id: Mapped[UUID] = mapped_column(ForeignKey("classes.id"))
+    course_id: Mapped[UUID] = mapped_column(ForeignKey("courses.id"))

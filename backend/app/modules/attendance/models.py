@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import date, datetime, time
 from enum import StrEnum
 from uuid import UUID
@@ -34,8 +35,8 @@ class TeacherAttendance(Base, IdMixin, TenantMixin, TimestampMixin):
     session_id: Mapped[UUID] = mapped_column(ForeignKey("academic_sessions.id"), index=True)
     attendance_date: Mapped[date] = mapped_column(Date, index=True)
     status: Mapped[AttendanceStatus] = mapped_column(Enum(AttendanceStatus))
-    check_in: Mapped[time | None] = mapped_column(Time)
-    check_out: Mapped[time | None] = mapped_column(Time)
+    check_in: Mapped[time] = mapped_column(Time, nullable=True)
+    check_out: Mapped[time] = mapped_column(Time, nullable=True)
     marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     marked_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     idempotency_key: Mapped[str] = mapped_column(String(120), unique=True)
@@ -50,4 +51,4 @@ class AttendanceCorrection(Base, IdMixin, TenantMixin, TimestampMixin):
     old_value: Mapped[str] = mapped_column(Text)
     new_value: Mapped[str] = mapped_column(Text)
     actor_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
-    reason: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text)

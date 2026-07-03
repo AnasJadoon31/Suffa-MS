@@ -1,3 +1,4 @@
+from typing import Optional
 from enum import StrEnum
 from uuid import UUID
 
@@ -24,7 +25,7 @@ class User(Base, IdMixin, TimestampMixin):
 
     madrasa_id: Mapped[UUID] = mapped_column(ForeignKey("madaris.id"), index=True)
     username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
-    password_hash: Mapped[str | None] = mapped_column(String(255))
+    password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole))
     preferred_language: Mapped[str] = mapped_column(String(8), default="en")
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus), default=UserStatus.invited)
@@ -36,4 +37,4 @@ class UserPermission(Base, IdMixin, TimestampMixin):
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     permission_code: Mapped[str] = mapped_column(String(120), index=True)
-    granted_by_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    granted_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
