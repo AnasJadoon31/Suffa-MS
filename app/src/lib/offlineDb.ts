@@ -6,6 +6,7 @@ export type OutboxEntry = Readonly<{
   id?: number;
   subject_type: "student" | "teacher";
   subject_id: string;
+  session_id: string;
   attendance_date: string;
   status: AttendanceStatus;
   captured_at: string;

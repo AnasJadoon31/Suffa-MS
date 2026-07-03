@@ -5,9 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, get_current_madrasa
-from app.db.base import get_session
+from app.db.session import get_session
 from app.modules.auth.models import User
-from app.modules.academics.models import Madrasa, Program, AcademicClass, Section, Enrollment, StudentProfile
+from app.modules.academics.models import Madrasa, Program, AcademicClass, Section, Enrollment
+from app.modules.people.models import StudentProfile
 from app.modules.academics.schemas import (
     AcademicSessionCreate,
     AcademicSessionRead,

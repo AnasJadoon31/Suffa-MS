@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import ALGORITHM
 from app.core.permissions import registry
-from app.db.base import get_session
+from app.db.session import get_session
 from app.modules.auth.models import User
 from app.modules.academics.models import Madrasa
 

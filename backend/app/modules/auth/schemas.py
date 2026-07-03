@@ -6,8 +6,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 
 class Role(StrEnum):
-    superadmin = "superadmin"
-    admin = "admin"
+    principal = "principal"
     teacher = "teacher"
     student = "student"
     parent = "parent"

@@ -83,10 +83,10 @@ export const navItems: readonly NavItem[] = [
 ];
 
 export const students: readonly Student[] = [
-  { id: "stu-1", admissionNumber: "ADM-0001", name: "Ahmad Ali", className: "Darja 1", status: "unmarked" },
-  { id: "stu-2", admissionNumber: "ADM-0002", name: "Hamza Khan", className: "Darja 1", status: "unmarked" },
-  { id: "stu-3", admissionNumber: "ADM-0003", name: "Bilal Usman", className: "Darja 1", status: "unmarked" },
-  { id: "stu-4", admissionNumber: "ADM-0004", name: "Saad Noor", className: "Darja 1", status: "unmarked" }
+  { id: "13c1cbf0-5be1-4647-bb27-5d97f3debdba", admissionNumber: "ADM-0001", name: "Ahmad Ali", className: "Darja 1", status: "unmarked" },
+  { id: "4be8120e-97f3-4bf4-ab46-add3341aa52b", admissionNumber: "ADM-0002", name: "Hamza Khan", className: "Darja 1", status: "unmarked" },
+  { id: "821caaa1-1e36-4093-b2f8-29f06ed5eaf5", admissionNumber: "ADM-0003", name: "Bilal Usman", className: "Darja 1", status: "unmarked" },
+  { id: "3f400a0a-af52-463c-b25b-a6b981d71260", admissionNumber: "ADM-0004", name: "Saad Noor", className: "Darja 1", status: "unmarked" }
 ];
 
 export type ModuleRecord = Record<string, string> & { id: string };

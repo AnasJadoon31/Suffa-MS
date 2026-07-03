@@ -6,6 +6,8 @@ import { AttendanceBoard } from "./components/AttendanceBoard";
 import { DashboardCards } from "./components/DashboardCards";
 import { ModuleView } from "./components/ModuleViews";
 import { Sidebar } from "./components/Sidebar";
+import { LoginScreen } from "./components/LoginScreen";
+import { useAuth } from "./lib/AuthContext";
 import type { ViewId } from "./data/mockData";
 
 const principalPermissions: readonly string[] = [
@@ -30,6 +32,7 @@ const principalPermissions: readonly string[] = [
 
 export default function App() {
   const { i18n } = useTranslation();
+  const { isAuthenticated, isLoading, logout } = useAuth();
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const isUrdu = i18n.language === "ur";
 
@@ -56,6 +59,14 @@ export default function App() {
     return <ModuleView view={activeView} />;
   }
 
+  if (isLoading) {
+    return <div className="loading-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
   return (
     <main className="appShell">
       <Sidebar activeView={activeView} onViewChange={setActiveView} permissions={principalPermissions} />
@@ -65,10 +76,15 @@ export default function App() {
             <span className="eyebrow">26 June 2026 · 11 Muharram 1448</span>
             <h1>{activeView === "dashboard" ? "Principal Dashboard" : "MMS Workspace"}</h1>
           </div>
-          <button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>
-            <Languages size={18} />
-            {isUrdu ? "English" : "اردو"}
-          </button>
+          <div className="topbar-actions">
+            <button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>
+              <Languages size={18} />
+              {isUrdu ? "English" : "اردو"}
+            </button>
+            <button className="iconTextButton" type="button" onClick={logout}>
+              Logout
+            </button>
+          </div>
         </header>
         {renderActiveView()}
       </section>

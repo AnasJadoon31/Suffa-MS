@@ -9,7 +9,7 @@ from app.core.permissions import registry
 from app.core.security import issue_token, verify_password
 from app.core.tenancy import TenantContext, get_tenant
 from app.core.dependencies import get_current_user, get_current_madrasa
-from app.db.base import get_session
+from app.db.session import get_session
 from app.modules.auth.models import User, UserStatus
 from app.modules.academics.models import Madrasa
 from app.modules.auth.schemas import (

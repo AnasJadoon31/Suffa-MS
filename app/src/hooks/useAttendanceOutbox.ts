@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { AttendanceStatus } from "../data/mockData";
-import { API_BASE } from "../lib/config";
+import { api } from "../lib/api";
 import { db, type OutboxEntry } from "../lib/offlineDb";
 
 type AttendanceOutboxState = Readonly<{
@@ -18,6 +18,7 @@ function createAttendanceEntry(studentId: string, status: AttendanceStatus): Out
   return {
     subject_type: "student",
     subject_id: studentId,
+    session_id: "a01bc7a7-9e56-46f6-8954-8194b0c439ae",
     attendance_date: capturedAt.slice(0, 10),
     status,
     captured_at: capturedAt,
@@ -33,39 +34,42 @@ export function useAttendanceOutbox(): AttendanceOutboxState {
     setEntries(await db.outbox.toArray());
   }, []);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  const queueAttendance = useCallback(
-    async (studentId: string, status: AttendanceStatus): Promise<void> => {
-      await db.outbox.add(createAttendanceEntry(studentId, status));
-      await refresh();
-    },
-    [refresh],
-  );
-
   const sync = useCallback(async (): Promise<void> => {
     const pending = await db.outbox.toArray();
     if (pending.length === 0) return;
 
     setIsSyncing(true);
     try {
-      const response = await fetch(`${API_BASE}/api/v1/attendance/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries: pending })
-      });
-      if (!response.ok) {
-        throw new Error("Attendance sync failed");
-      }
-      const payload = (await response.json()) as { idempotency_keys: string[] };
+      const response = await api.post("/api/v1/attendance/sync", { entries: pending });
+      
+      const payload = response.data;
       await db.outbox.where("idempotency_key").anyOf(payload.idempotency_keys).delete();
       await refresh();
+    } catch (error) {
+      console.error("Attendance sync failed:", error);
     } finally {
       setIsSyncing(false);
     }
   }, [refresh]);
+
+  useEffect(() => {
+    void refresh();
+    
+    const handleOnline = () => { void sync(); };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [refresh, sync]);
+
+  const queueAttendance = useCallback(
+    async (studentId: string, status: AttendanceStatus): Promise<void> => {
+      await db.outbox.add(createAttendanceEntry(studentId, status));
+      await refresh();
+      if (navigator.onLine) {
+        sync();
+      }
+    },
+    [refresh, sync],
+  );
 
   return { entries, isSyncing, queueAttendance, sync };
 }
