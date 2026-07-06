@@ -79,3 +79,33 @@ class AcademicSessionRead(BaseModel):
     gregorian_end: date
     hijri_span: str
     is_active: bool
+
+
+class AcademicClassCreate(BaseModel):
+    program_id: UUID
+    name: str
+    default_portal_enabled: bool = True
+
+
+class SectionCreate(BaseModel):
+    name: str
+
+
+class CourseCreate(BaseModel):
+    name: str
+
+
+class TeacherAssignmentCreate(BaseModel):
+    teacher_id: UUID
+    session_id: UUID
+    class_id: UUID
+    course_id: UUID
+
+
+class TeacherAssignmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    teacher_id: UUID
+    session_id: UUID
+    class_id: UUID
+    course_id: UUID

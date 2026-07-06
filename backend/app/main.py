@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.modules.academics.routes import router as academics_router
+from app.modules.assessments.routes import router as assessments_router
 from app.modules.attendance.routes import router as attendance_router
 from app.modules.auth.routes import router as auth_router
+from app.modules.finance.routes import router as finance_router
 from app.modules.messaging.routes import router as messaging_router
 from app.modules.operations.routes import router as operations_router
 from app.modules.people.routes import router as people_router
@@ -25,6 +27,8 @@ def create_app() -> FastAPI:
     app.include_router(academics_router, prefix="/api/v1/academics", tags=["academics"])
     app.include_router(people_router, prefix="/api/v1/people", tags=["people"])
     app.include_router(attendance_router, prefix="/api/v1/attendance", tags=["attendance"])
+    app.include_router(assessments_router, prefix="/api/v1/assessments", tags=["assessments"])
+    app.include_router(finance_router, prefix="/api/v1/finance", tags=["finance"])
     app.include_router(messaging_router, prefix="/api/v1/messaging", tags=["messaging"])
     app.include_router(operations_router, prefix="/api/v1/operations", tags=["operations"])
     app.include_router(reporting_router, prefix="/api/v1/reporting", tags=["reporting"])

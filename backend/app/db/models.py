@@ -3,7 +3,7 @@ from app.db.base import Base
 # Import all models here for Alembic to discover them
 from app.db.core_models import FileObject, AuditLog
 from app.modules.academics.models import Madrasa, Program, AcademicClass, Section, Course, AcademicSession, Enrollment, TeacherAssignment
-from app.modules.assessments.models import Assignment, Submission, GradingScheme, ExamType, Mark
+from app.modules.assessments.models import Assignment, Submission, GradingScheme, ExamType, Mark, ResultPublication
 from app.modules.attendance.models import StudentAttendance, TeacherAttendance, AttendanceCorrection
 from app.modules.auth.models import User, UserPermission
 from app.modules.finance.models import PaymentCategory, Payment, Donor, Donation, SalaryRecord, SalaryPayment
@@ -16,7 +16,7 @@ __all__ = [
     "Base",
     "FileObject", "AuditLog",
     "Madrasa", "Program", "AcademicClass", "Section", "Course", "AcademicSession", "Enrollment", "TeacherAssignment",
-    "Assignment", "Submission", "GradingScheme", "ExamType", "Mark",
+    "Assignment", "Submission", "GradingScheme", "ExamType", "Mark", "ResultPublication",
     "StudentAttendance", "TeacherAttendance", "AttendanceCorrection",
     "User", "UserPermission",
     "PaymentCategory", "Payment", "Donor", "Donation", "SalaryRecord", "SalaryPayment",

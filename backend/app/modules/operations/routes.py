@@ -485,14 +485,10 @@ async def list_announcements(
 
 # --------------------------------------------------------- Remaining mock
 # Still-fake areas awaiting their own modules (salary, assignments, results,
-# finance, messaging templates, reports, blog, admissions, settings). Each
-# maps to the real Appendix A permission it will require once implemented.
+# messaging templates, reports, blog, admissions, settings). Each maps to
+# the real Appendix A permission it will require once implemented.
 
 MODULE_PERMISSIONS: dict[str, str] = {
-    "salary": "teachers.salary.manage",
-    "assignments": "assignments.manage_all",
-    "results": "assessments.results.publish",
-    "finance": "finance.manage",
     "messaging": "messaging.send",
     "reports": "finance.reports.view",
     "blog": "blog.manage",
@@ -501,10 +497,6 @@ MODULE_PERMISSIONS: dict[str, str] = {
 }
 
 module_store: dict[str, list[dict[str, str]]] = {
-    "salary": [{"id": "sal-1", "teacher": "Maulana Yusuf", "amount": "65000", "period": "June 2026", "state": "Paid"}],
-    "assignments": [{"id": "asg-1", "title": "Sabaq revision", "className": "Darja 1", "state": "Open"}],
-    "results": [{"id": "res-1", "student": "Ahmad Ali", "course": "Quran", "score": "92", "state": "Published"}],
-    "finance": [{"id": "fin-1", "source": "ADM-0001", "amount": "12000", "state": "Receipted"}],
     "messaging": [{"id": "msg-1", "recipient": "Abdul Ali", "phone": "923001234567", "state": "Ready"}],
     "reports": [{"id": "rpt-1", "title": "Attendance summary", "period": "June 2026", "state": "Ready"}],
     "blog": [{"id": "post-1", "title": "Attendance with accountability", "author": "Maulana Yusuf", "state": "Draft"}],
