@@ -2,7 +2,7 @@ from typing import Optional
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
@@ -30,6 +30,7 @@ class StudentProfile(Base, IdMixin, TenantMixin, TimestampMixin):
     date_of_birth: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(24), default="active")
     notes: Mapped[str] = mapped_column(Text, nullable=True)
+    portal_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class Guardian(Base, IdMixin, TenantMixin, TimestampMixin):

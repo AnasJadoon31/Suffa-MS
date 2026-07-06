@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.security import ALGORITHM
 from app.core.permissions import registry
 from app.db.session import get_session
-from app.modules.auth.models import User
+from app.modules.auth.models import User, UserPermission, UserRole
 from app.modules.academics.models import Madrasa
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
@@ -50,26 +50,55 @@ async def get_current_madrasa(
     slug = x_madrasa or settings.default_tenant
     if not slug:
         raise HTTPException(status_code=400, detail="Madrasa tenant not specified")
-    
+
     stmt = select(Madrasa).where(Madrasa.slug == slug)
     result = await session.execute(stmt)
     madrasa = result.scalar_one_or_none()
     if madrasa is None:
         raise HTTPException(status_code=404, detail="Madrasa not found")
-    
+
     return madrasa
 
 
+async def user_has_permission(user: User, code: str, session: AsyncSession) -> bool:
+    """The Principal is an implicit superuser (FR-RBAC-01); every other role
+    must hold an explicit, persisted grant for the exact permission code."""
+    if user.role == UserRole.principal:
+        return True
+    stmt = select(UserPermission).where(
+        UserPermission.user_id == user.id,
+        UserPermission.permission_code == code,
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none() is not None
+
+
 def require_permission(code: str):
-    def permission_checker(current_user: User = Depends(get_current_user)):
-        # For simplicity, if user is superadmin or has specific permission (would be checked via db normally)
-        # In a real app, query UserPermission or attach permissions to current_user
-        # We will assume a basic implementation for now.
-        if current_user.system_role == "superadmin":
-            return current_user
-            
-        # Check explicit permission
-        # In this basic form, we would ideally query the db. We can raise 403 if they don't have it.
-        # This will be fully implemented in phase 2 when business APIs are built.
+    """Returns a dependency callable — use as Depends(require_permission("some.code"))."""
+    registry.require_known(code)  # fail fast at import time on a typo'd code
+
+    async def permission_checker(
+        current_user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(get_session),
+    ) -> User:
+        if not await user_has_permission(current_user, code, session):
+            raise HTTPException(status_code=403, detail=f"Missing permission: {code}")
         return current_user
-    return Depends(permission_checker)
+
+    return permission_checker
+
+
+async def require_mapped_permission(
+    key: str,
+    permission_map: dict[str, str],
+    current_user: User,
+    session: AsyncSession,
+) -> None:
+    """Same enforcement as require_permission(), for routes where the
+    permission code depends on a path parameter known only at request time
+    (e.g. the operations module's shared /{module_key} routes)."""
+    code = permission_map.get(key)
+    if code is None:
+        raise HTTPException(status_code=404, detail="Unknown module")
+    if not await user_has_permission(current_user, code, session):
+        raise HTTPException(status_code=403, detail=f"Missing permission: {code}")

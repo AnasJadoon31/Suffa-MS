@@ -63,3 +63,8 @@ class ProvisionUserResponse(BaseModel):
 class PermissionGrantRequest(BaseModel):
     user_id: UUID
     permission_codes: list[str]
+
+
+class SetPasswordRequest(BaseModel):
+    token: str
+    password: str = Field(min_length=8)

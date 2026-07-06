@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user, get_current_madrasa
+from app.core.dependencies import get_current_user, get_current_madrasa, require_permission
 from app.db.session import get_session
 from app.modules.auth.models import User
 from app.modules.academics.models import Madrasa, Program, AcademicClass, Section, Enrollment
@@ -24,6 +24,7 @@ router = APIRouter()
 
 @router.get("/programs", response_model=list[ProgramRead])
 async def list_programs(
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
 ) -> list[ProgramRead]:
@@ -34,6 +35,7 @@ async def list_programs(
 
 @router.get("/classes", response_model=list[AcademicClassRead])
 async def list_classes(
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
 ) -> list[AcademicClassRead]:
@@ -45,6 +47,7 @@ async def list_classes(
 @router.get("/classes/{class_id}/sections", response_model=list[SectionRead])
 async def list_sections(
     class_id: str,
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
 ) -> list[SectionRead]:
@@ -56,6 +59,7 @@ async def list_sections(
 @router.post("/students/enroll")
 async def enroll_student(
     payload: StudentEnrollRequest,
+    current_user: User = Depends(require_permission("academics.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
 ) -> dict[str, str]:

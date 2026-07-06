@@ -1,7 +1,9 @@
 from urllib.parse import quote
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.core.dependencies import require_permission
+from app.modules.auth.models import User
 from app.modules.messaging.schemas import WhatsAppLinkRequest, WhatsAppLinkResponse
 
 router = APIRouter()
@@ -24,7 +26,10 @@ def render_template(template: str, variables: dict[str, str]) -> str:
 
 
 @router.post("/whatsapp-link", response_model=WhatsAppLinkResponse)
-async def whatsapp_link(payload: WhatsAppLinkRequest) -> WhatsAppLinkResponse:
+async def whatsapp_link(
+    payload: WhatsAppLinkRequest,
+    current_user: User = Depends(require_permission("messaging.send")),
+) -> WhatsAppLinkResponse:
     number = normalise_phone_number(payload.phone_number)
     message = render_template(payload.template, payload.variables)
     return WhatsAppLinkResponse(normalised_number=number, url=f"https://wa.me/{number}?text={quote(message)}")

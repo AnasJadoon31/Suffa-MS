@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.core.tenancy import TenantContext, get_tenant
-from app.core.dependencies import get_current_user, get_current_madrasa
+from app.core.dependencies import get_current_madrasa, require_permission
 from app.db.session import get_session
 from app.modules.auth.models import User
 from app.modules.academics.models import Madrasa
@@ -23,7 +23,7 @@ def is_synced_late(captured_at: datetime) -> bool:
 @router.post("/sync", response_model=AttendanceSyncResponse)
 async def sync_attendance(
     payload: AttendanceSyncRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("attendance.take")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
 ) -> AttendanceSyncResponse:
