@@ -6,16 +6,20 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD}@db:5432/mms
       REDIS_URL: redis://redis:6379/0
-      S3_ENDPOINT: http://minio:9000
-      S3_BUCKET: mms-files
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_ENDPOINT: ${MINIO_ENDPOINT}
+      S3_PUBLIC_URL: ${MINIO_PUBLIC_URL}
+      S3_BUCKET: ${MINIO_BUCKET:-mms-files}
+      S3_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      S3_SECRET_KEY: ${MINIO_SECRET_KEY}
       SECRET_KEY: ${SECRET_KEY}
       DEFAULT_TENANT: ${DEFAULT_TENANT:-default}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      MADRASA_NAME: ${MADRASA_NAME:-}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
     depends_on:
       - db
       - redis
-      - minio
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -39,6 +43,8 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: ${API_BASE}
     ports:
       - "5173:80"
     restart: unless-stopped
@@ -61,27 +67,11 @@ services:
       POSTGRES_DB: mms
     volumes:
       - db-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
 
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - minio-data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    restart: unless-stopped
-
 volumes:
   db-data:
-  minio-data:

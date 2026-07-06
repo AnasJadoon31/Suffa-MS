@@ -11,14 +11,14 @@ type AttendanceOutboxState = Readonly<{
   sync: () => Promise<void>;
 }>;
 
-function createAttendanceEntry(studentId: string, status: AttendanceStatus): OutboxEntry {
+function createAttendanceEntry(studentId: string, status: AttendanceStatus, sessionId: string): OutboxEntry {
   const now = new Date();
   const capturedAt = now.toISOString();
 
   return {
     subject_type: "student",
     subject_id: studentId,
-    session_id: "a01bc7a7-9e56-46f6-8954-8194b0c439ae",
+    session_id: sessionId,
     attendance_date: capturedAt.slice(0, 10),
     status,
     captured_at: capturedAt,
@@ -26,7 +26,7 @@ function createAttendanceEntry(studentId: string, status: AttendanceStatus): Out
   };
 }
 
-export function useAttendanceOutbox(): AttendanceOutboxState {
+export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxState {
   const [entries, setEntries] = useState<OutboxEntry[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -41,7 +41,7 @@ export function useAttendanceOutbox(): AttendanceOutboxState {
     setIsSyncing(true);
     try {
       const response = await api.post("/api/v1/attendance/sync", { entries: pending });
-      
+
       const payload = response.data;
       await db.outbox.where("idempotency_key").anyOf(payload.idempotency_keys).delete();
       await refresh();
@@ -54,7 +54,7 @@ export function useAttendanceOutbox(): AttendanceOutboxState {
 
   useEffect(() => {
     void refresh();
-    
+
     const handleOnline = () => { void sync(); };
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
@@ -62,13 +62,14 @@ export function useAttendanceOutbox(): AttendanceOutboxState {
 
   const queueAttendance = useCallback(
     async (studentId: string, status: AttendanceStatus): Promise<void> => {
-      await db.outbox.add(createAttendanceEntry(studentId, status));
+      if (!sessionId) return;
+      await db.outbox.add(createAttendanceEntry(studentId, status, sessionId));
       await refresh();
       if (navigator.onLine) {
         sync();
       }
     },
-    [refresh, sync],
+    [refresh, sync, sessionId],
   );
 
   return { entries, isSyncing, queueAttendance, sync };

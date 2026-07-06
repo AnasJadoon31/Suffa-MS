@@ -1,16 +1,17 @@
 import { useTranslation } from "react-i18next";
 
 import { navItems, type ViewId } from "../data/mockData";
+import { useAuth } from "../lib/AuthContext";
 
 export type SidebarProps = Readonly<{
   activeView: ViewId;
   onViewChange: (view: ViewId) => void;
-  permissions: readonly string[];
 }>;
 
-export function Sidebar({ activeView, onViewChange, permissions }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const { t } = useTranslation();
-  const visibleItems = navItems.filter((item) => !item.permission || permissions.includes(item.permission));
+  const { hasPermission, user } = useAuth();
+  const visibleItems = navItems.filter((item) => !item.permission || hasPermission(item.permission));
 
   return (
     <aside className="sidebar">
@@ -18,7 +19,7 @@ export function Sidebar({ activeView, onViewChange, permissions }: SidebarProps)
         <span className="brandMark">م</span>
         <div>
           <strong>{t("appName")}</strong>
-          <small>Principal workspace</small>
+          <small>{user?.role ? `${user.role[0]?.toUpperCase()}${user.role.slice(1)} workspace` : "Workspace"}</small>
         </div>
       </div>
       <nav className="navList" aria-label="Primary">

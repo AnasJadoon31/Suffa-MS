@@ -18,8 +18,10 @@ export interface Madrasa {
 interface AuthContextType {
   user: User | null;
   madrasa: Madrasa | null;
+  permissions: string[];
   isAuthenticated: boolean;
   isLoading: boolean;
+  hasPermission: (code: string) => boolean;
   login: (token: string, tenant: string) => Promise<void>;
   logout: () => void;
 }
@@ -29,6 +31,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [madrasa, setMadrasa] = useState<Madrasa | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProfile = async () => {
@@ -36,9 +39,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await api.get("/api/v1/auth/me");
       setUser(res.data.user);
       setMadrasa(res.data.madrasa);
+      setPermissions(res.data.permissions ?? []);
     } catch (err) {
       setUser(null);
       setMadrasa(null);
+      setPermissions([]);
       localStorage.removeItem("mms_token");
     } finally {
       setIsLoading(false);
@@ -56,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const handleUnauthorized = () => {
       setUser(null);
       setMadrasa(null);
+      setPermissions([]);
     };
 
     window.addEventListener("unauthorized", handleUnauthorized);
@@ -72,10 +78,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("mms_token");
     setUser(null);
     setMadrasa(null);
+    setPermissions([]);
   };
 
+  const hasPermission = (code: string) => user?.role === "principal" || permissions.includes(code);
+
   return (
-    <AuthContext.Provider value={{ user, madrasa, isAuthenticated: !!user, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, madrasa, permissions, isAuthenticated: !!user, isLoading, hasPermission, login, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

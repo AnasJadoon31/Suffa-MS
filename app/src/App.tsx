@@ -1,38 +1,22 @@
 import { Languages } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Route, Routes } from "react-router-dom";
 
+import { AcademicsView } from "./components/AcademicsView";
+import { AssessmentsView } from "./components/AssessmentsView";
 import { AttendanceBoard } from "./components/AttendanceBoard";
 import { DashboardCards } from "./components/DashboardCards";
-import { ModuleView } from "./components/ModuleViews";
-import { Sidebar } from "./components/Sidebar";
 import { LoginScreen } from "./components/LoginScreen";
+import { PeopleView } from "./components/PeopleView";
+import { SetPasswordPage } from "./components/SetPasswordPage";
+import { Sidebar } from "./components/Sidebar";
 import { useAuth } from "./lib/AuthContext";
 import type { ViewId } from "./data/mockData";
 
-const principalPermissions: readonly string[] = [
-  "attendance.mark",
-  "users.manage",
-  "academics.manage",
-  "students.add",
-  "teachers.add",
-  "salary.manage",
-  "assignments.manage_all",
-  "results.publish",
-  "timetable.manage",
-  "resources.manage",
-  "forms.manage",
-  "announcements.manage",
-  "finance.manage",
-  "messaging.send",
-  "reports.view",
-  "blog.manage",
-  "admissions.review"
-];
-
-export default function App() {
+function Workspace() {
   const { i18n } = useTranslation();
-  const { isAuthenticated, isLoading, logout } = useAuth();
+  const { isAuthenticated, isLoading, logout, user } = useAuth();
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const isUrdu = i18n.language === "ur";
 
@@ -43,20 +27,25 @@ export default function App() {
   }
 
   function renderActiveView() {
-    if (activeView === "dashboard") {
-      return (
-        <>
-          <DashboardCards />
-          <AttendanceBoard />
-        </>
-      );
+    switch (activeView) {
+      case "dashboard":
+        return (
+          <>
+            <DashboardCards />
+            <AttendanceBoard />
+          </>
+        );
+      case "attendance":
+        return <AttendanceBoard />;
+      case "academics":
+        return <AcademicsView />;
+      case "people":
+        return <PeopleView />;
+      case "assessments":
+        return <AssessmentsView />;
+      default:
+        return null;
     }
-
-    if (activeView === "attendance") {
-      return <AttendanceBoard />;
-    }
-
-    return <ModuleView view={activeView} />;
   }
 
   if (isLoading) {
@@ -69,12 +58,12 @@ export default function App() {
 
   return (
     <main className="appShell">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} permissions={principalPermissions} />
+      <Sidebar activeView={activeView} onViewChange={setActiveView} />
       <section className="workspace">
         <header className="topbar">
           <div>
-            <span className="eyebrow">26 June 2026 · 11 Muharram 1448</span>
-            <h1>{activeView === "dashboard" ? "Principal Dashboard" : "MMS Workspace"}</h1>
+            <span className="eyebrow">{user?.username}</span>
+            <h1>{activeView === "dashboard" ? "Dashboard" : "MMS Workspace"}</h1>
           </div>
           <div className="topbar-actions">
             <button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>
@@ -89,5 +78,14 @@ export default function App() {
         {renderActiveView()}
       </section>
     </main>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/set-password" element={<SetPasswordPage />} />
+      <Route path="*" element={<Workspace />} />
+    </Routes>
   );
 }
