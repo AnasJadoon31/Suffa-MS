@@ -45,16 +45,21 @@ attendance, assessments, dashboard). Everything below is still open.
 
 ## Frontend screens not built (backend is real for all of these)
 
-- [ ] Timetable / Holidays / Leave — no screen.
-- [ ] Resources — no screen. Presign upload/download endpoints exist
-      (`/api/v1/files/*`) but nothing calls them yet.
-- [ ] Forms — no screen (builder or response viewer).
-- [ ] Announcements — no screen.
-- [ ] Finance (contributions/donations/summary) — no screen.
-- [ ] Salary — no screen.
-- [ ] Blog / Admissions / Settings — still the old fake `operations` mock
-      dict; no real table behind blog or admissions at all (announcements
-      got a real table, blog/admissions never did).
+- [x] Timetable / Holidays / Leave — screen added (`TimetableView.tsx`).
+- [x] Resources — screen added (`ResourcesView.tsx`), wired to the real
+      presign upload/download endpoints.
+- [x] Forms — screen added (`FormsView.tsx`): builder + response viewer.
+- [x] Announcements — screen added (`AnnouncementsView.tsx`).
+- [x] Finance (contributions/donations/summary) — screen added
+      (`FinanceView.tsx`).
+- [x] Salary — screen added (`SalaryView.tsx`).
+- [x] Blog / Admissions — now have real tables (`blog_posts`,
+      `admission_applications`, migration `c48e6a1f9d73`), real routes, and
+      screens (`BlogView.tsx`, `AdmissionsView.tsx`). Admission submission
+      itself is unauthenticated (walk-in/public intake); review is gated by
+      `students.provision`.
+- [x] Settings — real `madrasa_settings` key/value table (migration
+      `d59f7b2a3e84`), route, and screen (`SettingsView.tsx`).
 
 ## Public marketing site (§4.18 FR-WEB)
 

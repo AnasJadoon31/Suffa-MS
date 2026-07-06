@@ -12,18 +12,25 @@ from app.db.session import get_session
 from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
 from app.modules.auth.models import User, UserRole
 from app.modules.operations.models import (
+    AdmissionApplication,
     Announcement,
+    BlogPost,
     Form,
     FormResponse,
     Holiday,
     Leave,
+    MadrasaSetting,
     Resource,
     ResourceCategory,
     TimetableSlot,
 )
 from app.modules.operations.schemas import (
+    AdmissionApplicationCreate,
+    AdmissionApplicationRead,
     AnnouncementCreate,
     AnnouncementRead,
+    BlogPostCreate,
+    BlogPostRead,
     CreateOperationRecord,
     FormCreate,
     FormRead,
@@ -40,6 +47,8 @@ from app.modules.operations.schemas import (
     ResourceCategoryRead,
     ResourceCreate,
     ResourceRead,
+    SettingRead,
+    SettingUpsert,
     TimetableSlotCreate,
     TimetableSlotRead,
 )
@@ -483,25 +492,144 @@ async def list_announcements(
     return [AnnouncementRead.model_validate(row) for row in rows if _live(row)]
 
 
+# ------------------------------------------------------------------- Blog
+
+@router.post("/blog", response_model=BlogPostRead)
+async def create_blog_post(
+    payload: BlogPostCreate,
+    current_user: User = Depends(require_permission("blog.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> BlogPostRead:
+    post = BlogPost(madrasa_id=madrasa.id, author_id=current_user.id, **payload.model_dump())
+    session.add(post)
+    await session.commit()
+    await session.refresh(post)
+    return BlogPostRead.model_validate(post)
+
+
+@router.get("/blog", response_model=list[BlogPostRead])
+async def list_blog_posts(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    published_only: bool = False,
+) -> list[BlogPostRead]:
+    stmt = select(BlogPost).where(BlogPost.madrasa_id == madrasa.id)
+    if published_only:
+        stmt = stmt.where(BlogPost.published.is_(True))
+    result = await session.execute(stmt.order_by(BlogPost.created_at.desc()))
+    return [BlogPostRead.model_validate(row) for row in result.scalars().all()]
+
+
+@router.post("/blog/{post_id}/publish", response_model=BlogPostRead)
+async def publish_blog_post(
+    post_id: UUID,
+    current_user: User = Depends(require_permission("blog.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> BlogPostRead:
+    post = await session.get(BlogPost, post_id)
+    if post is None or post.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    post.published = True
+    await session.commit()
+    await session.refresh(post)
+    return BlogPostRead.model_validate(post)
+
+
+# -------------------------------------------------------------- Admissions
+
+@router.post("/admissions", response_model=AdmissionApplicationRead)
+async def create_admission_application(
+    payload: AdmissionApplicationCreate,
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AdmissionApplicationRead:
+    application = AdmissionApplication(madrasa_id=madrasa.id, **payload.model_dump())
+    session.add(application)
+    await session.commit()
+    await session.refresh(application)
+    return AdmissionApplicationRead.model_validate(application)
+
+
+@router.get("/admissions", response_model=list[AdmissionApplicationRead])
+async def list_admission_applications(
+    current_user: User = Depends(require_permission("students.provision")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[AdmissionApplicationRead]:
+    result = await session.execute(
+        select(AdmissionApplication).where(AdmissionApplication.madrasa_id == madrasa.id).order_by(AdmissionApplication.created_at.desc())
+    )
+    return [AdmissionApplicationRead.model_validate(row) for row in result.scalars().all()]
+
+
+@router.post("/admissions/{application_id}/status", response_model=AdmissionApplicationRead)
+async def set_admission_status(
+    application_id: UUID,
+    status_value: str,
+    current_user: User = Depends(require_permission("students.provision")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AdmissionApplicationRead:
+    if status_value not in {"pending", "accepted", "rejected"}:
+        raise HTTPException(status_code=400, detail="status must be pending, accepted, or rejected")
+    application = await session.get(AdmissionApplication, application_id)
+    if application is None or application.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Admission application not found")
+    application.status = status_value
+    await session.commit()
+    await session.refresh(application)
+    return AdmissionApplicationRead.model_validate(application)
+
+
+# ---------------------------------------------------------------- Settings
+
+@router.get("/settings", response_model=list[SettingRead])
+async def list_settings(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[SettingRead]:
+    result = await session.execute(
+        select(MadrasaSetting).where(MadrasaSetting.madrasa_id == madrasa.id).order_by(MadrasaSetting.key)
+    )
+    return [SettingRead.model_validate(row) for row in result.scalars().all()]
+
+
+@router.put("/settings", response_model=SettingRead)
+async def upsert_setting(
+    payload: SettingUpsert,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> SettingRead:
+    setting = (
+        await session.execute(
+            select(MadrasaSetting).where(MadrasaSetting.madrasa_id == madrasa.id, MadrasaSetting.key == payload.key)
+        )
+    ).scalar_one_or_none()
+    if setting is None:
+        setting = MadrasaSetting(madrasa_id=madrasa.id, key=payload.key, value=payload.value)
+        session.add(setting)
+    else:
+        setting.value = payload.value
+    await session.commit()
+    await session.refresh(setting)
+    return SettingRead.model_validate(setting)
+
+
 # --------------------------------------------------------- Remaining mock
-# Still-fake areas awaiting their own modules (salary, assignments, results,
-# messaging templates, reports, blog, admissions, settings). Each maps to
-# the real Appendix A permission it will require once implemented.
+# Still-fake areas awaiting their own module (reports). Maps to the real
+# Appendix A permission it will require once implemented.
 
 MODULE_PERMISSIONS: dict[str, str] = {
-    "messaging": "messaging.send",
     "reports": "finance.reports.view",
-    "blog": "blog.manage",
-    "admissions": "students.provision",
-    "settings": "academics.manage",
 }
 
 module_store: dict[str, list[dict[str, str]]] = {
-    "messaging": [{"id": "msg-1", "recipient": "Abdul Ali", "phone": "923001234567", "state": "Ready"}],
     "reports": [{"id": "rpt-1", "title": "Attendance summary", "period": "June 2026", "state": "Ready"}],
-    "blog": [{"id": "post-1", "title": "Attendance with accountability", "author": "Maulana Yusuf", "state": "Draft"}],
-    "admissions": [{"id": "adm-1", "student": "Muhammad Umar", "program": "Hifz", "state": "Pending"}],
-    "settings": [{"id": "set-1", "key": "Content language", "value": "Urdu", "state": "Saved"}],
 }
 
 

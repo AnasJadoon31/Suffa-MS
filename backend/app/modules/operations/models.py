@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, Integer
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, Integer, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -89,3 +89,32 @@ class Announcement(Base, IdMixin, TenantMixin, TimestampMixin):
     publish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+
+
+class BlogPost(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "blog_posts"
+
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    published: Mapped[bool] = mapped_column(Boolean, default=False)
+    publish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    author_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+
+
+class AdmissionApplication(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "admission_applications"
+
+    applicant_name: Mapped[str] = mapped_column(String(160))
+    guardian_contact: Mapped[str] = mapped_column(String(60))
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id"), nullable=True)
+    date_of_birth: Mapped[date] = mapped_column(Date, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(24), default="pending") # pending, accepted, rejected
+
+
+class MadrasaSetting(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "madrasa_settings"
+    __table_args__ = (UniqueConstraint("madrasa_id", "key", name="uq_setting_madrasa_key"),)
+
+    key: Mapped[str] = mapped_column(String(120))
+    value: Mapped[str] = mapped_column(Text)

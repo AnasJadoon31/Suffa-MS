@@ -1,0 +1,270 @@
+import { useEffect, useState } from "react";
+import { Landmark, Plus } from "lucide-react";
+
+import { financeApi, type Donation, type Donor, type Payment, type PaymentCategory, type FinanceSummary } from "../lib/endpoints";
+import { peopleApi, type Student } from "../lib/endpoints";
+import { useAuth } from "../lib/AuthContext";
+
+type Tab = "contributions" | "donations" | "summary";
+
+export function FinanceView() {
+  const { hasPermission } = useAuth();
+  const [tab, setTab] = useState<Tab>("contributions");
+  const canManage = hasPermission("finance.manage");
+  const [categories, setCategories] = useState<PaymentCategory[]>([]);
+  const [categoryName, setCategoryName] = useState("");
+  const [error, setError] = useState("");
+
+  const loadCategories = async () => setCategories(await financeApi.listCategories());
+  useEffect(() => {
+    void loadCategories();
+  }, []);
+
+  return (
+    <section className="modulePanel">
+      <div className="moduleHeader">
+        <h2><Landmark size={18} /> Finance</h2>
+        <p className="notice">Student contributions, donations, and reports.</p>
+      </div>
+      <div className="formActions" style={{ marginBottom: 16 }}>
+        <button className={tab === "contributions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("contributions")}>Contributions</button>
+        <button className={tab === "donations" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("donations")}>Donations</button>
+        <button className={tab === "summary" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("summary")}>Summary</button>
+      </div>
+
+      {canManage && (
+        <form
+          className="inlineForm"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            if (!categoryName) return;
+            try {
+              await financeApi.createCategory(categoryName);
+              setCategoryName("");
+              await loadCategories();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? "Failed to add category");
+            }
+          }}
+        >
+          <label>New category<input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="e.g. Tuition" /></label>
+          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Add category</button></div>
+        </form>
+      )}
+      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+
+      {tab === "contributions" && <ContributionsTab categories={categories} canManage={canManage} />}
+      {tab === "donations" && <DonationsTab categories={categories} canManage={canManage} />}
+      {tab === "summary" && <SummaryTab />}
+    </section>
+  );
+}
+
+function ContributionsTab({ categories, canManage }: Readonly<{ categories: PaymentCategory[]; canManage: boolean }>) {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [form, setForm] = useState({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
+  const [error, setError] = useState("");
+
+  const load = async () => setPayments(await financeApi.listPayments());
+  useEffect(() => {
+    void load();
+    void peopleApi.listStudents().then(setStudents);
+  }, []);
+
+  return (
+    <>
+      {canManage && (
+        <form
+          className="inlineForm"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            const { student_id, category_id, amount, payment_date } = form;
+            if (!student_id || !category_id || !amount || !payment_date) return;
+            try {
+              await financeApi.createPayment({ student_id, category_id, amount: Number(amount), payment_date, note: form.note || undefined });
+              setForm({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
+              await load();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? "Failed to record payment");
+            }
+          }}
+        >
+          <label>
+            Student
+            <select required value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })}>
+              <option value="">Select…</option>
+              {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          <label>
+            Category
+            <select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+              <option value="">Select…</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          <label>Amount<input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+          <label>Date<input required type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></label>
+          <label>Note<input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Record payment</button></div>
+        </form>
+      )}
+      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      <div className="dataTable">
+        <div className="dataRow header"><span>Student</span><span>Category</span><span>Amount</span><span>Date</span><span>Note</span></div>
+        {payments.length === 0 && <p className="emptyState">No contributions recorded.</p>}
+        {payments.map((p) => (
+          <div className="dataRow" key={p.id}>
+            <span>{students.find((s) => s.id === p.student_id)?.name ?? p.student_id}</span>
+            <span>{categories.find((c) => c.id === p.category_id)?.name ?? "—"}</span>
+            <span>{p.currency} {p.amount}</span>
+            <span>{p.payment_date}</span>
+            <span>{p.note ?? "—"}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentCategory[]; canManage: boolean }>) {
+  const [donors, setDonors] = useState<Donor[]>([]);
+  const [donations, setDonations] = useState<Donation[]>([]);
+  const [donorForm, setDonorForm] = useState({ name: "", contact: "" });
+  const [form, setForm] = useState({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    setDonors(await financeApi.listDonors());
+    setDonations(await financeApi.listDonations());
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+
+  return (
+    <>
+      {canManage && (
+        <form
+          className="inlineForm"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            if (!donorForm.name || !donorForm.contact) return;
+            try {
+              await financeApi.createDonor(donorForm);
+              setDonorForm({ name: "", contact: "" });
+              await load();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? "Failed to add donor");
+            }
+          }}
+        >
+          <label>Donor name<input required value={donorForm.name} onChange={(e) => setDonorForm({ ...donorForm, name: e.target.value })} /></label>
+          <label>Contact<input required value={donorForm.contact} onChange={(e) => setDonorForm({ ...donorForm, contact: e.target.value })} /></label>
+          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Add donor</button></div>
+        </form>
+      )}
+
+      {canManage && (
+        <form
+          className="inlineForm"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            const { donor_id, category_id, amount, donation_date } = form;
+            if (!donor_id || !category_id || !amount || !donation_date) return;
+            try {
+              await financeApi.createDonation({ donor_id, category_id, amount: Number(amount), donation_date, note: form.note || undefined });
+              setForm({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
+              await load();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? "Failed to record donation");
+            }
+          }}
+        >
+          <label>
+            Donor
+            <select required value={form.donor_id} onChange={(e) => setForm({ ...form, donor_id: e.target.value })}>
+              <option value="">Select…</option>
+              {donors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </label>
+          <label>
+            Category
+            <select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+              <option value="">Select…</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          <label>Amount<input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+          <label>Date<input required type="date" value={form.donation_date} onChange={(e) => setForm({ ...form, donation_date: e.target.value })} /></label>
+          <label>Note<input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Record donation</button></div>
+        </form>
+      )}
+      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      <div className="dataTable">
+        <div className="dataRow header"><span>Donor</span><span>Category</span><span>Amount</span><span>Date</span><span>Note</span></div>
+        {donations.length === 0 && <p className="emptyState">No donations recorded.</p>}
+        {donations.map((d) => (
+          <div className="dataRow" key={d.id}>
+            <span>{donors.find((x) => x.id === d.donor_id)?.name ?? d.donor_id}</span>
+            <span>{categories.find((c) => c.id === d.category_id)?.name ?? "—"}</span>
+            <span>{d.currency} {d.amount}</span>
+            <span>{d.donation_date}</span>
+            <span>{d.note ?? "—"}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function SummaryTab() {
+  const [range, setRange] = useState({ date_from: "", date_to: "" });
+  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    setError("");
+    try {
+      setSummary(await financeApi.summary({ date_from: range.date_from || undefined, date_to: range.date_to || undefined }));
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? "Failed to load summary");
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  return (
+    <>
+      <div className="inlineForm">
+        <label>From<input type="date" value={range.date_from} onChange={(e) => setRange({ ...range, date_from: e.target.value })} /></label>
+        <label>To<input type="date" value={range.date_to} onChange={(e) => setRange({ ...range, date_to: e.target.value })} /></label>
+        <div className="formActions"><button className="secondaryAction" type="button" onClick={load}>Refresh</button></div>
+      </div>
+      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {summary && (
+        <>
+          <div className="metricsRow" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
+            <div className="metricCard"><span>Contributions</span><strong>{summary.total_contributions}</strong></div>
+            <div className="metricCard"><span>Donations</span><strong>{summary.total_donations}</strong></div>
+            <div className="metricCard"><span>Total</span><strong>{summary.total}</strong></div>
+          </div>
+          <div className="dataTable">
+            <div className="dataRow header"><span>Category</span><span>Amount</span></div>
+            {Object.entries(summary.by_category).map(([name, amount]) => (
+              <div className="dataRow" key={name}><span>{name}</span><span>{amount}</span></div>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}

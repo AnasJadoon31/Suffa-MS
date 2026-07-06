@@ -190,3 +190,60 @@ class AnnouncementRead(BaseModel):
     publish_at: datetime | None
     expires_at: datetime | None
     created_at: datetime
+
+
+# ------------------------------------------------------------------- Blog
+
+class BlogPostCreate(BaseModel):
+    title: str
+    body: str
+    published: bool = False
+    publish_at: datetime | None = None
+
+
+class BlogPostRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    title: str
+    body: str
+    published: bool
+    publish_at: datetime | None
+    author_id: UUID
+    created_at: datetime
+
+
+# -------------------------------------------------------------- Admissions
+
+class AdmissionApplicationCreate(BaseModel):
+    applicant_name: str
+    guardian_contact: str
+    program_id: UUID | None = None
+    date_of_birth: date | None = None
+    notes: str | None = None
+
+
+class AdmissionApplicationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    applicant_name: str
+    guardian_contact: str
+    program_id: UUID | None
+    date_of_birth: date | None
+    notes: str | None
+    status: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------- Settings
+
+class SettingUpsert(BaseModel):
+    key: str
+    value: str
+
+
+class SettingRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    key: str
+    value: str
+    updated_at: datetime

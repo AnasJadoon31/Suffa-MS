@@ -140,3 +140,162 @@ export interface DashboardData {
 export const reportingApi = {
   dashboard: () => api.get<DashboardData>("/api/v1/reporting/dashboard").then((r) => r.data),
 };
+
+// -------------------------------------------------------------- Operations
+
+export interface Scope { all: boolean; classes: string[] }
+export interface TimetableSlot {
+  id: string; class_id: string; section_id: string; course_id: string; teacher_id: string;
+  day_of_week: number; period: number; start_time: string; end_time: string;
+}
+export interface Holiday { id: string; name: string; start_date: string; end_date: string }
+export interface Leave { id: string; user_id: string; start_date: string; end_date: string; reason: string | null; status: string }
+export interface ResourceCategory { id: string; name: string }
+export interface ResourceItem {
+  id: string; category_id: string; title: string; description: string | null;
+  file_key: string | null; video_url: string | null; visibility_scope: Scope; created_at: string;
+}
+export interface FormFieldDefinition { key: string; label: string; type: string; required: boolean; options: string[] }
+export interface FormDef {
+  id: string; title: string; description: string; fields_definition: FormFieldDefinition[];
+  visibility_scope: Scope; open_from: string | null; open_until: string | null; allow_multiple: boolean; created_at: string;
+}
+export interface FormResponse {
+  id: string; form_id: string; student_id: string; submitted_by_id: string; response_data: Record<string, unknown>; created_at: string;
+}
+export interface Announcement {
+  id: string; title: string; body: string; attachment_link: string | null; audience_scope: Scope;
+  publish_at: string | null; expires_at: string | null; created_at: string;
+}
+
+export const operationsApi = {
+  listTimetable: (params?: { class_id?: string; section_id?: string; teacher_id?: string }) =>
+    api.get<TimetableSlot[]>("/api/v1/operations/timetable", { params }).then((r) => r.data),
+  createTimetableSlot: (payload: {
+    class_id: string; section_id: string; course_id: string; teacher_id: string;
+    day_of_week: number; period: number; start_time: string; end_time: string;
+  }) => api.post<TimetableSlot>("/api/v1/operations/timetable", payload).then((r) => r.data),
+  deleteTimetableSlot: (id: string) => api.delete(`/api/v1/operations/timetable/${id}`).then((r) => r.data),
+
+  listHolidays: () => api.get<Holiday[]>("/api/v1/operations/holidays").then((r) => r.data),
+  createHoliday: (payload: { name: string; start_date: string; end_date: string }) =>
+    api.post<Holiday>("/api/v1/operations/holidays", payload).then((r) => r.data),
+
+  listLeave: (userId?: string) =>
+    api.get<Leave[]>("/api/v1/operations/leave", { params: { user_id: userId } }).then((r) => r.data),
+  createLeave: (payload: { user_id: string; start_date: string; end_date: string; reason?: string }) =>
+    api.post<Leave>("/api/v1/operations/leave", payload).then((r) => r.data),
+  setLeaveStatus: (id: string, status: string) =>
+    api.post<Leave>(`/api/v1/operations/leave/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
+
+  listResourceCategories: () => api.get<ResourceCategory[]>("/api/v1/operations/resource-categories").then((r) => r.data),
+  createResourceCategory: (name: string) =>
+    api.post<ResourceCategory>("/api/v1/operations/resource-categories", { name }).then((r) => r.data),
+  listResources: (categoryId?: string) =>
+    api.get<ResourceItem[]>("/api/v1/operations/resources", { params: { category_id: categoryId } }).then((r) => r.data),
+  createResource: (payload: {
+    category_id: string; title: string; description?: string; file_key?: string; video_url?: string; visibility_scope?: Scope;
+  }) => api.post<ResourceItem>("/api/v1/operations/resources", payload).then((r) => r.data),
+
+  listForms: () => api.get<FormDef[]>("/api/v1/operations/forms").then((r) => r.data),
+  getForm: (id: string) => api.get<FormDef>(`/api/v1/operations/forms/${id}`).then((r) => r.data),
+  createForm: (payload: {
+    title: string; description?: string; fields: FormFieldDefinition[]; visibility_scope?: Scope;
+    open_from?: string; open_until?: string; allow_multiple?: boolean;
+  }) => api.post<FormDef>("/api/v1/operations/forms", payload).then((r) => r.data),
+  submitFormResponse: (formId: string, responseData: Record<string, unknown>) =>
+    api.post<FormResponse>(`/api/v1/operations/forms/${formId}/responses`, { response_data: responseData }).then((r) => r.data),
+  listFormResponses: (formId: string) =>
+    api.get<FormResponse[]>(`/api/v1/operations/forms/${formId}/responses`).then((r) => r.data),
+
+  listAnnouncements: () => api.get<Announcement[]>("/api/v1/operations/announcements").then((r) => r.data),
+  createAnnouncement: (payload: {
+    title: string; body: string; attachment_link?: string; audience_scope?: Scope; publish_at?: string; expires_at?: string;
+  }) => api.post<Announcement>("/api/v1/operations/announcements", payload).then((r) => r.data),
+
+  listBlogPosts: (publishedOnly?: boolean) =>
+    api.get<BlogPost[]>("/api/v1/operations/blog", { params: { published_only: publishedOnly } }).then((r) => r.data),
+  createBlogPost: (payload: { title: string; body: string; published?: boolean; publish_at?: string }) =>
+    api.post<BlogPost>("/api/v1/operations/blog", payload).then((r) => r.data),
+  publishBlogPost: (id: string) => api.post<BlogPost>(`/api/v1/operations/blog/${id}/publish`).then((r) => r.data),
+
+  listAdmissions: () => api.get<AdmissionApplication[]>("/api/v1/operations/admissions").then((r) => r.data),
+  createAdmission: (payload: {
+    applicant_name: string; guardian_contact: string; program_id?: string; date_of_birth?: string; notes?: string;
+  }) => api.post<AdmissionApplication>("/api/v1/operations/admissions", payload).then((r) => r.data),
+  setAdmissionStatus: (id: string, status: string) =>
+    api.post<AdmissionApplication>(`/api/v1/operations/admissions/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
+
+  listSettings: () => api.get<MadrasaSetting[]>("/api/v1/operations/settings").then((r) => r.data),
+  upsertSetting: (key: string, value: string) =>
+    api.put<MadrasaSetting>("/api/v1/operations/settings", { key, value }).then((r) => r.data),
+};
+
+export interface MadrasaSetting { id: string; key: string; value: string; updated_at: string }
+
+export interface BlogPost {
+  id: string; title: string; body: string; published: boolean; publish_at: string | null; author_id: string; created_at: string;
+}
+export interface AdmissionApplication {
+  id: string; applicant_name: string; guardian_contact: string; program_id: string | null;
+  date_of_birth: string | null; notes: string | null; status: string; created_at: string;
+}
+
+// ------------------------------------------------------------------ Files
+
+export const filesApi = {
+  presignUpload: (payload: { category: string; filename: string; content_type?: string }) =>
+    api.post<{ object_key: string; upload_url: string }>("/api/v1/files/presign-upload", payload).then((r) => r.data),
+  presignDownload: (objectKey: string) =>
+    api.get<{ url: string }>("/api/v1/files/presign-download", { params: { object_key: objectKey } }).then((r) => r.data),
+};
+
+// ---------------------------------------------------------------- Finance
+
+export interface PaymentCategory { id: string; name: string }
+export interface Payment {
+  id: string; student_id: string; category_id: string; amount: number; currency: string;
+  payment_date: string; note: string | null; recorded_by_id: string;
+}
+export interface Donor { id: string; name: string; contact: string }
+export interface Donation {
+  id: string; donor_id: string; category_id: string; amount: number; currency: string;
+  donation_date: string; note: string | null; recorded_by_id: string;
+}
+export interface FinanceSummary { total_contributions: number; total_donations: number; total: number; by_category: Record<string, number> }
+export interface SalaryRecord { id: string; teacher_id: string; amount: number; currency: string; effective_from: string }
+export interface SalaryPayment {
+  id: string; teacher_id: string; amount: number; currency: string; payment_date: string;
+  period_covered: string; method: string; note: string; recorded_by_id: string; created_at: string;
+}
+
+export const financeApi = {
+  listCategories: () => api.get<PaymentCategory[]>("/api/v1/finance/categories").then((r) => r.data),
+  createCategory: (name: string) => api.post<PaymentCategory>("/api/v1/finance/categories", { name }).then((r) => r.data),
+
+  listPayments: (params?: { student_id?: string; category_id?: string; date_from?: string; date_to?: string }) =>
+    api.get<Payment[]>("/api/v1/finance/payments", { params }).then((r) => r.data),
+  createPayment: (payload: {
+    student_id: string; category_id: string; amount: number; currency?: string; payment_date: string; note?: string;
+  }) => api.post<Payment>("/api/v1/finance/payments", payload).then((r) => r.data),
+
+  listDonors: () => api.get<Donor[]>("/api/v1/finance/donors").then((r) => r.data),
+  createDonor: (payload: { name: string; contact: string }) => api.post<Donor>("/api/v1/finance/donors", payload).then((r) => r.data),
+  listDonations: (donorId?: string) =>
+    api.get<Donation[]>("/api/v1/finance/donations", { params: { donor_id: donorId } }).then((r) => r.data),
+  createDonation: (payload: {
+    donor_id: string; category_id: string; amount: number; currency?: string; donation_date: string; note?: string;
+  }) => api.post<Donation>("/api/v1/finance/donations", payload).then((r) => r.data),
+
+  summary: (params?: { date_from?: string; date_to?: string }) =>
+    api.get<FinanceSummary>("/api/v1/finance/summary", { params }).then((r) => r.data),
+
+  getSalary: (teacherId: string) => api.get<SalaryRecord>(`/api/v1/finance/salary/${teacherId}`).then((r) => r.data),
+  setSalary: (teacherId: string, payload: { amount: number; currency?: string; effective_from: string }) =>
+    api.put<SalaryRecord>(`/api/v1/finance/salary/${teacherId}`, payload).then((r) => r.data),
+  listSalaryPayments: (teacherId: string) =>
+    api.get<SalaryPayment[]>(`/api/v1/finance/salary/${teacherId}/payments`).then((r) => r.data),
+  recordSalaryPayment: (teacherId: string, payload: {
+    amount: number; currency?: string; payment_date: string; period_covered: string; method: string; note?: string;
+  }) => api.post<SalaryPayment>(`/api/v1/finance/salary/${teacherId}/payments`, payload).then((r) => r.data),
+};

@@ -27,7 +27,16 @@ void i18next.use(initReactI18next).init({
         outbox: "Outbox",
         present: "Present",
         absent: "Absent",
-        leave: "Leave"
+        leave: "Leave",
+        timetable: "Timetable",
+        resources: "Resources",
+        forms: "Forms",
+        announcements: "Announcements",
+        finance: "Finance",
+        salary: "Salary",
+        blog: "Blog",
+        admissions: "Admissions",
+        settings: "Settings"
       }
     },
     ur: {
@@ -51,7 +60,16 @@ void i18next.use(initReactI18next).init({
         outbox: "آؤٹ باکس",
         present: "حاضر",
         absent: "غائب",
-        leave: "رخصت"
+        leave: "رخصت",
+        timetable: "ٹائم ٹیبل",
+        resources: "وسائل",
+        forms: "فارمز",
+        announcements: "اعلانات",
+        finance: "مالیات",
+        salary: "تنخواہ",
+        blog: "بلاگ",
+        admissions: "داخلے",
+        settings: "ترتیبات"
       }
     }
   }

@@ -4,13 +4,22 @@ import { useTranslation } from "react-i18next";
 import { Route, Routes } from "react-router-dom";
 
 import { AcademicsView } from "./components/AcademicsView";
+import { AdmissionsView } from "./components/AdmissionsView";
+import { AnnouncementsView } from "./components/AnnouncementsView";
 import { AssessmentsView } from "./components/AssessmentsView";
 import { AttendanceBoard } from "./components/AttendanceBoard";
+import { BlogView } from "./components/BlogView";
 import { DashboardCards } from "./components/DashboardCards";
+import { FinanceView } from "./components/FinanceView";
+import { FormsView } from "./components/FormsView";
 import { LoginScreen } from "./components/LoginScreen";
 import { PeopleView } from "./components/PeopleView";
+import { ResourcesView } from "./components/ResourcesView";
+import { SalaryView } from "./components/SalaryView";
+import { SettingsView } from "./components/SettingsView";
 import { SetPasswordPage } from "./components/SetPasswordPage";
 import { Sidebar } from "./components/Sidebar";
+import { TimetableView } from "./components/TimetableView";
 import { useAuth } from "./lib/AuthContext";
 import type { ViewId } from "./data/mockData";
 
@@ -43,6 +52,24 @@ function Workspace() {
         return <PeopleView />;
       case "assessments":
         return <AssessmentsView />;
+      case "timetable":
+        return <TimetableView />;
+      case "resources":
+        return <ResourcesView />;
+      case "forms":
+        return <FormsView />;
+      case "announcements":
+        return <AnnouncementsView />;
+      case "finance":
+        return <FinanceView />;
+      case "salary":
+        return <SalaryView />;
+      case "blog":
+        return <BlogView />;
+      case "admissions":
+        return <AdmissionsView />;
+      case "settings":
+        return <SettingsView />;
       default:
         return null;
     }
