@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   type AcademicClass,
@@ -13,6 +14,7 @@ import {
 import { peopleApi, type Teacher } from "../lib/endpoints";
 
 export function AcademicsView() {
+  const { t } = useTranslation();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [sections, setSections] = useState<Record<string, Section[]>>({});
@@ -62,11 +64,11 @@ export function AcademicsView() {
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
-        <h2>Academic Structure</h2>
-        <p className="notice">Programs, classes, sections, courses, sessions, and teacher assignments.</p>
+        <h2>{t("academicStructureTitle")}</h2>
+        <p className="notice">{t("academicStructureSubtitle")}</p>
       </div>
 
-      <h3>Programs</h3>
+      <h3>{t("programsHeading")}</h3>
       <form
         className="inlineForm"
         onSubmit={async (e) => {
@@ -77,20 +79,20 @@ export function AcademicsView() {
         }}
       >
         <label>
-          Program name
+          {t("programNameLabel")}
           <input required value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder="e.g. Hifz" />
         </label>
         <div className="formActions">
-          <button className="primaryAction" type="submit"><Plus size={16} /> Add program</button>
+          <button className="primaryAction" type="submit"><Plus size={16} /> {t("addProgramBtn")}</button>
         </div>
       </form>
       <div className="dataTable">
-        <div className="dataRow header"><span>Name</span></div>
-        {programs.length === 0 && <p className="emptyState">No programs yet.</p>}
+        <div className="dataRow header"><span>{t("nameLabel")}</span></div>
+        {programs.length === 0 && <p className="emptyState">{t("noProgramsYet")}</p>}
         {programs.map((p) => <div className="dataRow" key={p.id}><span>{p.name}</span></div>)}
       </div>
 
-      <h3 style={{ marginTop: 24 }}>Classes</h3>
+      <h3 style={{ marginTop: 24 }}>{t("classesHeading")}</h3>
       <form
         className="inlineForm"
         onSubmit={async (e) => {
@@ -102,23 +104,23 @@ export function AcademicsView() {
         }}
       >
         <label>
-          Program
+          {t("programLabel")}
           <select required value={classProgramId} onChange={(e) => setClassProgramId(e.target.value)}>
-            <option value="">Select…</option>
+            <option value="">{t("selectEllipsis")}</option>
             {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
         <label>
-          Class name
+          {t("classNameLabel")}
           <input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Darja 1" />
         </label>
         <div className="formActions">
-          <button className="primaryAction" type="submit"><Plus size={16} /> Add class</button>
+          <button className="primaryAction" type="submit"><Plus size={16} /> {t("addClassBtn")}</button>
         </div>
       </form>
       <div className="dataTable">
-        <div className="dataRow header"><span>Name</span><span>Program</span></div>
-        {classes.length === 0 && <p className="emptyState">No classes yet.</p>}
+        <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span></div>
+        {classes.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
         {classes.map((c) => (
           <div className="dataRow" key={c.id}>
             <span>{c.name}</span>
@@ -127,7 +129,7 @@ export function AcademicsView() {
         ))}
       </div>
 
-      <h3 style={{ marginTop: 24 }}>Sections &amp; Courses</h3>
+      <h3 style={{ marginTop: 24 }}>{t("sectionsCoursesHeading")}</h3>
       <form
         className="inlineForm"
         onSubmit={async (e) => {
@@ -139,18 +141,18 @@ export function AcademicsView() {
         }}
       >
         <label>
-          Class
+          {t("classLabel")}
           <select required value={sectionClassId} onChange={(e) => setSectionClassId(e.target.value)}>
-            <option value="">Select…</option>
+            <option value="">{t("selectEllipsis")}</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </label>
         <label>
-          Section name
+          {t("sectionNameLabel")}
           <input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder="e.g. A" />
         </label>
         <div className="formActions">
-          <button className="primaryAction" type="submit"><Plus size={16} /> Add section</button>
+          <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSectionBtn")}</button>
         </div>
       </form>
       <form
@@ -164,22 +166,22 @@ export function AcademicsView() {
         }}
       >
         <label>
-          Class
+          {t("classLabel")}
           <select required value={courseClassId} onChange={(e) => setCourseClassId(e.target.value)}>
-            <option value="">Select…</option>
+            <option value="">{t("selectEllipsis")}</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </label>
         <label>
-          Course name
+          {t("courseNameLabel")}
           <input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="e.g. Quran" />
         </label>
         <div className="formActions">
-          <button className="primaryAction" type="submit"><Plus size={16} /> Add course</button>
+          <button className="primaryAction" type="submit"><Plus size={16} /> {t("addCourseBtn")}</button>
         </div>
       </form>
       <div className="dataTable">
-        <div className="dataRow header"><span>Class</span><span>Sections</span><span>Courses</span></div>
+        <div className="dataRow header"><span>{t("classLabel")}</span><span>{t("sectionsCol")}</span><span>{t("coursesCol")}</span></div>
         {classes.map((c) => (
           <div className="dataRow" key={c.id}>
             <span>{c.name}</span>
@@ -189,7 +191,7 @@ export function AcademicsView() {
         ))}
       </div>
 
-      <h3 style={{ marginTop: 24 }}>Academic Sessions</h3>
+      <h3 style={{ marginTop: 24 }}>{t("sessionsHeading")}</h3>
       <form
         className="inlineForm"
         onSubmit={async (e) => {
@@ -199,17 +201,17 @@ export function AcademicsView() {
           await refreshAll();
         }}
       >
-        <label>Name<input required value={sessionForm.name} onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })} placeholder="2026" /></label>
-        <label>Start<input required type="date" value={sessionForm.gregorian_start} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_start: e.target.value })} /></label>
-        <label>End<input required type="date" value={sessionForm.gregorian_end} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_end: e.target.value })} /></label>
-        <label>Hijri span<input required value={sessionForm.hijri_span} onChange={(e) => setSessionForm({ ...sessionForm, hijri_span: e.target.value })} placeholder="1447-1448" /></label>
+        <label>{t("nameLabel")}<input required value={sessionForm.name} onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })} placeholder="2026" /></label>
+        <label>{t("startLabel")}<input required type="date" value={sessionForm.gregorian_start} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_start: e.target.value })} /></label>
+        <label>{t("endLabel")}<input required type="date" value={sessionForm.gregorian_end} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_end: e.target.value })} /></label>
+        <label>{t("hijriSpanLabel")}<input required value={sessionForm.hijri_span} onChange={(e) => setSessionForm({ ...sessionForm, hijri_span: e.target.value })} placeholder="1447-1448" /></label>
         <div className="formActions">
-          <button className="primaryAction" type="submit"><Plus size={16} /> Add session</button>
+          <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSessionBtn")}</button>
         </div>
       </form>
       <div className="dataTable">
-        <div className="dataRow header"><span>Name</span><span>Span</span><span>Active</span><span></span></div>
-        {sessions.length === 0 && <p className="emptyState">No sessions yet.</p>}
+        <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("spanCol")}</span><span>{t("activeCol")}</span><span></span></div>
+        {sessions.length === 0 && <p className="emptyState">{t("noSessionsYet")}</p>}
         {sessions.map((s) => (
           <div className="dataRow" key={s.id}>
             <span>{s.name}</span>
@@ -218,7 +220,7 @@ export function AcademicsView() {
             <span>
               {!s.is_active && (
                 <button className="tableAction" type="button" onClick={async () => { await academicsApi.activateSession(s.id); await refreshAll(); }}>
-                  Activate
+                  {t("activateBtn")}
                 </button>
               )}
             </span>
@@ -226,7 +228,7 @@ export function AcademicsView() {
         ))}
       </div>
 
-      <h3 style={{ marginTop: 24 }}>Teacher Assignments</h3>
+      <h3 style={{ marginTop: 24 }}>{t("teacherAssignmentsHeading")}</h3>
       <form
         className="inlineForm"
         onSubmit={async (e) => {
@@ -238,40 +240,40 @@ export function AcademicsView() {
         }}
       >
         <label>
-          Teacher
+          {t("teacherLabel")}
           <select required value={assignForm.teacher_id} onChange={(e) => setAssignForm({ ...assignForm, teacher_id: e.target.value })}>
-            <option value="">Select…</option>
+            <option value="">{t("selectEllipsis")}</option>
             {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </label>
         <label>
-          Session
+          {t("sessionLabel")}
           <select required value={assignForm.session_id} onChange={(e) => setAssignForm({ ...assignForm, session_id: e.target.value })}>
-            <option value="">Select…</option>
+            <option value="">{t("selectEllipsis")}</option>
             {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </label>
         <label>
-          Class
+          {t("classLabel")}
           <select required value={assignForm.class_id} onChange={(e) => setAssignForm({ ...assignForm, class_id: e.target.value })}>
-            <option value="">Select…</option>
+            <option value="">{t("selectEllipsis")}</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </label>
         <label>
-          Course
+          {t("courseNameLabel")}
           <select required value={assignForm.course_id} onChange={(e) => setAssignForm({ ...assignForm, course_id: e.target.value })}>
-            <option value="">Select…</option>
+            <option value="">{t("selectEllipsis")}</option>
             {(courses[assignForm.class_id] ?? allCourses).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </label>
         <div className="formActions">
-          <button className="primaryAction" type="submit"><Plus size={16} /> Assign</button>
+          <button className="primaryAction" type="submit"><Plus size={16} /> {t("assignBtn")}</button>
         </div>
       </form>
       <div className="dataTable">
-        <div className="dataRow header"><span>Teacher</span><span>Class</span><span>Course</span></div>
-        {assignments.length === 0 && <p className="emptyState">No assignments yet.</p>}
+        <div className="dataRow header"><span>{t("teacherLabel")}</span><span>{t("classLabel")}</span><span>{t("courseNameLabel")}</span></div>
+        {assignments.length === 0 && <p className="emptyState">{t("noAssignmentsYet")}</p>}
         {assignments.map((a) => (
           <div className="dataRow" key={a.id}>
             <span>{teachers.find((t) => t.id === a.teacher_id)?.name ?? a.teacher_id}</span>

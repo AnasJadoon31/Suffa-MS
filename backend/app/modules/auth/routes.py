@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.audit import record_audit
 from app.core.config import settings
 from app.core.permissions import registry
+from app.core.rate_limit import LOGIN_LOCKOUT_SECONDS, LOGIN_MAX_ATTEMPTS, assert_not_locked_out, clear_failures, record_failure
 from app.core.security import ALGORITHM, hash_password, verify_password, issue_token
 from app.core.tenancy import TenantContext, get_tenant
 from app.core.dependencies import get_current_user, get_current_madrasa, require_permission
@@ -37,17 +38,22 @@ async def login(
     tenant: TenantContext = Depends(get_tenant),
     session: AsyncSession = Depends(get_session)
 ) -> TokenResponse:
+    lockout_key = f"login_lockout:{tenant.slug}:{payload.username}"
+    await assert_not_locked_out(lockout_key, LOGIN_MAX_ATTEMPTS)
+
     stmt = select(User).where(User.username == payload.username, User.status == UserStatus.active)
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.password_hash):
+        await record_failure(lockout_key, LOGIN_LOCKOUT_SECONDS)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    await clear_failures(lockout_key)
     token = issue_token(str(user.id), extra={"tenant": tenant.slug, "role": str(user.role)})
     return TokenResponse(access_token=token)
 

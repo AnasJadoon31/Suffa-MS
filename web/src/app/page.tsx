@@ -1,8 +1,12 @@
 import { ArrowRight, BookOpenText, MessageCircle, Newspaper, ShieldCheck } from "lucide-react";
 
-import { featuredPosts, admissionFields } from "../data/site";
+import { AdmissionForm } from "../components/AdmissionForm";
+import { ContactForm } from "../components/ContactForm";
+import { fetchPublishedPosts } from "../lib/api";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const posts = await fetchPublishedPosts();
+
   return (
     <main>
       <nav className="siteNav" aria-label="Public site">
@@ -56,11 +60,11 @@ export default function HomePage() {
           <h2>Blog</h2>
         </div>
         <div className="postList">
-          {featuredPosts.map((post) => (
-            <article className="postCard" key={post.slug}>
-              <small>{post.category}</small>
+          {posts.length === 0 && <p>No posts published yet — check back soon.</p>}
+          {posts.map((post) => (
+            <article className="postCard" key={post.id}>
               <h3>{post.title}</h3>
-              <p>{post.excerpt}</p>
+              <p>{post.body.slice(0, 160)}{post.body.length > 160 ? "…" : ""}</p>
             </article>
           ))}
         </div>
@@ -72,21 +76,13 @@ export default function HomePage() {
           <h2>Application intake</h2>
           <p>Public submissions enter a review queue. Approval creates the student profile and optional portal login.</p>
         </div>
-        <form className="admissionForm">
-          {admissionFields.map((field) => (
-            <label key={field}>
-              <span>{field}</span>
-              <input placeholder={field} />
-            </label>
-          ))}
-          <button type="button">Submit for review</button>
-        </form>
+        <AdmissionForm />
       </section>
 
       <section className="contactBand" id="contact">
         <span className="eyebrow">Contact</span>
         <h2>Questions from families and community donors land in one staff queue.</h2>
-        <a href="mailto:info@example.com">info@example.com</a>
+        <ContactForm />
       </section>
     </main>
   );

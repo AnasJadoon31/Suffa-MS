@@ -112,6 +112,15 @@ class AdmissionApplication(Base, IdMixin, TenantMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(String(24), default="pending") # pending, accepted, rejected
 
 
+class ContactEnquiry(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "contact_enquiries"
+
+    name: Mapped[str] = mapped_column(String(160))
+    contact: Mapped[str] = mapped_column(String(160))  # email or phone
+    message: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="new")  # new, reviewed
+
+
 class MadrasaSetting(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "madrasa_settings"
     __table_args__ = (UniqueConstraint("madrasa_id", "key", name="uq_setting_madrasa_key"),)

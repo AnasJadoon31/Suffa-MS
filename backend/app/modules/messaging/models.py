@@ -23,7 +23,7 @@ class MessageLog(Base, IdMixin, TenantMixin, TimestampMixin):
     template_code: Mapped[str] = mapped_column(String(80))
     recipient_number: Mapped[str] = mapped_column(String(32))
     recipient_type: Mapped[str] = mapped_column(String(32)) # guardian, student, teacher
-    recipient_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    recipient_id: Mapped[UUID] = mapped_column()  # polymorphic: guardians.id, student_profiles.id, or teacher_profiles.id
     dispatched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     sent_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     content_sent: Mapped[str] = mapped_column(Text)

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { AttendanceStatus } from "../data/mockData";
 import { useAttendanceOutbox } from "../hooks/useAttendanceOutbox";
+import { useAuth } from "../lib/AuthContext";
 import { academicsApi, peopleApi, type Student } from "../lib/endpoints";
 
 const attendanceOptions = ["present", "absent", "leave"] as const;
@@ -12,11 +13,20 @@ export type AttendanceBoardProps = Readonly<Record<string, never>>;
 
 export function AttendanceBoard({}: AttendanceBoardProps) {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
   const [marked, setMarked] = useState<Record<string, AttendanceStatus>>({});
   const [students, setStudents] = useState<Student[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState("");
-  const { entries, isSyncing, queueAttendance, sync } = useAttendanceOutbox(sessionId);
+  const { entries, lockedKeys, isSyncing, queueAttendance, sync, overrideEntry } = useAttendanceOutbox(sessionId);
+  const canOverride = hasPermission("attendance.edit_locked");
+  const lockedEntries = entries.filter((entry) => lockedKeys.includes(entry.idempotency_key));
+
+  async function handleOverride(entry: (typeof lockedEntries)[number]): Promise<void> {
+    const reason = window.prompt(t("overrideReasonPrompt") ?? "Reason for overriding locked attendance day:");
+    if (!reason) return;
+    await overrideEntry(entry, reason);
+  }
 
   useEffect(() => {
     void (async () => {
@@ -52,6 +62,29 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       </header>
 
       {!sessionId && <p className="notice">No active academic session — activate one under Academics first.</p>}
+
+      {lockedEntries.length > 0 && (
+        <div className="notice notice-warning">
+          <p>
+            {lockedEntries.length} entr{lockedEntries.length === 1 ? "y" : "ies"} rejected — attendance day is locked
+            (past 23:59).
+          </p>
+          {canOverride ? (
+            <ul>
+              {lockedEntries.map((entry) => (
+                <li key={entry.idempotency_key}>
+                  {entry.attendance_date} · {entry.subject_id}
+                  <button type="button" onClick={() => void handleOverride(entry)}>
+                    {t("override")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>Ask the Principal to override.</p>
+          )}
+        </div>
+      )}
 
       <div className="roster">
         {students.map((student) => {

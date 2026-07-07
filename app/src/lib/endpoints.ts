@@ -12,6 +12,7 @@ export interface AcademicSession {
 export interface TeacherAssignment { id: string; teacher_id: string; session_id: string; class_id: string; course_id: string }
 
 export const academicsApi = {
+  today: () => api.get<{ gregorian: string; hijri: string }>("/api/v1/academics/today").then((r) => r.data),
   listPrograms: () => api.get<Program[]>("/api/v1/academics/programs").then((r) => r.data),
   createProgram: (name: string) => api.post<Program>("/api/v1/academics/programs", { name }).then((r) => r.data),
   listClasses: () => api.get<AcademicClass[]>("/api/v1/academics/classes").then((r) => r.data),
@@ -75,6 +76,17 @@ export const peopleApi = {
     api.get<Guardian[]>(`/api/v1/people/students/${studentId}/guardians`).then((r) => r.data),
 };
 
+// -------------------------------------------------------------------- Messaging
+
+export interface WhatsAppLink { normalised_number: string; url: string }
+
+export const messagingApi = {
+  sendCredentials: (payload: { subject_type: "student" | "teacher"; subject_id: string; set_password_url: string }) =>
+    api.post<WhatsAppLink>("/api/v1/messaging/send-credentials", payload).then((r) => r.data),
+  sendReport: (payload: { student_id: string }) =>
+    api.post<WhatsAppLink>("/api/v1/messaging/send-report", payload).then((r) => r.data),
+};
+
 // --------------------------------------------------------------- Assessments
 
 export interface Assignment {
@@ -97,10 +109,12 @@ export const assessmentsApi = {
   listAssignments: (params?: { class_id?: string; course_id?: string }) =>
     api.get<Assignment[]>("/api/v1/assessments/assignments", { params }).then((r) => r.data),
   createAssignment: (payload: {
-    class_id: string; course_id: string; title: string; instructions: string; due_date: string;
+    class_id: string; course_id: string; title: string; instructions: string; due_date: string; attachment_key?: string;
   }) => api.post<Assignment>("/api/v1/assessments/assignments", payload).then((r) => r.data),
   listSubmissions: (assignmentId: string) =>
     api.get<Submission[]>(`/api/v1/assessments/assignments/${assignmentId}/submissions`).then((r) => r.data),
+  submitAssignment: (assignmentId: string, fileKey: string) =>
+    api.post<Submission>(`/api/v1/assessments/assignments/${assignmentId}/submissions`, { file_key: fileKey }).then((r) => r.data),
   gradeSubmission: (submissionId: string, payload: { mark?: number; feedback?: string }) =>
     api.put<Submission>(`/api/v1/assessments/submissions/${submissionId}/grade`, payload).then((r) => r.data),
 
@@ -126,19 +140,60 @@ export const assessmentsApi = {
       .then((r) => r.data),
   publishResults: (sessionId: string, studentIds: string[]) =>
     api.post("/api/v1/assessments/results/publish", { session_id: sessionId, student_ids: studentIds }).then((r) => r.data),
+  downloadResultCard: (studentId: string, sessionId: string) =>
+    downloadReport("/api/v1/assessments/results/card", { student_id: studentId, session_id: sessionId }, "pdf"),
+  downloadMyResultCard: (sessionId: string) =>
+    downloadReport("/api/v1/assessments/results/card/me", { session_id: sessionId }, "pdf"),
 };
 
 // ---------------------------------------------------------------- Reporting
 
-export interface DashboardData {
+export interface PrincipalDashboard {
+  role: "principal";
   counts: { students: number; teachers: number; classes: number };
-  attendance: { present: number; absent: number; leave: number; missing_sync_teachers: number };
+  attendance: {
+    present: number; absent: number; leave: number;
+    missing_sync_teachers: number; missing_sync_teacher_list: { id: string; name: string }[];
+  };
   finance: { month_total: number; currency: string };
   activity: string[];
+}
+export interface TimetableEntry { course_id: string; period: number; start_time: string; end_time: string }
+export interface TeacherDashboard {
+  role: "teacher";
+  my_classes: { class_id: string; course_id: string; class_name: string; course_name: string }[];
+  pending_submissions: number;
+  today_timetable: TimetableEntry[];
+}
+export interface StudentDashboard {
+  role: "student";
+  today_timetable: TimetableEntry[];
+  latest_result: SessionResult | null;
+  due_assignments: { id: string; title: string; due_date: string; course_id: string }[];
+  resources: { id: string; title: string }[];
+  announcements: { id: string; title: string; body: string }[];
+}
+export type DashboardData = PrincipalDashboard | TeacherDashboard | StudentDashboard;
+
+async function downloadReport(path: string, params: Record<string, string>, format: "csv" | "pdf"): Promise<void> {
+  const response = await api.get(path, { params: { ...params, format }, responseType: "blob" });
+  const disposition: string = response.headers["content-disposition"] ?? "";
+  const match = /filename="([^"]+)"/.exec(disposition);
+  const filename = match ? match[1] : `report.${format}`;
+  const url = window.URL.createObjectURL(response.data as Blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
 }
 
 export const reportingApi = {
   dashboard: () => api.get<DashboardData>("/api/v1/reporting/dashboard").then((r) => r.data),
+  downloadAttendanceReport: (params: { class_id: string; section_id?: string; start_date: string; end_date: string }, format: "csv" | "pdf") =>
+    downloadReport("/api/v1/reporting/reports/attendance", params as Record<string, string>, format),
+  downloadFinanceReport: (params: { start_date: string; end_date: string }, format: "csv" | "pdf") =>
+    downloadReport("/api/v1/reporting/reports/finance", params, format),
 };
 
 // -------------------------------------------------------------- Operations
@@ -226,6 +281,10 @@ export const operationsApi = {
   setAdmissionStatus: (id: string, status: string) =>
     api.post<AdmissionApplication>(`/api/v1/operations/admissions/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
 
+  listEnquiries: () => api.get<ContactEnquiry[]>("/api/v1/operations/enquiries").then((r) => r.data),
+  setEnquiryStatus: (id: string, status: string) =>
+    api.post<ContactEnquiry>(`/api/v1/operations/enquiries/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
+
   listSettings: () => api.get<MadrasaSetting[]>("/api/v1/operations/settings").then((r) => r.data),
   upsertSetting: (key: string, value: string) =>
     api.put<MadrasaSetting>("/api/v1/operations/settings", { key, value }).then((r) => r.data),
@@ -239,6 +298,9 @@ export interface BlogPost {
 export interface AdmissionApplication {
   id: string; applicant_name: string; guardian_contact: string; program_id: string | null;
   date_of_birth: string | null; notes: string | null; status: string; created_at: string;
+}
+export interface ContactEnquiry {
+  id: string; name: string; contact: string; message: string; status: string; created_at: string;
 }
 
 // ------------------------------------------------------------------ Files

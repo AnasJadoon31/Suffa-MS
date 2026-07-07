@@ -62,5 +62,7 @@ registry.register(
     Permission("finance.manage", "Record income/donations", "finance", scoped=False),
     Permission("finance.reports.view", "View finance reports", "finance", scoped=False),
     Permission("messaging.send", "Send WhatsApp reports/credentials", "messaging", scoped=True),
+    Permission("messaging.templates.manage", "Manage bilingual message templates", "messaging", scoped=False),
     Permission("blog.manage", "Author/manage blog posts", "web", scoped=False),
+    Permission("contact.enquiries.view", "View public contact enquiries", "web", scoped=False),
 )

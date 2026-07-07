@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -5,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, get_current_madrasa, require_permission
+from app.core.hijri import to_hijri_string
 from app.db.session import get_session
 from app.modules.auth.models import User
 from app.modules.academics.models import (
@@ -35,6 +37,12 @@ from app.modules.academics.schemas import (
 )
 
 router = APIRouter()
+
+
+@router.get("/today")
+async def today(current_user: User = Depends(get_current_user)) -> dict[str, str]:
+    today_date = datetime.now(UTC).date()
+    return {"gregorian": today_date.isoformat(), "hijri": to_hijri_string(today_date)}
 
 
 # ------------------------------------------------------------------ Programs

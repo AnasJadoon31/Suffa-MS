@@ -1,13 +1,12 @@
-from copy import deepcopy
 from datetime import UTC, datetime
-from time import time
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_madrasa, get_current_user, require_mapped_permission, require_permission
+from app.core.dependencies import get_current_madrasa, get_current_user, get_optional_user, require_permission
 from app.db.session import get_session
 from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
 from app.modules.auth.models import User, UserRole
@@ -15,6 +14,7 @@ from app.modules.operations.models import (
     AdmissionApplication,
     Announcement,
     BlogPost,
+    ContactEnquiry,
     Form,
     FormResponse,
     Holiday,
@@ -31,7 +31,8 @@ from app.modules.operations.schemas import (
     AnnouncementRead,
     BlogPostCreate,
     BlogPostRead,
-    CreateOperationRecord,
+    ContactEnquiryCreate,
+    ContactEnquiryRead,
     FormCreate,
     FormRead,
     FormResponseCreate,
@@ -40,9 +41,6 @@ from app.modules.operations.schemas import (
     HolidayRead,
     LeaveCreate,
     LeaveRead,
-    OperationActionResponse,
-    OperationModule,
-    OperationRecord,
     ResourceCategoryCreate,
     ResourceCategoryRead,
     ResourceCreate,
@@ -510,13 +508,14 @@ async def create_blog_post(
 
 @router.get("/blog", response_model=list[BlogPostRead])
 async def list_blog_posts(
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     published_only: bool = False,
 ) -> list[BlogPostRead]:
+    # Anonymous visitors (the public marketing site) only ever see published posts.
     stmt = select(BlogPost).where(BlogPost.madrasa_id == madrasa.id)
-    if published_only:
+    if published_only or current_user is None:
         stmt = stmt.where(BlogPost.published.is_(True))
     result = await session.execute(stmt.order_by(BlogPost.created_at.desc()))
     return [BlogPostRead.model_validate(row) for row in result.scalars().all()]
@@ -584,6 +583,52 @@ async def set_admission_status(
     return AdmissionApplicationRead.model_validate(application)
 
 
+# --------------------------------------------------------- Contact enquiries
+
+@router.post("/enquiries", response_model=ContactEnquiryRead)
+async def create_contact_enquiry(
+    payload: ContactEnquiryCreate,
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> ContactEnquiryRead:
+    enquiry = ContactEnquiry(madrasa_id=madrasa.id, **payload.model_dump())
+    session.add(enquiry)
+    await session.commit()
+    await session.refresh(enquiry)
+    return ContactEnquiryRead.model_validate(enquiry)
+
+
+@router.get("/enquiries", response_model=list[ContactEnquiryRead])
+async def list_contact_enquiries(
+    current_user: User = Depends(require_permission("contact.enquiries.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[ContactEnquiryRead]:
+    result = await session.execute(
+        select(ContactEnquiry).where(ContactEnquiry.madrasa_id == madrasa.id).order_by(ContactEnquiry.created_at.desc())
+    )
+    return [ContactEnquiryRead.model_validate(row) for row in result.scalars().all()]
+
+
+@router.post("/enquiries/{enquiry_id}/status", response_model=ContactEnquiryRead)
+async def set_enquiry_status(
+    enquiry_id: UUID,
+    status_value: str,
+    current_user: User = Depends(require_permission("contact.enquiries.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> ContactEnquiryRead:
+    if status_value not in {"new", "reviewed"}:
+        raise HTTPException(status_code=400, detail="status must be new or reviewed")
+    enquiry = await session.get(ContactEnquiry, enquiry_id)
+    if enquiry is None or enquiry.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    enquiry.status = status_value
+    await session.commit()
+    await session.refresh(enquiry)
+    return ContactEnquiryRead.model_validate(enquiry)
+
+
 # ---------------------------------------------------------------- Settings
 
 @router.get("/settings", response_model=list[SettingRead])
@@ -620,107 +665,3 @@ async def upsert_setting(
     return SettingRead.model_validate(setting)
 
 
-# --------------------------------------------------------- Remaining mock
-# Still-fake areas awaiting their own module (reports). Maps to the real
-# Appendix A permission it will require once implemented.
-
-MODULE_PERMISSIONS: dict[str, str] = {
-    "reports": "finance.reports.view",
-}
-
-module_store: dict[str, list[dict[str, str]]] = {
-    "reports": [{"id": "rpt-1", "title": "Attendance summary", "period": "June 2026", "state": "Ready"}],
-}
-
-
-@router.get("", response_model=list[str])
-async def list_modules(current_user: User = Depends(get_current_user)) -> list[str]:
-    return sorted(module_store)
-
-
-@router.get("/{module_key}", response_model=OperationModule)
-async def list_records(
-    module_key: str,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> OperationModule:
-    await require_mapped_permission(module_key, MODULE_PERMISSIONS, current_user, session)
-    records = get_module(module_key)
-    return OperationModule(key=module_key, records=[to_record(record) for record in records])
-
-
-@router.post("/{module_key}", response_model=OperationRecord)
-async def create_record(
-    module_key: str,
-    payload: CreateOperationRecord,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> OperationRecord:
-    await require_mapped_permission(module_key, MODULE_PERMISSIONS, current_user, session)
-    records = get_module(module_key)
-    record = {"id": f"{module_key}-{int(time() * 1000)}", **payload.data}
-    records.insert(0, record)
-    return to_record(record)
-
-
-@router.post("/{module_key}/{record_id}/actions/{action}", response_model=OperationActionResponse)
-async def apply_action(
-    module_key: str,
-    record_id: str,
-    action: str,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> OperationActionResponse:
-    await require_mapped_permission(module_key, MODULE_PERMISSIONS, current_user, session)
-    records = get_module(module_key)
-    record = next((item for item in records if item["id"] == record_id), None)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Record not found")
-
-    record["state"] = action_to_state(action)
-    if action == "send":
-        record["link"] = build_whatsapp_link(record)
-    return OperationActionResponse(record=to_record(record), message=f"{action} complete")
-
-
-@router.get("/{module_key}/export/csv")
-async def export_csv(
-    module_key: str,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, str]:
-    await require_mapped_permission(module_key, MODULE_PERMISSIONS, current_user, session)
-    records = get_module(module_key)
-    columns = sorted({key for record in records for key in record})
-    lines = [",".join(columns)]
-    lines.extend(",".join(record.get(column, "") for column in columns) for record in records)
-    return {"filename": f"{module_key}.csv", "content": "\n".join(lines)}
-
-
-def get_module(module_key: str) -> list[dict[str, str]]:
-    if module_key not in module_store:
-        raise HTTPException(status_code=404, detail="Unknown module")
-    return module_store[module_key]
-
-
-def to_record(record: dict[str, str]) -> OperationRecord:
-    data = deepcopy(record)
-    record_id = data.pop("id")
-    return OperationRecord(id=record_id, data=data)
-
-
-def action_to_state(action: str) -> str:
-    states = {
-        "approve": "Approved",
-        "export": "Exported",
-        "publish": "Published",
-        "receipt": "Receipted",
-        "save": "Saved",
-        "send": "Sent",
-    }
-    return states.get(action, "Updated")
-
-
-def build_whatsapp_link(record: dict[str, str]) -> str:
-    phone = record.get("phone", "923001234567").replace("+", "").replace(" ", "")
-    return f"https://wa.me/{phone}?text=MMS%20update%20ready"

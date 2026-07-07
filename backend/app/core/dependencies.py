@@ -15,6 +15,27 @@ from app.modules.auth.models import User, UserPermission, UserRole
 from app.modules.academics.models import Madrasa
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="api/auth/token", auto_error=False)
+
+
+async def get_optional_user(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    session: AsyncSession = Depends(get_session),
+) -> Optional[User]:
+    """For public-facing endpoints that behave differently for staff vs anonymous
+    visitors (e.g. the public marketing site) — never raises, just returns None."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+        user_id = UUID(payload.get("sub"))
+    except (JWTError, ValueError, TypeError):
+        return None
+
+    stmt = select(User).where(User.id == user_id, User.status == "active")
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),

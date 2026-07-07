@@ -4,25 +4,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class OperationRecord(BaseModel):
-    id: str
-    data: dict[str, str] = Field(default_factory=dict)
-
-
-class CreateOperationRecord(BaseModel):
-    data: dict[str, str]
-
-
-class OperationActionResponse(BaseModel):
-    record: OperationRecord
-    message: str
-
-
-class OperationModule(BaseModel):
-    key: str
-    records: list[OperationRecord]
-
-
 # ------------------------------------------------------------------ Scope
 # Shared visibility/audience shape used by Resource, Form, Announcement:
 # {"all": true} or {"classes": [id1, id2]}.
@@ -230,6 +211,22 @@ class AdmissionApplicationRead(BaseModel):
     program_id: UUID | None
     date_of_birth: date | None
     notes: str | None
+    status: str
+    created_at: datetime
+
+
+class ContactEnquiryCreate(BaseModel):
+    name: str
+    contact: str
+    message: str
+
+
+class ContactEnquiryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    name: str
+    contact: str
+    message: str
     status: str
     created_at: datetime
 

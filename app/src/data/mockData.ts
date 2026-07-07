@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
+  FileDown,
   FileText,
   FolderOpen,
   GraduationCap,
@@ -32,7 +33,8 @@ export type ViewId =
   | "salary"
   | "blog"
   | "admissions"
-  | "settings";
+  | "settings"
+  | "reports";
 
 export type NavItem = Readonly<{
   id: ViewId;
@@ -55,7 +57,8 @@ export const navItems: readonly NavItem[] = [
   { id: "salary", labelKey: "salary", icon: Banknote, permission: "teachers.salary.manage" },
   { id: "blog", labelKey: "blog", icon: Newspaper },
   { id: "admissions", labelKey: "admissions", icon: ClipboardList },
-  { id: "settings", labelKey: "settings", icon: Settings, permission: "academics.manage" }
+  { id: "settings", labelKey: "settings", icon: Settings, permission: "academics.manage" },
+  { id: "reports", labelKey: "reports", icon: FileDown, permission: "attendance.take" }
 ];
 
 export const peopleIcons = { teachers: UserRoundCog, students: GraduationCap, guardians: UsersRound };

@@ -6,9 +6,11 @@ import { db, type OutboxEntry } from "../lib/offlineDb";
 
 type AttendanceOutboxState = Readonly<{
   entries: OutboxEntry[];
+  lockedKeys: string[];
   isSyncing: boolean;
   queueAttendance: (studentId: string, status: AttendanceStatus) => Promise<void>;
   sync: () => Promise<void>;
+  overrideEntry: (entry: OutboxEntry, reason: string) => Promise<void>;
 }>;
 
 function createAttendanceEntry(studentId: string, status: AttendanceStatus, sessionId: string): OutboxEntry {
@@ -28,6 +30,7 @@ function createAttendanceEntry(studentId: string, status: AttendanceStatus, sess
 
 export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxState {
   const [entries, setEntries] = useState<OutboxEntry[]>([]);
+  const [lockedKeys, setLockedKeys] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -44,6 +47,7 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
 
       const payload = response.data;
       await db.outbox.where("idempotency_key").anyOf(payload.idempotency_keys).delete();
+      setLockedKeys(payload.locked ?? []);
       await refresh();
     } catch (error) {
       console.error("Attendance sync failed:", error);
@@ -51,6 +55,16 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
       setIsSyncing(false);
     }
   }, [refresh]);
+
+  const overrideEntry = useCallback(
+    async (entry: OutboxEntry, reason: string): Promise<void> => {
+      await api.post("/api/v1/attendance/override", { entry, reason });
+      await db.outbox.where("idempotency_key").equals(entry.idempotency_key).delete();
+      setLockedKeys((current) => current.filter((key) => key !== entry.idempotency_key));
+      await refresh();
+    },
+    [refresh],
+  );
 
   useEffect(() => {
     void refresh();
@@ -72,5 +86,5 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
     [refresh, sync, sessionId],
   );
 
-  return { entries, isSyncing, queueAttendance, sync };
+  return { entries, lockedKeys, isSyncing, queueAttendance, sync, overrideEntry };
 }

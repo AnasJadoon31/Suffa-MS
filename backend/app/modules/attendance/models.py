@@ -26,6 +26,7 @@ class StudentAttendance(Base, IdMixin, TenantMixin, TimestampMixin):
     marked_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     idempotency_key: Mapped[str] = mapped_column(String(120), unique=True)
     synced_late: Mapped[bool] = mapped_column(Boolean, default=False)
+    overridden: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class TeacherAttendance(Base, IdMixin, TenantMixin, TimestampMixin):

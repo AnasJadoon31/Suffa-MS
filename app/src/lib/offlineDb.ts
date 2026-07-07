@@ -11,6 +11,8 @@ export type OutboxEntry = Readonly<{
   status: AttendanceStatus;
   captured_at: string;
   idempotency_key: string;
+  check_in?: string;
+  check_out?: string;
 }>;
 
 class MmsOfflineDb extends Dexie {

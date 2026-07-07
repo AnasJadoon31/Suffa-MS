@@ -1,30 +1,64 @@
 import { useEffect, useState } from "react";
 import { GraduationCap, Search, UserPlus, UserRoundCog, UsersRound } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../lib/AuthContext";
-import { type Guardian, type Student, type Teacher, peopleApi } from "../lib/endpoints";
+import { type Guardian, type Student, type Teacher, messagingApi, peopleApi } from "../lib/endpoints";
+
+function SendCredentialsButton({
+  subjectType,
+  subjectId,
+  setPasswordUrl,
+}: Readonly<{ subjectType: "student" | "teacher"; subjectId: string; setPasswordUrl: string }>) {
+  const { t } = useTranslation();
+  const [error, setError] = useState("");
+
+  const send = async () => {
+    setError("");
+    try {
+      const link = await messagingApi.sendCredentials({
+        subject_type: subjectType,
+        subject_id: subjectId,
+        set_password_url: setPasswordUrl,
+      });
+      window.open(link.url, "_blank", "noopener,noreferrer");
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedSendCredentials"));
+    }
+  };
+
+  return (
+    <>
+      <button className="secondaryAction" type="button" onClick={() => void send()}>
+        {t("sendCredentialsBtn")}
+      </button>
+      {error && <span className="notice" style={{ color: "var(--rose)" }}>{error}</span>}
+    </>
+  );
+}
 
 type Tab = "teachers" | "students" | "guardians";
 
 export function PeopleView() {
+  const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const [tab, setTab] = useState<Tab>("teachers");
 
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
-        <h2>People</h2>
-        <p className="notice">Teachers, students, and guardians — real records, real logins.</p>
+        <h2>{t("peopleTitle")}</h2>
+        <p className="notice">{t("peopleSubtitle")}</p>
       </div>
       <div className="formActions" style={{ marginBottom: 16 }}>
         <button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teachers")}>
-          <UserRoundCog size={16} /> Teachers
+          <UserRoundCog size={16} /> {t("teachers")}
         </button>
         <button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("students")}>
-          <GraduationCap size={16} /> Students
+          <GraduationCap size={16} /> {t("students")}
         </button>
         <button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("guardians")}>
-          <UsersRound size={16} /> Guardians
+          <UsersRound size={16} /> {t("guardians")}
         </button>
       </div>
       {tab === "teachers" && <TeachersTab canCreate={hasPermission("teachers.add")} />}
@@ -35,11 +69,13 @@ export function PeopleView() {
 }
 
 function TeachersTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
+  const { t } = useTranslation();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({ username: "", name: "", whatsapp_number: "" });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [justCreated, setJustCreated] = useState<Teacher | null>(null);
 
   const load = async (query?: string) => setTeachers(await peopleApi.listTeachers(query || undefined));
   useEffect(() => {
@@ -52,11 +88,12 @@ function TeachersTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
     setNotice("");
     try {
       const created = await peopleApi.createTeacher(form);
-      setNotice(`Created ${created.employee_code} — set-password link: ${created.set_password_url}`);
+      setNotice(t("createdSetPasswordLink", { code: created.employee_code, url: created.set_password_url }));
+      setJustCreated(created);
       setForm({ username: "", name: "", whatsapp_number: "" });
       await load();
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? "Failed to create teacher");
+      setError(err.response?.data?.detail ?? t("failedCreateTeacher"));
     }
   };
 
@@ -64,7 +101,7 @@ function TeachersTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
     <>
       <div className="moduleToolbar">
         <div className="searchBox">
-          <label htmlFor="teacher-search">Search</label>
+          <label htmlFor="teacher-search">{t("searchLabel")}</label>
           <input
             id="teacher-search"
             placeholder="Name or employee code"
@@ -79,34 +116,41 @@ function TeachersTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
       {canCreate && (
         <form className="inlineForm" onSubmit={onSubmit}>
           <label>
-            Username
+            {t("usernameLabel")}
             <input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
           </label>
           <label>
-            Full name
+            {t("fullNameLabel")}
             <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </label>
           <label>
-            WhatsApp number
+            {t("whatsappNumberLabel")}
             <input value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} />
           </label>
           <div className="formActions">
             <button className="primaryAction" type="submit">
-              <UserPlus size={16} /> Add teacher
+              <UserPlus size={16} /> {t("addTeacherBtn")}
             </button>
           </div>
         </form>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
+      {justCreated?.set_password_url && (
+        <SendCredentialsButton
+          subjectType="teacher"
+          subjectId={justCreated.id}
+          setPasswordUrl={justCreated.set_password_url}
+        />
+      )}
       <div className="dataTable">
         <div className="dataRow header">
-          <span>Code</span>
-          <span>Name</span>
-          <span>WhatsApp</span>
-          <span>Status</span>
+          <span>{t("codeCol")}</span>
+          <span>{t("nameLabel")}</span>
+          <span>{t("whatsappCol")}</span>
+          <span>{t("statusCol")}</span>
         </div>
-        {teachers.length === 0 && <p className="emptyState">No teachers yet.</p>}
+        {teachers.length === 0 && <p className="emptyState">{t("noTeachersYet")}</p>}
         {teachers.map((t) => (
           <div className="dataRow" key={t.id}>
             <span>{t.employee_code}</span>
@@ -121,11 +165,13 @@ function TeachersTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
 }
 
 function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
+  const { t } = useTranslation();
   const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({ username: "", name: "", date_of_birth: "" });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [justCreated, setJustCreated] = useState<Student | null>(null);
 
   const load = async (query?: string) => setStudents(await peopleApi.listStudents(query || undefined));
   useEffect(() => {
@@ -138,11 +184,12 @@ function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
     setNotice("");
     try {
       const created = await peopleApi.createStudent(form);
-      setNotice(`Created ${created.admission_number} — set-password link: ${created.set_password_url}`);
+      setNotice(t("createdSetPasswordLink", { code: created.admission_number, url: created.set_password_url }));
+      setJustCreated(created);
       setForm({ username: "", name: "", date_of_birth: "" });
       await load();
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? "Failed to create student");
+      setError(err.response?.data?.detail ?? t("failedCreateStudent"));
     }
   };
 
@@ -150,7 +197,7 @@ function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
     <>
       <div className="moduleToolbar">
         <div className="searchBox">
-          <label htmlFor="student-search">Search</label>
+          <label htmlFor="student-search">{t("searchLabel")}</label>
           <input
             id="student-search"
             placeholder="Name or admission number"
@@ -165,41 +212,48 @@ function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
       {canCreate && (
         <form className="inlineForm" onSubmit={onSubmit}>
           <label>
-            Username
+            {t("usernameLabel")}
             <input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
           </label>
           <label>
-            Full name
+            {t("fullNameLabel")}
             <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </label>
           <label>
-            Date of birth
+            {t("dobLabel")}
             <input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
           </label>
           <div className="formActions">
             <button className="primaryAction" type="submit">
-              <UserPlus size={16} /> Add student
+              <UserPlus size={16} /> {t("addStudentBtn")}
             </button>
           </div>
         </form>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
+      {justCreated?.set_password_url && (
+        <SendCredentialsButton
+          subjectType="student"
+          subjectId={justCreated.id}
+          setPasswordUrl={justCreated.set_password_url}
+        />
+      )}
       <div className="dataTable">
         <div className="dataRow header">
-          <span>Admission #</span>
-          <span>Name</span>
-          <span>DOB</span>
-          <span>Portal</span>
-          <span>Status</span>
+          <span>{t("admissionNumberCol")}</span>
+          <span>{t("nameLabel")}</span>
+          <span>{t("dobCol")}</span>
+          <span>{t("portalCol")}</span>
+          <span>{t("statusCol")}</span>
         </div>
-        {students.length === 0 && <p className="emptyState">No students yet.</p>}
+        {students.length === 0 && <p className="emptyState">{t("noStudentsYet")}</p>}
         {students.map((s) => (
           <div className="dataRow" key={s.id}>
             <span>{s.admission_number}</span>
             <span>{s.name}</span>
             <span>{s.date_of_birth}</span>
-            <span>{s.portal_enabled ? "Enabled" : "Disabled"}</span>
+            <span>{s.portal_enabled ? t("enabledLabel") : t("disabledLabel")}</span>
             <span>{s.status}</span>
           </div>
         ))}
@@ -209,6 +263,7 @@ function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
 }
 
 function GuardiansTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
+  const { t } = useTranslation();
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({ name: "", relationship: "", phone_numbers: "" });
@@ -227,7 +282,7 @@ function GuardiansTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
       setForm({ name: "", relationship: "", phone_numbers: "" });
       await load();
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? "Failed to create guardian");
+      setError(err.response?.data?.detail ?? t("failedCreateGuardian"));
     }
   };
 
@@ -236,7 +291,7 @@ function GuardiansTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
       <div className="moduleToolbar">
         <div className="searchBox">
           <label htmlFor="guardian-search">
-            <Search size={14} /> Search
+            <Search size={14} /> {t("searchLabel")}
           </label>
           <input id="guardian-search" placeholder="Name" value={search} onChange={(e) => {
             setSearch(e.target.value);
@@ -247,20 +302,20 @@ function GuardiansTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
       {canCreate && (
         <form className="inlineForm" onSubmit={onSubmit}>
           <label>
-            Name
+            {t("nameLabel")}
             <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </label>
           <label>
-            Relationship
+            {t("relationshipLabel")}
             <input required value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} />
           </label>
           <label>
-            Phone (WhatsApp)
+            {t("phoneWhatsappLabel")}
             <input required value={form.phone_numbers} onChange={(e) => setForm({ ...form, phone_numbers: e.target.value })} />
           </label>
           <div className="formActions">
             <button className="primaryAction" type="submit">
-              <UserPlus size={16} /> Add guardian
+              <UserPlus size={16} /> {t("addGuardianBtn")}
             </button>
           </div>
         </form>
@@ -268,12 +323,12 @@ function GuardiansTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <div className="dataTable">
         <div className="dataRow header">
-          <span>Name</span>
-          <span>Relationship</span>
-          <span>Phone</span>
-          <span>Language</span>
+          <span>{t("nameLabel")}</span>
+          <span>{t("relationshipCol")}</span>
+          <span>{t("phoneCol")}</span>
+          <span>{t("languageCol")}</span>
         </div>
-        {guardians.length === 0 && <p className="emptyState">No guardians yet.</p>}
+        {guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
         {guardians.map((g) => (
           <div className="dataRow" key={g.id}>
             <span>{g.name}</span>

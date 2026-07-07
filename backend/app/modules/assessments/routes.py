@@ -2,12 +2,16 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.audit import record_audit
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.hijri import to_hijri_string
+from app.core.pdf import render_result_card_pdf
 from app.db.session import get_session
-from app.modules.academics.models import Course, Enrollment, Madrasa, TeacherAssignment
+from app.modules.academics.models import AcademicSession, Course, Enrollment, Madrasa, TeacherAssignment
 from app.modules.assessments.models import Assignment, ExamType, GradingScheme, Mark, ResultPublication, Submission
 from app.modules.assessments.schemas import (
     AssignmentCreate,
@@ -387,6 +391,16 @@ async def enter_mark(
         )
     ).scalar_one_or_none()
     if existing is not None:
+        record_audit(
+            session,
+            madrasa_id=madrasa.id,
+            actor_id=current_user.id,
+            action="assessments.mark_overwrite",
+            entity_name="mark",
+            entity_id=str(existing.id),
+            old_values={"score": existing.score},
+            new_values={"score": payload.score},
+        )
         existing.score = payload.score
         if teacher:
             existing.entered_by_id = teacher.id
@@ -571,3 +585,82 @@ async def publish_results(
             published_count += 1
     await session.commit()
     return {"published": published_count, "session_id": payload.session_id}
+
+
+async def _render_result_card(session: AsyncSession, madrasa_id: UUID, student: StudentProfile, session_id: UUID) -> bytes:
+    result = await _build_session_result(session, madrasa_id, student.id, session_id)
+    academic_session = await session.get(AcademicSession, session_id)
+
+    course_names = dict(
+        (
+            await session.execute(
+                select(Course.id, Course.name).where(
+                    Course.id.in_([cr.course_id for cr in result.course_results])
+                )
+            )
+        ).all()
+    )
+    course_rows = [
+        [course_names.get(cr.course_id, str(cr.course_id)), f"{cr.raw_score:g}" if cr.raw_score is not None else "—", cr.band or "—"]
+        for cr in result.course_results
+    ]
+
+    today = datetime.now(UTC).date()
+    return render_result_card_pdf(
+        student_name=student.name,
+        admission_number=student.admission_number,
+        session_name=academic_session.name if academic_session else str(session_id),
+        gregorian_date=today.isoformat(),
+        hijri_date=to_hijri_string(today),
+        course_rows=course_rows,
+        overall_score=f"{result.overall_score:g}" if result.overall_score is not None else "—",
+        published=result.published,
+    )
+
+
+@router.get("/results/card/me")
+async def get_my_result_card(
+    session_id: UUID,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    student = await _student_profile(session, current_user)
+    if student is None:
+        raise HTTPException(status_code=403, detail="Only portal students can view their own result card")
+    published = (
+        await session.execute(
+            select(ResultPublication).where(
+                ResultPublication.student_id == student.id, ResultPublication.session_id == session_id
+            )
+        )
+    ).scalar_one_or_none()
+    if published is None:
+        raise HTTPException(status_code=403, detail="Results have not been published yet")
+
+    pdf_bytes = await _render_result_card(session, madrasa.id, student, session_id)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="result-card-{student.admission_number}.pdf"'},
+    )
+
+
+@router.get("/results/card")
+async def get_result_card(
+    student_id: UUID,
+    session_id: UUID,
+    current_user: User = Depends(require_permission("assessments.marks.enter")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    student = await session.get(StudentProfile, student_id)
+    if student is None or student.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    pdf_bytes = await _render_result_card(session, madrasa.id, student, session_id)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="result-card-{student.admission_number}.pdf"'},
+    )

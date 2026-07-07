@@ -1,5 +1,5 @@
 import { Languages } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Route, Routes } from "react-router-dom";
 
@@ -14,6 +14,7 @@ import { FinanceView } from "./components/FinanceView";
 import { FormsView } from "./components/FormsView";
 import { LoginScreen } from "./components/LoginScreen";
 import { PeopleView } from "./components/PeopleView";
+import { ReportsView } from "./components/ReportsView";
 import { ResourcesView } from "./components/ResourcesView";
 import { SalaryView } from "./components/SalaryView";
 import { SettingsView } from "./components/SettingsView";
@@ -21,13 +22,21 @@ import { SetPasswordPage } from "./components/SetPasswordPage";
 import { Sidebar } from "./components/Sidebar";
 import { TimetableView } from "./components/TimetableView";
 import { useAuth } from "./lib/AuthContext";
+import { academicsApi } from "./lib/endpoints";
 import type { ViewId } from "./data/mockData";
 
 function Workspace() {
   const { i18n } = useTranslation();
   const { isAuthenticated, isLoading, logout, user } = useAuth();
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
+  const [hijriDate, setHijriDate] = useState("");
   const isUrdu = i18n.language === "ur";
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      void academicsApi.today().then((d) => setHijriDate(d.hijri));
+    }
+  }, [isAuthenticated]);
 
   async function toggleLanguage(): Promise<void> {
     await i18n.changeLanguage(isUrdu ? "en" : "ur");
@@ -41,7 +50,7 @@ function Workspace() {
         return (
           <>
             <DashboardCards />
-            <AttendanceBoard />
+            {user?.role !== "student" && <AttendanceBoard />}
           </>
         );
       case "attendance":
@@ -70,6 +79,8 @@ function Workspace() {
         return <AdmissionsView />;
       case "settings":
         return <SettingsView />;
+      case "reports":
+        return <ReportsView />;
       default:
         return null;
     }
@@ -91,6 +102,7 @@ function Workspace() {
           <div>
             <span className="eyebrow">{user?.username}</span>
             <h1>{activeView === "dashboard" ? "Dashboard" : "MMS Workspace"}</h1>
+            {hijriDate && <small className="eyebrow">{hijriDate}</small>}
           </div>
           <div className="topbar-actions">
             <button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>

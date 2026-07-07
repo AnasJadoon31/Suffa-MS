@@ -11,6 +11,26 @@ from app.core.config import settings
 from app.core.security import hash_password
 from app.modules.academics.models import Madrasa
 from app.modules.auth.models import User, UserRole, UserStatus
+from app.modules.messaging.models import MessageTemplate
+
+DEFAULT_TEMPLATES = [
+    {
+        "code": "performance_report",
+        "name": "Performance report",
+        "content": {
+            "en": "Assalam-o-Alaikum. {student_name}'s results: {results}.",
+            "ur": "السلام علیکم۔ {student_name} کے نتائج: {results}۔",
+        },
+    },
+    {
+        "code": "credentials",
+        "name": "Login credentials",
+        "content": {
+            "en": "Assalam-o-Alaikum. Username: {username}. Set your password here: {url}",
+            "ur": "السلام علیکم۔ صارف نام: {username}۔ اپنا پاس ورڈ یہاں مقرر کریں: {url}",
+        },
+    },
+]
 
 
 async def bootstrap() -> None:
@@ -55,6 +75,18 @@ async def bootstrap() -> None:
             print(f"[bootstrap] created Principal login '{admin_username}' for tenant '{tenant_slug}'")
         else:
             print(f"[bootstrap] tenant '{tenant_slug}' already has a Principal login, skipping")
+
+        existing_codes = set(
+            (
+                await session.execute(
+                    select(MessageTemplate.code).where(MessageTemplate.madrasa_id == madrasa.id)
+                )
+            ).scalars().all()
+        )
+        for template in DEFAULT_TEMPLATES:
+            if template["code"] not in existing_codes:
+                session.add(MessageTemplate(madrasa_id=madrasa.id, **template))
+                print(f"[bootstrap] created message template '{template['code']}'")
 
         await session.commit()
 

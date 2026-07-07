@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, ClipboardList, Plus, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardList, MessageCircle, Plus, XCircle } from "lucide-react";
 
 import { academicsApi, type Program } from "../lib/endpoints";
-import { operationsApi, type AdmissionApplication } from "../lib/endpoints";
+import { operationsApi, type AdmissionApplication, type ContactEnquiry } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 
 export function AdmissionsView() {
   const { hasPermission } = useAuth();
   const canReview = hasPermission("students.provision");
+  const canViewEnquiries = hasPermission("contact.enquiries.view");
   const [programs, setPrograms] = useState<Program[]>([]);
   const [applications, setApplications] = useState<AdmissionApplication[]>([]);
+  const [enquiries, setEnquiries] = useState<ContactEnquiry[]>([]);
   const [form, setForm] = useState({ applicant_name: "", guardian_contact: "", program_id: "", date_of_birth: "", notes: "" });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -17,6 +19,7 @@ export function AdmissionsView() {
   const load = async () => {
     setPrograms(await academicsApi.listPrograms());
     if (canReview) setApplications(await operationsApi.listAdmissions());
+    if (canViewEnquiries) setEnquiries(await operationsApi.listEnquiries());
   };
   useEffect(() => {
     void load();
@@ -93,6 +96,33 @@ export function AdmissionsView() {
             </div>
           ))}
         </div>
+      )}
+
+      {canViewEnquiries && (
+        <>
+          <div className="moduleHeader" style={{ marginTop: 24 }}>
+            <h3><MessageCircle size={16} /> Contact enquiries</h3>
+          </div>
+          <div className="dataTable">
+            <div className="dataRow header"><span>Name</span><span>Contact</span><span>Message</span><span>Status</span><span></span></div>
+            {enquiries.length === 0 && <p className="emptyState">No enquiries yet.</p>}
+            {enquiries.map((e) => (
+              <div className="dataRow" key={e.id}>
+                <span>{e.name}</span>
+                <span>{e.contact}</span>
+                <span>{e.message}</span>
+                <span>{e.status}</span>
+                <span>
+                  {e.status === "new" && (
+                    <button className="tableAction" type="button" onClick={async () => { await operationsApi.setEnquiryStatus(e.id, "reviewed"); await load(); }}>
+                      <CheckCircle2 size={14} />
+                    </button>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </section>
   );

@@ -368,6 +368,20 @@ h2 {
   color: var(--muted);
 }
 
+@font-face {
+  font-family: "Noto Nastaliq Urdu";
+  src: url("/fonts/NotoNastaliqUrdu-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Nastaliq Urdu";
+  src: url("/fonts/NotoNastaliqUrdu-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+
 html[dir="rtl"] body {
   font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Segoe UI", sans-serif;
 }
