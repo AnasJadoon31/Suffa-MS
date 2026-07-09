@@ -62,7 +62,6 @@ function Workspace() {
         return (
           <>
             <DashboardCards />
-            {user?.role !== "student" && <AttendanceBoard />}
           </>
         );
       case "attendance":

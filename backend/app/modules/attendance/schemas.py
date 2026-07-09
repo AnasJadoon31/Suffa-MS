@@ -46,6 +46,29 @@ class AttendanceOverrideResponse(BaseModel):
     subject_id: UUID
 
 
+class AttendanceClassRead(BaseModel):
+    id: UUID
+    name: str
+    course_names: list[str] = Field(default_factory=list)
+    student_count: int = 0
+
+
+class AttendanceRosterStudent(BaseModel):
+    id: UUID
+    admission_number: str
+    name: str
+    section_id: UUID | None = None
+    section_name: str | None = None
+
+
+class AttendanceRosterResponse(BaseModel):
+    session_id: UUID
+    session_name: str
+    class_id: UUID
+    class_name: str
+    students: list[AttendanceRosterStudent]
+
+
 class AttendanceDayBreakdown(BaseModel):
     attendance_date: date
     status: Optional[AttendanceStatus] = None

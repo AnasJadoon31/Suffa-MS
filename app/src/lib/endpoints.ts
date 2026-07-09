@@ -92,6 +92,35 @@ export const messagingApi = {
     api.post<WhatsAppLink>("/api/v1/messaging/send-report", payload).then((r) => r.data),
 };
 
+// ---------------------------------------------------------------- Attendance
+
+export interface AttendanceClassOption {
+  id: string;
+  name: string;
+  course_names: string[];
+  student_count: number;
+}
+export interface AttendanceRosterStudent {
+  id: string;
+  admission_number: string;
+  name: string;
+  section_id: string | null;
+  section_name: string | null;
+}
+export interface AttendanceRoster {
+  session_id: string;
+  session_name: string;
+  class_id: string;
+  class_name: string;
+  students: AttendanceRosterStudent[];
+}
+
+export const attendanceApi = {
+  listClasses: () => api.get<AttendanceClassOption[]>("/api/v1/attendance/classes").then((r) => r.data),
+  classRoster: (classId: string) =>
+    api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`).then((r) => r.data),
+};
+
 // --------------------------------------------------------------- Assessments
 
 export interface Assignment {

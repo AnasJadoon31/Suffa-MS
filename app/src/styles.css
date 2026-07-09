@@ -531,7 +531,86 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+.panelSubtext {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 /* ============================ attendance ============================ */
+
+.attendanceHeader {
+  align-items: flex-start;
+}
+
+.attendanceClassGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.attendanceClassButton {
+  min-height: 118px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.05s ease;
+}
+
+.attendanceClassButton:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.attendanceClassButton:active {
+  transform: translateY(1px);
+}
+
+.attendanceClassIcon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--brand-deep);
+}
+
+.attendanceClassBody {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.attendanceClassBody strong,
+.attendanceClassBody small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attendanceClassBody small {
+  color: var(--muted);
+}
+
+.attendanceClassMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: var(--brand-deep);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
 
 .roster {
   display: grid;
@@ -1182,6 +1261,18 @@ html[dir="rtl"] .navGroupLabel {
 
   .statusButtons {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .attendanceClassGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .attendanceClassButton {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .attendanceClassButton > svg {
+    display: none;
   }
 
   .moduleToolbar {

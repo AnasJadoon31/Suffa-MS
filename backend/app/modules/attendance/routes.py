@@ -1,22 +1,26 @@
 import json
+from collections import defaultdict
 from datetime import UTC, date, datetime, time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.core.audit import record_audit
-from app.core.dependencies import get_current_madrasa, require_permission
+from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
 from app.db.session import get_session
-from app.modules.auth.models import User
-from app.modules.academics.models import Madrasa
+from app.modules.auth.models import User, UserRole
+from app.modules.academics.models import AcademicClass, AcademicSession, Course, Enrollment, Madrasa, Section, TeacherAssignment
 from app.modules.attendance.models import AttendanceCorrection, StudentAttendance, TeacherAttendance
 from app.modules.attendance.schemas import (
+    AttendanceClassRead,
     AttendanceEntry,
     AttendanceOverrideRequest,
     AttendanceOverrideResponse,
+    AttendanceRosterResponse,
+    AttendanceRosterStudent,
     AttendanceStatus,
     AttendanceSummary,
     AttendanceDayBreakdown,
@@ -24,6 +28,7 @@ from app.modules.attendance.schemas import (
     AttendanceSyncResponse,
 )
 from app.modules.operations.models import Holiday, Leave
+from app.modules.people.models import StudentProfile, TeacherProfile
 
 router = APIRouter()
 
@@ -115,19 +120,249 @@ def build_record(entry: AttendanceEntry, madrasa_id: UUID, marked_by_id: UUID, o
     )
 
 
+async def _require_student_attendance_access(current_user: User, session: AsyncSession) -> None:
+    if await user_has_permission(current_user, "attendance.take", session):
+        return
+    if await user_has_permission(current_user, "students.attendance.manage", session):
+        return
+    raise HTTPException(status_code=403, detail="Missing permission: attendance.take")
+
+
+async def _has_global_student_attendance_access(current_user: User, session: AsyncSession) -> bool:
+    if current_user.role == UserRole.principal:
+        return True
+    return await user_has_permission(current_user, "students.attendance.manage", session)
+
+
+async def _active_session(session: AsyncSession, madrasa_id: UUID) -> AcademicSession | None:
+    return (
+        await session.execute(
+            select(AcademicSession).where(AcademicSession.madrasa_id == madrasa_id, AcademicSession.is_active.is_(True))
+        )
+    ).scalar_one_or_none()
+
+
+async def _current_teacher_id(current_user: User, session: AsyncSession, madrasa_id: UUID) -> UUID | None:
+    return (
+        await session.execute(
+            select(TeacherProfile.id).where(
+                TeacherProfile.user_id == current_user.id,
+                TeacherProfile.madrasa_id == madrasa_id,
+                TeacherProfile.status == "active",
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def _teacher_assignment_class_ids(
+    current_user: User,
+    session: AsyncSession,
+    madrasa_id: UUID,
+    session_id: UUID,
+) -> set[UUID]:
+    teacher_id = await _current_teacher_id(current_user, session, madrasa_id)
+    if teacher_id is None:
+        return set()
+    result = await session.execute(
+        select(TeacherAssignment.class_id).where(
+            TeacherAssignment.madrasa_id == madrasa_id,
+            TeacherAssignment.teacher_id == teacher_id,
+            TeacherAssignment.session_id == session_id,
+        )
+    )
+    return set(result.scalars().all())
+
+
+async def _assert_can_mark_class(
+    current_user: User,
+    session: AsyncSession,
+    madrasa_id: UUID,
+    session_id: UUID,
+    class_id: UUID,
+) -> None:
+    if await _has_global_student_attendance_access(current_user, session):
+        return
+    assigned_class_ids = await _teacher_assignment_class_ids(current_user, session, madrasa_id, session_id)
+    if class_id not in assigned_class_ids:
+        raise HTTPException(status_code=403, detail="Attendance access is not assigned for this class")
+
+
+async def _assert_can_mark_entry(
+    current_user: User,
+    session: AsyncSession,
+    madrasa_id: UUID,
+    entry: AttendanceEntry,
+) -> None:
+    if entry.subject_type == "teacher":
+        if await user_has_permission(current_user, "teachers.attendance.manage", session):
+            return
+        raise HTTPException(status_code=403, detail="Missing permission: teachers.attendance.manage")
+
+    if await _has_global_student_attendance_access(current_user, session):
+        return
+
+    class_id = (
+        await session.execute(
+            select(Enrollment.class_id).where(
+                Enrollment.madrasa_id == madrasa_id,
+                Enrollment.student_id == entry.subject_id,
+                Enrollment.session_id == entry.session_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if class_id is None:
+        raise HTTPException(status_code=403, detail="Student is not enrolled in this session")
+    await _assert_can_mark_class(current_user, session, madrasa_id, entry.session_id, class_id)
+
+
+@router.get("/classes", response_model=list[AttendanceClassRead])
+async def attendance_classes(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[AttendanceClassRead]:
+    await _require_student_attendance_access(current_user, session)
+    active_session = await _active_session(session, madrasa.id)
+    if active_session is None:
+        return []
+
+    is_global = await _has_global_student_attendance_access(current_user, session)
+    assigned_course_ids: set[UUID] = set()
+    class_stmt = select(AcademicClass.id, AcademicClass.name).where(AcademicClass.madrasa_id == madrasa.id)
+
+    if not is_global:
+        teacher_id = await _current_teacher_id(current_user, session, madrasa.id)
+        if teacher_id is None:
+            return []
+        assignments = (
+            await session.execute(
+                select(TeacherAssignment.class_id, TeacherAssignment.course_id).where(
+                    TeacherAssignment.madrasa_id == madrasa.id,
+                    TeacherAssignment.teacher_id == teacher_id,
+                    TeacherAssignment.session_id == active_session.id,
+                )
+            )
+        ).all()
+        assigned_class_ids = {row[0] for row in assignments}
+        assigned_course_ids = {row[1] for row in assignments}
+        if not assigned_class_ids:
+            return []
+        class_stmt = class_stmt.where(AcademicClass.id.in_(assigned_class_ids))
+
+    class_rows = (await session.execute(class_stmt.order_by(AcademicClass.name))).all()
+    class_ids = [row[0] for row in class_rows]
+    if not class_ids:
+        return []
+
+    count_rows = (
+        await session.execute(
+            select(Enrollment.class_id, func.count(StudentProfile.id))
+            .join(StudentProfile, StudentProfile.id == Enrollment.student_id)
+            .where(
+                Enrollment.madrasa_id == madrasa.id,
+                Enrollment.session_id == active_session.id,
+                Enrollment.class_id.in_(class_ids),
+                StudentProfile.status == "active",
+            )
+            .group_by(Enrollment.class_id)
+        )
+    ).all()
+    student_counts = {row[0]: row[1] for row in count_rows}
+
+    course_stmt = select(Course.class_id, Course.name).where(
+        Course.madrasa_id == madrasa.id,
+        Course.class_id.in_(class_ids),
+    )
+    if assigned_course_ids:
+        course_stmt = course_stmt.where(Course.id.in_(assigned_course_ids))
+    course_rows = (await session.execute(course_stmt.order_by(Course.name))).all()
+    course_names: defaultdict[UUID, list[str]] = defaultdict(list)
+    for class_id, course_name in course_rows:
+        course_names[class_id].append(course_name)
+
+    return [
+        AttendanceClassRead(
+            id=class_id,
+            name=class_name,
+            course_names=course_names[class_id],
+            student_count=student_counts.get(class_id, 0),
+        )
+        for class_id, class_name in class_rows
+    ]
+
+
+@router.get("/classes/{class_id}/roster", response_model=AttendanceRosterResponse)
+async def attendance_class_roster(
+    class_id: UUID,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AttendanceRosterResponse:
+    await _require_student_attendance_access(current_user, session)
+    active_session = await _active_session(session, madrasa.id)
+    if active_session is None:
+        raise HTTPException(status_code=409, detail="No active academic session")
+
+    academic_class = await session.get(AcademicClass, class_id)
+    if academic_class is None or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
+
+    rows = (
+        await session.execute(
+            select(
+                StudentProfile.id,
+                StudentProfile.admission_number,
+                StudentProfile.name,
+                Section.id,
+                Section.name,
+            )
+            .join(Enrollment, Enrollment.student_id == StudentProfile.id)
+            .outerjoin(Section, Section.id == Enrollment.section_id)
+            .where(
+                Enrollment.madrasa_id == madrasa.id,
+                Enrollment.session_id == active_session.id,
+                Enrollment.class_id == class_id,
+                StudentProfile.status == "active",
+            )
+            .order_by(Section.name, StudentProfile.name)
+        )
+    ).all()
+
+    return AttendanceRosterResponse(
+        session_id=active_session.id,
+        session_name=active_session.name,
+        class_id=academic_class.id,
+        class_name=academic_class.name,
+        students=[
+            AttendanceRosterStudent(
+                id=student_id,
+                admission_number=admission_number,
+                name=name,
+                section_id=section_id,
+                section_name=section_name,
+            )
+            for student_id, admission_number, name, section_id, section_name in rows
+        ],
+    )
+
+
 @router.post("/sync", response_model=AttendanceSyncResponse)
 async def sync_attendance(
     payload: AttendanceSyncRequest,
-    current_user: User = Depends(require_permission("attendance.take")),
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
 ) -> AttendanceSyncResponse:
+    await _require_student_attendance_access(current_user, session)
     accepted = 0
     corrected = 0
     locked_keys: list[str] = []
     idempotency_keys = []
 
     for entry in payload.entries:
+        await _assert_can_mark_entry(current_user, session, madrasa.id, entry)
         model = StudentAttendance if entry.subject_type == "student" else TeacherAttendance
         subject_col = model.student_id if entry.subject_type == "student" else model.teacher_id
 
@@ -203,6 +438,7 @@ async def override_locked_attendance(
     session: AsyncSession = Depends(get_session),
 ) -> AttendanceOverrideResponse:
     entry = payload.entry
+    await _assert_can_mark_entry(current_user, session, madrasa.id, entry)
     model = StudentAttendance if entry.subject_type == "student" else TeacherAttendance
     subject_col = model.student_id if entry.subject_type == "student" else model.teacher_id
 
