@@ -4,8 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f766e" />
-    <link rel="manifest" href="/manifest.webmanifest" />
     <title>MMS Portal</title>
+    <script>
+      // Clear the old PWA service worker/cache that could keep serving an
+      // outdated bundle with http://api-suffa baked in.
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((registration) => registration.unregister());
+        });
+      }
+      if (window.caches) {
+        caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
