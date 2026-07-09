@@ -1,5 +1,9 @@
 FROM node:20-alpine AS build
 WORKDIR /web
+# NEXT_PUBLIC_* is inlined into the client bundle at build time, so it must
+# arrive as a build arg — a runtime env var only reaches server-side code.
+ARG NEXT_PUBLIC_API_BASE
+ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 COPY package*.json ./
 RUN npm ci
 COPY . .
