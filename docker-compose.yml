@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD}@bidci6fpu9mwov6ebann77tz:5432/suffa_ms
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://suffa-ms-redis:6379/0
       S3_ENDPOINT: ${MINIO_ENDPOINT}
       S3_PUBLIC_URL: ${MINIO_PUBLIC_URL}
       S3_BUCKET: ${MINIO_BUCKET:-suffa-ms}
@@ -36,7 +36,7 @@ services:
     command: arq app.worker.WorkerSettings
     environment:
       DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD}@bidci6fpu9mwov6ebann77tz:5432/suffa_ms
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://suffa-ms-redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
       DEFAULT_TENANT: ${DEFAULT_TENANT:-suffa}
     depends_on:
@@ -72,6 +72,10 @@ services:
 
   redis:
     image: redis:7-alpine
+    networks:
+      default:
+        aliases:
+          - suffa-ms-redis
     restart: unless-stopped
 
 networks:
