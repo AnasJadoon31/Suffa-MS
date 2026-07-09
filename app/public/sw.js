@@ -1,11 +1,19 @@
-const CACHE_NAME = "mms-shell-v1";
-const SHELL = ["/", "/manifest.webmanifest"];
+const clearCaches = async () => {
+  const keys = await caches.keys();
+  await Promise.all(keys.map((key) => caches.delete(key)));
+};
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)));
+  self.skipWaiting();
+  event.waitUntil(clearCaches());
 });
 
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      await clearCaches();
+      await self.clients.claim();
+      await self.registration.unregister();
+    })(),
+  );
 });
