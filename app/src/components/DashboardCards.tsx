@@ -31,13 +31,26 @@ export function DashboardCards({}: DashboardCardsProps) {
 
 function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }>) {
   const { t } = useTranslation();
-  const attendanceTotal = data.attendance.present + data.attendance.absent + data.attendance.leave;
+  const studentCount = data.counts.students ?? 0;
+  const teacherCount = data.counts.teachers ?? 0;
+  const guardianCount = data.counts.guardians ?? 0;
+  const peopleTotal = studentCount + teacherCount + guardianCount;
+  const markedAttendanceTotal = data.attendance.present + data.attendance.absent + data.attendance.leave;
+  const attendanceRosterTotal = data.attendance.total_students ?? markedAttendanceTotal;
+  const attendanceDetail = attendanceRosterTotal
+    ? `${Math.round((data.attendance.present / attendanceRosterTotal) * 100)}% present · ${markedAttendanceTotal}/${attendanceRosterTotal} marked`
+    : "No active roster";
   const cards = [
-    { label: t("people"), value: String(data.counts.students), detail: `${data.counts.teachers} teachers · ${data.counts.classes} classes`, icon: UsersRound },
+    {
+      label: t("people"),
+      value: String(peopleTotal),
+      detail: `${studentCount} students · ${teacherCount} teachers · ${guardianCount} guardians · ${data.counts.classes} classes`,
+      icon: UsersRound,
+    },
     {
       label: t("todayAttendance"),
-      value: `${data.attendance.present} / ${attendanceTotal || "—"}`,
-      detail: attendanceTotal ? `${Math.round((data.attendance.present / attendanceTotal) * 100)}% present` : "No marks yet today",
+      value: `${data.attendance.present} / ${attendanceRosterTotal || "—"}`,
+      detail: attendanceDetail,
       icon: ClipboardCheck,
     },
     { label: t("missingSync"), value: String(data.attendance.missing_sync_teachers), detail: "Teachers without today's mark", icon: AlertTriangle },

@@ -25,7 +25,7 @@ from app.modules.auth.models import User, UserRole
 from app.modules.finance.models import Donation, Donor, Payment, PaymentCategory
 from app.modules.operations.models import Announcement, Resource, TimetableSlot
 from app.modules.operations.routes import _active_session_id, _visible
-from app.modules.people.models import StudentProfile, TeacherProfile
+from app.modules.people.models import Guardian, StudentProfile, TeacherProfile
 
 router = APIRouter()
 
@@ -46,6 +46,7 @@ async def dashboard(
 async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[str, object]:
     today = datetime.now(timezone.utc).date()
     month_start = today.replace(day=1)
+    active_session_id = await _active_session_id(session, madrasa.id)
 
     student_count = (
         await session.execute(
@@ -59,30 +60,91 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
             select(TeacherProfile).where(TeacherProfile.madrasa_id == madrasa.id, TeacherProfile.status == "active")
         )
     ).scalars().all()
-    class_count = (
-        await session.execute(select(func.count()).select_from(AcademicClass).where(AcademicClass.madrasa_id == madrasa.id))
+    guardian_count = (
+        await session.execute(select(func.count()).select_from(Guardian).where(Guardian.madrasa_id == madrasa.id))
     ).scalar_one()
-
-    attendance_counts = {"present": 0, "absent": 0, "leave": 0}
-    rows = (
-        await session.execute(
-            select(StudentAttendance.status, func.count())
-            .where(StudentAttendance.madrasa_id == madrasa.id, StudentAttendance.attendance_date == today)
-            .group_by(StudentAttendance.status)
-        )
-    ).all()
-    for status_value, count in rows:
-        attendance_counts[str(status_value.value if isinstance(status_value, AttendanceStatus) else status_value)] = count
-
-    synced_teacher_ids = set(
-        (
+    if active_session_id is None:
+        class_count = (
             await session.execute(
-                select(TeacherAttendance.teacher_id).where(
-                    TeacherAttendance.madrasa_id == madrasa.id, TeacherAttendance.attendance_date == today
+                select(func.count()).select_from(AcademicClass).where(AcademicClass.madrasa_id == madrasa.id)
+            )
+        ).scalar_one()
+        attendance_roster_count = 0
+    else:
+        enrolled_class_ids = set(
+            (
+                await session.execute(
+                    select(Enrollment.class_id)
+                    .join(StudentProfile, StudentProfile.id == Enrollment.student_id)
+                    .where(
+                        Enrollment.madrasa_id == madrasa.id,
+                        Enrollment.session_id == active_session_id,
+                        StudentProfile.status == "active",
+                    )
+                )
+            ).scalars().all()
+        )
+        assigned_class_ids = set(
+            (
+                await session.execute(
+                    select(TeacherAssignment.class_id).where(
+                        TeacherAssignment.madrasa_id == madrasa.id,
+                        TeacherAssignment.session_id == active_session_id,
+                    )
+                )
+            ).scalars().all()
+        )
+        class_count = len(enrolled_class_ids | assigned_class_ids)
+        attendance_roster_count = (
+            await session.execute(
+                select(func.count())
+                .select_from(Enrollment)
+                .join(StudentProfile, StudentProfile.id == Enrollment.student_id)
+                .where(
+                    Enrollment.madrasa_id == madrasa.id,
+                    Enrollment.session_id == active_session_id,
+                    StudentProfile.status == "active",
                 )
             )
-        ).scalars().all()
-    )
+        ).scalar_one()
+
+    attendance_counts = {"present": 0, "absent": 0, "leave": 0}
+    if active_session_id is not None:
+        rows = (
+            await session.execute(
+                select(StudentAttendance.status, func.count())
+                .join(
+                    Enrollment,
+                    (Enrollment.student_id == StudentAttendance.student_id)
+                    & (Enrollment.session_id == StudentAttendance.session_id),
+                )
+                .join(StudentProfile, StudentProfile.id == StudentAttendance.student_id)
+                .where(
+                    StudentAttendance.madrasa_id == madrasa.id,
+                    StudentAttendance.session_id == active_session_id,
+                    StudentAttendance.attendance_date == today,
+                    Enrollment.madrasa_id == madrasa.id,
+                    StudentProfile.status == "active",
+                )
+                .group_by(StudentAttendance.status)
+            )
+        ).all()
+        for status_value, count in rows:
+            attendance_counts[str(status_value.value if isinstance(status_value, AttendanceStatus) else status_value)] = count
+
+    synced_teacher_ids = set()
+    if active_session_id is not None:
+        synced_teacher_ids = set(
+            (
+                await session.execute(
+                    select(TeacherAttendance.teacher_id).where(
+                        TeacherAttendance.madrasa_id == madrasa.id,
+                        TeacherAttendance.session_id == active_session_id,
+                        TeacherAttendance.attendance_date == today,
+                    )
+                )
+            ).scalars().all()
+        )
     missing_teachers = [t for t in teacher_rows if t.id not in synced_teacher_ids]
     missing_sync_teachers = len(missing_teachers)
     missing_sync_teacher_list = [{"id": str(t.id), "name": t.name} for t in missing_teachers]
@@ -114,9 +176,15 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
 
     return {
         "role": "principal",
-        "counts": {"students": student_count, "teachers": len(teacher_rows), "classes": class_count},
+        "counts": {
+            "students": student_count,
+            "teachers": len(teacher_rows),
+            "guardians": guardian_count,
+            "classes": class_count,
+        },
         "attendance": {
             **attendance_counts,
+            "total_students": attendance_roster_count,
             "missing_sync_teachers": missing_sync_teachers,
             "missing_sync_teacher_list": missing_sync_teacher_list,
         },

@@ -218,9 +218,9 @@ export const assessmentsApi = {
 
 export interface PrincipalDashboard {
   role: "principal";
-  counts: { students: number; teachers: number; classes: number };
+  counts: { students: number; teachers: number; guardians: number; classes: number };
   attendance: {
-    present: number; absent: number; leave: number;
+    present: number; absent: number; leave: number; total_students: number;
     missing_sync_teachers: number; missing_sync_teacher_list: { id: string; name: string }[];
   };
   finance: { month_total: number; currency: string };
