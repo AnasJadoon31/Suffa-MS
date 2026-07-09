@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GraduationCap, Search, UserPlus, UserRoundCog, UsersRound } from "lucide-react";
+import { GraduationCap, KeyRound, Search, UserPlus, UserRoundCog, UsersRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../lib/AuthContext";
@@ -34,6 +34,46 @@ function SendCredentialsButton({
       </button>
       {error && <span className="notice" style={{ color: "var(--rose)" }}>{error}</span>}
     </>
+  );
+}
+
+function ReissueCredentialsButton({
+  subjectType,
+  subjectId,
+}: Readonly<{ subjectType: "student" | "teacher"; subjectId: string }>) {
+  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+
+  const reissue = async () => {
+    try {
+      const result =
+        subjectType === "teacher"
+          ? await peopleApi.reissueTeacherCredentials(subjectId)
+          : await peopleApi.reissueStudentCredentials(subjectId);
+      const fullUrl = `${window.location.origin}${result.set_password_url}`;
+      await navigator.clipboard.writeText(fullUrl);
+      setState("copied");
+      // Also offer the WhatsApp dispatch with the fresh link.
+      try {
+        const link = await messagingApi.sendCredentials({
+          subject_type: subjectType,
+          subject_id: subjectId,
+          set_password_url: fullUrl,
+        });
+        window.open(link.url, "_blank", "noopener,noreferrer");
+      } catch {
+        // No guardian/number on file — link is still on the clipboard.
+      }
+      setTimeout(() => setState("idle"), 3000);
+    } catch {
+      setState("error");
+      setTimeout(() => setState("idle"), 3000);
+    }
+  };
+
+  return (
+    <button className="tableAction" type="button" title="Generate a fresh set-password link (valid 24h)" onClick={() => void reissue()}>
+      <KeyRound size={14} /> {state === "copied" ? "Link copied!" : state === "error" ? "Failed" : "Login link"}
+    </button>
   );
 }
 
@@ -149,6 +189,7 @@ function TeachersTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
           <span>{t("nameLabel")}</span>
           <span>{t("whatsappCol")}</span>
           <span>{t("statusCol")}</span>
+          <span></span>
         </div>
         {teachers.length === 0 && <p className="emptyState">{t("noTeachersYet")}</p>}
         {teachers.map((t) => (
@@ -157,6 +198,9 @@ function TeachersTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
             <span>{t.name}</span>
             <span>{t.whatsapp_number || "—"}</span>
             <span>{t.status}</span>
+            <span>
+              <ReissueCredentialsButton subjectType="teacher" subjectId={t.id} />
+            </span>
           </div>
         ))}
       </div>
@@ -246,6 +290,7 @@ function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
           <span>{t("dobCol")}</span>
           <span>{t("portalCol")}</span>
           <span>{t("statusCol")}</span>
+          <span></span>
         </div>
         {students.length === 0 && <p className="emptyState">{t("noStudentsYet")}</p>}
         {students.map((s) => (
@@ -255,6 +300,9 @@ function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
             <span>{s.date_of_birth}</span>
             <span>{s.portal_enabled ? t("enabledLabel") : t("disabledLabel")}</span>
             <span>{s.status}</span>
+            <span>
+              {s.portal_enabled && <ReissueCredentialsButton subjectType="student" subjectId={s.id} />}
+            </span>
           </div>
         ))}
       </div>

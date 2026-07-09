@@ -2,7 +2,7 @@ from typing import Optional
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, ForeignKey, String
+from sqlalchemy import Boolean, Date, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, SlugMixin, TenantMixin, TimestampMixin
@@ -55,6 +55,9 @@ class AcademicSession(Base, IdMixin, TenantMixin, TimestampMixin):
 
 class Enrollment(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "enrollments"
+    __table_args__ = (
+        UniqueConstraint("student_id", "session_id", name="uq_enrollment_student_session"),
+    )
 
     student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"), index=True)
     session_id: Mapped[UUID] = mapped_column(ForeignKey("academic_sessions.id"), index=True)

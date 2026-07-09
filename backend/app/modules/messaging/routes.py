@@ -157,8 +157,9 @@ async def send_report(
         await session.execute(
             select(Enrollment)
             .where(Enrollment.student_id == student.id, Enrollment.session_id == publication.session_id)
+            .order_by(Enrollment.created_at.desc())
         )
-    ).scalar_one_or_none()
+    ).scalars().first()
     if enrollment is not None:
         academic_class = await session.get(AcademicClass, enrollment.class_id)
         class_name = academic_class.name if academic_class else class_name

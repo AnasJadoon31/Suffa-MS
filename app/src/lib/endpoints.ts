@@ -74,6 +74,11 @@ export const peopleApi = {
     api.post<Guardian>("/api/v1/people/guardians", payload).then((r) => r.data),
   studentGuardians: (studentId: string) =>
     api.get<Guardian[]>(`/api/v1/people/students/${studentId}/guardians`).then((r) => r.data),
+
+  reissueTeacherCredentials: (teacherId: string) =>
+    api.post<{ username: string; set_password_url: string }>(`/api/v1/people/teachers/${teacherId}/credentials-link`).then((r) => r.data),
+  reissueStudentCredentials: (studentId: string) =>
+    api.post<{ username: string; set_password_url: string }>(`/api/v1/people/students/${studentId}/credentials-link`).then((r) => r.data),
 };
 
 // -------------------------------------------------------------------- Messaging

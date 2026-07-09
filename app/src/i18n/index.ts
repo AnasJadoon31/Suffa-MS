@@ -9,6 +9,36 @@ void i18next.use(initReactI18next).init({
     en: {
       translation: {
         appName: "Madrasa Management",
+
+        groupOverview: "Overview",
+        groupDaily: "Daily operations",
+        groupTeaching: "Teaching",
+        groupPeople: "People",
+        groupFinance: "Finance & reports",
+        groupSite: "Madrasa site",
+
+        rolePrincipal: "Principal",
+        roleTeacher: "Teacher",
+        roleStudent: "Student",
+        logout: "Logout",
+        todayLabel: "Today",
+
+        descDashboard: "Everything that needs your attention today, in one place.",
+        descAttendance: "Mark the roster — works offline, syncs when you're back online.",
+        descTimetable: "Class schedule, holiday calendar, and leave requests.",
+        descAnnouncements: "Notices for classes, teachers, and parents.",
+        descAcademics: "Programs, classes, sections, courses, and sessions.",
+        descAssessments: "Assignments, grading pipeline, and published results.",
+        descResources: "Study material and videos shared with classes.",
+        descForms: "Custom forms and their responses.",
+        descPeople: "Teachers, students, and guardians — records and logins.",
+        descAdmissions: "Walk-in applications and public enquiries.",
+        descFinance: "Contributions, donations, receipts, and summaries.",
+        descSalary: "Teacher salary records and disbursements.",
+        descReports: "Attendance, results, and finance exports (CSV / PDF).",
+        descBlog: "Public posts for the marketing site.",
+        descSettings: "Madrasa-wide configuration.",
+
         dashboard: "Dashboard",
         attendance: "Attendance",
         academics: "Academics",
@@ -176,6 +206,36 @@ void i18next.use(initReactI18next).init({
     ur: {
       translation: {
         appName: "مدرسہ مینجمنٹ",
+
+        groupOverview: "جائزہ",
+        groupDaily: "روزمرہ امور",
+        groupTeaching: "تدریس",
+        groupPeople: "افراد",
+        groupFinance: "مالیات و رپورٹس",
+        groupSite: "مدرسہ ویب سائٹ",
+
+        rolePrincipal: "مہتمم",
+        roleTeacher: "استاد",
+        roleStudent: "طالب علم",
+        logout: "لاگ آؤٹ",
+        todayLabel: "آج",
+
+        descDashboard: "آج جن چیزوں پر توجہ درکار ہے، سب ایک جگہ۔",
+        descAttendance: "حاضری لگائیں — آف لائن بھی کام کرتی ہے، آن لائن ہوتے ہی سنک۔",
+        descTimetable: "کلاس شیڈول، تعطیلات کا کیلنڈر، اور رخصت کی درخواستیں۔",
+        descAnnouncements: "جماعتوں، اساتذہ اور والدین کے لیے اطلاعات۔",
+        descAcademics: "پروگرام، جماعتیں، سیکشنز، کورسز اور سیشنز۔",
+        descAssessments: "اسائنمنٹس، گریڈنگ کا نظام، اور شائع شدہ نتائج۔",
+        descResources: "جماعتوں کے ساتھ شیئر کردہ تعلیمی مواد اور ویڈیوز۔",
+        descForms: "حسبِ ضرورت فارمز اور ان کے جوابات۔",
+        descPeople: "اساتذہ، طلبہ اور سرپرست — ریکارڈ اور لاگ اِن۔",
+        descAdmissions: "داخلہ درخواستیں اور عوامی استفسارات۔",
+        descFinance: "فیس، عطیات، رسیدیں اور خلاصے۔",
+        descSalary: "اساتذہ کی تنخواہ کے ریکارڈ اور ادائیگیاں۔",
+        descReports: "حاضری، نتائج اور مالیات کی رپورٹس (CSV / PDF)۔",
+        descBlog: "مارکیٹنگ سائٹ کے لیے عوامی تحریریں۔",
+        descSettings: "مدرسے کی مجموعی ترتیبات۔",
+
         dashboard: "ڈیش بورڈ",
         attendance: "حاضری",
         academics: "تعلیمی ڈھانچہ",

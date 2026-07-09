@@ -270,14 +270,29 @@ async def enroll_student(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    enrollment = Enrollment(
-        madrasa_id=madrasa.id,
-        student_id=payload.student_id,
-        session_id=payload.session_id,
-        program_id=payload.program_id,
-        class_id=payload.class_id,
-        section_id=payload.section_id
-    )
-    session.add(enrollment)
+    # One enrollment per (student, session) — re-enrolling moves the student
+    # to the new program/class/section instead of stacking duplicate rows.
+    enrollment = (
+        await session.execute(
+            select(Enrollment).where(
+                Enrollment.student_id == payload.student_id,
+                Enrollment.session_id == payload.session_id,
+            )
+        )
+    ).scalars().first()
+    if enrollment is None:
+        enrollment = Enrollment(
+            madrasa_id=madrasa.id,
+            student_id=payload.student_id,
+            session_id=payload.session_id,
+            program_id=payload.program_id,
+            class_id=payload.class_id,
+            section_id=payload.section_id
+        )
+        session.add(enrollment)
+    else:
+        enrollment.program_id = payload.program_id
+        enrollment.class_id = payload.class_id
+        enrollment.section_id = payload.section_id
     await session.commit()
     return {"status": "success", "enrollment_id": str(enrollment.id)}

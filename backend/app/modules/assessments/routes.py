@@ -518,13 +518,15 @@ async def get_my_result(
 async def _build_session_result(session: AsyncSession, madrasa_id: UUID, student_id: UUID, session_id: UUID) -> SessionResult:
     enrollment = (
         await session.execute(
-            select(Enrollment).where(
+            select(Enrollment)
+            .where(
                 Enrollment.student_id == student_id,
                 Enrollment.session_id == session_id,
                 Enrollment.madrasa_id == madrasa_id,
             )
+            .order_by(Enrollment.created_at.desc())
         )
-    ).scalar_one_or_none()
+    ).scalars().first()
     course_ids: list[UUID] = []
     if enrollment is not None:
         course_ids = [

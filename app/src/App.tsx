@@ -1,4 +1,4 @@
-import { Languages } from "lucide-react";
+import { CalendarDays, Languages } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Route, Routes } from "react-router-dom";
@@ -19,22 +19,34 @@ import { ResourcesView } from "./components/ResourcesView";
 import { SalaryView } from "./components/SalaryView";
 import { SettingsView } from "./components/SettingsView";
 import { SetPasswordPage } from "./components/SetPasswordPage";
-import { Sidebar } from "./components/Sidebar";
+import { initialsOf, RoleBadge, Sidebar } from "./components/Sidebar";
 import { TimetableView } from "./components/TimetableView";
 import { useAuth } from "./lib/AuthContext";
 import { academicsApi } from "./lib/endpoints";
-import type { ViewId } from "./data/mockData";
+import { navItems, type ViewId } from "./data/mockData";
+
+const VIEW_STORAGE_KEY = "mms_active_view";
+
+function loadInitialView(): ViewId {
+  const stored = localStorage.getItem(VIEW_STORAGE_KEY);
+  return navItems.some((item) => item.id === stored) ? (stored as ViewId) : "dashboard";
+}
 
 function Workspace() {
-  const { i18n } = useTranslation();
-  const { isAuthenticated, isLoading, logout, user } = useAuth();
-  const [activeView, setActiveView] = useState<ViewId>("dashboard");
-  const [hijriDate, setHijriDate] = useState("");
+  const { t, i18n } = useTranslation();
+  const { isAuthenticated, isLoading, user, madrasa } = useAuth();
+  const [activeView, setActiveViewState] = useState<ViewId>(loadInitialView);
+  const [today, setToday] = useState<{ gregorian: string; hijri: string } | null>(null);
   const isUrdu = i18n.language === "ur";
+
+  const setActiveView = (view: ViewId) => {
+    setActiveViewState(view);
+    localStorage.setItem(VIEW_STORAGE_KEY, view);
+  };
 
   useEffect(() => {
     if (isAuthenticated) {
-      void academicsApi.today().then((d) => setHijriDate(d.hijri));
+      void academicsApi.today().then(setToday).catch(() => setToday(null));
     }
   }, [isAuthenticated]);
 
@@ -94,24 +106,40 @@ function Workspace() {
     return <LoginScreen />;
   }
 
+  const activeItem = navItems.find((item) => item.id === activeView);
+
   return (
     <main className="appShell">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
       <section className="workspace">
         <header className="topbar">
-          <div>
-            <span className="eyebrow">{user?.username}</span>
-            <h1>{activeView === "dashboard" ? "Dashboard" : "MMS Workspace"}</h1>
-            {hijriDate && <small className="eyebrow">{hijriDate}</small>}
+          <div className="topbarContext">
+            <h1>{activeItem ? t(activeItem.labelKey) : t("appName")}</h1>
+            <p className="viewDescription">{activeItem ? t(activeItem.descKey) : ""}</p>
           </div>
           <div className="topbar-actions">
+            {today && (
+              <span className="dateChip" title={t("todayLabel")}>
+                <CalendarDays size={15} />
+                <span className="dateChipText">
+                  <strong>{today.gregorian}</strong>
+                  <small>{today.hijri}</small>
+                </span>
+              </span>
+            )}
             <button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>
-              <Languages size={18} />
+              <Languages size={16} />
               {isUrdu ? "English" : "اردو"}
             </button>
-            <button className="iconTextButton" type="button" onClick={logout}>
-              Logout
-            </button>
+            {user && (
+              <span className="profileChip" title={madrasa?.name ?? ""}>
+                <span className="avatar avatarSmall" aria-hidden="true">{initialsOf(user.username)}</span>
+                <span className="profileChipText">
+                  <strong>{user.username}</strong>
+                  <RoleBadge role={user.role} />
+                </span>
+              </span>
+            )}
           </div>
         </header>
         {renderActiveView()}

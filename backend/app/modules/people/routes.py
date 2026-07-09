@@ -8,7 +8,7 @@ from app.core.dependencies import get_current_madrasa, require_permission
 from app.db.session import get_session
 from app.modules.academics.models import Madrasa
 from app.modules.auth.models import User, UserRole
-from app.modules.auth.service import UsernameTakenError, provision_login
+from app.modules.auth.service import UsernameTakenError, provision_login, reissue_set_password_link
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 from app.modules.people.schemas import (
     GuardianCreate,
@@ -146,6 +146,22 @@ async def deactivate_teacher(
     return TeacherRead.model_validate(teacher)
 
 
+@router.post("/teachers/{teacher_id}/credentials-link")
+async def reissue_teacher_credentials(
+    teacher_id: UUID,
+    current_user: User = Depends(require_permission("teachers.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    teacher = await _get_or_404(session, TeacherProfile, teacher_id, madrasa.id)
+    user = await session.get(User, teacher.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Linked user account not found")
+    url = reissue_set_password_link(session, madrasa_id=madrasa.id, actor_id=current_user.id, user=user)
+    await session.commit()
+    return {"username": user.username, "set_password_url": url}
+
+
 # ----------------------------------------------------------------- Students
 
 @router.post("/students", response_model=StudentProvisionedRead)
@@ -263,6 +279,22 @@ async def deactivate_student(
     await session.commit()
     await session.refresh(student)
     return StudentRead.model_validate(student)
+
+
+@router.post("/students/{student_id}/credentials-link")
+async def reissue_student_credentials(
+    student_id: UUID,
+    current_user: User = Depends(require_permission("students.send_credentials")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    student = await _get_or_404(session, StudentProfile, student_id, madrasa.id)
+    user = await session.get(User, student.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Linked user account not found")
+    url = reissue_set_password_link(session, madrasa_id=madrasa.id, actor_id=current_user.id, user=user)
+    await session.commit()
+    return {"username": user.username, "set_password_url": url}
 
 
 # ---------------------------------------------------------------- Guardians

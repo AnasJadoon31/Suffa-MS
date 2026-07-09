@@ -63,3 +63,32 @@ async def provision_login(
     )
 
     return user, set_password_url
+
+
+def reissue_set_password_link(
+    session: AsyncSession,
+    *,
+    madrasa_id: UUID,
+    actor_id: UUID,
+    user: User,
+) -> str:
+    """Issues a fresh one-time set-password link for an existing login —
+    the original link from provisioning is only shown once, so staff need a
+    way to re-send credentials later (lost link, expired token, forgotten
+    password). The current password stays valid until the link is used."""
+    token = issue_token(
+        str(user.id),
+        minutes=settings.set_password_token_hours * 60,
+        extra={"purpose": "set-password"},
+    )
+    record_audit(
+        session,
+        madrasa_id=madrasa_id,
+        actor_id=actor_id,
+        action="user.credentials_reissue",
+        entity_name="user",
+        entity_id=str(user.id),
+        old_values={},
+        new_values={"username": user.username},
+    )
+    return f"/set-password?token={token}"

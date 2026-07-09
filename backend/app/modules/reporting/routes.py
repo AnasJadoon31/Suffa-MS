@@ -193,9 +193,11 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
     if active_session_id is not None:
         enrollment = (
             await session.execute(
-                select(Enrollment).where(Enrollment.student_id == student.id, Enrollment.session_id == active_session_id)
+                select(Enrollment)
+                .where(Enrollment.student_id == student.id, Enrollment.session_id == active_session_id)
+                .order_by(Enrollment.created_at.desc())
             )
-        ).scalar_one_or_none()
+        ).scalars().first()
 
     today_timetable = []
     due_assignments: list[dict[str, object]] = []
