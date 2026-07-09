@@ -1,4 +1,3 @@
-from typing import Optional
 from datetime import date, datetime
 from uuid import UUID
 
@@ -20,7 +19,7 @@ class Assignment(Base, IdMixin, TenantMixin, TimestampMixin):
     due_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # Null/empty = whole class (FR-ASG-02); populated = only these students.
     target_student_ids: Mapped[list] = mapped_column(JSONB, nullable=True)
-    created_by_id: Mapped[UUID] = mapped_column(ForeignKey("teacher_profiles.id"))
+    created_by_id: Mapped[UUID] = mapped_column(ForeignKey("teacher_profiles.id"), nullable=True)
 
 
 class Submission(Base, IdMixin, TimestampMixin):
@@ -57,7 +56,7 @@ class Mark(Base, IdMixin, TimestampMixin):
     exam_type_id: Mapped[UUID] = mapped_column(ForeignKey("exam_types.id"), index=True)
     student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"), index=True)
     score: Mapped[float] = mapped_column(Float)
-    entered_by_id: Mapped[UUID] = mapped_column(ForeignKey("teacher_profiles.id"))
+    entered_by_id: Mapped[UUID] = mapped_column(ForeignKey("teacher_profiles.id"), nullable=True)
 
 
 # Marks a student's session result visible to their portal (FR-RES-08).

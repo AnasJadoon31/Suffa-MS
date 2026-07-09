@@ -131,7 +131,7 @@ async def create_assignment(
         attachment_key=payload.attachment_key,
         due_date=payload.due_date,
         target_student_ids=[str(sid) for sid in payload.target_student_ids] or None,
-        created_by_id=teacher.id if teacher else current_user.id,
+        created_by_id=teacher.id if teacher else None,
     )
     session.add(assignment)
     await session.commit()
@@ -410,7 +410,7 @@ async def enter_mark(
             exam_type_id=payload.exam_type_id,
             student_id=payload.student_id,
             score=payload.score,
-            entered_by_id=teacher.id if teacher else current_user.id,
+            entered_by_id=teacher.id if teacher else None,
         )
         session.add(mark)
 

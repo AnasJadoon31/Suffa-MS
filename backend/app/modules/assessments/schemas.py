@@ -32,7 +32,7 @@ class AssignmentRead(BaseModel):
     attachment_key: str | None
     due_date: datetime
     target_student_ids: list | None
-    created_by_id: UUID
+    created_by_id: UUID | None
     created_at: datetime
 
 
@@ -103,7 +103,7 @@ class MarkRead(BaseModel):
     exam_type_id: UUID
     student_id: UUID
     score: float
-    entered_by_id: UUID
+    entered_by_id: UUID | None
 
 
 class CourseResult(BaseModel):
