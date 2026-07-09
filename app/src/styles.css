@@ -612,6 +612,122 @@ button:disabled {
   font-weight: 750;
 }
 
+.attendanceActionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.attendanceActionButton {
+  min-height: 112px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.05s ease;
+}
+
+.attendanceActionButton:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.attendanceActionButton:active {
+  transform: translateY(1px);
+}
+
+.attendanceActionButton.primary {
+  border-color: #9bc7a9;
+  background: var(--leaf-soft);
+}
+
+.attendanceActionButton span:not(.attendanceClassIcon) {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.attendanceActionButton strong,
+.attendanceActionButton small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attendanceActionButton small {
+  color: var(--muted);
+}
+
+.attendanceModeSection {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.attendanceStudentPicker {
+  grid-template-columns: minmax(220px, 420px);
+  margin-bottom: 0;
+}
+
+.attendanceHistoryTable .dataRow {
+  grid-template-columns: minmax(96px, 0.75fr) minmax(160px, 1.2fr) minmax(120px, 0.9fr) minmax(130px, 1fr) minmax(170px, 1.15fr) minmax(170px, 1.15fr);
+}
+
+.attendanceHistoryTable.compact .dataRow {
+  grid-template-columns: minmax(96px, 0.75fr) minmax(120px, 0.9fr) minmax(130px, 1fr) minmax(170px, 1.15fr) minmax(170px, 1.15fr);
+}
+
+.attendanceHistoryTable strong,
+.attendanceHistoryTable small {
+  display: block;
+  width: 100%;
+}
+
+.attendanceHistoryTable small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.statusPill,
+.syncBadge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.statusPill.present {
+  background: var(--leaf-soft);
+  color: var(--leaf);
+}
+
+.statusPill.absent {
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.statusPill.leave {
+  background: var(--saffron-soft);
+  color: var(--saffron);
+}
+
+.syncBadge {
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+
 .roster {
   display: grid;
   gap: 8px;
@@ -1236,6 +1352,10 @@ html[dir="rtl"] .navGroupLabel {
   .metricGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .attendanceActionGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1273,6 +1393,32 @@ html[dir="rtl"] .navGroupLabel {
 
   .attendanceClassButton > svg {
     display: none;
+  }
+
+  .attendanceActionButton {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .attendanceActionButton > svg {
+    display: none;
+  }
+
+  .attendanceHistoryTable .dataRow,
+  .attendanceHistoryTable.compact .dataRow {
+    grid-template-columns: 1fr;
+  }
+
+  .attendanceHistoryTable .dataRow.header {
+    display: none;
+  }
+
+  .attendanceHistoryTable .dataRow span {
+    border-inline-start: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .attendanceHistoryTable .dataRow span:first-child {
+    border-top: 0;
   }
 
   .moduleToolbar {

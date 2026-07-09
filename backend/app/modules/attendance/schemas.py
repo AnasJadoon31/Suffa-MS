@@ -69,6 +69,43 @@ class AttendanceRosterResponse(BaseModel):
     students: list[AttendanceRosterStudent]
 
 
+class AttendanceMarkerRead(BaseModel):
+    id: UUID
+    username: str
+    display_name: str
+    role: str
+
+
+class AttendanceLogEntry(BaseModel):
+    id: UUID
+    attendance_date: date
+    student_id: UUID
+    student_name: str
+    admission_number: str
+    status: AttendanceStatus
+    marked_at: datetime
+    synced_at: datetime
+    marked_by: AttendanceMarkerRead
+    overridden: bool = False
+
+
+class ClassAttendanceHistoryResponse(BaseModel):
+    session_id: UUID
+    session_name: str
+    class_id: UUID
+    class_name: str
+    entries: list[AttendanceLogEntry]
+
+
+class StudentAttendanceHistoryResponse(BaseModel):
+    session_id: UUID
+    session_name: str
+    class_id: UUID
+    class_name: str
+    student: AttendanceRosterStudent
+    entries: list[AttendanceLogEntry]
+
+
 class AttendanceDayBreakdown(BaseModel):
     attendance_date: date
     status: Optional[AttendanceStatus] = None

@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -17,6 +17,8 @@ from app.modules.attendance.models import AttendanceCorrection, StudentAttendanc
 from app.modules.attendance.schemas import (
     AttendanceClassRead,
     AttendanceEntry,
+    AttendanceLogEntry,
+    AttendanceMarkerRead,
     AttendanceOverrideRequest,
     AttendanceOverrideResponse,
     AttendanceRosterResponse,
@@ -26,6 +28,8 @@ from app.modules.attendance.schemas import (
     AttendanceDayBreakdown,
     AttendanceSyncRequest,
     AttendanceSyncResponse,
+    ClassAttendanceHistoryResponse,
+    StudentAttendanceHistoryResponse,
 )
 from app.modules.operations.models import Holiday, Leave
 from app.modules.people.models import StudentProfile, TeacherProfile
@@ -345,6 +349,202 @@ async def attendance_class_roster(
             )
             for student_id, admission_number, name, section_id, section_name in rows
         ],
+    )
+
+
+def _history_entry_from_row(row) -> AttendanceLogEntry:
+    (
+        attendance_id,
+        attendance_date,
+        student_id,
+        admission_number,
+        student_name,
+        status,
+        marked_at,
+        created_at,
+        updated_at,
+        marker_id,
+        marker_username,
+        marker_role,
+        marker_display_name,
+        overridden,
+    ) = row
+    synced_at = updated_at or created_at
+    return AttendanceLogEntry(
+        id=attendance_id,
+        attendance_date=attendance_date,
+        student_id=student_id,
+        student_name=student_name,
+        admission_number=admission_number,
+        status=status,
+        marked_at=marked_at,
+        synced_at=synced_at,
+        marked_by=AttendanceMarkerRead(
+            id=marker_id,
+            username=marker_username,
+            display_name=marker_display_name or marker_username,
+            role=str(marker_role.value if hasattr(marker_role, "value") else marker_role),
+        ),
+        overridden=overridden,
+    )
+
+
+async def _class_history_entries(
+    session: AsyncSession,
+    *,
+    madrasa_id: UUID,
+    session_id: UUID,
+    class_id: UUID,
+    student_id: UUID | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[AttendanceLogEntry]:
+    stmt = (
+        select(
+            StudentAttendance.id,
+            StudentAttendance.attendance_date,
+            StudentProfile.id,
+            StudentProfile.admission_number,
+            StudentProfile.name,
+            StudentAttendance.status,
+            StudentAttendance.marked_at,
+            StudentAttendance.created_at,
+            StudentAttendance.updated_at,
+            User.id,
+            User.username,
+            User.role,
+            TeacherProfile.name,
+            StudentAttendance.overridden,
+        )
+        .select_from(StudentAttendance)
+        .join(StudentProfile, StudentProfile.id == StudentAttendance.student_id)
+        .join(
+            Enrollment,
+            and_(
+                Enrollment.student_id == StudentAttendance.student_id,
+                Enrollment.session_id == StudentAttendance.session_id,
+                Enrollment.madrasa_id == madrasa_id,
+            ),
+        )
+        .join(User, User.id == StudentAttendance.marked_by_id)
+        .outerjoin(TeacherProfile, TeacherProfile.user_id == User.id)
+        .where(
+            StudentAttendance.madrasa_id == madrasa_id,
+            StudentAttendance.session_id == session_id,
+            Enrollment.class_id == class_id,
+        )
+    )
+    if student_id is not None:
+        stmt = stmt.where(StudentAttendance.student_id == student_id)
+    if start_date is not None:
+        stmt = stmt.where(StudentAttendance.attendance_date >= start_date)
+    if end_date is not None:
+        stmt = stmt.where(StudentAttendance.attendance_date <= end_date)
+    rows = (
+        await session.execute(
+            stmt.order_by(StudentAttendance.attendance_date.desc(), StudentProfile.name)
+        )
+    ).all()
+    return [_history_entry_from_row(row) for row in rows]
+
+
+@router.get("/classes/{class_id}/history", response_model=ClassAttendanceHistoryResponse)
+async def attendance_class_history(
+    class_id: UUID,
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> ClassAttendanceHistoryResponse:
+    await _require_student_attendance_access(current_user, session)
+    active_session = await _active_session(session, madrasa.id)
+    if active_session is None:
+        raise HTTPException(status_code=409, detail="No active academic session")
+
+    academic_class = await session.get(AcademicClass, class_id)
+    if academic_class is None or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
+
+    entries = await _class_history_entries(
+        session,
+        madrasa_id=madrasa.id,
+        session_id=active_session.id,
+        class_id=class_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return ClassAttendanceHistoryResponse(
+        session_id=active_session.id,
+        session_name=active_session.name,
+        class_id=academic_class.id,
+        class_name=academic_class.name,
+        entries=entries,
+    )
+
+
+@router.get("/classes/{class_id}/students/{student_id}/history", response_model=StudentAttendanceHistoryResponse)
+async def attendance_student_history(
+    class_id: UUID,
+    student_id: UUID,
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> StudentAttendanceHistoryResponse:
+    await _require_student_attendance_access(current_user, session)
+    active_session = await _active_session(session, madrasa.id)
+    if active_session is None:
+        raise HTTPException(status_code=409, detail="No active academic session")
+
+    academic_class = await session.get(AcademicClass, class_id)
+    if academic_class is None or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
+
+    student_row = (
+        await session.execute(
+            select(StudentProfile.id, StudentProfile.admission_number, StudentProfile.name, Section.id, Section.name)
+            .join(Enrollment, Enrollment.student_id == StudentProfile.id)
+            .outerjoin(Section, Section.id == Enrollment.section_id)
+            .where(
+                Enrollment.madrasa_id == madrasa.id,
+                Enrollment.session_id == active_session.id,
+                Enrollment.class_id == class_id,
+                StudentProfile.id == student_id,
+                StudentProfile.status == "active",
+            )
+        )
+    ).first()
+    if student_row is None:
+        raise HTTPException(status_code=404, detail="Student not found in this class")
+
+    entries = await _class_history_entries(
+        session,
+        madrasa_id=madrasa.id,
+        session_id=active_session.id,
+        class_id=class_id,
+        student_id=student_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return StudentAttendanceHistoryResponse(
+        session_id=active_session.id,
+        session_name=active_session.name,
+        class_id=academic_class.id,
+        class_name=academic_class.name,
+        student=AttendanceRosterStudent(
+            id=student_row[0],
+            admission_number=student_row[1],
+            name=student_row[2],
+            section_id=student_row[3],
+            section_name=student_row[4],
+        ),
+        entries=entries,
     )
 
 

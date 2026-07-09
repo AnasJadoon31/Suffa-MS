@@ -114,11 +114,45 @@ export interface AttendanceRoster {
   class_name: string;
   students: AttendanceRosterStudent[];
 }
+export interface AttendanceMarker {
+  id: string;
+  username: string;
+  display_name: string;
+  role: string;
+}
+export interface AttendanceLogEntry {
+  id: string;
+  attendance_date: string;
+  student_id: string;
+  student_name: string;
+  admission_number: string;
+  status: "present" | "absent" | "leave";
+  marked_at: string;
+  synced_at: string;
+  marked_by: AttendanceMarker;
+  overridden: boolean;
+}
+export interface ClassAttendanceHistory {
+  session_id: string;
+  session_name: string;
+  class_id: string;
+  class_name: string;
+  entries: AttendanceLogEntry[];
+}
+export interface StudentAttendanceHistory extends ClassAttendanceHistory {
+  student: AttendanceRosterStudent;
+}
 
 export const attendanceApi = {
   listClasses: () => api.get<AttendanceClassOption[]>("/api/v1/attendance/classes").then((r) => r.data),
   classRoster: (classId: string) =>
     api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`).then((r) => r.data),
+  classHistory: (classId: string) =>
+    api.get<ClassAttendanceHistory>(`/api/v1/attendance/classes/${classId}/history`).then((r) => r.data),
+  studentHistory: (classId: string, studentId: string) =>
+    api
+      .get<StudentAttendanceHistory>(`/api/v1/attendance/classes/${classId}/students/${studentId}/history`)
+      .then((r) => r.data),
 };
 
 // --------------------------------------------------------------- Assessments
