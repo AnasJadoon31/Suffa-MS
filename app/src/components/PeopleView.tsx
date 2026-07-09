@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { GraduationCap, KeyRound, Search, UserPlus, UserRoundCog, UsersRound } from "lucide-react";
+import { GraduationCap, KeyRound, UserPlus, UserRoundCog } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../lib/AuthContext";
-import { type Guardian, type Student, type Teacher, messagingApi, peopleApi } from "../lib/endpoints";
+import { type Student, type Teacher, messagingApi, peopleApi } from "../lib/endpoints";
 
 function SendCredentialsButton({
   subjectType,
@@ -61,7 +61,7 @@ function ReissueCredentialsButton({
         });
         window.open(link.url, "_blank", "noopener,noreferrer");
       } catch {
-        // No guardian/number on file — link is still on the clipboard.
+        // No number on file; the link is still on the clipboard.
       }
       setTimeout(() => setState("idle"), 3000);
     } catch {
@@ -77,7 +77,7 @@ function ReissueCredentialsButton({
   );
 }
 
-type Tab = "teachers" | "students" | "guardians";
+type Tab = "teachers" | "students";
 
 export function PeopleView() {
   const { t } = useTranslation();
@@ -97,13 +97,9 @@ export function PeopleView() {
         <button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("students")}>
           <GraduationCap size={16} /> {t("students")}
         </button>
-        <button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("guardians")}>
-          <UsersRound size={16} /> {t("guardians")}
-        </button>
       </div>
       {tab === "teachers" && <TeachersTab canCreate={hasPermission("teachers.add")} />}
       {tab === "students" && <StudentsTab canCreate={hasPermission("students.add")} />}
-      {tab === "guardians" && <GuardiansTab canCreate={hasPermission("students.add")} />}
     </section>
   );
 }
@@ -303,86 +299,6 @@ function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
             <span>
               {s.portal_enabled && <ReissueCredentialsButton subjectType="student" subjectId={s.id} />}
             </span>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function GuardiansTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
-  const { t } = useTranslation();
-  const [guardians, setGuardians] = useState<Guardian[]>([]);
-  const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ name: "", relationship: "", phone_numbers: "" });
-  const [error, setError] = useState("");
-
-  const load = async (query?: string) => setGuardians(await peopleApi.listGuardians(query || undefined));
-  useEffect(() => {
-    void load();
-  }, []);
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    try {
-      await peopleApi.createGuardian(form);
-      setForm({ name: "", relationship: "", phone_numbers: "" });
-      await load();
-    } catch (err: any) {
-      setError(err.response?.data?.detail ?? t("failedCreateGuardian"));
-    }
-  };
-
-  return (
-    <>
-      <div className="moduleToolbar">
-        <div className="searchBox">
-          <label htmlFor="guardian-search">
-            <Search size={14} /> {t("searchLabel")}
-          </label>
-          <input id="guardian-search" placeholder="Name" value={search} onChange={(e) => {
-            setSearch(e.target.value);
-            void load(e.target.value);
-          }} />
-        </div>
-      </div>
-      {canCreate && (
-        <form className="inlineForm" onSubmit={onSubmit}>
-          <label>
-            {t("nameLabel")}
-            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </label>
-          <label>
-            {t("relationshipLabel")}
-            <input required value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} />
-          </label>
-          <label>
-            {t("phoneWhatsappLabel")}
-            <input required value={form.phone_numbers} onChange={(e) => setForm({ ...form, phone_numbers: e.target.value })} />
-          </label>
-          <div className="formActions">
-            <button className="primaryAction" type="submit">
-              <UserPlus size={16} /> {t("addGuardianBtn")}
-            </button>
-          </div>
-        </form>
-      )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <div className="dataTable">
-        <div className="dataRow header">
-          <span>{t("nameLabel")}</span>
-          <span>{t("relationshipCol")}</span>
-          <span>{t("phoneCol")}</span>
-          <span>{t("languageCol")}</span>
-        </div>
-        {guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
-        {guardians.map((g) => (
-          <div className="dataRow" key={g.id}>
-            <span>{g.name}</span>
-            <span>{g.relationship}</span>
-            <span>{g.phone_numbers}</span>
-            <span>{g.preferred_language}</span>
           </div>
         ))}
       </div>

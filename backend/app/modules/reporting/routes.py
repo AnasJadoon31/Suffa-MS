@@ -25,7 +25,7 @@ from app.modules.auth.models import User, UserRole
 from app.modules.finance.models import Donation, Donor, Payment, PaymentCategory
 from app.modules.operations.models import Announcement, Resource, TimetableSlot
 from app.modules.operations.routes import _active_session_id, _visible
-from app.modules.people.models import Guardian, StudentProfile, TeacherProfile
+from app.modules.people.models import StudentProfile, TeacherProfile
 
 router = APIRouter()
 
@@ -60,9 +60,6 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
             select(TeacherProfile).where(TeacherProfile.madrasa_id == madrasa.id, TeacherProfile.status == "active")
         )
     ).scalars().all()
-    guardian_count = (
-        await session.execute(select(func.count()).select_from(Guardian).where(Guardian.madrasa_id == madrasa.id))
-    ).scalar_one()
     if active_session_id is None:
         class_count = (
             await session.execute(
@@ -179,7 +176,6 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
         "counts": {
             "students": student_count,
             "teachers": len(teacher_rows),
-            "guardians": guardian_count,
             "classes": class_count,
         },
         "attendance": {

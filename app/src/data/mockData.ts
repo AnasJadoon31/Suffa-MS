@@ -98,5 +98,5 @@ export const navGroups: readonly NavGroup[] = [
 
 export const navItems: readonly NavItem[] = navGroups.flatMap((group) => group.items);
 
-export const peopleIcons = { teachers: UserRoundCog, students: GraduationCap, guardians: UsersRound };
+export const peopleIcons = { teachers: UserRoundCog, students: GraduationCap };
 export const assessmentIcons = { assignments: ClipboardList, results: BookOpen };

@@ -1,4 +1,4 @@
-import { AlertTriangle, CircleDollarSign, ClipboardCheck, UsersRound } from "lucide-react";
+import { AlertTriangle, CircleDollarSign, ClipboardCheck, GraduationCap, UserRoundCog } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -33,8 +33,6 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
   const { t } = useTranslation();
   const studentCount = data.counts.students ?? 0;
   const teacherCount = data.counts.teachers ?? 0;
-  const guardianCount = data.counts.guardians ?? 0;
-  const peopleTotal = studentCount + teacherCount + guardianCount;
   const markedAttendanceTotal = data.attendance.present + data.attendance.absent + data.attendance.leave;
   const attendanceRosterTotal = data.attendance.total_students ?? markedAttendanceTotal;
   const attendanceDetail = attendanceRosterTotal
@@ -42,10 +40,16 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
     : "No active roster";
   const cards = [
     {
-      label: t("people"),
-      value: String(peopleTotal),
-      detail: `${studentCount} students · ${teacherCount} teachers · ${guardianCount} guardians · ${data.counts.classes} classes`,
-      icon: UsersRound,
+      label: t("students"),
+      value: String(studentCount),
+      detail: `${data.counts.classes} active classes`,
+      icon: GraduationCap,
+    },
+    {
+      label: t("teachers"),
+      value: String(teacherCount),
+      detail: "Active teacher profiles",
+      icon: UserRoundCog,
     },
     {
       label: t("todayAttendance"),
