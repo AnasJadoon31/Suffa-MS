@@ -7,6 +7,7 @@ ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 COPY package*.json ./
 RUN npm ci
 COPY . .
+RUN mkdir -p public
 RUN npm run build
 
 FROM node:20-alpine
