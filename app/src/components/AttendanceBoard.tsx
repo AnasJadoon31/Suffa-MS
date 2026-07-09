@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   CloudUpload,
   History,
+  Save,
   UserSearch,
   UsersRound,
 } from "lucide-react";
@@ -102,12 +103,16 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [isLoadingRoster, setIsLoadingRoster] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
+  const [hasUnsavedMarks, setHasUnsavedMarks] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const { entries, lockedKeys, isSyncing, queueAttendance, sync, overrideEntry } = useAttendanceOutbox(sessionId);
+  const { entries, lockedKeys, isSyncing, queueAttendanceBatch, sync, overrideEntry } = useAttendanceOutbox(sessionId);
   const canOverride = hasPermission("attendance.edit_locked");
   const lockedEntries = entries.filter((entry) => lockedKeys.includes(entry.idempotency_key));
   const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
+  const markedCount = Object.keys(marked).length;
 
   async function handleOverride(entry: (typeof lockedEntries)[number]): Promise<void> {
     const reason = window.prompt(t("overrideReasonPrompt") ?? "Reason for overriding locked attendance day:");
@@ -121,6 +126,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setClassHistory(null);
     setStudentHistory(null);
     setSelectedStudentId("");
+    setHasUnsavedMarks(false);
+    setSaveMessage("");
   }
 
   function returnToClasses(): void {
@@ -129,6 +136,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setClassHistory(null);
     setStudentHistory(null);
     setSelectedStudentId("");
+    setHasUnsavedMarks(false);
+    setSaveMessage("");
   }
 
   useEffect(() => {
@@ -151,12 +160,16 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       setRoster(null);
       setSessionId(null);
       setMarked({});
+      setHasUnsavedMarks(false);
+      setSaveMessage("");
       return;
     }
     void (async () => {
       setIsLoadingRoster(true);
       setError("");
       setMarked({});
+      setHasUnsavedMarks(false);
+      setSaveMessage("");
       try {
         const { data } = await cachedFetch(`attendance-roster-${selectedClassId}`, () =>
           attendanceApi.classRoster(selectedClassId),
@@ -211,9 +224,25 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     })();
   }, [activeMode, selectedClassId, selectedStudentId, t]);
 
-  async function mark(studentId: string, status: AttendanceStatus): Promise<void> {
+  function mark(studentId: string, status: AttendanceStatus): void {
     setMarked((current) => ({ ...current, [studentId]: status }));
-    await queueAttendance(studentId, status);
+    setHasUnsavedMarks(true);
+    setSaveMessage("");
+  }
+
+  async function saveAttendance(): Promise<void> {
+    if (!sessionId || markedCount === 0) return;
+    setIsSavingAttendance(true);
+    setError("");
+    try {
+      await queueAttendanceBatch(marked);
+      setHasUnsavedMarks(false);
+      setSaveMessage(navigator.onLine ? t("attendanceSavedSyncing") : t("attendanceSavedOffline"));
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedSaveAttendance"));
+    } finally {
+      setIsSavingAttendance(false);
+    }
   }
 
   const headerTitle = roster ? roster.class_name : t("chooseAttendanceClass");
@@ -242,21 +271,33 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               {t("classesHeading")}
             </button>
             {activeMode === "markToday" && (
-              <button
-                className="primaryAction"
-                type="button"
-                onClick={() => void sync()}
-                disabled={isSyncing || entries.length === 0}
-              >
-                <CloudUpload size={18} />
-                {t("syncNow")}
-              </button>
+              <>
+                <button
+                  className="primaryAction"
+                  type="button"
+                  onClick={() => void saveAttendance()}
+                  disabled={!sessionId || !hasUnsavedMarks || markedCount === 0 || isSavingAttendance}
+                >
+                  <Save size={18} />
+                  {t("saveAttendance")}
+                </button>
+                <button
+                  className="secondaryAction"
+                  type="button"
+                  onClick={() => void sync()}
+                  disabled={isSyncing || entries.length === 0}
+                >
+                  <CloudUpload size={18} />
+                  {t("syncNow")}
+                </button>
+              </>
             )}
           </div>
         )}
       </header>
 
       {error && <p className="notice notice-warning">{error}</p>}
+      {activeMode === "markToday" && saveMessage && <p className="notice">{saveMessage}</p>}
 
       {lockedEntries.length > 0 && (
         <div className="notice notice-warning">
@@ -385,7 +426,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                       key={option}
                       type="button"
                       disabled={!sessionId}
-                      onClick={() => void mark(student.id, option)}
+                      onClick={() => mark(student.id, option)}
                     >
                       {t(option)}
                     </button>
@@ -402,7 +443,18 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         <footer className="outboxStrip">
           <span>{t("outbox")}</span>
           <strong>{entries.length}</strong>
+          <span>{t("markedStudents")}</span>
+          <strong>{markedCount}</strong>
           <small>{t("outboxHelp")}</small>
+          <button
+            className="primaryAction"
+            type="button"
+            onClick={() => void saveAttendance()}
+            disabled={!sessionId || !hasUnsavedMarks || markedCount === 0 || isSavingAttendance}
+          >
+            <Save size={18} />
+            {t("saveAttendance")}
+          </button>
         </footer>
       )}
     </section>

@@ -9,13 +9,17 @@ type AttendanceOutboxState = Readonly<{
   lockedKeys: string[];
   isSyncing: boolean;
   queueAttendance: (studentId: string, status: AttendanceStatus) => Promise<void>;
+  queueAttendanceBatch: (marks: Record<string, AttendanceStatus>) => Promise<void>;
   sync: () => Promise<void>;
   overrideEntry: (entry: OutboxEntry, reason: string) => Promise<void>;
 }>;
 
-function createAttendanceEntry(studentId: string, status: AttendanceStatus, sessionId: string): OutboxEntry {
-  const now = new Date();
-  const capturedAt = now.toISOString();
+function createAttendanceEntry(
+  studentId: string,
+  status: AttendanceStatus,
+  sessionId: string,
+  capturedAt = new Date().toISOString(),
+): OutboxEntry {
   const attendanceDate = capturedAt.slice(0, 10);
 
   return {
@@ -93,5 +97,27 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
     [refresh, sync, sessionId],
   );
 
-  return { entries, lockedKeys, isSyncing, queueAttendance, sync, overrideEntry };
+  const queueAttendanceBatch = useCallback(
+    async (marks: Record<string, AttendanceStatus>): Promise<void> => {
+      if (!sessionId) return;
+      const capturedAt = new Date().toISOString();
+      const batch = Object.entries(marks).map(([studentId, status]) =>
+        createAttendanceEntry(studentId, status, sessionId, capturedAt),
+      );
+      if (batch.length === 0) return;
+
+      for (const entry of batch) {
+        await db.outbox.where("idempotency_key").equals(entry.idempotency_key).delete();
+        await db.outbox.add(entry);
+      }
+
+      await refresh();
+      if (navigator.onLine) {
+        sync();
+      }
+    },
+    [refresh, sync, sessionId],
+  );
+
+  return { entries, lockedKeys, isSyncing, queueAttendance, queueAttendanceBatch, sync, overrideEntry };
 }
