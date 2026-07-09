@@ -4,24 +4,29 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD}@db:5432/mms
+      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD}@bidci6fpu9mwov6ebann77tz:5432/suffa_ms
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT: ${MINIO_ENDPOINT}
       S3_PUBLIC_URL: ${MINIO_PUBLIC_URL}
-      S3_BUCKET: ${MINIO_BUCKET:-mms-files}
+      S3_BUCKET: ${MINIO_BUCKET:-suffa-ms}
       S3_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       S3_SECRET_KEY: ${MINIO_SECRET_KEY}
       SECRET_KEY: ${SECRET_KEY}
-      DEFAULT_TENANT: ${DEFAULT_TENANT:-default}
+      DEFAULT_TENANT: ${DEFAULT_TENANT:-suffa}
       CORS_ORIGINS: ${CORS_ORIGINS}
-      MADRASA_NAME: ${MADRASA_NAME:-}
+      MADRASA_NAME: ${MADRASA_NAME:-Suffa Madrasa}
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
+      MINIO_BUCKET: ${MINIO_BUCKET:-suffa-ms}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
     depends_on:
-      - db
       - redis
-    ports:
-      - "8000:8000"
+    networks:
+      - default
+      - coolify
     restart: unless-stopped
 
   worker:
@@ -30,13 +35,15 @@ services:
       dockerfile: Dockerfile
     command: arq app.worker.WorkerSettings
     environment:
-      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD}@db:5432/mms
+      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD}@bidci6fpu9mwov6ebann77tz:5432/suffa_ms
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
-      DEFAULT_TENANT: ${DEFAULT_TENANT:-default}
+      DEFAULT_TENANT: ${DEFAULT_TENANT:-suffa}
     depends_on:
-      - db
       - redis
+    networks:
+      - default
+      - coolify
     restart: unless-stopped
 
   app:
@@ -45,8 +52,10 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE: ${API_BASE}
+    environment:
+      VITE_API_BASE: ${API_BASE}
     ports:
-      - "5173:80"
+      - "80:80"
     restart: unless-stopped
 
   web:
@@ -61,19 +70,10 @@ services:
       - "3000:3000"
     restart: unless-stopped
 
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: mms
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: mms
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    restart: unless-stopped
-
   redis:
     image: redis:7-alpine
     restart: unless-stopped
 
-volumes:
-  db-data:
+networks:
+  coolify:
+    external: true
