@@ -127,3 +127,67 @@ public marketing site).
       round-tripped through object storage (no stale-cache concern, and the
       SRS requirement was "a downloadable bilingual PDF exists", not
       "stored in MinIO").
+
+## Found via full SRS re-read (2026-07-09) — not covered above, not previously tracked
+
+Everything above closed the items this file already knew about. A full pass
+against `MMS-SRS.pdf` (not just this file) turned up gaps the file never
+mentioned. All closed in the 2026-07-09 pass:
+
+- [x] **Same-day attendance correction (FR-TCH-ATT-04, FR-STU-04, Must).**
+      Fixed at three layers. Client: `idempotency_key` is now deterministic
+      per `(student, session, day)` and the outbox upserts by key, so a
+      re-mark replaces the queued entry. Server: `/attendance/sync` now looks
+      up the existing row by key *and* by `(subject, session, date)`; a
+      same-day re-mark before the lock updates the row in place and writes an
+      `AttendanceCorrection` (old → new snapshot, actor, reason) — the table
+      is live now, and `/attendance/override` writes correction rows too.
+      DB: unique constraints `uq_student_attendance_day` /
+      `uq_teacher_attendance_day` on `(subject, session_id, attendance_date)`
+      via migration `f9d24a7c81e3`, which also collapses pre-existing
+      duplicates to the most recent mark. (Also fixed: `TeacherAttendance`
+      was missing the `overridden` attribute the DB column and `build_record`
+      both expected — teacher sync would have crashed.)
+- [x] **Results/scope report (FR-RPT-04, Should).**
+      `GET /reporting/reports/results?class_id&session_id[&section_id]&format=csv|pdf`
+      — one row per enrolled student, one column per class course plus
+      Overall, built on `_build_session_result`. Exposed in `ReportsView.tsx`
+      ("Results (gradesheet)" section, gated by `assessments.marks.enter`).
+- [x] **Finance audit trail (NFR 5.3).** `create_payment`, `create_donation`,
+      `set_salary`, and `record_salary_payment` now call `record_audit`
+      (actions `finance.payment_create`, `finance.donation_create`,
+      `finance.salary_set`, `finance.salary_payment_create`).
+- [x] **Receipt PDF (FR-FIN-04, Should).** `render_receipt_pdf` in
+      `core/pdf.py`; `GET /finance/payments/{id}/receipt` and
+      `/finance/donations/{id}/receipt` stream the PDF;
+      `POST .../receipt-share` builds a wa.me link from the new seeded
+      `receipt` template (guardian for payments, donor contact for
+      donations) and logs to `MessageLog`. Buttons on both FinanceView
+      tables (PDF + WhatsApp).
+- [x] **Blog WYSIWYG editor (FR-WEB-02, Must).** New `RichTextEditor.tsx`
+      (contentEditable + toolbar: bold/italic/underline, heading/paragraph,
+      lists, LTR/RTL toggle for Urdu, font choice incl. Noto Nastaliq Urdu) —
+      no new dependency. Body is stored as HTML; the staff table and the
+      marketing site's excerpt strip tags for display.
+- [x] **Offline timetable/reference-data caching (FR-TT-02, Must; §3.4).**
+      Dexie v2 adds a `refCache` table; `lib/offlineCache.ts#cachedFetch` is a
+      network-first read-through cache that serves the last good copy when
+      the fetch fails. Wired into TimetableView (slots + holidays + leave,
+      with an "offline copy from …" banner), AttendanceBoard (active session
+      + roster, so marking works fully offline), DashboardCards (today's
+      timetable per role), and ResourcesView.
+- [x] **WhatsApp template content aligned with Appendix C.** Seeded
+      `performance_report`/`credentials` templates now carry the exact spec
+      wording and variables (`{guardian_name}`, `{class_name}`, `{session}`,
+      `{summary_line}`, `{result_link}`, `{madrasa_name}`, `{setup_link}`,
+      `{student_name}`); `send-report` accepts an optional `result_link`
+      (frontend passes the app origin) and `send-credentials` passes the new
+      variables. Legacy `{results}`/`{url}` keys are still populated so
+      templates seeded before this change keep rendering. Note: bootstrap
+      seeds only missing codes — an existing DB keeps its old template rows
+      until they're edited or deleted (template CRUD exists for that).
+
+Not a gap: permission catalogue (Appendix A) is fully covered; the two extra
+codes present (`messaging.templates.manage`, `contact.enquiries.view`) are
+legitimate additions for the template-CRUD and contact-enquiry features built
+this session, consistent with FR-RBAC-06 ("catalogue is extensible").

@@ -83,7 +83,7 @@ export interface WhatsAppLink { normalised_number: string; url: string }
 export const messagingApi = {
   sendCredentials: (payload: { subject_type: "student" | "teacher"; subject_id: string; set_password_url: string }) =>
     api.post<WhatsAppLink>("/api/v1/messaging/send-credentials", payload).then((r) => r.data),
-  sendReport: (payload: { student_id: string }) =>
+  sendReport: (payload: { student_id: string; result_link?: string }) =>
     api.post<WhatsAppLink>("/api/v1/messaging/send-report", payload).then((r) => r.data),
 };
 
@@ -194,6 +194,8 @@ export const reportingApi = {
     downloadReport("/api/v1/reporting/reports/attendance", params as Record<string, string>, format),
   downloadFinanceReport: (params: { start_date: string; end_date: string }, format: "csv" | "pdf") =>
     downloadReport("/api/v1/reporting/reports/finance", params, format),
+  downloadResultsReport: (params: { class_id: string; session_id: string; section_id?: string }, format: "csv" | "pdf") =>
+    downloadReport("/api/v1/reporting/reports/results", params as Record<string, string>, format),
 };
 
 // -------------------------------------------------------------- Operations
@@ -351,6 +353,15 @@ export const financeApi = {
 
   summary: (params?: { date_from?: string; date_to?: string }) =>
     api.get<FinanceSummary>("/api/v1/finance/summary", { params }).then((r) => r.data),
+
+  downloadPaymentReceipt: (paymentId: string) =>
+    downloadReport(`/api/v1/finance/payments/${paymentId}/receipt`, {}, "pdf"),
+  sharePaymentReceipt: (paymentId: string) =>
+    api.post<WhatsAppLink>(`/api/v1/finance/payments/${paymentId}/receipt-share`).then((r) => r.data),
+  downloadDonationReceipt: (donationId: string) =>
+    downloadReport(`/api/v1/finance/donations/${donationId}/receipt`, {}, "pdf"),
+  shareDonationReceipt: (donationId: string) =>
+    api.post<WhatsAppLink>(`/api/v1/finance/donations/${donationId}/receipt-share`).then((r) => r.data),
 
   getSalary: (teacherId: string) => api.get<SalaryRecord>(`/api/v1/finance/salary/${teacherId}`).then((r) => r.data),
   setSalary: (teacherId: string, payload: { amount: number; currency?: string; effective_from: string }) =>

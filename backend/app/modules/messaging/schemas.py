@@ -19,6 +19,7 @@ class WhatsAppLinkResponse(BaseModel):
 
 class SendReportRequest(BaseModel):
     student_id: UUID
+    result_link: str | None = None  # tap-through URL to the full result card (FR/Appendix C {result_link})
 
 
 class SendCredentialsRequest(BaseModel):

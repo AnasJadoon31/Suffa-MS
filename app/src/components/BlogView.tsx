@@ -3,6 +3,11 @@ import { CheckCircle2, Newspaper, Plus } from "lucide-react";
 
 import { operationsApi, type BlogPost } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { RichTextEditor } from "./RichTextEditor";
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
 
 export function BlogView() {
   const { hasPermission } = useAuth();
@@ -29,7 +34,7 @@ export function BlogView() {
           onSubmit={async (e) => {
             e.preventDefault();
             setError("");
-            if (!form.title || !form.body) return;
+            if (!form.title || !stripHtml(form.body)) return;
             try {
               await operationsApi.createBlogPost(form);
               setForm({ title: "", body: "" });
@@ -42,7 +47,11 @@ export function BlogView() {
           <label>Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
           <label style={{ gridColumn: "span 2" }}>
             Body
-            <input required value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
+            <RichTextEditor
+              value={form.body}
+              onChange={(body) => setForm((current) => ({ ...current, body }))}
+              placeholder="Write the post…"
+            />
           </label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Save draft</button></div>
         </form>
@@ -55,7 +64,7 @@ export function BlogView() {
         {posts.map((p) => (
           <div className="dataRow" key={p.id}>
             <span>{p.title}</span>
-            <span>{p.body}</span>
+            <span>{stripHtml(p.body).slice(0, 120)}</span>
             <span>{p.published ? "Published" : "Draft"}</span>
             <span>
               {canManage && !p.published && (

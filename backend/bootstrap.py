@@ -13,21 +13,64 @@ from app.modules.academics.models import Madrasa
 from app.modules.auth.models import User, UserRole, UserStatus
 from app.modules.messaging.models import MessageTemplate
 
+# Wording per SRS Appendix C — Sample WhatsApp Templates.
 DEFAULT_TEMPLATES = [
     {
         "code": "performance_report",
         "name": "Performance report",
         "content": {
-            "en": "Assalam-o-Alaikum. {student_name}'s results: {results}.",
-            "ur": "السلام علیکم۔ {student_name} کے نتائج: {results}۔",
+            "en": (
+                "Assalamu Alaikum {guardian_name},\n"
+                "Result for {student_name} ({class_name}), {session}:\n"
+                "{summary_line}\n"
+                "Full result card: {result_link}\n"
+                "— {madrasa_name}"
+            ),
+            "ur": (
+                "السلام علیکم {guardian_name}،\n"
+                "{student_name} ({class_name}) کا نتیجہ، {session}:\n"
+                "{summary_line}\n"
+                "مکمل نتیجہ کارڈ: {result_link}\n"
+                "— {madrasa_name}"
+            ),
         },
     },
     {
         "code": "credentials",
         "name": "Login credentials",
         "content": {
-            "en": "Assalam-o-Alaikum. Username: {username}. Set your password here: {url}",
-            "ur": "السلام علیکم۔ صارف نام: {username}۔ اپنا پاس ورڈ یہاں مقرر کریں: {url}",
+            "en": (
+                "Assalamu Alaikum,\n"
+                "Portal access for {student_name}.\n"
+                "Username: {username}\n"
+                "Set your password (valid 24h): {setup_link}\n"
+                "— {madrasa_name}"
+            ),
+            "ur": (
+                "السلام علیکم،\n"
+                "{student_name} کے پورٹل تک رسائی۔\n"
+                "صارف نام: {username}\n"
+                "اپنا پاس ورڈ مقرر کریں (24 گھنٹے کارآمد): {setup_link}\n"
+                "— {madrasa_name}"
+            ),
+        },
+    },
+    {
+        "code": "receipt",
+        "name": "Payment/donation receipt",
+        "content": {
+            "en": (
+                "Assalamu Alaikum {payer_name},\n"
+                "Receipt {receipt_no}: {amount} received for {category} on {date}.\n"
+                "JazakAllah khair.\n"
+                "— {madrasa_name}"
+            ),
+            "ur": (
+                "السلام علیکم {payer_name}،\n"
+                "رسید {receipt_no}: {category} کی مد میں {amount} موصول ہوئے ({date})۔\n"
+                "جزاک اللہ خیر۔\n"
+                "— {madrasa_name}"
+            ),
         },
     },
 ]

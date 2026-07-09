@@ -4,6 +4,12 @@ import { AdmissionForm } from "../components/AdmissionForm";
 import { ContactForm } from "../components/ContactForm";
 import { fetchPublishedPosts } from "../lib/api";
 
+// Post bodies are WYSIWYG-authored HTML; excerpts show plain text only.
+function excerpt(body: string): string {
+  const text = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text.length > 160 ? `${text.slice(0, 160)}…` : text;
+}
+
 export default async function HomePage() {
   const posts = await fetchPublishedPosts();
 
@@ -64,7 +70,7 @@ export default async function HomePage() {
           {posts.map((post) => (
             <article className="postCard" key={post.id}>
               <h3>{post.title}</h3>
-              <p>{post.body.slice(0, 160)}{post.body.length > 160 ? "…" : ""}</p>
+              <p>{excerpt(post.body)}</p>
             </article>
           ))}
         </div>

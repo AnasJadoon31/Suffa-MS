@@ -2,18 +2,25 @@ import { FileDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "../lib/AuthContext";
-import { academicsApi, type AcademicClass, reportingApi } from "../lib/endpoints";
+import { academicsApi, type AcademicClass, type AcademicSession, reportingApi } from "../lib/endpoints";
 
 export function ReportsView() {
   const { hasPermission } = useAuth();
   const [classes, setClasses] = useState<AcademicClass[]>([]);
+  const [sessions, setSessions] = useState<AcademicSession[]>([]);
   const [classId, setClassId] = useState("");
+  const [sessionId, setSessionId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     void academicsApi.listClasses().then(setClasses);
+    void academicsApi.listSessions().then((rows) => {
+      setSessions(rows);
+      const active = rows.find((s) => s.is_active);
+      if (active) setSessionId(active.id);
+    });
   }, []);
 
   const withErrorHandling = async (fn: () => Promise<void>) => {
@@ -81,6 +88,54 @@ export function ReportsView() {
           </div>
         </div>
       </div>
+
+      {hasPermission("assessments.marks.enter") && (
+        <div className="modulePanel">
+          <div className="moduleHeader"><h3>Results (gradesheet)</h3></div>
+          <div className="inlineForm">
+            <label>
+              Class
+              <select value={classId} onChange={(e) => setClassId(e.target.value)}>
+                <option value="">Select…</option>
+                {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Session
+              <select value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
+                <option value="">Select…</option>
+                {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+            <div className="formActions">
+              <button
+                className="secondaryAction"
+                type="button"
+                disabled={!classId || !sessionId}
+                onClick={() =>
+                  void withErrorHandling(() =>
+                    reportingApi.downloadResultsReport({ class_id: classId, session_id: sessionId }, "csv")
+                  )
+                }
+              >
+                <FileDown size={16} /> CSV
+              </button>
+              <button
+                className="secondaryAction"
+                type="button"
+                disabled={!classId || !sessionId}
+                onClick={() =>
+                  void withErrorHandling(() =>
+                    reportingApi.downloadResultsReport({ class_id: classId, session_id: sessionId }, "pdf")
+                  )
+                }
+              >
+                <FileDown size={16} /> PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {hasPermission("finance.reports.view") && (
         <div className="modulePanel">

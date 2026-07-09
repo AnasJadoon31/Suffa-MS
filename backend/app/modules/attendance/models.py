@@ -3,7 +3,7 @@ from datetime import date, datetime, time
 from enum import StrEnum
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String, Text, Time
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String, Text, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
@@ -17,6 +17,9 @@ class AttendanceStatus(StrEnum):
 
 class StudentAttendance(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "student_attendance"
+    __table_args__ = (
+        UniqueConstraint("student_id", "session_id", "attendance_date", name="uq_student_attendance_day"),
+    )
 
     student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"), index=True)
     session_id: Mapped[UUID] = mapped_column(ForeignKey("academic_sessions.id"), index=True)
@@ -31,6 +34,9 @@ class StudentAttendance(Base, IdMixin, TenantMixin, TimestampMixin):
 
 class TeacherAttendance(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "teacher_attendance"
+    __table_args__ = (
+        UniqueConstraint("teacher_id", "session_id", "attendance_date", name="uq_teacher_attendance_day"),
+    )
 
     teacher_id: Mapped[UUID] = mapped_column(ForeignKey("teacher_profiles.id"), index=True)
     session_id: Mapped[UUID] = mapped_column(ForeignKey("academic_sessions.id"), index=True)
@@ -42,6 +48,7 @@ class TeacherAttendance(Base, IdMixin, TenantMixin, TimestampMixin):
     marked_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     idempotency_key: Mapped[str] = mapped_column(String(120), unique=True)
     synced_late: Mapped[bool] = mapped_column(Boolean, default=False)
+    overridden: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class AttendanceCorrection(Base, IdMixin, TenantMixin, TimestampMixin):

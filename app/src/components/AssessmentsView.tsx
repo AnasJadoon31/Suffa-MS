@@ -401,7 +401,7 @@ function ResultsTab({
   const sendReport = async () => {
     setSendNotice("");
     try {
-      const link = await messagingApi.sendReport({ student_id: studentId });
+      const link = await messagingApi.sendReport({ student_id: studentId, result_link: window.location.origin });
       window.open(link.url, "_blank", "noopener,noreferrer");
     } catch (err: any) {
       setSendNotice(err.response?.data?.detail ?? t("failedSendReport"));

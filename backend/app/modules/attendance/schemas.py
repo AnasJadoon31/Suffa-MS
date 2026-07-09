@@ -31,6 +31,7 @@ class AttendanceSyncRequest(BaseModel):
 class AttendanceSyncResponse(BaseModel):
     accepted: int
     synced_late: int
+    corrected: int = 0
     idempotency_keys: list[str]
     locked: list[str] = Field(default_factory=list)
 

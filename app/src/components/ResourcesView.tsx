@@ -3,6 +3,7 @@ import { Download, FolderPlus, Plus, Video } from "lucide-react";
 
 import { filesApi, operationsApi, type ResourceCategory, type ResourceItem } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { cachedFetch } from "../lib/offlineCache";
 
 export function ResourcesView() {
   const { hasPermission } = useAuth();
@@ -16,9 +17,15 @@ export function ResourcesView() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
-  const loadResources = async (categoryId?: string) => setResources(await operationsApi.listResources(categoryId || undefined));
+  const loadResources = async (categoryId?: string) => {
+    const { data } = await cachedFetch(`resources:${categoryId || "all"}`, () =>
+      operationsApi.listResources(categoryId || undefined),
+    );
+    setResources(data);
+  };
   const refreshAll = async () => {
-    setCategories(await operationsApi.listResourceCategories());
+    const { data } = await cachedFetch("resource-categories", () => operationsApi.listResourceCategories());
+    setCategories(data);
     await loadResources(categoryFilter);
   };
 

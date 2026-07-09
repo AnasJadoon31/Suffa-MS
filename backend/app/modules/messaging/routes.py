@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, require_permission
 from app.db.session import get_session
-from app.modules.academics.models import Course, Madrasa
+from app.modules.academics.models import AcademicClass, AcademicSession, Course, Enrollment, Madrasa
 from app.modules.assessments.models import ExamType, Mark, ResultPublication
 from app.modules.auth.models import User
 from app.modules.messaging.models import MessageLog, MessageTemplate
@@ -151,6 +151,21 @@ async def send_report(
     ).all()
     results_summary = ", ".join(f"{name}: {score:g}" for name, score in rows) or "N/A"
 
+    class_name = "—"
+    session_name = "—"
+    enrollment = (
+        await session.execute(
+            select(Enrollment)
+            .where(Enrollment.student_id == student.id, Enrollment.session_id == publication.session_id)
+        )
+    ).scalar_one_or_none()
+    if enrollment is not None:
+        academic_class = await session.get(AcademicClass, enrollment.class_id)
+        class_name = academic_class.name if academic_class else class_name
+    academic_session = await session.get(AcademicSession, publication.session_id)
+    if academic_session is not None:
+        session_name = academic_session.name
+
     guardian = await _primary_guardian(session, student.id)
     phone = guardian.phone_numbers.split(",")[0].strip()
 
@@ -160,7 +175,17 @@ async def send_report(
         current_user=current_user,
         template_code="performance_report",
         language=guardian.preferred_language,
-        variables={"student_name": student.name, "results": results_summary},
+        variables={
+            "guardian_name": guardian.name,
+            "student_name": student.name,
+            "class_name": class_name,
+            "session": session_name,
+            "summary_line": results_summary,
+            "result_link": payload.result_link or "(available on the student portal)",
+            "madrasa_name": madrasa.name,
+            # legacy key kept so templates seeded before Appendix C alignment still render
+            "results": results_summary,
+        },
         recipient_type="guardian",
         recipient_id=guardian.id,
         phone_number=phone,
@@ -179,6 +204,7 @@ async def send_credentials(
         if profile is None or profile.madrasa_id != madrasa.id:
             raise HTTPException(status_code=404, detail="Teacher profile not found")
         user = await session.get(User, profile.user_id)
+        subject_name = profile.name
         phone = profile.whatsapp_number
         language = "ur"
         recipient_type = "teacher"
@@ -188,6 +214,7 @@ async def send_credentials(
         if student is None or student.madrasa_id != madrasa.id:
             raise HTTPException(status_code=404, detail="Student profile not found")
         user = await session.get(User, student.user_id)
+        subject_name = student.name
         guardian = await _primary_guardian(session, student.id)
         phone = guardian.phone_numbers.split(",")[0].strip()
         language = guardian.preferred_language
@@ -203,7 +230,14 @@ async def send_credentials(
         current_user=current_user,
         template_code="credentials",
         language=language,
-        variables={"username": user.username, "url": payload.set_password_url},
+        variables={
+            "student_name": subject_name,
+            "username": user.username,
+            "setup_link": payload.set_password_url,
+            "madrasa_name": madrasa.name,
+            # legacy key kept so templates seeded before Appendix C alignment still render
+            "url": payload.set_password_url,
+        },
         recipient_type=recipient_type,
         recipient_id=recipient_id,
         phone_number=phone,

@@ -11,6 +11,7 @@ import {
   filesApi,
   reportingApi,
 } from "../lib/endpoints";
+import { cachedFetch } from "../lib/offlineCache";
 
 export type DashboardCardsProps = Readonly<Record<string, never>>;
 
@@ -18,7 +19,8 @@ export function DashboardCards({}: DashboardCardsProps) {
   const [data, setData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
-    void reportingApi.dashboard().then(setData);
+    // Cached so today's timetable / dashboard stays viewable offline (FR-TT-02).
+    void cachedFetch("dashboard", () => reportingApi.dashboard()).then(({ data: payload }) => setData(payload));
   }, []);
 
   if (!data) return null;

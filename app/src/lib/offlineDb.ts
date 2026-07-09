@@ -15,13 +15,26 @@ export type OutboxEntry = Readonly<{
   check_out?: string;
 }>;
 
+export type RefCacheEntry = Readonly<{
+  key: string;
+  data: unknown;
+  fetched_at: string;
+}>;
+
 class MmsOfflineDb extends Dexie {
   outbox!: Table<OutboxEntry, number>;
+  refCache!: Table<RefCacheEntry, string>;
 
   constructor() {
     super("mms-offline");
     this.version(1).stores({
       outbox: "++id, subject_type, subject_id, attendance_date, idempotency_key"
+    });
+    // v2: reference-data cache (timetable, rosters, holidays, …) so read
+    // screens survive a fully offline day (§3.4, FR-TT-02).
+    this.version(2).stores({
+      outbox: "++id, subject_type, subject_id, attendance_date, idempotency_key",
+      refCache: "key"
     });
   }
 }

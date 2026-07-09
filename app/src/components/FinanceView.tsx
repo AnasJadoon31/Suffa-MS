@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Landmark, Plus } from "lucide-react";
+import { FileDown, Landmark, MessageCircle, Plus } from "lucide-react";
 
 import { financeApi, type Donation, type Donor, type Payment, type PaymentCategory, type FinanceSummary } from "../lib/endpoints";
 import { peopleApi, type Student } from "../lib/endpoints";
@@ -114,7 +114,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <div className="dataTable">
-        <div className="dataRow header"><span>Student</span><span>Category</span><span>Amount</span><span>Date</span><span>Note</span></div>
+        <div className="dataRow header"><span>Student</span><span>Category</span><span>Amount</span><span>Date</span><span>Note</span><span>Receipt</span></div>
         {payments.length === 0 && <p className="emptyState">No contributions recorded.</p>}
         {payments.map((p) => (
           <div className="dataRow" key={p.id}>
@@ -123,6 +123,27 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
             <span>{p.currency} {p.amount}</span>
             <span>{p.payment_date}</span>
             <span>{p.note ?? "—"}</span>
+            <span>
+              <button className="tableAction" type="button" onClick={() => void financeApi.downloadPaymentReceipt(p.id)}>
+                <FileDown size={14} /> PDF
+              </button>
+              {canManage && (
+                <button
+                  className="tableAction"
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const link = await financeApi.sharePaymentReceipt(p.id);
+                      window.open(link.url, "_blank", "noopener,noreferrer");
+                    } catch (err: any) {
+                      setError(err.response?.data?.detail ?? "Failed to share receipt");
+                    }
+                  }}
+                >
+                  <MessageCircle size={14} /> WhatsApp
+                </button>
+              )}
+            </span>
           </div>
         ))}
       </div>
@@ -208,7 +229,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <div className="dataTable">
-        <div className="dataRow header"><span>Donor</span><span>Category</span><span>Amount</span><span>Date</span><span>Note</span></div>
+        <div className="dataRow header"><span>Donor</span><span>Category</span><span>Amount</span><span>Date</span><span>Note</span><span>Receipt</span></div>
         {donations.length === 0 && <p className="emptyState">No donations recorded.</p>}
         {donations.map((d) => (
           <div className="dataRow" key={d.id}>
@@ -217,6 +238,27 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
             <span>{d.currency} {d.amount}</span>
             <span>{d.donation_date}</span>
             <span>{d.note ?? "—"}</span>
+            <span>
+              <button className="tableAction" type="button" onClick={() => void financeApi.downloadDonationReceipt(d.id)}>
+                <FileDown size={14} /> PDF
+              </button>
+              {canManage && (
+                <button
+                  className="tableAction"
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const link = await financeApi.shareDonationReceipt(d.id);
+                      window.open(link.url, "_blank", "noopener,noreferrer");
+                    } catch (err: any) {
+                      setError(err.response?.data?.detail ?? "Failed to share receipt");
+                    }
+                  }}
+                >
+                  <MessageCircle size={14} /> WhatsApp
+                </button>
+              )}
+            </span>
           </div>
         ))}
       </div>

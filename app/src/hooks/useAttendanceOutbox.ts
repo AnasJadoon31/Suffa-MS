@@ -16,15 +16,19 @@ type AttendanceOutboxState = Readonly<{
 function createAttendanceEntry(studentId: string, status: AttendanceStatus, sessionId: string): OutboxEntry {
   const now = new Date();
   const capturedAt = now.toISOString();
+  const attendanceDate = capturedAt.slice(0, 10);
 
   return {
     subject_type: "student",
     subject_id: studentId,
     session_id: sessionId,
-    attendance_date: capturedAt.slice(0, 10),
+    attendance_date: attendanceDate,
     status,
     captured_at: capturedAt,
-    idempotency_key: `${studentId}-${capturedAt}`
+    // Deterministic per (student, session, day): a same-day re-mark reuses the
+    // key, so the server updates the existing row (logging a correction)
+    // instead of inserting a duplicate.
+    idempotency_key: `${studentId}:${sessionId}:${attendanceDate}`
   };
 }
 
@@ -77,7 +81,10 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
   const queueAttendance = useCallback(
     async (studentId: string, status: AttendanceStatus): Promise<void> => {
       if (!sessionId) return;
-      await db.outbox.add(createAttendanceEntry(studentId, status, sessionId));
+      const entry = createAttendanceEntry(studentId, status, sessionId);
+      // Upsert: re-marking a student the same day replaces the queued entry.
+      await db.outbox.where("idempotency_key").equals(entry.idempotency_key).delete();
+      await db.outbox.add(entry);
       await refresh();
       if (navigator.onLine) {
         sync();

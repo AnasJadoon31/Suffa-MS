@@ -12,9 +12,13 @@ from app.core.dependencies import get_current_madrasa, get_current_user, require
 from app.core.pdf import render_table_pdf
 from app.db.core_models import AuditLog
 from app.db.session import get_session
-from app.modules.academics.models import AcademicClass, Course, Enrollment, Madrasa, TeacherAssignment
+from app.modules.academics.models import AcademicClass, AcademicSession, Course, Enrollment, Madrasa, TeacherAssignment
 from app.modules.assessments.models import Assignment, ResultPublication, Submission
-from app.modules.assessments.routes import _build_session_result, _student_profile, _teacher_profile
+from app.modules.assessments.routes import (
+    _build_session_result,
+    _student_profile,
+    _teacher_profile,
+)
 from app.modules.attendance.models import AttendanceStatus, StudentAttendance, TeacherAttendance
 from app.modules.attendance.routes import compute_attendance_summary
 from app.modules.auth.models import User, UserRole
@@ -321,6 +325,64 @@ async def attendance_report(
     if format == "csv":
         return _csv_response(filename, headers, rows)
     return _pdf_response(filename, "Attendance Summary", f"{start_date} to {end_date}", headers, rows)
+
+
+@router.get("/reports/results")
+async def results_report(
+    class_id: UUID,
+    session_id: UUID,
+    section_id: UUID | None = None,
+    format: str = Query("csv", pattern="^(csv|pdf)$"),
+    current_user: User = Depends(require_permission("assessments.marks.enter")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    stmt = (
+        select(Enrollment, StudentProfile)
+        .join(StudentProfile, StudentProfile.id == Enrollment.student_id)
+        .where(
+            Enrollment.madrasa_id == madrasa.id,
+            Enrollment.class_id == class_id,
+            Enrollment.session_id == session_id,
+        )
+    )
+    if section_id:
+        stmt = stmt.where(Enrollment.section_id == section_id)
+    enrolled = (await session.execute(stmt)).all()
+    if not enrolled:
+        raise HTTPException(status_code=404, detail="No students enrolled for this class/section in this session")
+
+    courses = (
+        await session.execute(
+            select(Course.id, Course.name)
+            .where(Course.class_id == class_id, Course.madrasa_id == madrasa.id)
+            .order_by(Course.name)
+        )
+    ).all()
+    course_ids = [course_id for course_id, _name in courses]
+
+    rows = []
+    for _enrollment, student in enrolled:
+        result = await _build_session_result(session, madrasa.id, student.id, session_id)
+        by_course = {cr.course_id: cr for cr in result.course_results}
+        score_cells = []
+        for course_id in course_ids:
+            cr = by_course.get(course_id)
+            score_cells.append(f"{cr.raw_score:g}" if cr and cr.raw_score is not None else "—")
+        overall = f"{result.overall_score:g}" if result.overall_score is not None else "—"
+        rows.append([student.admission_number, student.name, *score_cells, overall])
+    rows.sort(key=lambda row: row[1])
+    headers = ["Admission #", "Name", *[name for _course_id, name in courses], "Overall"]
+
+    academic_class = await session.get(AcademicClass, class_id)
+    academic_session = await session.get(AcademicSession, session_id)
+    class_name = academic_class.name if academic_class else str(class_id)
+    session_name = academic_session.name if academic_session else str(session_id)
+
+    filename = f"results-{class_name}-{session_name}".replace(" ", "-").lower()
+    if format == "csv":
+        return _csv_response(filename, headers, rows)
+    return _pdf_response(filename, "Results Report", f"{class_name} — {session_name}", headers, rows)
 
 
 @router.get("/reports/finance")

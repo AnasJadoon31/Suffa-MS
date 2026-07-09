@@ -683,3 +683,60 @@ html[dir="rtl"] body {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+.richTextEditor {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.richTextToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+  background: #fbfcf8;
+}
+
+.richTextToolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.richTextToolbar button:hover {
+  background: #eef2ea;
+}
+
+.richTextToolbar select {
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.richTextArea {
+  min-height: 140px;
+  padding: 10px 12px;
+  outline: none;
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.richTextArea:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+}

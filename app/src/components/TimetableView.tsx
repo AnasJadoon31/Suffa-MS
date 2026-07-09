@@ -5,6 +5,7 @@ import { academicsApi, type AcademicClass, type Course, type Section, type Teach
 import { operationsApi, type Holiday, type Leave, type TimetableSlot } from "../lib/endpoints";
 import { peopleApi } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { cachedFetch } from "../lib/offlineCache";
 
 type Tab = "timetable" | "holidays" | "leave";
 
@@ -50,22 +51,31 @@ function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
     start_time: "", end_time: "",
   });
   const [error, setError] = useState("");
+  const [offlineCopy, setOfflineCopy] = useState<string | null>(null);
 
   const load = async () => setSlots(await operationsApi.listTimetable());
 
   const refreshAll = async () => {
-    const [c, t] = await Promise.all([academicsApi.listClasses(), peopleApi.listTeachers()]);
-    setClasses(c);
-    setTeachers(t);
-    const secByClass: Record<string, Section[]> = {};
-    const courseByClass: Record<string, Course[]> = {};
-    for (const cls of c) {
-      secByClass[cls.id] = await academicsApi.listSections(cls.id);
-      courseByClass[cls.id] = await academicsApi.listCourses(cls.id);
-    }
-    setSections(secByClass);
-    setCourses(courseByClass);
-    await load();
+    const { data, fromCache, fetchedAt } = await cachedFetch("timetable-reference", async () => {
+      const [c, t, s] = await Promise.all([
+        academicsApi.listClasses(),
+        peopleApi.listTeachers(),
+        operationsApi.listTimetable(),
+      ]);
+      const secByClass: Record<string, Section[]> = {};
+      const courseByClass: Record<string, Course[]> = {};
+      for (const cls of c) {
+        secByClass[cls.id] = await academicsApi.listSections(cls.id);
+        courseByClass[cls.id] = await academicsApi.listCourses(cls.id);
+      }
+      return { classes: c, teachers: t, slots: s, sections: secByClass, courses: courseByClass };
+    });
+    setClasses(data.classes);
+    setTeachers(data.teachers);
+    setSlots(data.slots);
+    setSections(data.sections);
+    setCourses(data.courses);
+    setOfflineCopy(fromCache ? fetchedAt : null);
   };
 
   useEffect(() => {
@@ -149,6 +159,7 @@ function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
         </form>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {offlineCopy && <p className="notice">Offline — showing cached timetable from {new Date(offlineCopy).toLocaleString()}.</p>}
       <div className="dataTable">
         <div className="dataRow header"><span>Day</span><span>Period</span><span>Time</span><span>Class</span><span>Course</span><span>Teacher</span><span></span></div>
         {slots.length === 0 && <p className="emptyState">No timetable slots yet.</p>}
@@ -179,7 +190,10 @@ function HolidaysTab({ canManage }: Readonly<{ canManage: boolean }>) {
   const [form, setForm] = useState({ name: "", start_date: "", end_date: "" });
   const [error, setError] = useState("");
 
-  const load = async () => setHolidays(await operationsApi.listHolidays());
+  const load = async () => {
+    const { data } = await cachedFetch("holidays", () => operationsApi.listHolidays());
+    setHolidays(data);
+  };
   useEffect(() => {
     void load();
   }, []);
@@ -224,7 +238,10 @@ function LeaveTab({ canManage }: Readonly<{ canManage: boolean }>) {
   const [form, setForm] = useState({ user_id: "", start_date: "", end_date: "", reason: "" });
   const [error, setError] = useState("");
 
-  const load = async () => setLeave(await operationsApi.listLeave());
+  const load = async () => {
+    const { data } = await cachedFetch("leave", () => operationsApi.listLeave());
+    setLeave(data);
+  };
   useEffect(() => {
     void load();
   }, []);

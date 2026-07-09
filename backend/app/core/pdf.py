@@ -80,6 +80,64 @@ def render_table_pdf(title: str, subtitle: str, headers: list[str], rows: list[l
     return buffer.getvalue()
 
 
+def render_receipt_pdf(
+    *,
+    madrasa_name: str,
+    receipt_kind: str,  # "Contribution" | "Donation"
+    receipt_number: str,
+    payer_name: str,
+    category_name: str,
+    amount: str,
+    currency: str,
+    payment_date: str,
+    hijri_date: str,
+    recorded_by: str,
+    note: str | None = None,
+) -> bytes:
+    _ensure_urdu_font()
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, title=f"{receipt_kind} receipt {receipt_number}")
+    styles = getSampleStyleSheet()
+    urdu_title_style = ParagraphStyle("urduTitle", fontName=URDU_FONT_BOLD, fontSize=15, alignment=2, leading=22)
+
+    elements = [
+        Paragraph(escape(madrasa_name), styles["Title"]),
+        Paragraph(f"{receipt_kind} Receipt", styles["Heading2"]),
+        Paragraph(f'<font name="{URDU_FONT_BOLD}">{shape_urdu("رسید")}</font>', urdu_title_style),
+        Spacer(1, 12),
+    ]
+
+    detail_rows = [
+        ["Receipt #", receipt_number],
+        ["Received from", payer_name],
+        ["Category / purpose", category_name],
+        ["Amount", f"{amount} {currency}"],
+        ["Date", f"{payment_date} ({hijri_date})"],
+        ["Recorded by", recorded_by],
+    ]
+    if note:
+        detail_rows.append(["Note", note])
+
+    table = Table(detail_rows, colWidths=[140, 320])
+    table.setStyle(
+        TableStyle(
+            [
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#f3f4f6")]),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]
+        )
+    )
+    elements.append(table)
+    elements.append(Spacer(1, 24))
+    elements.append(Paragraph("This is a system-generated receipt.", styles["Italic"]))
+
+    doc.build(elements)
+    return buffer.getvalue()
+
+
 def render_result_card_pdf(
     *,
     student_name: str,

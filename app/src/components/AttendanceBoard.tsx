@@ -6,6 +6,7 @@ import type { AttendanceStatus } from "../data/mockData";
 import { useAttendanceOutbox } from "../hooks/useAttendanceOutbox";
 import { useAuth } from "../lib/AuthContext";
 import { academicsApi, peopleApi, type Student } from "../lib/endpoints";
+import { cachedFetch } from "../lib/offlineCache";
 
 const attendanceOptions = ["present", "absent", "leave"] as const;
 
@@ -30,11 +31,16 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
   useEffect(() => {
     void (async () => {
-      const [sessions, roster] = await Promise.all([academicsApi.listSessions(), peopleApi.listStudents()]);
-      const active = sessions.find((s) => s.is_active);
+      // Cached so the roster and active session survive a fully offline day —
+      // marks queue in the outbox and sync once back online (§3.4).
+      const { data } = await cachedFetch("attendance-roster", async () => {
+        const [sessions, roster] = await Promise.all([academicsApi.listSessions(), peopleApi.listStudents()]);
+        return { sessions, roster };
+      });
+      const active = data.sessions.find((s) => s.is_active);
       setSessionId(active?.id ?? null);
       setSessionName(active?.name ?? "No active session");
-      setStudents(roster.filter((s) => s.status === "active"));
+      setStudents(data.roster.filter((s) => s.status === "active"));
     })();
   }, []);
 
