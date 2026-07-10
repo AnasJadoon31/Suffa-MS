@@ -45,7 +45,7 @@ async def login(
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(payload.password, user.password_hash):
+    if not user or not await verify_password(payload.password, user.password_hash):
         await record_failure(lockout_key, LOGIN_LOCKOUT_SECONDS)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -134,7 +134,7 @@ async def set_password(
         # Also blocks replaying an already-used link (FR-AUTH-03: one-time).
         raise HTTPException(status_code=400, detail="This link has already been used or is invalid")
 
-    user.password_hash = hash_password(payload.password)
+    user.password_hash = await hash_password(payload.password)
     user.status = UserStatus.active
     await session.commit()
     return {"status": "ok"}

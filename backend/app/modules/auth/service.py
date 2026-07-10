@@ -35,7 +35,7 @@ async def provision_login(
     user = User(
         madrasa_id=madrasa_id,
         username=username,
-        password_hash=hash_password(secrets.token_urlsafe(32)),
+        password_hash=await hash_password(secrets.token_urlsafe(32)),
         role=role,
         preferred_language=preferred_language,
         status=UserStatus.invited,

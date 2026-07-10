@@ -34,7 +34,7 @@ async def seed():
             id=uuid4(),
             madrasa_id=madrasa_id,
             username="admin",
-            password_hash=hash_password("password123"),
+            password_hash=await hash_password("password123"),
             role="principal",
             status="active",
             preferred_language="en",
