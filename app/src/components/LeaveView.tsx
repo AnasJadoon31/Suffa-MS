@@ -25,6 +25,8 @@ export function LeaveView() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [form, setForm] = useState({ user_id: "", start_date: "", end_date: "", reason: "" });
+  const [personSearchDraft, setPersonSearchDraft] = useState("");
+  const [personSearchQuery, setPersonSearchQuery] = useState("");
   const [searchDraft, setSearchDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
@@ -49,6 +51,22 @@ export function LeaveView() {
     for (const student of students) people.set(student.user_id, { name: student.name, role: "student" });
     return people;
   }, [teachers, students]);
+
+  const filteredTeachers = useMemo(() => {
+    const query = personSearchQuery.trim().toLowerCase();
+    if (!query) return teachers;
+    return teachers.filter((teacher) => (
+      [teacher.name, teacher.employee_code, "teacher"].some((value) => value.toLowerCase().includes(query))
+    ));
+  }, [personSearchQuery, teachers]);
+
+  const filteredStudents = useMemo(() => {
+    const query = personSearchQuery.trim().toLowerCase();
+    if (!query) return students;
+    return students.filter((student) => (
+      [student.name, student.admission_number, "student"].some((value) => value.toLowerCase().includes(query))
+    ));
+  }, [personSearchQuery, students]);
 
   const filteredLeave = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -93,6 +111,8 @@ export function LeaveView() {
           try {
             await operationsApi.createLeave(form);
             setForm({ user_id: "", start_date: "", end_date: "", reason: "" });
+            setPersonSearchDraft("");
+            setPersonSearchQuery("");
             await load();
           } catch (err: any) {
             setError(err.response?.data?.detail ?? "Failed to submit leave");
@@ -100,18 +120,60 @@ export function LeaveView() {
         }}
       >
         <label>
+          Find person
+          <input
+            placeholder="Name, code, admission #, or type"
+            value={personSearchDraft}
+            onChange={(e) => setPersonSearchDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                setForm({ ...form, user_id: "" });
+                setPersonSearchQuery(personSearchDraft);
+              }
+            }}
+          />
+        </label>
+        <div className="headerActions">
+          <button
+            className="secondaryAction"
+            type="button"
+            onClick={() => {
+              setForm({ ...form, user_id: "" });
+              setPersonSearchQuery(personSearchDraft);
+            }}
+          >
+            <Search size={16} /> Search
+          </button>
+          {personSearchQuery && (
+            <button
+              className="secondaryAction"
+              type="button"
+              onClick={() => {
+                setPersonSearchDraft("");
+                setPersonSearchQuery("");
+                setForm({ ...form, user_id: "" });
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <label>
           Person
           <select required value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}>
             <option value="">Select...</option>
             <optgroup label="Teachers">
-              {teachers.map((teacher) => (
+              {filteredTeachers.map((teacher) => (
                 <option key={teacher.user_id} value={teacher.user_id}>{teacher.name}</option>
               ))}
+              {personSearchQuery && filteredTeachers.length === 0 && <option disabled>No matching teachers</option>}
             </optgroup>
             <optgroup label="Students">
-              {students.map((student) => (
+              {filteredStudents.map((student) => (
                 <option key={student.user_id} value={student.user_id}>{student.name}</option>
               ))}
+              {personSearchQuery && filteredStudents.length === 0 && <option disabled>No matching students</option>}
             </optgroup>
           </select>
         </label>
