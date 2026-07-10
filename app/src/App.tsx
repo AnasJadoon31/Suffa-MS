@@ -12,6 +12,7 @@ import { BlogView } from "./components/BlogView";
 import { DashboardCards } from "./components/DashboardCards";
 import { FinanceView } from "./components/FinanceView";
 import { FormsView } from "./components/FormsView";
+import { HolidaysView } from "./components/HolidaysView";
 import { LeaveView } from "./components/LeaveView";
 import { LoginScreen } from "./components/LoginScreen";
 import { PeopleView } from "./components/PeopleView";
@@ -75,6 +76,8 @@ function Workspace() {
         return <AssessmentsView />;
       case "timetable":
         return <TimetableView />;
+      case "holidays":
+        return <HolidaysView />;
       case "leave":
         return <LeaveView />;
       case "resources":

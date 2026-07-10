@@ -1,37 +1,25 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { CalendarClock, LayoutGrid, List, Plus, Trash2 } from "lucide-react";
+import { LayoutGrid, List, Plus, Trash2 } from "lucide-react";
 
 import { academicsApi, type AcademicClass, type Course, type Section, type Teacher } from "../lib/endpoints";
-import { operationsApi, type Holiday, type TimetableSlot } from "../lib/endpoints";
+import { operationsApi, type TimetableSlot } from "../lib/endpoints";
 import { peopleApi } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
-
-type Tab = "timetable" | "holidays";
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export function TimetableView() {
   const { hasPermission } = useAuth();
-  const [tab, setTab] = useState<Tab>("timetable");
   const canManage = hasPermission("timetable.manage");
 
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
         <h2>Timetable</h2>
-        <p className="notice">Class schedule and holiday calendar.</p>
+        <p className="notice">Class schedule and teacher assignments.</p>
       </div>
-      <div className="formActions" style={{ marginBottom: 16 }}>
-        <button className={tab === "timetable" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("timetable")}>
-          <CalendarClock size={16} /> Timetable
-        </button>
-        <button className={tab === "holidays" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("holidays")}>
-          Holidays
-        </button>
-      </div>
-      {tab === "timetable" && <TimetableTab canManage={canManage} />}
-      {tab === "holidays" && <HolidaysTab canManage={canManage} />}
+      <TimetableTab canManage={canManage} />
     </section>
   );
 }
@@ -262,54 +250,6 @@ function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
         ))}
       </div>
       )}
-    </>
-  );
-}
-
-function HolidaysTab({ canManage }: Readonly<{ canManage: boolean }>) {
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [form, setForm] = useState({ name: "", start_date: "", end_date: "" });
-  const [error, setError] = useState("");
-
-  const load = async () => {
-    const { data } = await cachedFetch("holidays", () => operationsApi.listHolidays());
-    setHolidays(data);
-  };
-  useEffect(() => {
-    void load();
-  }, []);
-
-  return (
-    <>
-      {canManage && (
-        <form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            try {
-              await operationsApi.createHoliday(form);
-              setForm({ name: "", start_date: "", end_date: "" });
-              await load();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? "Failed to add holiday");
-            }
-          }}
-        >
-          <label>Name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>Start<input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
-          <label>End<input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
-          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Add holiday</button></div>
-        </form>
-      )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <div className="dataTable">
-        <div className="dataRow header"><span>Name</span><span>Start</span><span>End</span></div>
-        {holidays.length === 0 && <p className="emptyState">No holidays recorded.</p>}
-        {holidays.map((h) => (
-          <div className="dataRow" key={h.id}><span>{h.name}</span><span>{h.start_date}</span><span>{h.end_date}</span></div>
-        ))}
-      </div>
     </>
   );
 }

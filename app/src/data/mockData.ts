@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   CalendarClock,
   CalendarDays,
+  CalendarX,
   ClipboardCheck,
   ClipboardList,
   FileDown,
@@ -28,6 +29,7 @@ export type ViewId =
   | "people"
   | "assessments"
   | "timetable"
+  | "holidays"
   | "leave"
   | "resources"
   | "forms"
@@ -62,6 +64,7 @@ export const navGroups: readonly NavGroup[] = [
     items: [
       { id: "attendance", labelKey: "attendance", descKey: "descAttendance", icon: CalendarDays, permission: "attendance.take" },
       { id: "timetable", labelKey: "timetable", descKey: "descTimetable", icon: CalendarClock },
+      { id: "holidays", labelKey: "holidays", descKey: "descHolidays", icon: CalendarX },
       { id: "leave", labelKey: "leave", descKey: "descLeave", icon: CalendarCheck, permission: "timetable.manage" },
       { id: "announcements", labelKey: "announcements", descKey: "descAnnouncements", icon: Megaphone }
     ]

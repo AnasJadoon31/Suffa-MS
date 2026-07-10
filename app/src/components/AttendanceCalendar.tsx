@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 export type ClassDayStats = Record<string, { present: number; total: number }>;
 export type StudentDayStatus = Record<string, "present" | "absent" | "leave">;
+export type HolidayMarkers = Record<string, string>;
 
 interface AttendanceCalendarProps {
   month: Date;
@@ -12,6 +13,7 @@ interface AttendanceCalendarProps {
   mode: "class" | "student";
   classDayStats?: ClassDayStats;
   studentDayStatus?: StudentDayStatus;
+  holidayMarkers?: HolidayMarkers;
 }
 
 export function toDateKey(date: Date): string {
@@ -40,6 +42,7 @@ export function AttendanceCalendar({
   mode,
   classDayStats = {},
   studentDayStatus = {},
+  holidayMarkers = {},
 }: Readonly<AttendanceCalendarProps>) {
   const { t, i18n } = useTranslation();
   const today = new Date();
@@ -94,11 +97,13 @@ export function AttendanceCalendar({
           const isSelected = cell.key === selectedDate;
           const stats = mode === "class" ? classDayStats[cell.key] : undefined;
           const status = mode === "student" ? studentDayStatus[cell.key] : undefined;
+          const holidayName = holidayMarkers[cell.key];
           const classNames = [
             "attendanceCalendarDay",
             isFuture && "future",
             isToday && "today",
             isSelected && "selected",
+            holidayName && "holiday",
             status ? status : "",
           ]
             .filter(Boolean)
@@ -111,9 +116,13 @@ export function AttendanceCalendar({
               key={cell.key}
               disabled={isFuture}
               onClick={() => onSelectDate(cell.key)}
+              title={holidayName}
             >
               <span className="attendanceCalendarDayNumber">{cell.day}</span>
-              {mode === "class" && stats && (
+              {holidayName && (
+                <span className="attendanceCalendarDayHoliday">{t("holidayLabel")}</span>
+              )}
+              {mode === "class" && stats && !holidayName && (
                 <span className="attendanceCalendarDayStat">
                   {stats.present}/{stats.total}
                 </span>

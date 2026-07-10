@@ -1,0 +1,68 @@
+import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
+
+import { operationsApi, type Holiday } from "../lib/endpoints";
+import { useAuth } from "../lib/AuthContext";
+import { cachedFetch } from "../lib/offlineCache";
+
+export function HolidaysView() {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("timetable.manage");
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [form, setForm] = useState({ name: "", start_date: "", end_date: "" });
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    const { data } = await cachedFetch("holidays", () => operationsApi.listHolidays());
+    setHolidays(data);
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  return (
+    <section className="modulePanel">
+      <div className="moduleHeader">
+        <h2>Holidays</h2>
+        <p className="notice">Holiday calendar for attendance and operations.</p>
+      </div>
+
+      {canManage && (
+        <form
+          className="inlineForm"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            try {
+              await operationsApi.createHoliday(form);
+              setForm({ name: "", start_date: "", end_date: "" });
+              await load();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? "Failed to add holiday");
+            }
+          }}
+        >
+          <label>Name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+          <label>Start<input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
+          <label>End<input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
+          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Add holiday</button></div>
+        </form>
+      )}
+
+      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+
+      <div className="dataTable">
+        <div className="dataRow header"><span>Name</span><span>Start</span><span>End</span></div>
+        {holidays.length === 0 && <p className="emptyState">No holidays recorded.</p>}
+        {holidays.map((holiday) => (
+          <div className="dataRow" key={holiday.id}>
+            <span>{holiday.name}</span>
+            <span>{holiday.start_date}</span>
+            <span>{holiday.end_date}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

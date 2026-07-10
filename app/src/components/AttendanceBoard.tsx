@@ -7,11 +7,11 @@ import {
   Save,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AttendanceStatus } from "../data/mockData";
-import { AttendanceCalendar, monthRange, toDateKey, type ClassDayStats, type StudentDayStatus } from "./AttendanceCalendar";
+import { AttendanceCalendar, monthRange, toDateKey, type ClassDayStats, type HolidayMarkers, type StudentDayStatus } from "./AttendanceCalendar";
 import { useAttendanceOutbox } from "../hooks/useAttendanceOutbox";
 import { useAuth } from "../lib/AuthContext";
 import {
@@ -20,7 +20,9 @@ import {
   type AttendanceLogEntry,
   type AttendanceRoster,
   type ClassAttendanceHistory,
+  type Holiday,
   type StudentAttendanceHistory,
+  operationsApi,
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
 
@@ -61,6 +63,24 @@ function buildStudentDayStatus(entries: AttendanceLogEntry[]): StudentDayStatus 
   const map: StudentDayStatus = {};
   for (const entry of entries) map[entry.attendance_date] = entry.status;
   return map;
+}
+
+function parseDateKey(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function buildHolidayMarkers(holidays: Holiday[]): HolidayMarkers {
+  const markers: HolidayMarkers = {};
+  for (const holiday of holidays) {
+    const current = parseDateKey(holiday.start_date);
+    const end = parseDateKey(holiday.end_date);
+    while (current <= end) {
+      markers[toDateKey(current)] = holiday.name;
+      current.setDate(current.getDate() + 1);
+    }
+  }
+  return markers;
 }
 
 function AttendanceHistoryTable({
@@ -121,6 +141,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [roster, setRoster] = useState<AttendanceRoster | null>(null);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [isLoadingRoster, setIsLoadingRoster] = useState(false);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [hasUnsavedMarks, setHasUnsavedMarks] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -193,6 +214,17 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       }
     })();
   }, [t]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { data } = await cachedFetch("holidays", () => operationsApi.listHolidays());
+        setHolidays(data);
+      } catch {
+        setHolidays([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!selectedClassId) {
@@ -317,6 +349,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
   const todayKey = toDateKey(new Date());
   const totalStudents = roster?.students.length ?? 0;
+  const holidayMarkers = useMemo(() => buildHolidayMarkers(holidays), [holidays]);
   const dayStats = buildClassDayStats(calendarMonth, totalStudents, classHistory?.entries ?? []);
   const selectedDayEntries = selectedDate
     ? (classHistory?.entries ?? []).filter((entry) => entry.attendance_date === selectedDate)
@@ -447,6 +480,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             selectedDate={selectedDate}
             onSelectDate={handleSelectClassDate}
             classDayStats={dayStats}
+            holidayMarkers={holidayMarkers}
           />
 
           <section className="attendanceModeSection">
@@ -563,6 +597,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               selectedDate={studentSelectedDate}
               onSelectDate={setStudentSelectedDate}
               studentDayStatus={studentDayStatus}
+              holidayMarkers={holidayMarkers}
             />
             <section className="attendanceModeSection">
               {isLoadingStudentHistory && <p className="emptyState">{t("loadingLabel")}</p>}
