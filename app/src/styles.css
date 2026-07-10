@@ -949,6 +949,57 @@ button:disabled {
   background: var(--surface-2);
 }
 
+.timetableGridSection {
+  display: grid;
+  gap: 12px;
+}
+
+.timetableGrid {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--line);
+}
+
+.timetableGridCell {
+  min-height: 56px;
+  padding: 8px 10px;
+  background: var(--surface);
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
+.timetableGridCorner {
+  background: var(--surface-2);
+}
+
+.timetableGridHeader {
+  background: var(--surface-2);
+  color: var(--brand-deep);
+  font-weight: 800;
+  font-size: 0.82rem;
+}
+
+.timetableGridHeader small {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.timetableGridCell strong {
+  font-size: 0.86rem;
+}
+
+.timetableGridCell small {
+  color: var(--muted);
+}
+
+.timetableGridEmpty {
+  color: var(--faint);
+}
+
 /* ============================ forms ============================ */
 
 .settingsGrid {
@@ -976,7 +1027,7 @@ button:disabled {
 
 .inlineForm {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 12px;
   align-items: end;
   margin-bottom: 16px;
@@ -984,6 +1035,10 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-2);
+}
+
+.inlineForm > .formActions {
+  grid-column: 1 / -1;
 }
 
 .formActions {
@@ -1005,6 +1060,7 @@ button:disabled {
 .inlineForm select,
 .settingsGrid select,
 .settingsGrid input {
+  width: 100%;
   min-height: 42px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);

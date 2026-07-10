@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { CalendarClock, CheckCircle2, Plus, Trash2, XCircle } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { CalendarClock, CheckCircle2, LayoutGrid, List, Plus, Trash2, XCircle } from "lucide-react";
 
 import { academicsApi, type AcademicClass, type Course, type Section, type Teacher } from "../lib/endpoints";
 import { operationsApi, type Holiday, type Leave, type TimetableSlot } from "../lib/endpoints";
@@ -40,6 +40,8 @@ export function TimetableView() {
   );
 }
 
+type TimetableViewMode = "list" | "grid";
+
 function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
   const [slots, setSlots] = useState<TimetableSlot[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
@@ -52,6 +54,9 @@ function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
   });
   const [error, setError] = useState("");
   const [offlineCopy, setOfflineCopy] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<TimetableViewMode>("list");
+  const [gridClassId, setGridClassId] = useState("");
+  const [gridSectionId, setGridSectionId] = useState("");
 
   const load = async () => setSlots(await operationsApi.listTimetable());
 
@@ -85,9 +90,87 @@ function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
   const allCourses = Object.values(courses).flat();
   const allSections = Object.values(sections).flat();
 
+  const gridSlots = useMemo(
+    () => slots.filter((s) => s.class_id === gridClassId && s.section_id === gridSectionId),
+    [slots, gridClassId, gridSectionId],
+  );
+  const gridPeriods = useMemo(
+    () => Array.from(new Set(gridSlots.map((s) => s.period))).sort((a, b) => a - b),
+    [gridSlots],
+  );
+
   return (
     <>
-      {canManage && (
+      <div className="formActions" style={{ marginBottom: 16 }}>
+        <button className={viewMode === "list" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setViewMode("list")}>
+          <List size={16} /> List
+        </button>
+        <button className={viewMode === "grid" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setViewMode("grid")}>
+          <LayoutGrid size={16} /> Weekly grid
+        </button>
+      </div>
+
+      {viewMode === "grid" && (
+        <section className="timetableGridSection">
+          <div className="inlineForm">
+            <label>
+              Class
+              <select value={gridClassId} onChange={(e) => { setGridClassId(e.target.value); setGridSectionId(""); }}>
+                <option value="">Select…</option>
+                {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Section
+              <select value={gridSectionId} onChange={(e) => setGridSectionId(e.target.value)} disabled={!gridClassId}>
+                <option value="">Select…</option>
+                {(sections[gridClassId] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+          </div>
+
+          {!gridClassId || !gridSectionId ? (
+            <p className="emptyState">Pick a class and section to see its weekly timetable.</p>
+          ) : gridPeriods.length === 0 ? (
+            <p className="emptyState">No timetable slots for this section yet.</p>
+          ) : (
+            <div className="timetableGrid" style={{ gridTemplateColumns: `auto repeat(${DAY_NAMES.length}, 1fr)` }}>
+              <div className="timetableGridCell timetableGridCorner" />
+              {DAY_NAMES.map((day) => (
+                <div className="timetableGridCell timetableGridHeader" key={day}>{day}</div>
+              ))}
+              {gridPeriods.map((period) => {
+                const timeForPeriod = gridSlots.find((s) => s.period === period);
+                return (
+                  <Fragment key={period}>
+                    <div className="timetableGridCell timetableGridHeader">
+                      <strong>Period {period}</strong>
+                      {timeForPeriod && <small>{timeForPeriod.start_time}–{timeForPeriod.end_time}</small>}
+                    </div>
+                    {DAY_NAMES.map((_, dayIndex) => {
+                      const slot = gridSlots.find((s) => s.day_of_week === dayIndex && s.period === period);
+                      return (
+                        <div className="timetableGridCell" key={`${period}-${dayIndex}`}>
+                          {slot ? (
+                            <>
+                              <strong>{allCourses.find((c) => c.id === slot.course_id)?.name ?? "—"}</strong>
+                              <small>{teachers.find((t) => t.id === slot.teacher_id)?.name ?? "—"}</small>
+                            </>
+                          ) : (
+                            <span className="timetableGridEmpty">—</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </Fragment>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {viewMode === "list" && canManage && (
         <form
           className="inlineForm"
           onSubmit={async (e) => {
@@ -158,8 +241,9 @@ function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
           </div>
         </form>
       )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      {offlineCopy && <p className="notice">Offline — showing cached timetable from {new Date(offlineCopy).toLocaleString()}.</p>}
+      {viewMode === "list" && error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {viewMode === "list" && offlineCopy && <p className="notice">Offline — showing cached timetable from {new Date(offlineCopy).toLocaleString()}.</p>}
+      {viewMode === "list" && (
       <div className="dataTable">
         <div className="dataRow header"><span>Day</span><span>Period</span><span>Time</span><span>Class</span><span>Course</span><span>Teacher</span><span></span></div>
         {slots.length === 0 && <p className="emptyState">No timetable slots yet.</p>}
@@ -181,6 +265,7 @@ function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
           </div>
         ))}
       </div>
+      )}
     </>
   );
 }
