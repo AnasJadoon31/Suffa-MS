@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Plus, XCircle } from "lucide-react";
+import { CheckCircle2, Plus, Search, XCircle } from "lucide-react";
 
 import { operationsApi, peopleApi, type Leave, type Student, type Teacher } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
@@ -10,6 +10,14 @@ function displayType(type: string | null | undefined): string {
   return `${type.charAt(0).toUpperCase()}${type.slice(1)}`;
 }
 
+function resolvePerson(record: Leave, personByUserId: Map<string, { name: string; role: string }>) {
+  const fallbackPerson = personByUserId.get(record.user_id);
+  return {
+    name: record.person_name ?? fallbackPerson?.name ?? "Unknown person",
+    type: record.person_type ?? fallbackPerson?.role,
+  };
+}
+
 export function LeaveView() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("timetable.manage");
@@ -17,6 +25,8 @@ export function LeaveView() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [form, setForm] = useState({ user_id: "", start_date: "", end_date: "", reason: "" });
+  const [searchDraft, setSearchDraft] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
 
   const load = async () => {
@@ -39,6 +49,23 @@ export function LeaveView() {
     for (const student of students) people.set(student.user_id, { name: student.name, role: "student" });
     return people;
   }, [teachers, students]);
+
+  const filteredLeave = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return leave;
+
+    return leave.filter((record) => {
+      const person = resolvePerson(record, personByUserId);
+      return [
+        person.name,
+        displayType(person.type),
+        record.start_date,
+        record.end_date,
+        record.reason ?? "",
+        displayType(record.status),
+      ].some((value) => value.toLowerCase().includes(query));
+    });
+  }, [leave, personByUserId, searchQuery]);
 
   if (!canManage) {
     return (
@@ -107,6 +134,38 @@ export function LeaveView() {
 
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
+      <form
+        className="moduleToolbar"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setSearchQuery(searchDraft);
+        }}
+      >
+        <label className="searchBox">
+          Search leave
+          <input
+            placeholder="Name, type, status, date, or reason"
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+          />
+        </label>
+        <div className="formActions">
+          <button className="primaryAction" type="submit"><Search size={16} /> Search</button>
+          {searchQuery && (
+            <button
+              className="secondaryAction"
+              type="button"
+              onClick={() => {
+                setSearchDraft("");
+                setSearchQuery("");
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </form>
+
       <div className="dataTable">
         <div className="dataRow header">
           <span>Person</span>
@@ -118,15 +177,14 @@ export function LeaveView() {
           <span></span>
         </div>
         {leave.length === 0 && <p className="emptyState">No leave records.</p>}
-        {leave.map((record) => {
-          const fallbackPerson = personByUserId.get(record.user_id);
-          const personName = record.person_name ?? fallbackPerson?.name ?? "Unknown person";
-          const personType = record.person_type ?? fallbackPerson?.role;
+        {leave.length > 0 && filteredLeave.length === 0 && <p className="emptyState">No leave records match this search.</p>}
+        {filteredLeave.map((record) => {
+          const person = resolvePerson(record, personByUserId);
 
           return (
             <div className="dataRow" key={record.id}>
-              <span>{personName}</span>
-              <span>{displayType(personType)}</span>
+              <span>{person.name}</span>
+              <span>{displayType(person.type)}</span>
               <span>{record.start_date}</span>
               <span>{record.end_date}</span>
               <span>{record.reason || "-"}</span>
