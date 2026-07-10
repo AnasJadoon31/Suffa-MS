@@ -32,8 +32,10 @@ class SectionRead(BaseModel):
 class CourseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
-    class_id: UUID
     name: str
+
+class ClassCourseAssignRequest(BaseModel):
+    course_id: UUID
 
 
 class StudentProfileRead(BaseModel):

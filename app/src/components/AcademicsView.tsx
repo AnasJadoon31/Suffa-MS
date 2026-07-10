@@ -19,6 +19,7 @@ export function AcademicsView() {
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [sections, setSections] = useState<Record<string, Section[]>>({});
   const [courses, setCourses] = useState<Record<string, Course[]>>({});
+  const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [sessions, setSessions] = useState<AcademicSession[]>([]);
   const [assignments, setAssignments] = useState<TeacherAssignment[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -30,22 +31,25 @@ export function AcademicsView() {
   const [sectionName, setSectionName] = useState("");
   const [courseClassId, setCourseClassId] = useState("");
   const [courseName, setCourseName] = useState("");
+  const [assignCourseId, setAssignCourseId] = useState("");
   const [sessionForm, setSessionForm] = useState({ name: "", gregorian_start: "", gregorian_end: "", hijri_span: "" });
   const [assignForm, setAssignForm] = useState({ teacher_id: "", session_id: "", class_id: "", course_id: "" });
 
-  const [activeTab, setActiveTab] = useState<"programs" | "classes" | "sections" | "sessions" | "assignments">("programs");
+  const [activeTab, setActiveTab] = useState<"programs" | "classes" | "courses" | "sections" | "sessions" | "assignments">("programs");
 
   const refreshAll = async () => {
-    const [p, c, s, t_res] = await Promise.all([
+    const [p, c, s, t_res, ac] = await Promise.all([
       academicsApi.listPrograms(),
       academicsApi.listClasses(),
       academicsApi.listSessions(),
       peopleApi.listTeachers(),
+      academicsApi.listAllCourses(),
     ]);
     setPrograms(p);
     setClasses(c);
     setSessions(s);
     setTeachers(t_res);
+    setAllCourses(ac);
     const secByClass: Record<string, Section[]> = {};
     const courseByClass: Record<string, Course[]> = {};
     for (const cls of c) {
@@ -60,8 +64,6 @@ export function AcademicsView() {
   useEffect(() => {
     void refreshAll();
   }, []);
-
-  const allCourses = Object.values(courses).flat();
 
   return (
     <section className="modulePanel">
@@ -85,6 +87,13 @@ export function AcademicsView() {
             onClick={() => setActiveTab("classes")}
           >
             {t("classesHeading")}
+          </button>
+          <button
+            type="button"
+            className={`tabButton ${activeTab === "courses" ? "active" : ""}`}
+            onClick={() => setActiveTab("courses")}
+          >
+            Courses
           </button>
           <button
             type="button"
@@ -179,6 +188,34 @@ export function AcademicsView() {
             </>
           )}
 
+          {activeTab === "courses" && (
+            <>
+              <h3>Courses</h3>
+              <form
+                className="inlineForm"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  await academicsApi.createCourse(courseName);
+                  setCourseName("");
+                  await refreshAll();
+                }}
+              >
+                <label>
+                  {t("courseNameLabel")}
+                  <input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="e.g. Quran" />
+                </label>
+                <div className="formActions">
+                  <button className="primaryAction" type="submit"><Plus size={16} /> {t("addCourseBtn")}</button>
+                </div>
+              </form>
+              <div className="dataTable">
+                <div className="dataRow header"><span>{t("nameLabel")}</span></div>
+                {allCourses.length === 0 && <p className="emptyState">No courses yet.</p>}
+                {allCourses.map((c) => <div className="dataRow" key={c.id}><span>{c.name}</span></div>)}
+              </div>
+            </>
+          )}
+
           {activeTab === "sections" && (
             <>
               <h3>{t("sectionsCoursesHeading")}</h3>
@@ -211,9 +248,9 @@ export function AcademicsView() {
                 className="inlineForm"
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  if (!courseClassId) return;
-                  await academicsApi.createCourse(courseClassId, courseName);
-                  setCourseName("");
+                  if (!courseClassId || !assignCourseId) return;
+                  await academicsApi.assignCourseToClass(courseClassId, assignCourseId);
+                  setAssignCourseId("");
                   await refreshAll();
                 }}
               >
@@ -225,11 +262,14 @@ export function AcademicsView() {
                   </select>
                 </label>
                 <label>
-                  {t("courseNameLabel")}
-                  <input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="e.g. Quran" />
+                  Course
+                  <select required value={assignCourseId} onChange={(e) => setAssignCourseId(e.target.value)}>
+                    <option value="">{t("selectEllipsis")}</option>
+                    {allCourses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                 </label>
                 <div className="formActions">
-                  <button className="primaryAction" type="submit"><Plus size={16} /> {t("addCourseBtn")}</button>
+                  <button className="primaryAction" type="submit"><Plus size={16} /> Assign</button>
                 </div>
               </form>
               <div className="dataTable">

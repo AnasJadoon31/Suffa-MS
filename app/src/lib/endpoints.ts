@@ -5,7 +5,7 @@ import { api } from "./api";
 export interface Program { id: string; name: string; created_at: string }
 export interface AcademicClass { id: string; program_id: string; name: string; default_portal_enabled: boolean }
 export interface Section { id: string; class_id: string; name: string }
-export interface Course { id: string; class_id: string; name: string }
+export interface Course { id: string; name: string }
 export interface AcademicSession {
   id: string; name: string; gregorian_start: string; gregorian_end: string; hijri_span: string; is_active: boolean;
 }
@@ -22,10 +22,14 @@ export const academicsApi = {
     api.get<Section[]>(`/api/v1/academics/classes/${classId}/sections`).then((r) => r.data),
   createSection: (classId: string, name: string) =>
     api.post<Section>(`/api/v1/academics/classes/${classId}/sections`, { name }).then((r) => r.data),
+  listAllCourses: () =>
+    api.get<Course[]>("/api/v1/academics/courses").then((r) => r.data),
   listCourses: (classId: string) =>
     api.get<Course[]>(`/api/v1/academics/classes/${classId}/courses`).then((r) => r.data),
-  createCourse: (classId: string, name: string) =>
-    api.post<Course>(`/api/v1/academics/classes/${classId}/courses`, { name }).then((r) => r.data),
+  createCourse: (name: string) =>
+    api.post<Course>("/api/v1/academics/courses", { name }).then((r) => r.data),
+  assignCourseToClass: (classId: string, courseId: string) =>
+    api.post(`/api/v1/academics/classes/${classId}/courses/assign`, { course_id: courseId }).then((r) => r.data),
   listSessions: () => api.get<AcademicSession[]>("/api/v1/academics/sessions").then((r) => r.data),
   createSession: (payload: {
     name: string; gregorian_start: string; gregorian_end: string; hijri_span: string; is_active?: boolean;

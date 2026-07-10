@@ -13,6 +13,7 @@ from app.modules.academics.models import (
     AcademicClass,
     AcademicSession,
     Course,
+    ClassCourse,
     Enrollment,
     Madrasa,
     Program,
@@ -25,6 +26,7 @@ from app.modules.academics.schemas import (
     AcademicClassRead,
     AcademicSessionCreate,
     AcademicSessionRead,
+    ClassCourseAssignRequest,
     CourseCreate,
     CourseRead,
     ProgramCreate,
@@ -130,29 +132,66 @@ async def list_sections(
 
 # ------------------------------------------------------------------- Courses
 
-@router.post("/classes/{class_id}/courses", response_model=CourseRead)
+@router.post("/courses", response_model=CourseRead)
 async def create_course(
-    class_id: UUID,
     payload: CourseCreate,
     current_user: User = Depends(require_permission("academics.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> CourseRead:
-    course = Course(madrasa_id=madrasa.id, class_id=class_id, name=payload.name)
+    course = Course(madrasa_id=madrasa.id, name=payload.name)
     session.add(course)
     await session.commit()
     await session.refresh(course)
     return CourseRead.model_validate(course)
 
 
+@router.get("/courses", response_model=list[CourseRead])
+async def list_all_courses(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[CourseRead]:
+    stmt = select(Course).where(Course.madrasa_id == madrasa.id)
+    result = await session.execute(stmt)
+    return [CourseRead.model_validate(c) for c in result.scalars().all()]
+
+
+@router.post("/classes/{class_id}/courses/assign", response_model=dict[str, str])
+async def assign_course_to_class(
+    class_id: UUID,
+    payload: ClassCourseAssignRequest,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    # Ensure course exists and belongs to madrasa
+    course = await session.get(Course, payload.course_id)
+    if not course or course.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    assignment = ClassCourse(madrasa_id=madrasa.id, class_id=class_id, course_id=payload.course_id)
+    session.add(assignment)
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail="Course already assigned to this class")
+    return {"status": "success"}
+
+
 @router.get("/classes/{class_id}/courses", response_model=list[CourseRead])
-async def list_courses(
+async def list_assigned_courses(
     class_id: UUID,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> list[CourseRead]:
-    stmt = select(Course).where(Course.class_id == class_id, Course.madrasa_id == madrasa.id)
+    stmt = (
+        select(Course)
+        .join(ClassCourse, Course.id == ClassCourse.course_id)
+        .where(ClassCourse.class_id == class_id, ClassCourse.madrasa_id == madrasa.id)
+    )
     result = await session.execute(stmt)
     return [CourseRead.model_validate(c) for c in result.scalars().all()]
 
