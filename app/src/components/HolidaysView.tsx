@@ -1,15 +1,23 @@
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { operationsApi, type Holiday } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
 
+type HolidayForm = {
+  name: string;
+  start_date: string;
+  end_date: string;
+};
+
 export function HolidaysView() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("timetable.manage");
   const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [form, setForm] = useState({ name: "", start_date: "", end_date: "" });
+  const [form, setForm] = useState<HolidayForm>({ name: "", start_date: "", end_date: "" });
+  const [editingId, setEditingId] = useState("");
+  const [editForm, setEditForm] = useState<HolidayForm>({ name: "", start_date: "", end_date: "" });
   const [error, setError] = useState("");
 
   const load = async () => {
@@ -20,6 +28,44 @@ export function HolidaysView() {
   useEffect(() => {
     void load();
   }, []);
+
+  const startEditing = (holiday: Holiday) => {
+    setEditingId(holiday.id);
+    setEditForm({ name: holiday.name, start_date: holiday.start_date, end_date: holiday.end_date });
+    setError("");
+  };
+
+  const cancelEditing = () => {
+    setEditingId("");
+    setEditForm({ name: "", start_date: "", end_date: "" });
+  };
+
+  const saveHoliday = async (holidayId: string) => {
+    setError("");
+    if (!editForm.name || !editForm.start_date || !editForm.end_date) {
+      setError("Name, start, and end are required");
+      return;
+    }
+    try {
+      await operationsApi.updateHoliday(holidayId, editForm);
+      cancelEditing();
+      await load();
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? "Failed to update holiday");
+    }
+  };
+
+  const deleteHoliday = async (holiday: Holiday) => {
+    if (!window.confirm(`Delete holiday "${holiday.name}"?`)) return;
+    setError("");
+    try {
+      await operationsApi.deleteHoliday(holiday.id);
+      if (editingId === holiday.id) cancelEditing();
+      await load();
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? "Failed to delete holiday");
+    }
+  };
 
   return (
     <section className="modulePanel">
@@ -53,15 +99,73 @@ export function HolidaysView() {
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
       <div className="dataTable">
-        <div className="dataRow header"><span>Name</span><span>Start</span><span>End</span></div>
+        <div className="dataRow header">
+          <span>Name</span>
+          <span>Start</span>
+          <span>End</span>
+          {canManage && <span>Actions</span>}
+        </div>
         {holidays.length === 0 && <p className="emptyState">No holidays recorded.</p>}
-        {holidays.map((holiday) => (
-          <div className="dataRow" key={holiday.id}>
-            <span>{holiday.name}</span>
-            <span>{holiday.start_date}</span>
-            <span>{holiday.end_date}</span>
-          </div>
-        ))}
+        {holidays.map((holiday) => {
+          const isEditing = editingId === holiday.id;
+
+          return (
+            <div className="dataRow" key={holiday.id}>
+              <span>
+                {isEditing ? (
+                  <input
+                    required
+                    value={editForm.name}
+                    onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
+                  />
+                ) : holiday.name}
+              </span>
+              <span>
+                {isEditing ? (
+                  <input
+                    required
+                    type="date"
+                    value={editForm.start_date}
+                    onChange={(event) => setEditForm({ ...editForm, start_date: event.target.value })}
+                  />
+                ) : holiday.start_date}
+              </span>
+              <span>
+                {isEditing ? (
+                  <input
+                    required
+                    type="date"
+                    value={editForm.end_date}
+                    onChange={(event) => setEditForm({ ...editForm, end_date: event.target.value })}
+                  />
+                ) : holiday.end_date}
+              </span>
+              {canManage && (
+                <span>
+                  {isEditing ? (
+                    <>
+                      <button className="tableAction" type="button" onClick={() => void saveHoliday(holiday.id)}>
+                        <Save size={14} /> Save
+                      </button>
+                      <button className="tableAction" type="button" onClick={cancelEditing}>
+                        <X size={14} /> Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="tableAction" type="button" onClick={() => startEditing(holiday)}>
+                        <Pencil size={14} /> Edit
+                      </button>
+                      <button className="tableAction" type="button" onClick={() => void deleteHoliday(holiday)}>
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

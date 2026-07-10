@@ -45,6 +45,12 @@ class HolidayCreate(BaseModel):
     end_date: date
 
 
+class HolidayUpdate(BaseModel):
+    name: str
+    start_date: date
+    end_date: date
+
+
 class HolidayRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID

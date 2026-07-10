@@ -353,6 +353,9 @@ export const operationsApi = {
   listHolidays: () => api.get<Holiday[]>("/api/v1/operations/holidays").then((r) => r.data),
   createHoliday: (payload: { name: string; start_date: string; end_date: string }) =>
     api.post<Holiday>("/api/v1/operations/holidays", payload).then((r) => r.data),
+  updateHoliday: (id: string, payload: { name: string; start_date: string; end_date: string }) =>
+    api.put<Holiday>(`/api/v1/operations/holidays/${id}`, payload).then((r) => r.data),
+  deleteHoliday: (id: string) => api.delete(`/api/v1/operations/holidays/${id}`).then((r) => r.data),
 
   listLeave: (userId?: string) =>
     api.get<Leave[]>("/api/v1/operations/leave", { params: { user_id: userId } }).then((r) => r.data),

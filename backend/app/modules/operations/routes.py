@@ -39,6 +39,7 @@ from app.modules.operations.schemas import (
     FormResponseRead,
     HolidayCreate,
     HolidayRead,
+    HolidayUpdate,
     LeaveCreate,
     LeaveRead,
     ResourceCategoryCreate,
@@ -100,6 +101,11 @@ def _role_value(role: UserRole | str | None) -> str | None:
     if role is None:
         return None
     return role.value if isinstance(role, UserRole) else str(role)
+
+
+def _ensure_valid_date_range(start_date, end_date) -> None:
+    if end_date < start_date:
+        raise HTTPException(status_code=400, detail="End date must be on or after start date")
 
 
 async def _leave_reads(session: AsyncSession, rows: list[Leave], madrasa_id: UUID) -> list[LeaveRead]:
@@ -257,6 +263,7 @@ async def create_holiday(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> HolidayRead:
+    _ensure_valid_date_range(payload.start_date, payload.end_date)
     holiday = Holiday(madrasa_id=madrasa.id, **payload.model_dump())
     session.add(holiday)
     await session.commit()
@@ -276,6 +283,41 @@ async def list_holidays(
     return [HolidayRead.model_validate(row) for row in result.scalars().all()]
 
 
+@router.put("/holidays/{holiday_id}", response_model=HolidayRead)
+async def update_holiday(
+    holiday_id: UUID,
+    payload: HolidayUpdate,
+    current_user: User = Depends(require_permission("timetable.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> HolidayRead:
+    _ensure_valid_date_range(payload.start_date, payload.end_date)
+    holiday = await session.get(Holiday, holiday_id)
+    if holiday is None or holiday.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Holiday not found")
+    holiday.name = payload.name
+    holiday.start_date = payload.start_date
+    holiday.end_date = payload.end_date
+    await session.commit()
+    await session.refresh(holiday)
+    return HolidayRead.model_validate(holiday)
+
+
+@router.delete("/holidays/{holiday_id}")
+async def delete_holiday(
+    holiday_id: UUID,
+    current_user: User = Depends(require_permission("timetable.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    holiday = await session.get(Holiday, holiday_id)
+    if holiday is None or holiday.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Holiday not found")
+    await session.delete(holiday)
+    await session.commit()
+    return {"status": "deleted"}
+
+
 @router.post("/leave", response_model=LeaveRead)
 async def create_leave(
     payload: LeaveCreate,
@@ -283,8 +325,7 @@ async def create_leave(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> LeaveRead:
-    if payload.end_date < payload.start_date:
-        raise HTTPException(status_code=400, detail="End date must be on or after start date")
+    _ensure_valid_date_range(payload.start_date, payload.end_date)
 
     can_manage_leave = await user_has_permission(current_user, "timetable.manage", session)
     target_user_id = payload.user_id or current_user.id
