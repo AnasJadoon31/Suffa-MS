@@ -7,7 +7,13 @@ from passlib.context import CryptContext
 from app.core.config import settings
 
 
-pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["argon2", "bcrypt"],
+    deprecated="auto",
+    argon2__memory_cost=10240,  # 10MB (reduced from 100MB default to prevent swapping)
+    argon2__parallelism=1,      # 1 thread
+    argon2__time_cost=2
+)
 ALGORITHM = "HS256"
 
 

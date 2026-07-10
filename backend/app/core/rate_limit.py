@@ -12,7 +12,12 @@ _redis: redis.Redis | None = None
 def get_redis() -> redis.Redis:
     global _redis
     if _redis is None:
-        _redis = redis.from_url(settings.redis_url, decode_responses=True)
+        _redis = redis.from_url(
+            settings.redis_url, 
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5
+        )
     return _redis
 
 

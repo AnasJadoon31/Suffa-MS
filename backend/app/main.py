@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -26,11 +27,12 @@ def create_app() -> FastAPI:
     async def log_requests(request, call_next):
         logger = logging.getLogger("app.request")
         start_time = time.time()
+        logger.info(f"STARTED {request.method} {request.url.path}")
         
         try:
             response = await call_next(request)
             process_time = time.time() - start_time
-            logger.info(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.4f}s")
+            logger.info(f"COMPLETED {request.method} {request.url.path} - {response.status_code} - {process_time:.4f}s")
             return response
         except Exception as e:
             process_time = time.time() - start_time
@@ -44,6 +46,15 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        logger = logging.getLogger("app.request")
+        logger.error(f"Unhandled exception: {exc}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(academics_router, prefix="/api/v1/academics", tags=["academics"])
