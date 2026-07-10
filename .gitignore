@@ -10,3 +10,4 @@ dist/
 coverage/
 uploads/
 *.tsbuildinfo
+backend/uvicorn.log
