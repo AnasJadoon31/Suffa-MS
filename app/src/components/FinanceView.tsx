@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileDown, Landmark, MessageCircle, Plus } from "lucide-react";
 
 import { financeApi, type Donation, type Donor, type Payment, type PaymentCategory, type FinanceSummary } from "../lib/endpoints";
 import { peopleApi, type Student } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { SearchDropdown } from "./SearchDropdown";
 
 type Tab = "contributions" | "donations" | "summary";
 
@@ -64,6 +65,7 @@ export function FinanceView() {
 function ContributionsTab({ categories, canManage }: Readonly<{ categories: PaymentCategory[]; canManage: boolean }>) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [studentSearch, setStudentSearch] = useState("");
   const [form, setForm] = useState({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
   const [error, setError] = useState("");
 
@@ -72,6 +74,14 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
     void load();
     void peopleApi.listStudents().then(setStudents);
   }, []);
+
+  const matchingStudents = useMemo(() => {
+    const query = studentSearch.trim().toLowerCase();
+    if (!query) return students;
+    return students.filter((student) => (
+      student.name.toLowerCase().includes(query) || student.admission_number.toLowerCase().includes(query)
+    ));
+  }, [studentSearch, students]);
 
   return (
     <>
@@ -86,19 +96,32 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
             try {
               await financeApi.createPayment({ student_id, category_id, amount: Number(amount), payment_date, note: form.note || undefined });
               setForm({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
+              setStudentSearch("");
               await load();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? "Failed to record payment");
             }
           }}
         >
-          <label>
-            Student
-            <select required value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })}>
-              <option value="">Select…</option>
-              {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
+          <SearchDropdown
+            id="contribution-student"
+            label="Student"
+            placeholder="Search student name or admission #"
+            items={matchingStudents}
+            value={studentSearch}
+            getKey={(student) => student.id}
+            getLabel={(student) => student.name}
+            getDescription={(student) => student.admission_number}
+            onQueryChange={(query) => {
+              setStudentSearch(query);
+              setForm({ ...form, student_id: "" });
+            }}
+            onSelect={(student) => {
+              setStudentSearch(`${student.name} (${student.admission_number})`);
+              setForm({ ...form, student_id: student.id });
+            }}
+            emptyLabel="No matching students"
+          />
           <label>
             Category
             <select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
@@ -155,6 +178,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
   const [donors, setDonors] = useState<Donor[]>([]);
   const [donations, setDonations] = useState<Donation[]>([]);
   const [donorForm, setDonorForm] = useState({ name: "", contact: "" });
+  const [donorSearch, setDonorSearch] = useState("");
   const [form, setForm] = useState({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
   const [error, setError] = useState("");
 
@@ -165,6 +189,14 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
   useEffect(() => {
     void load();
   }, []);
+
+  const matchingDonors = useMemo(() => {
+    const query = donorSearch.trim().toLowerCase();
+    if (!query) return donors;
+    return donors.filter((donor) => (
+      donor.name.toLowerCase().includes(query) || donor.contact.toLowerCase().includes(query)
+    ));
+  }, [donorSearch, donors]);
 
   return (
     <>
@@ -201,19 +233,32 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
             try {
               await financeApi.createDonation({ donor_id, category_id, amount: Number(amount), donation_date, note: form.note || undefined });
               setForm({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
+              setDonorSearch("");
               await load();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? "Failed to record donation");
             }
           }}
         >
-          <label>
-            Donor
-            <select required value={form.donor_id} onChange={(e) => setForm({ ...form, donor_id: e.target.value })}>
-              <option value="">Select…</option>
-              {donors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </label>
+          <SearchDropdown
+            id="donation-donor"
+            label="Donor"
+            placeholder="Search donor name or contact"
+            items={matchingDonors}
+            value={donorSearch}
+            getKey={(donor) => donor.id}
+            getLabel={(donor) => donor.name}
+            getDescription={(donor) => donor.contact}
+            onQueryChange={(query) => {
+              setDonorSearch(query);
+              setForm({ ...form, donor_id: "" });
+            }}
+            onSelect={(donor) => {
+              setDonorSearch(`${donor.name} (${donor.contact})`);
+              setForm({ ...form, donor_id: donor.id });
+            }}
+            emptyLabel="No matching donors"
+          />
           <label>
             Category
             <select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>

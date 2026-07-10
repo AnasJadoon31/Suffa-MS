@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Banknote, Plus } from "lucide-react";
 
 import { financeApi, type SalaryPayment, type SalaryRecord } from "../lib/endpoints";
 import { peopleApi, type Teacher } from "../lib/endpoints";
+import { SearchDropdown } from "./SearchDropdown";
 
 export function SalaryView() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [teacherId, setTeacherId] = useState("");
+  const [teacherSearch, setTeacherSearch] = useState("");
   const [record, setRecord] = useState<SalaryRecord | null>(null);
   const [payments, setPayments] = useState<SalaryPayment[]>([]);
   const [salaryForm, setSalaryForm] = useState({ amount: "", effective_from: "" });
@@ -32,6 +34,14 @@ export function SalaryView() {
     setPayments(await financeApi.listSalaryPayments(id));
   };
 
+  const matchingTeachers = useMemo(() => {
+    const query = teacherSearch.trim().toLowerCase();
+    if (!query) return teachers;
+    return teachers.filter((teacher) => (
+      teacher.name.toLowerCase().includes(query) || teacher.employee_code.toLowerCase().includes(query)
+    ));
+  }, [teacherSearch, teachers]);
+
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
@@ -40,13 +50,39 @@ export function SalaryView() {
       </div>
 
       <div className="moduleToolbar">
-        <div className="searchBox">
-          <label htmlFor="salary-teacher">Teacher</label>
-          <select id="salary-teacher" value={teacherId} onChange={(e) => void loadTeacher(e.target.value)}>
-            <option value="">Select…</option>
-            {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </div>
+        <SearchDropdown
+          id="salary-teacher"
+          label="Teacher"
+          placeholder="Search teacher name or code"
+          items={matchingTeachers}
+          value={teacherSearch}
+          getKey={(teacher) => teacher.id}
+          getLabel={(teacher) => teacher.name}
+          getDescription={(teacher) => teacher.employee_code}
+          onQueryChange={(query) => {
+            setTeacherSearch(query);
+            void loadTeacher("");
+          }}
+          onSelect={(teacher) => {
+            setTeacherSearch(`${teacher.name} (${teacher.employee_code})`);
+            void loadTeacher(teacher.id);
+          }}
+          emptyLabel="No matching teachers"
+        />
+        {(teacherSearch || teacherId) && (
+          <div className="formActions">
+            <button
+              className="secondaryAction"
+              type="button"
+              onClick={() => {
+                setTeacherSearch("");
+                void loadTeacher("");
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {teacherId && (

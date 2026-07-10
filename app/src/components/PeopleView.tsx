@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../lib/AuthContext";
 import { type Student, type Teacher, messagingApi, peopleApi } from "../lib/endpoints";
+import { SearchDropdown } from "./SearchDropdown";
 
 function SendCredentialsButton({
   subjectType,
@@ -136,18 +137,39 @@ function TeachersTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
   return (
     <>
       <div className="moduleToolbar">
-        <div className="searchBox">
-          <label htmlFor="teacher-search">{t("searchLabel")}</label>
-          <input
-            id="teacher-search"
-            placeholder="Name or employee code"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              void load(e.target.value);
-            }}
-          />
-        </div>
+        <SearchDropdown
+          id="teacher-search"
+          label={t("searchLabel")}
+          placeholder="Name or employee code"
+          items={teachers}
+          value={search}
+          getKey={(teacher) => teacher.id}
+          getLabel={(teacher) => teacher.name}
+          getDescription={(teacher) => `${teacher.employee_code} · ${teacher.status}`}
+          onQueryChange={(query) => {
+            setSearch(query);
+            void load(query);
+          }}
+          onSelect={(teacher) => {
+            setSearch(`${teacher.name} (${teacher.employee_code})`);
+            setTeachers([teacher]);
+          }}
+          emptyLabel={t("noTeachersYet")}
+        />
+        {search && (
+          <div className="formActions">
+            <button
+              className="secondaryAction"
+              type="button"
+              onClick={() => {
+                setSearch("");
+                void load();
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
       {canCreate && (
         <form className="inlineForm" onSubmit={onSubmit}>
@@ -236,18 +258,39 @@ function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
   return (
     <>
       <div className="moduleToolbar">
-        <div className="searchBox">
-          <label htmlFor="student-search">{t("searchLabel")}</label>
-          <input
-            id="student-search"
-            placeholder="Name or admission number"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              void load(e.target.value);
-            }}
-          />
-        </div>
+        <SearchDropdown
+          id="student-search"
+          label={t("searchLabel")}
+          placeholder="Name or admission number"
+          items={students}
+          value={search}
+          getKey={(student) => student.id}
+          getLabel={(student) => student.name}
+          getDescription={(student) => `${student.admission_number} · ${student.status}`}
+          onQueryChange={(query) => {
+            setSearch(query);
+            void load(query);
+          }}
+          onSelect={(student) => {
+            setSearch(`${student.name} (${student.admission_number})`);
+            setStudents([student]);
+          }}
+          emptyLabel={t("noStudentsYet")}
+        />
+        {search && (
+          <div className="formActions">
+            <button
+              className="secondaryAction"
+              type="button"
+              onClick={() => {
+                setSearch("");
+                void load();
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
       {canCreate && (
         <form className="inlineForm" onSubmit={onSubmit}>

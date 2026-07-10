@@ -1,4 +1,4 @@
-import { AlertTriangle, CircleDollarSign, ClipboardCheck, GraduationCap, UserRoundCog } from "lucide-react";
+import { AlertTriangle, CircleDollarSign, ClipboardCheck, GraduationCap, LogIn, LogOut, UserRoundCog } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,13 +7,19 @@ import {
   type PrincipalDashboard,
   type StudentDashboard,
   type TeacherDashboard,
+  type TeacherAttendanceLogEntry,
   assessmentsApi,
+  attendanceApi,
   filesApi,
   reportingApi,
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
 
 export type DashboardCardsProps = Readonly<Record<string, never>>;
+
+function formatTime(value: string | null | undefined): string {
+  return value ? value.slice(0, 5) : "—";
+}
 
 export function DashboardCards({}: DashboardCardsProps) {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -97,6 +103,43 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
 }
 
 function TeacherDashboardCards({ data }: Readonly<{ data: TeacherDashboard }>) {
+  const [attendance, setAttendance] = useState(data.today_attendance);
+  const [logs, setLogs] = useState<TeacherAttendanceLogEntry[]>([]);
+  const [error, setError] = useState("");
+
+  const loadLogs = async () => {
+    try {
+      setLogs(await attendanceApi.teacherHistory());
+    } catch {
+      setLogs([]);
+    }
+  };
+
+  useEffect(() => {
+    setAttendance(data.today_attendance);
+    void loadLogs();
+  }, [data.today_attendance]);
+
+  const checkIn = async () => {
+    setError("");
+    try {
+      setAttendance(await attendanceApi.teacherCheckIn());
+      await loadLogs();
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? "Could not check in");
+    }
+  };
+
+  const checkOut = async () => {
+    setError("");
+    try {
+      setAttendance(await attendanceApi.teacherCheckOut());
+      await loadLogs();
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? "Could not check out");
+    }
+  };
+
   return (
     <>
       <section className="metricGrid" aria-label="Dashboard summary">
@@ -110,6 +153,23 @@ function TeacherDashboardCards({ data }: Readonly<{ data: TeacherDashboard }>) {
           <strong>{data.pending_submissions}</strong>
           <small>Ungraded across your classes</small>
         </article>
+        <article className="metricCard">
+          <span>Today attendance</span>
+          <strong>{attendance?.check_in ? formatTime(attendance.check_in) : "Not in"}</strong>
+          <small>Out: {formatTime(attendance?.check_out)}</small>
+        </article>
+      </section>
+      <section className="modulePanel">
+        <div className="moduleHeader"><h2>Time in / time out</h2></div>
+        <div className="formActions">
+          <button className="primaryAction" type="button" disabled={!!attendance?.check_in} onClick={() => void checkIn()}>
+            <LogIn size={16} /> Time in
+          </button>
+          <button className="secondaryAction" type="button" disabled={!attendance?.check_in || !!attendance?.check_out} onClick={() => void checkOut()}>
+            <LogOut size={16} /> Time out
+          </button>
+        </div>
+        {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       </section>
       <section className="modulePanel">
         <div className="moduleHeader"><h2>Today's timetable</h2></div>
@@ -119,6 +179,21 @@ function TeacherDashboardCards({ data }: Readonly<{ data: TeacherDashboard }>) {
             <li key={i}>{slot.start_time} – {slot.end_time} (period {slot.period})</li>
           ))}
         </ul>
+      </section>
+      <section className="modulePanel">
+        <div className="moduleHeader"><h2>My attendance log</h2></div>
+        <div className="dataTable">
+          <div className="dataRow header"><span>Date</span><span>Status</span><span>Time in</span><span>Time out</span></div>
+          {logs.length === 0 && <p className="emptyState">No teacher attendance logs yet.</p>}
+          {logs.slice(0, 10).map((entry) => (
+            <div className="dataRow" key={entry.id}>
+              <span>{entry.attendance_date}</span>
+              <span>{entry.status}</span>
+              <span>{formatTime(entry.check_in)}</span>
+              <span>{formatTime(entry.check_out)}</span>
+            </div>
+          ))}
+        </div>
       </section>
     </>
   );

@@ -22,12 +22,17 @@ import {
   type ClassAttendanceHistory,
   type Holiday,
   type StudentAttendanceHistory,
+  type Teacher,
+  type TeacherAttendanceLogEntry,
   operationsApi,
+  peopleApi,
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
+import { SearchDropdown } from "./SearchDropdown";
 
 const attendanceOptions = ["present", "absent", "leave"] as const;
 type AttendanceTab = "calendar" | "studentHistory";
+type AttendanceMode = "students" | "teachers";
 
 export type AttendanceBoardProps = Readonly<Record<string, never>>;
 
@@ -38,8 +43,114 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
+function formatTime(value: string | null | undefined): string {
+  return value ? value.slice(0, 5) : "-";
+}
+
 function wasCapturedOffline(entry: AttendanceLogEntry): boolean {
   return new Date(entry.synced_at).getTime() - new Date(entry.marked_at).getTime() > 60_000;
+}
+
+function TeacherAttendancePanel() {
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [teacherSearch, setTeacherSearch] = useState("");
+  const [selectedTeacherId, setSelectedTeacherId] = useState("");
+  const [logs, setLogs] = useState<TeacherAttendanceLogEntry[]>([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    void peopleApi.listTeachers().then(setTeachers).catch(() => setTeachers([]));
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      setError("");
+      try {
+        setLogs(await attendanceApi.teacherHistory(selectedTeacherId ? { teacher_id: selectedTeacherId } : undefined));
+      } catch (err: any) {
+        setLogs([]);
+        setError(err.response?.data?.detail ?? "Could not load teacher attendance");
+      }
+    })();
+  }, [selectedTeacherId]);
+
+  const matchingTeachers = teachers.filter((teacher) => {
+    const query = teacherSearch.trim().toLowerCase();
+    if (!query) return true;
+    return teacher.name.toLowerCase().includes(query) || teacher.employee_code.toLowerCase().includes(query);
+  });
+
+  return (
+    <section className="modulePanel">
+      <div className="moduleHeader">
+        <h2>Teacher attendance</h2>
+        <p className="notice">Time-in/time-out logs for teachers.</p>
+      </div>
+      <div className="moduleToolbar">
+        <SearchDropdown
+          id="teacher-attendance-search"
+          label="Teacher"
+          placeholder="Search teacher name or code"
+          items={matchingTeachers}
+          value={teacherSearch}
+          getKey={(teacher) => teacher.id}
+          getLabel={(teacher) => teacher.name}
+          getDescription={(teacher) => teacher.employee_code}
+          onQueryChange={(query) => {
+            setTeacherSearch(query);
+            setSelectedTeacherId("");
+          }}
+          onSelect={(teacher) => {
+            setTeacherSearch(`${teacher.name} (${teacher.employee_code})`);
+            setSelectedTeacherId(teacher.id);
+          }}
+          emptyLabel="No matching teachers"
+        />
+        {(teacherSearch || selectedTeacherId) && (
+          <div className="formActions">
+            <button
+              className="secondaryAction"
+              type="button"
+              onClick={() => {
+                setTeacherSearch("");
+                setSelectedTeacherId("");
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        )}
+      </div>
+      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      <div className="dataTable">
+        <div className="dataRow header">
+          <span>Teacher</span>
+          <span>Date</span>
+          <span>Status</span>
+          <span>Time in</span>
+          <span>Time out</span>
+          <span>Marked by</span>
+        </div>
+        {logs.length === 0 && <p className="emptyState">No teacher attendance logs yet.</p>}
+        {logs.map((entry) => (
+          <div className="dataRow" key={entry.id}>
+            <span>
+              <strong>{entry.teacher_name}</strong>
+              <small>{entry.employee_code}</small>
+            </span>
+            <span>{entry.attendance_date}</span>
+            <span>{entry.status}</span>
+            <span>{formatTime(entry.check_in)}</span>
+            <span>{formatTime(entry.check_out)}</span>
+            <span>
+              <strong>{entry.marked_by.display_name}</strong>
+              <small>{entry.marked_by.username}</small>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function buildClassDayStats(month: Date, totalStudents: number, entries: AttendanceLogEntry[]): ClassDayStats {
@@ -134,6 +245,8 @@ function AttendanceHistoryTable({
 export function AttendanceBoard({}: AttendanceBoardProps) {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
+  const canManageTeacherAttendance = hasPermission("teachers.attendance.manage");
+  const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>("students");
   const [marked, setMarked] = useState<Record<string, AttendanceStatus>>({});
   const [classes, setClasses] = useState<AttendanceClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -427,7 +540,31 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </div>
       )}
 
-      {!selectedClassId && (
+      {canManageTeacherAttendance && (
+        <div className="formActions" style={{ marginTop: 16 }}>
+          <button
+            className={attendanceMode === "students" ? "primaryAction" : "secondaryAction"}
+            type="button"
+            onClick={() => setAttendanceMode("students")}
+          >
+            Student attendance
+          </button>
+          <button
+            className={attendanceMode === "teachers" ? "primaryAction" : "secondaryAction"}
+            type="button"
+            onClick={() => {
+              setAttendanceMode("teachers");
+              returnToClasses();
+            }}
+          >
+            Teacher attendance
+          </button>
+        </div>
+      )}
+
+      {attendanceMode === "teachers" && <TeacherAttendancePanel />}
+
+      {attendanceMode === "students" && !selectedClassId && (
         <div className="attendanceClassGrid" aria-label={t("chooseAttendanceClass")}>
           {classes.map((item) => (
             <button className="attendanceClassButton" key={item.id} type="button" onClick={() => selectClass(item.id)}>
@@ -448,7 +585,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </div>
       )}
 
-      {selectedClassId && (
+      {attendanceMode === "students" && selectedClassId && (
         <div className="formActions" style={{ marginTop: 16 }}>
           <button
             className={activeTab === "calendar" ? "primaryAction" : "secondaryAction"}
@@ -467,7 +604,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </div>
       )}
 
-      {selectedClassId && activeTab === "calendar" && (
+      {attendanceMode === "students" && selectedClassId && activeTab === "calendar" && (
         <>
           <AttendanceCalendar
             mode="class"
@@ -559,7 +696,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </>
       )}
 
-      {selectedClassId && activeTab === "studentHistory" && (
+      {attendanceMode === "students" && selectedClassId && activeTab === "studentHistory" && (
         <div className="attendanceStudentSplit">
           <div className="attendanceStudentList">
             <input

@@ -30,6 +30,8 @@ from app.modules.attendance.schemas import (
     AttendanceSyncResponse,
     ClassAttendanceHistoryResponse,
     StudentAttendanceHistoryResponse,
+    TeacherAttendanceLogEntry,
+    TeacherAttendanceTodayResponse,
 )
 from app.modules.operations.models import Holiday, Leave
 from app.modules.people.models import StudentProfile, TeacherProfile
@@ -199,6 +201,9 @@ async def _assert_can_mark_entry(
 ) -> None:
     if entry.subject_type == "teacher":
         if await user_has_permission(current_user, "teachers.attendance.manage", session):
+            return
+        teacher_id = await _current_teacher_id(current_user, session, madrasa_id)
+        if current_user.role == UserRole.teacher and teacher_id == entry.subject_id:
             return
         raise HTTPException(status_code=403, detail="Missing permission: teachers.attendance.manage")
 
@@ -389,6 +394,99 @@ def _history_entry_from_row(row) -> AttendanceLogEntry:
     )
 
 
+def _teacher_history_entry_from_row(row) -> TeacherAttendanceLogEntry:
+    (
+        attendance_id,
+        teacher_id,
+        teacher_name,
+        employee_code,
+        attendance_date,
+        status,
+        check_in,
+        check_out,
+        marked_at,
+        created_at,
+        updated_at,
+        marker_id,
+        marker_username,
+        marker_role,
+        marker_display_name,
+        overridden,
+    ) = row
+    synced_at = updated_at or created_at
+    return TeacherAttendanceLogEntry(
+        id=attendance_id,
+        teacher_id=teacher_id,
+        teacher_name=teacher_name,
+        employee_code=employee_code,
+        attendance_date=attendance_date,
+        status=status,
+        check_in=check_in,
+        check_out=check_out,
+        marked_at=marked_at,
+        synced_at=synced_at,
+        marked_by=AttendanceMarkerRead(
+            id=marker_id,
+            username=marker_username,
+            display_name=marker_display_name or marker_username,
+            role=str(marker_role.value if hasattr(marker_role, "value") else marker_role),
+        ),
+        overridden=overridden,
+    )
+
+
+async def _teacher_history_entries(
+    session: AsyncSession,
+    *,
+    madrasa_id: UUID,
+    session_id: UUID,
+    teacher_id: UUID | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[TeacherAttendanceLogEntry]:
+    marker_teacher = TeacherProfile.__table__.alias("marker_teacher")
+    stmt = (
+        select(
+            TeacherAttendance.id,
+            TeacherProfile.id,
+            TeacherProfile.name,
+            TeacherProfile.employee_code,
+            TeacherAttendance.attendance_date,
+            TeacherAttendance.status,
+            TeacherAttendance.check_in,
+            TeacherAttendance.check_out,
+            TeacherAttendance.marked_at,
+            TeacherAttendance.created_at,
+            TeacherAttendance.updated_at,
+            User.id,
+            User.username,
+            User.role,
+            marker_teacher.c.name,
+            TeacherAttendance.overridden,
+        )
+        .select_from(TeacherAttendance)
+        .join(TeacherProfile, TeacherProfile.id == TeacherAttendance.teacher_id)
+        .join(User, User.id == TeacherAttendance.marked_by_id)
+        .outerjoin(marker_teacher, marker_teacher.c.user_id == User.id)
+        .where(
+            TeacherAttendance.madrasa_id == madrasa_id,
+            TeacherAttendance.session_id == session_id,
+        )
+    )
+    if teacher_id is not None:
+        stmt = stmt.where(TeacherAttendance.teacher_id == teacher_id)
+    if start_date is not None:
+        stmt = stmt.where(TeacherAttendance.attendance_date >= start_date)
+    if end_date is not None:
+        stmt = stmt.where(TeacherAttendance.attendance_date <= end_date)
+    rows = (
+        await session.execute(
+            stmt.order_by(TeacherAttendance.attendance_date.desc(), TeacherProfile.name)
+        )
+    ).all()
+    return [_teacher_history_entry_from_row(row) for row in rows]
+
+
 async def _class_history_entries(
     session: AsyncSession,
     *,
@@ -548,6 +646,212 @@ async def attendance_student_history(
     )
 
 
+async def _teacher_today_response(
+    session: AsyncSession,
+    *,
+    madrasa_id: UUID,
+    session_id: UUID,
+    teacher: TeacherProfile,
+    attendance_date: date,
+) -> TeacherAttendanceTodayResponse:
+    record = (
+        await session.execute(
+            select(TeacherAttendance).where(
+                TeacherAttendance.madrasa_id == madrasa_id,
+                TeacherAttendance.session_id == session_id,
+                TeacherAttendance.teacher_id == teacher.id,
+                TeacherAttendance.attendance_date == attendance_date,
+            )
+        )
+    ).scalar_one_or_none()
+    return TeacherAttendanceTodayResponse(
+        session_id=session_id,
+        teacher_id=teacher.id,
+        teacher_name=teacher.name,
+        attendance_date=attendance_date,
+        id=record.id if record else None,
+        status=record.status if record else None,
+        check_in=record.check_in if record else None,
+        check_out=record.check_out if record else None,
+    )
+
+
+async def _current_teacher_profile_or_404(current_user: User, session: AsyncSession, madrasa_id: UUID) -> TeacherProfile:
+    teacher = (
+        await session.execute(
+            select(TeacherProfile).where(
+                TeacherProfile.user_id == current_user.id,
+                TeacherProfile.madrasa_id == madrasa_id,
+                TeacherProfile.status == "active",
+            )
+        )
+    ).scalar_one_or_none()
+    if teacher is None:
+        raise HTTPException(status_code=404, detail="Teacher profile not found")
+    return teacher
+
+
+@router.get("/teachers/me/today", response_model=TeacherAttendanceTodayResponse)
+async def my_teacher_attendance_today(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> TeacherAttendanceTodayResponse:
+    active_session = await _active_session(session, madrasa.id)
+    if active_session is None:
+        raise HTTPException(status_code=409, detail="No active academic session")
+    teacher = await _current_teacher_profile_or_404(current_user, session, madrasa.id)
+    today = datetime.now(UTC).date()
+    return await _teacher_today_response(
+        session,
+        madrasa_id=madrasa.id,
+        session_id=active_session.id,
+        teacher=teacher,
+        attendance_date=today,
+    )
+
+
+@router.post("/teachers/me/check-in", response_model=TeacherAttendanceTodayResponse)
+async def teacher_check_in(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> TeacherAttendanceTodayResponse:
+    active_session = await _active_session(session, madrasa.id)
+    if active_session is None:
+        raise HTTPException(status_code=409, detail="No active academic session")
+    teacher = await _current_teacher_profile_or_404(current_user, session, madrasa.id)
+    now = datetime.now(UTC)
+    today = now.date()
+    record = (
+        await session.execute(
+            select(TeacherAttendance).where(
+                TeacherAttendance.madrasa_id == madrasa.id,
+                TeacherAttendance.session_id == active_session.id,
+                TeacherAttendance.teacher_id == teacher.id,
+                TeacherAttendance.attendance_date == today,
+            )
+        )
+    ).scalar_one_or_none()
+    if record is None:
+        record = TeacherAttendance(
+            madrasa_id=madrasa.id,
+            teacher_id=teacher.id,
+            session_id=active_session.id,
+            attendance_date=today,
+            status=AttendanceStatus.present,
+            check_in=now.time().replace(tzinfo=None, microsecond=0),
+            marked_at=now,
+            marked_by_id=current_user.id,
+            idempotency_key=f"{teacher.id}:{active_session.id}:{today}",
+        )
+        session.add(record)
+    elif record.check_in is None:
+        old_values = _record_snapshot(record)
+        record.check_in = now.time().replace(tzinfo=None, microsecond=0)
+        record.status = AttendanceStatus.present
+        record.marked_at = now
+        record.marked_by_id = current_user.id
+        record_correction(
+            session,
+            madrasa_id=madrasa.id,
+            record=record,
+            old_values=old_values,
+            new_values=_record_snapshot(record),
+            actor_id=current_user.id,
+            reason="teacher check-in",
+        )
+    await session.commit()
+    return await _teacher_today_response(
+        session,
+        madrasa_id=madrasa.id,
+        session_id=active_session.id,
+        teacher=teacher,
+        attendance_date=today,
+    )
+
+
+@router.post("/teachers/me/check-out", response_model=TeacherAttendanceTodayResponse)
+async def teacher_check_out(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> TeacherAttendanceTodayResponse:
+    active_session = await _active_session(session, madrasa.id)
+    if active_session is None:
+        raise HTTPException(status_code=409, detail="No active academic session")
+    teacher = await _current_teacher_profile_or_404(current_user, session, madrasa.id)
+    now = datetime.now(UTC)
+    today = now.date()
+    record = (
+        await session.execute(
+            select(TeacherAttendance).where(
+                TeacherAttendance.madrasa_id == madrasa.id,
+                TeacherAttendance.session_id == active_session.id,
+                TeacherAttendance.teacher_id == teacher.id,
+                TeacherAttendance.attendance_date == today,
+            )
+        )
+    ).scalar_one_or_none()
+    if record is None or record.check_in is None:
+        raise HTTPException(status_code=409, detail="Check in before checking out")
+    if record.check_out is None:
+        old_values = _record_snapshot(record)
+        record.check_out = now.time().replace(tzinfo=None, microsecond=0)
+        record.status = AttendanceStatus.present
+        record.marked_at = now
+        record.marked_by_id = current_user.id
+        record_correction(
+            session,
+            madrasa_id=madrasa.id,
+            record=record,
+            old_values=old_values,
+            new_values=_record_snapshot(record),
+            actor_id=current_user.id,
+            reason="teacher check-out",
+        )
+    await session.commit()
+    return await _teacher_today_response(
+        session,
+        madrasa_id=madrasa.id,
+        session_id=active_session.id,
+        teacher=teacher,
+        attendance_date=today,
+    )
+
+
+@router.get("/teachers/history", response_model=list[TeacherAttendanceLogEntry])
+async def teacher_attendance_history(
+    teacher_id: UUID | None = Query(default=None),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[TeacherAttendanceLogEntry]:
+    active_session = await _active_session(session, madrasa.id)
+    if active_session is None:
+        return []
+
+    can_manage = await user_has_permission(current_user, "teachers.attendance.manage", session)
+    if not can_manage:
+        own_teacher_id = await _current_teacher_id(current_user, session, madrasa.id)
+        if own_teacher_id is None:
+            raise HTTPException(status_code=403, detail="Missing permission: teachers.attendance.manage")
+        if teacher_id is not None and teacher_id != own_teacher_id:
+            raise HTTPException(status_code=403, detail="Teacher attendance access is limited to your own logs")
+        teacher_id = own_teacher_id
+
+    return await _teacher_history_entries(
+        session,
+        madrasa_id=madrasa.id,
+        session_id=active_session.id,
+        teacher_id=teacher_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
 @router.post("/sync", response_model=AttendanceSyncResponse)
 async def sync_attendance(
     payload: AttendanceSyncRequest,
@@ -555,7 +859,6 @@ async def sync_attendance(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
 ) -> AttendanceSyncResponse:
-    await _require_student_attendance_access(current_user, session)
     accepted = 0
     corrected = 0
     locked_keys: list[str] = []
@@ -733,6 +1036,25 @@ async def compute_attendance_summary(
     ).all()
     by_date = {row[0]: row[1] for row in rows}
 
+    if subject_type == "student":
+        subject_user_id = (
+            await session.execute(
+                select(StudentProfile.user_id).where(
+                    StudentProfile.madrasa_id == madrasa_id,
+                    StudentProfile.id == subject_id,
+                )
+            )
+        ).scalar_one_or_none()
+    else:
+        subject_user_id = (
+            await session.execute(
+                select(TeacherProfile.user_id).where(
+                    TeacherProfile.madrasa_id == madrasa_id,
+                    TeacherProfile.id == subject_id,
+                )
+            )
+        ).scalar_one_or_none()
+
     holidays = (
         await session.execute(
             select(Holiday.start_date, Holiday.end_date).where(
@@ -743,17 +1065,19 @@ async def compute_attendance_summary(
         )
     ).all()
 
-    approved_leave = (
-        await session.execute(
-            select(Leave.start_date, Leave.end_date).where(
-                Leave.madrasa_id == madrasa_id,
-                Leave.user_id == subject_id,
-                Leave.status == "approved",
-                Leave.start_date <= end_date,
-                Leave.end_date >= start_date,
+    approved_leave = []
+    if subject_user_id is not None:
+        approved_leave = (
+            await session.execute(
+                select(Leave.start_date, Leave.end_date).where(
+                    Leave.madrasa_id == madrasa_id,
+                    Leave.user_id == subject_user_id,
+                    Leave.status == "approved",
+                    Leave.start_date <= end_date,
+                    Leave.end_date >= start_date,
+                )
             )
-        )
-    ).all()
+        ).all()
 
     def excluded_reason(day: date) -> str | None:
         for h_start, h_end in holidays:
@@ -771,7 +1095,7 @@ async def compute_attendance_summary(
     while current <= end_date:
         reason = excluded_reason(current)
         status_value = by_date.get(current)
-        if reason and status_value is None:
+        if reason:
             excluded_days += 1
             days.append(AttendanceDayBreakdown(attendance_date=current, excluded_reason=reason))
         elif status_value is not None:

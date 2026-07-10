@@ -204,7 +204,7 @@ async def _todays_timetable(session: AsyncSession, madrasa_id, **filters) -> lis
 async def _teacher_dashboard(session: AsyncSession, madrasa: Madrasa, current_user: User) -> dict[str, object]:
     teacher = await _teacher_profile(session, current_user)
     if teacher is None:
-        return {"role": "teacher", "my_classes": [], "pending_submissions": 0, "today_timetable": []}
+        return {"role": "teacher", "my_classes": [], "pending_submissions": 0, "today_timetable": [], "today_attendance": None}
 
     active_session_id = await _active_session_id(session, madrasa.id)
 
@@ -238,12 +238,36 @@ async def _teacher_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
         ).scalar_one()
 
     today_timetable = await _todays_timetable(session, madrasa.id, teacher_id=teacher.id)
+    today = datetime.now(timezone.utc).date()
+    today_attendance = None
+    if active_session_id is not None:
+        record = (
+            await session.execute(
+                select(TeacherAttendance).where(
+                    TeacherAttendance.madrasa_id == madrasa.id,
+                    TeacherAttendance.session_id == active_session_id,
+                    TeacherAttendance.teacher_id == teacher.id,
+                    TeacherAttendance.attendance_date == today,
+                )
+            )
+        ).scalar_one_or_none()
+        today_attendance = {
+            "session_id": str(active_session_id),
+            "teacher_id": str(teacher.id),
+            "teacher_name": teacher.name,
+            "attendance_date": str(today),
+            "id": str(record.id) if record else None,
+            "status": str(record.status.value if hasattr(record.status, "value") else record.status) if record else None,
+            "check_in": record.check_in.isoformat() if record and record.check_in else None,
+            "check_out": record.check_out.isoformat() if record and record.check_out else None,
+        }
 
     return {
         "role": "teacher",
         "my_classes": my_classes,
         "pending_submissions": pending_submissions,
         "today_timetable": today_timetable,
+        "today_attendance": today_attendance,
     }
 
 

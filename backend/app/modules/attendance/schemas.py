@@ -89,6 +89,32 @@ class AttendanceLogEntry(BaseModel):
     overridden: bool = False
 
 
+class TeacherAttendanceLogEntry(BaseModel):
+    id: UUID
+    teacher_id: UUID
+    teacher_name: str
+    employee_code: str
+    attendance_date: date
+    status: AttendanceStatus
+    check_in: Optional[time] = None
+    check_out: Optional[time] = None
+    marked_at: datetime
+    synced_at: datetime
+    marked_by: AttendanceMarkerRead
+    overridden: bool = False
+
+
+class TeacherAttendanceTodayResponse(BaseModel):
+    session_id: UUID
+    teacher_id: UUID
+    teacher_name: str
+    attendance_date: date
+    id: Optional[UUID] = None
+    status: Optional[AttendanceStatus] = None
+    check_in: Optional[time] = None
+    check_out: Optional[time] = None
+
+
 class ClassAttendanceHistoryResponse(BaseModel):
     session_id: UUID
     session_name: str

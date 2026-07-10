@@ -4,6 +4,7 @@ import { CheckCircle2, Plus, Search, XCircle } from "lucide-react";
 import { operationsApi, peopleApi, type Leave, type Student, type Teacher } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
+import { SearchDropdown } from "./SearchDropdown";
 
 function displayType(type: string | null | undefined): string {
   if (!type) return "Unknown";
@@ -36,7 +37,6 @@ export function LeaveView() {
   const [form, setForm] = useState({ user_id: "", start_date: "", end_date: "", reason: "" });
   const [personType, setPersonType] = useState<PersonType>("");
   const [personSearchDraft, setPersonSearchDraft] = useState("");
-  const [personSearchQuery, setPersonSearchQuery] = useState("");
   const [searchDraft, setSearchDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
@@ -79,13 +79,13 @@ export function LeaveView() {
 
   const filteredPersonOptions = useMemo(() => {
     if (!personType) return [];
-    const query = personSearchQuery.trim().toLowerCase();
+    const query = personSearchDraft.trim().toLowerCase();
     const typedPeople = personOptions.filter((person) => person.type === personType);
     if (!query) return typedPeople;
     return typedPeople.filter((person) => (
       [person.name, person.code, person.type].some((value) => value.toLowerCase().includes(query))
     ));
-  }, [personOptions, personSearchQuery, personType]);
+  }, [personOptions, personSearchDraft, personType]);
 
   const filteredLeave = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -104,22 +104,8 @@ export function LeaveView() {
     });
   }, [leave, personByUserId, searchQuery]);
 
-  const applyPersonSearch = () => {
-    if (!personType) return;
-    const query = personSearchDraft.trim();
-    const loweredQuery = query.toLowerCase();
-    const matches = personOptions.filter((person) => (
-      person.type === personType
-      && (!loweredQuery || [person.name, person.code, person.type].some((value) => value.toLowerCase().includes(loweredQuery)))
-    ));
-
-    setPersonSearchQuery(query);
-    setForm({ ...form, user_id: matches.length === 1 ? matches[0].userId : "" });
-  };
-
   const resetPersonSearch = () => {
     setPersonSearchDraft("");
-    setPersonSearchQuery("");
     setForm({ ...form, user_id: "" });
   };
 
@@ -148,12 +134,15 @@ export function LeaveView() {
         onSubmit={async (e) => {
           e.preventDefault();
           setError("");
+          if (!form.user_id) {
+            setError("Select a person");
+            return;
+          }
           try {
             await operationsApi.createLeave(form);
             setForm({ user_id: "", start_date: "", end_date: "", reason: "" });
             setPersonType("");
             setPersonSearchDraft("");
-            setPersonSearchQuery("");
             await load();
           } catch (err: any) {
             setError(err.response?.data?.detail ?? "Failed to submit leave");
@@ -175,31 +164,28 @@ export function LeaveView() {
             <option value="student">Student</option>
           </select>
         </label>
-        <label>
-          Find person
-          <input
-            disabled={!personType}
-            placeholder={personType === "teacher" ? "Name or employee code" : personType === "student" ? "Name or admission #" : "Select type first"}
-            value={personSearchDraft}
-            onChange={(e) => setPersonSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                applyPersonSearch();
-              }
-            }}
-          />
-        </label>
-        <div className="headerActions">
-          <button
-            className="secondaryAction"
-            disabled={!personType}
-            type="button"
-            onClick={applyPersonSearch}
-          >
-            <Search size={16} /> Search
-          </button>
-          {(personSearchQuery || personSearchDraft || form.user_id) && (
+        <SearchDropdown
+          id="leave-person-search"
+          label="Find person"
+          disabled={!personType}
+          placeholder={personType === "teacher" ? "Name or employee code" : personType === "student" ? "Name or admission #" : "Select type first"}
+          items={filteredPersonOptions}
+          value={personSearchDraft}
+          getKey={(person) => person.userId}
+          getLabel={(person) => person.name}
+          getDescription={(person) => `${displayType(person.type)} · ${person.code}`}
+          onQueryChange={(query) => {
+            setPersonSearchDraft(query);
+            setForm({ ...form, user_id: "" });
+          }}
+          onSelect={(person) => {
+            setPersonSearchDraft(`${person.name} (${person.code})`);
+            setForm({ ...form, user_id: person.userId });
+          }}
+          emptyLabel={personType ? "No matching people" : "Select type first"}
+        />
+        {(personSearchDraft || form.user_id) && (
+          <div className="headerActions">
             <button
               className="secondaryAction"
               type="button"
@@ -207,18 +193,8 @@ export function LeaveView() {
             >
               Clear
             </button>
-          )}
-        </div>
-        <label>
-          Person
-          <select required disabled={!personType} value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}>
-            <option value="">{personType ? "Select..." : "Select type first"}</option>
-            {filteredPersonOptions.map((person) => (
-              <option key={person.userId} value={person.userId}>{person.name} ({person.code})</option>
-            ))}
-            {personType && filteredPersonOptions.length === 0 && <option disabled>No matching people</option>}
-          </select>
-        </label>
+          </div>
+        )}
         <label>
           Start
           <input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />

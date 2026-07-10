@@ -132,6 +132,20 @@ export interface AttendanceLogEntry {
   marked_by: AttendanceMarker;
   overridden: boolean;
 }
+export interface TeacherAttendanceLogEntry {
+  id: string;
+  teacher_id: string;
+  teacher_name: string;
+  employee_code: string;
+  attendance_date: string;
+  status: "present" | "absent" | "leave";
+  check_in: string | null;
+  check_out: string | null;
+  marked_at: string;
+  synced_at: string;
+  marked_by: AttendanceMarker;
+  overridden: boolean;
+}
 export interface ClassAttendanceHistory {
   session_id: string;
   session_name: string;
@@ -146,6 +160,16 @@ export interface StudentAttendanceHistory extends ClassAttendanceHistory {
 export interface AttendanceDateRange {
   start_date?: string;
   end_date?: string;
+}
+export interface TeacherAttendanceToday {
+  session_id: string;
+  teacher_id: string;
+  teacher_name: string;
+  attendance_date: string;
+  id: string | null;
+  status: "present" | "absent" | "leave" | null;
+  check_in: string | null;
+  check_out: string | null;
 }
 
 export const attendanceApi = {
@@ -162,6 +186,14 @@ export const attendanceApi = {
         params: range,
       })
       .then((r) => r.data),
+  myTeacherAttendanceToday: () =>
+    api.get<TeacherAttendanceToday>("/api/v1/attendance/teachers/me/today").then((r) => r.data),
+  teacherCheckIn: () =>
+    api.post<TeacherAttendanceToday>("/api/v1/attendance/teachers/me/check-in").then((r) => r.data),
+  teacherCheckOut: () =>
+    api.post<TeacherAttendanceToday>("/api/v1/attendance/teachers/me/check-out").then((r) => r.data),
+  teacherHistory: (params?: AttendanceDateRange & { teacher_id?: string }) =>
+    api.get<TeacherAttendanceLogEntry[]>("/api/v1/attendance/teachers/history", { params }).then((r) => r.data),
 };
 
 // --------------------------------------------------------------- Assessments
@@ -241,6 +273,7 @@ export interface TeacherDashboard {
   my_classes: { class_id: string; course_id: string; class_name: string; course_name: string }[];
   pending_submissions: number;
   today_timetable: TimetableEntry[];
+  today_attendance: TeacherAttendanceToday | null;
 }
 export interface StudentDashboard {
   role: "student";

@@ -1029,6 +1029,7 @@ button:disabled {
 }
 
 .searchBox,
+.searchDropdown,
 .inlineForm label,
 .settingsGrid label {
   display: grid;
@@ -1069,6 +1070,7 @@ button:disabled {
 }
 
 .searchBox input,
+.searchDropdown input,
 .inlineForm input,
 .inlineForm select,
 .settingsGrid select,
@@ -1085,9 +1087,55 @@ button:disabled {
 }
 
 .searchBox input:hover,
+.searchDropdown input:hover,
 .inlineForm input:hover,
 .inlineForm select:hover {
   border-color: var(--brand);
+}
+
+.searchDropdown {
+  position: relative;
+}
+
+.searchDropdownMenu {
+  position: absolute;
+  z-index: 20;
+  inset-block-start: calc(100% + 4px);
+  inset-inline: 0;
+  display: grid;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+
+.searchDropdownItem {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  text-align: start;
+  cursor: pointer;
+}
+
+.searchDropdownItem:hover {
+  background: var(--surface-2);
+}
+
+.searchDropdownItem small,
+.searchDropdownEmpty {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.searchDropdownEmpty {
+  padding: 10px 12px;
 }
 
 .notice {
