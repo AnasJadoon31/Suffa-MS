@@ -208,7 +208,16 @@ export function LeaveView() {
         </label>
         <label>
           Reason
-          <input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+          <select required value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}>
+            <option value="">Select reason...</option>
+            <option value="Sick Leave">Sick Leave</option>
+            <option value="Casual Leave">Casual Leave</option>
+            <option value="Maternity Leave">Maternity Leave</option>
+            <option value="Paternity Leave">Paternity Leave</option>
+            <option value="Bereavement Leave">Bereavement Leave</option>
+            <option value="Unpaid Leave">Unpaid Leave</option>
+            <option value="Other">Other</option>
+          </select>
         </label>
         <div className="formActions">
           <button className="primaryAction" type="submit"><Plus size={16} /> Request leave</button>
