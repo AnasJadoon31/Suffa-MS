@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class Scope(BaseModel):
     all: bool = False
     classes: list[UUID] = []
+    roles: list[str] = []
 
 
 # -------------------------------------------------------------- Timetable
@@ -165,6 +166,15 @@ class AnnouncementCreate(BaseModel):
     body: str
     attachment_link: str | None = None
     audience_scope: Scope = Scope(all=True)
+    publish_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
+class AnnouncementUpdate(BaseModel):
+    title: str | None = None
+    body: str | None = None
+    attachment_link: str | None = None
+    audience_scope: Scope | None = None
     publish_at: datetime | None = None
     expires_at: datetime | None = None
 

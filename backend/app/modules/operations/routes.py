@@ -29,6 +29,7 @@ from app.modules.operations.schemas import (
     AdmissionApplicationRead,
     AnnouncementCreate,
     AnnouncementRead,
+    AnnouncementUpdate,
     BlogPostCreate,
     BlogPostRead,
     ContactEnquiryCreate,
@@ -85,10 +86,15 @@ async def _viewer_class_id(session: AsyncSession, current_user: User, madrasa_id
     return enrollment.class_id if enrollment else None
 
 
-def _visible(scope: dict, viewer_class_id: UUID | None) -> bool:
-    if viewer_class_id is None:  # staff/non-student: not scope-restricted
-        return True
+def _visible(scope: dict, viewer_class_id: UUID | None, viewer_role: str | None = None) -> bool:
     if scope.get("all"):
+        return True
+        
+    allowed_roles = scope.get("roles", [])
+    if allowed_roles and viewer_role and viewer_role not in allowed_roles:
+        return False
+
+    if viewer_class_id is None:  # staff/non-student: not scope-restricted
         return True
     return str(viewer_class_id) in {str(c) for c in scope.get("classes", [])}
 
@@ -450,7 +456,7 @@ async def list_resources(
     result = await session.execute(stmt.order_by(Resource.title))
     rows = result.scalars().all()
     viewer_class_id = await _viewer_class_id(session, current_user, madrasa.id)
-    return [ResourceRead.model_validate(row) for row in rows if _visible(row.visibility_scope, viewer_class_id)]
+    return [ResourceRead.model_validate(row) for row in rows if _visible(row.visibility_scope, viewer_class_id, current_user.role.value)]
 
 
 # ------------------------------------------------------------------ Forms
@@ -488,7 +494,7 @@ async def list_forms(
     result = await session.execute(select(Form).where(Form.madrasa_id == madrasa.id).order_by(Form.title))
     rows = result.scalars().all()
     viewer_class_id = await _viewer_class_id(session, current_user, madrasa.id)
-    return [FormRead.model_validate(row) for row in rows if _visible(row.visibility_scope, viewer_class_id)]
+    return [FormRead.model_validate(row) for row in rows if _visible(row.visibility_scope, viewer_class_id, current_user.role.value)]
 
 
 @router.get("/forms/{form_id}", response_model=FormRead)
@@ -606,9 +612,55 @@ async def list_announcements(
             return False
         if row.expires_at and now > row.expires_at:
             return False
-        return _visible(row.audience_scope, viewer_class_id)
+        return _visible(row.audience_scope, viewer_class_id, current_user.role.value)
 
     return [AnnouncementRead.model_validate(row) for row in rows if _live(row)]
+
+
+@router.put("/announcements/{announcement_id}", response_model=AnnouncementRead)
+async def update_announcement(
+    announcement_id: UUID,
+    payload: AnnouncementUpdate,
+    current_user: User = Depends(require_permission("announcements.post")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AnnouncementRead:
+    announcement = await session.get(Announcement, announcement_id)
+    if not announcement or announcement.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+
+    if payload.title is not None:
+        announcement.title = payload.title
+    if payload.body is not None:
+        announcement.body = payload.body
+    if payload.attachment_link is not None:
+        announcement.attachment_link = payload.attachment_link
+    if payload.audience_scope is not None:
+        announcement.audience_scope = _scope_dump(payload.audience_scope)
+    if payload.publish_at is not None:
+        announcement.publish_at = payload.publish_at
+    if payload.expires_at is not None:
+        announcement.expires_at = payload.expires_at
+
+    await session.commit()
+    await session.refresh(announcement)
+    return AnnouncementRead.model_validate(announcement)
+
+
+@router.delete("/announcements/{announcement_id}")
+async def delete_announcement(
+    announcement_id: UUID,
+    current_user: User = Depends(require_permission("announcements.post")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    announcement = await session.get(Announcement, announcement_id)
+    if not announcement or announcement.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+
+    await session.delete(announcement)
+    await session.commit()
+    return {"ok": True}
 
 
 # ------------------------------------------------------------------- Blog

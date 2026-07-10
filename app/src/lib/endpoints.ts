@@ -313,7 +313,7 @@ export const reportingApi = {
 
 // -------------------------------------------------------------- Operations
 
-export interface Scope { all: boolean; classes: string[] }
+export interface Scope { all: boolean; classes: string[]; roles?: string[] }
 export interface TimetableSlot {
   id: string; class_id: string; section_id: string; course_id: string; teacher_id: string;
   day_of_week: number; period: number; start_time: string; end_time: string;
@@ -388,6 +388,10 @@ export const operationsApi = {
   createAnnouncement: (payload: {
     title: string; body: string; attachment_link?: string; audience_scope?: Scope; publish_at?: string; expires_at?: string;
   }) => api.post<Announcement>("/api/v1/operations/announcements", payload).then((r) => r.data),
+  updateAnnouncement: (id: string, payload: {
+    title?: string; body?: string; attachment_link?: string; audience_scope?: Scope; publish_at?: string; expires_at?: string;
+  }) => api.put<Announcement>(`/api/v1/operations/announcements/${id}`, payload).then((r) => r.data),
+  deleteAnnouncement: (id: string) => api.delete(`/api/v1/operations/announcements/${id}`).then((r) => r.data),
 
   listBlogPosts: (publishedOnly?: boolean) =>
     api.get<BlogPost[]>("/api/v1/operations/blog", { params: { published_only: publishedOnly } }).then((r) => r.data),

@@ -204,7 +204,7 @@ async def _todays_timetable(session: AsyncSession, madrasa_id, **filters) -> lis
 async def _teacher_dashboard(session: AsyncSession, madrasa: Madrasa, current_user: User) -> dict[str, object]:
     teacher = await _teacher_profile(session, current_user)
     if teacher is None:
-        return {"role": "teacher", "my_classes": [], "pending_submissions": 0, "today_timetable": [], "today_attendance": None}
+        return {"role": "teacher", "my_classes": [], "pending_submissions": 0, "today_timetable": [], "today_attendance": None, "announcements": []}
 
     active_session_id = await _active_session_id(session, madrasa.id)
 
@@ -262,12 +262,23 @@ async def _teacher_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
             "check_out": record.check_out.isoformat() if record and record.check_out else None,
         }
 
+    now = datetime.now(timezone.utc)
+    announcement_rows = (
+        await session.execute(select(Announcement).where(Announcement.madrasa_id == madrasa.id))
+    ).scalars().all()
+    announcements = [
+        {"id": str(a.id), "title": a.title, "body": a.body}
+        for a in announcement_rows
+        if _visible(a.audience_scope, None, current_user.role.value) and (a.expires_at is None or a.expires_at >= now)
+    ]
+
     return {
         "role": "teacher",
         "my_classes": my_classes,
         "pending_submissions": pending_submissions,
         "today_timetable": today_timetable,
         "today_attendance": today_attendance,
+        "announcements": announcements,
     }
 
 
@@ -337,7 +348,7 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
     resources = [
         {"id": str(r.id), "title": r.title}
         for r in resource_rows
-        if _visible(r.visibility_scope, viewer_class_id)
+        if _visible(r.visibility_scope, viewer_class_id, current_user.role.value)
     ]
 
     now = datetime.now(timezone.utc)
@@ -347,7 +358,7 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
     announcements = [
         {"id": str(a.id), "title": a.title, "body": a.body}
         for a in announcement_rows
-        if _visible(a.audience_scope, viewer_class_id) and (a.expires_at is None or a.expires_at >= now)
+        if _visible(a.audience_scope, viewer_class_id, current_user.role.value) and (a.expires_at is None or a.expires_at >= now)
     ]
 
     return {
