@@ -44,11 +44,11 @@ export const academicsApi = {
 // -------------------------------------------------------------------- People
 
 export interface Teacher {
-  id: string; employee_code: string; name: string; whatsapp_number: string; qualifications: string | null;
+  id: string; user_id: string; employee_code: string; name: string; whatsapp_number: string; qualifications: string | null;
   join_date: string | null; status: string; notes: string | null; created_at: string; set_password_url?: string;
 }
 export interface Student {
-  id: string; admission_number: string; name: string; date_of_birth: string; status: string;
+  id: string; user_id: string; admission_number: string; name: string; date_of_birth: string; status: string;
   portal_enabled: boolean; notes: string | null; created_at: string; set_password_url?: string;
 }
 export interface Guardian {

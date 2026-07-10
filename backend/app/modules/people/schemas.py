@@ -25,6 +25,7 @@ class TeacherUpdate(BaseModel):
 class TeacherRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    user_id: UUID
     employee_code: str
     name: str
     whatsapp_number: str
@@ -59,6 +60,7 @@ class StudentUpdate(BaseModel):
 class StudentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    user_id: UUID
     admission_number: str
     name: str
     date_of_birth: date
