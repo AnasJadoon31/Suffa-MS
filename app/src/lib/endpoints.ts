@@ -131,6 +131,9 @@ export interface AttendanceLogEntry {
   synced_at: string;
   marked_by: AttendanceMarker;
   overridden: boolean;
+  source: "manual" | "approved_leave";
+  locked_reason: "approved_leave" | null;
+  leave_id: string | null;
 }
 export interface TeacherAttendanceLogEntry {
   id: string;
@@ -353,7 +356,7 @@ export const operationsApi = {
 
   listLeave: (userId?: string) =>
     api.get<Leave[]>("/api/v1/operations/leave", { params: { user_id: userId } }).then((r) => r.data),
-  createLeave: (payload: { user_id: string; start_date: string; end_date: string; reason?: string }) =>
+  createLeave: (payload: { user_id?: string; start_date: string; end_date: string; reason?: string }) =>
     api.post<Leave>("/api/v1/operations/leave", payload).then((r) => r.data),
   setLeaveStatus: (id: string, status: string) =>
     api.post<Leave>(`/api/v1/operations/leave/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),

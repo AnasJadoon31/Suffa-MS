@@ -225,6 +225,7 @@ function AttendanceHistoryTable({
           )}
           <span>
             <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
+            {entry.source === "approved_leave" && <small className="syncBadge">Approved leave</small>}
             {entry.overridden && <small className="syncBadge">{t("overriddenLabel")}</small>}
           </span>
           <span>
@@ -264,7 +265,6 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const canOverride = hasPermission("attendance.edit_locked");
   const lockedEntries = entries.filter((entry) => lockedKeys.includes(entry.idempotency_key));
   const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
-  const markedCount = Object.keys(marked).length;
 
   // Calendar tab
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -411,6 +411,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   }, [activeTab, selectedClassId, selectedStudentId, studentMonth, t]);
 
   function mark(studentId: string, status: AttendanceStatus): void {
+    if (approvedLeaveStudentIds.has(studentId)) return;
     setMarked((current) => ({ ...current, [studentId]: status }));
     setHasUnsavedMarks(true);
     setSaveMessage("");
@@ -421,10 +422,11 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setIsSavingAttendance(true);
     setError("");
     try {
-      await queueAttendanceBatch(marked);
+      const editableMarks = Object.fromEntries(activeMarkedEntries);
+      await queueAttendanceBatch(editableMarks);
       const todayKey = toDateKey(new Date());
       const nowIso = new Date().toISOString();
-      const optimisticEntries: AttendanceLogEntry[] = Object.entries(marked).map(([studentId, status]) => {
+      const optimisticEntries: AttendanceLogEntry[] = activeMarkedEntries.map(([studentId, status]) => {
         const student = roster.students.find((item) => item.id === studentId);
         return {
           id: `optimistic-${studentId}-${todayKey}`,
@@ -437,12 +439,15 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           synced_at: nowIso,
           marked_by: { id: user.id, username: user.username, display_name: user.username, role: user.role },
           overridden: false,
+          source: "manual",
+          locked_reason: null,
+          leave_id: null,
         };
       });
       setClassHistory((current) => {
         const base = current ?? { session_id: sessionId, session_name: "", class_id: selectedClassId ?? "", class_name: "", entries: [] };
         const untouched = base.entries.filter(
-          (entry) => !(entry.attendance_date === todayKey && marked[entry.student_id]),
+          (entry) => !(entry.attendance_date === todayKey && editableMarks[entry.student_id]),
         );
         return { ...base, entries: [...untouched, ...optimisticEntries] };
       });
@@ -467,8 +472,15 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const selectedDayEntries = selectedDate
     ? (classHistory?.entries ?? []).filter((entry) => entry.attendance_date === selectedDate)
     : [];
+  const approvedLeaveStudentIds = useMemo(
+    () => new Set(selectedDayEntries.filter((entry) => entry.source === "approved_leave").map((entry) => entry.student_id)),
+    [selectedDayEntries],
+  );
+  const activeMarkedEntries = Object.entries(marked).filter(([studentId]) => !approvedLeaveStudentIds.has(studentId));
+  const markedCount = activeMarkedEntries.length;
   const isSelectedToday = selectedDate === todayKey;
-  const showMarkForm = isSelectedToday && (selectedDayEntries.length === 0 || editingToday);
+  const onlyApprovedLeaveEntries = selectedDayEntries.length > 0 && selectedDayEntries.every((entry) => entry.source === "approved_leave");
+  const showMarkForm = isSelectedToday && (selectedDayEntries.length === 0 || onlyApprovedLeaveEntries || editingToday);
 
   const studentDayStatus = buildStudentDayStatus(studentHistory?.entries ?? []);
   const studentDayEntries = studentSelectedDate
@@ -488,7 +500,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
   function startEditingToday(): void {
     const prefill: Record<string, AttendanceStatus> = {};
-    for (const entry of selectedDayEntries) prefill[entry.student_id] = entry.status;
+    for (const entry of selectedDayEntries) {
+      if (entry.source !== "approved_leave") prefill[entry.student_id] = entry.status;
+    }
     setMarked(prefill);
     setEditingToday(true);
     setHasUnsavedMarks(false);
@@ -521,7 +535,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         <div className="notice notice-warning">
           <p>
             {lockedEntries.length} entr{lockedEntries.length === 1 ? "y" : "ies"} rejected - attendance day is locked
-            (past 23:59).
+            or covered by approved leave.
           </p>
           {canOverride ? (
             <ul>
@@ -628,12 +642,14 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               <div className="roster">
                 {isLoadingRoster && <p className="emptyState">{t("loadingLabel")}</p>}
                 {!isLoadingRoster && roster?.students.map((student) => {
-                  const status = marked[student.id];
+                  const isApprovedLeaveLocked = approvedLeaveStudentIds.has(student.id);
+                  const status = isApprovedLeaveLocked ? "leave" : marked[student.id];
                   return (
                     <article className="rosterRow" key={student.id}>
                       <div>
                         <strong>{student.name}</strong>
                         <small>{student.admission_number}{student.section_name ? ` - ${student.section_name}` : ""}</small>
+                        {isApprovedLeaveLocked && <span className="syncBadge">Approved leave</span>}
                       </div>
                       <div className="statusButtons" aria-label={`Attendance for ${student.name}`}>
                         {attendanceOptions.map((option) => (
@@ -641,7 +657,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                             className={status === option ? `statusButton active ${option}` : "statusButton"}
                             key={option}
                             type="button"
-                            disabled={!sessionId}
+                            disabled={!sessionId || isApprovedLeaveLocked}
                             onClick={() => mark(student.id, option)}
                           >
                             {t(option)}

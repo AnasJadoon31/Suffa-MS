@@ -1,7 +1,7 @@
 import json
 from collections import defaultdict
 from datetime import UTC, date, datetime, time
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, select
@@ -61,6 +61,13 @@ def _record_snapshot(record: StudentAttendance | TeacherAttendance) -> dict[str,
         snapshot["check_in"] = record.check_in.isoformat() if record.check_in else None
         snapshot["check_out"] = record.check_out.isoformat() if record.check_out else None
     return snapshot
+
+
+def _iter_days(start_date: date, end_date: date):
+    current = start_date
+    while current <= end_date:
+        yield current
+        current = date.fromordinal(current.toordinal() + 1)
 
 
 def record_correction(
@@ -394,6 +401,128 @@ def _history_entry_from_row(row) -> AttendanceLogEntry:
     )
 
 
+async def _approved_leave_history_entries(
+    session: AsyncSession,
+    *,
+    madrasa_id: UUID,
+    student_ids: set[UUID],
+    start_date: date,
+    end_date: date,
+) -> list[AttendanceLogEntry]:
+    if not student_ids:
+        return []
+
+    rows = (
+        await session.execute(
+            select(
+                StudentProfile.id,
+                StudentProfile.admission_number,
+                StudentProfile.name,
+                Leave.id,
+                Leave.start_date,
+                Leave.end_date,
+                Leave.created_at,
+                Leave.updated_at,
+                User.id,
+                User.username,
+                User.role,
+            )
+            .join(Leave, Leave.user_id == StudentProfile.user_id)
+            .join(User, User.id == StudentProfile.user_id)
+            .where(
+                StudentProfile.madrasa_id == madrasa_id,
+                StudentProfile.id.in_(student_ids),
+                Leave.madrasa_id == madrasa_id,
+                Leave.status == "approved",
+                Leave.start_date <= end_date,
+                Leave.end_date >= start_date,
+            )
+        )
+    ).all()
+
+    entries: list[AttendanceLogEntry] = []
+    seen_days: set[tuple[UUID, date]] = set()
+    for (
+        student_id,
+        admission_number,
+        student_name,
+        leave_id,
+        leave_start,
+        leave_end,
+        leave_created_at,
+        leave_updated_at,
+        user_id,
+        username,
+        role,
+    ) in rows:
+        for day in _iter_days(max(leave_start, start_date), min(leave_end, end_date)):
+            day_key = (student_id, day)
+            if day_key in seen_days:
+                continue
+            seen_days.add(day_key)
+            entries.append(
+                AttendanceLogEntry(
+                    id=uuid5(NAMESPACE_URL, f"suffa-ms:approved-leave:{leave_id}:{student_id}:{day.isoformat()}"),
+                    attendance_date=day,
+                    student_id=student_id,
+                    student_name=student_name,
+                    admission_number=admission_number,
+                    status=AttendanceStatus.leave,
+                    marked_at=leave_updated_at or leave_created_at,
+                    synced_at=leave_updated_at or leave_created_at,
+                    marked_by=AttendanceMarkerRead(
+                        id=user_id,
+                        username=username,
+                        display_name=student_name,
+                        role=str(role.value if hasattr(role, "value") else role),
+                    ),
+                    overridden=False,
+                    source="approved_leave",
+                    locked_reason="approved_leave",
+                    leave_id=leave_id,
+                )
+            )
+    return entries
+
+
+def _merge_approved_leave_entries(
+    manual_entries: list[AttendanceLogEntry],
+    approved_leave_entries: list[AttendanceLogEntry],
+) -> list[AttendanceLogEntry]:
+    locked_days = {(entry.student_id, entry.attendance_date) for entry in approved_leave_entries}
+    visible_manual = [
+        entry for entry in manual_entries
+        if (entry.student_id, entry.attendance_date) not in locked_days
+    ]
+    return sorted(
+        [*visible_manual, *approved_leave_entries],
+        key=lambda entry: (-entry.attendance_date.toordinal(), entry.student_name),
+    )
+
+
+async def _student_has_approved_leave(
+    session: AsyncSession,
+    *,
+    madrasa_id: UUID,
+    student_id: UUID,
+    attendance_date: date,
+) -> bool:
+    return (
+        await session.execute(
+            select(Leave.id)
+            .join(StudentProfile, StudentProfile.user_id == Leave.user_id)
+            .where(
+                StudentProfile.madrasa_id == madrasa_id,
+                StudentProfile.id == student_id,
+                Leave.madrasa_id == madrasa_id,
+                Leave.status == "approved",
+                Leave.start_date <= attendance_date,
+                Leave.end_date >= attendance_date,
+            )
+        )
+    ).scalar_one_or_none() is not None
+
+
 def _teacher_history_entry_from_row(row) -> TeacherAttendanceLogEntry:
     (
         attendance_id,
@@ -543,7 +672,36 @@ async def _class_history_entries(
             stmt.order_by(StudentAttendance.attendance_date.desc(), StudentProfile.name)
         )
     ).all()
-    return [_history_entry_from_row(row) for row in rows]
+    manual_entries = [_history_entry_from_row(row) for row in rows]
+
+    if start_date is None or end_date is None:
+        return manual_entries
+
+    if student_id is not None:
+        student_ids = {student_id}
+    else:
+        student_id_rows = (
+            await session.execute(
+                select(StudentProfile.id)
+                .join(Enrollment, Enrollment.student_id == StudentProfile.id)
+                .where(
+                    Enrollment.madrasa_id == madrasa_id,
+                    Enrollment.session_id == session_id,
+                    Enrollment.class_id == class_id,
+                    StudentProfile.status == "active",
+                )
+            )
+        ).all()
+        student_ids = {row[0] for row in student_id_rows}
+
+    approved_leave_entries = await _approved_leave_history_entries(
+        session,
+        madrasa_id=madrasa_id,
+        student_ids=student_ids,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return _merge_approved_leave_entries(manual_entries, approved_leave_entries)
 
 
 @router.get("/classes/{class_id}/history", response_model=ClassAttendanceHistoryResponse)
@@ -566,13 +724,15 @@ async def attendance_class_history(
 
     await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
 
+    effective_start = start_date or active_session.gregorian_start
+    effective_end = end_date or active_session.gregorian_end
     entries = await _class_history_entries(
         session,
         madrasa_id=madrasa.id,
         session_id=active_session.id,
         class_id=class_id,
-        start_date=start_date,
-        end_date=end_date,
+        start_date=effective_start,
+        end_date=effective_end,
     )
     return ClassAttendanceHistoryResponse(
         session_id=active_session.id,
@@ -621,14 +781,16 @@ async def attendance_student_history(
     if student_row is None:
         raise HTTPException(status_code=404, detail="Student not found in this class")
 
+    effective_start = start_date or active_session.gregorian_start
+    effective_end = end_date or active_session.gregorian_end
     entries = await _class_history_entries(
         session,
         madrasa_id=madrasa.id,
         session_id=active_session.id,
         class_id=class_id,
         student_id=student_id,
-        start_date=start_date,
-        end_date=end_date,
+        start_date=effective_start,
+        end_date=effective_end,
     )
     return StudentAttendanceHistoryResponse(
         session_id=active_session.id,
@@ -866,6 +1028,14 @@ async def sync_attendance(
 
     for entry in payload.entries:
         await _assert_can_mark_entry(current_user, session, madrasa.id, entry)
+        if entry.subject_type == "student" and await _student_has_approved_leave(
+            session,
+            madrasa_id=madrasa.id,
+            student_id=entry.subject_id,
+            attendance_date=entry.attendance_date,
+        ):
+            locked_keys.append(entry.idempotency_key)
+            continue
         model = StudentAttendance if entry.subject_type == "student" else TeacherAttendance
         subject_col = model.student_id if entry.subject_type == "student" else model.teacher_id
 
@@ -942,6 +1112,13 @@ async def override_locked_attendance(
 ) -> AttendanceOverrideResponse:
     entry = payload.entry
     await _assert_can_mark_entry(current_user, session, madrasa.id, entry)
+    if entry.subject_type == "student" and await _student_has_approved_leave(
+        session,
+        madrasa_id=madrasa.id,
+        student_id=entry.subject_id,
+        attendance_date=entry.attendance_date,
+    ):
+        raise HTTPException(status_code=409, detail="Approved leave is locked until the leave status is rejected")
     model = StudentAttendance if entry.subject_type == "student" else TeacherAttendance
     subject_col = model.student_id if entry.subject_type == "student" else model.teacher_id
 
@@ -1079,25 +1256,30 @@ async def compute_attendance_summary(
             )
         ).all()
 
-    def excluded_reason(day: date) -> str | None:
+    def is_holiday(day: date) -> bool:
         for h_start, h_end in holidays:
             if h_start <= day <= h_end:
-                return "holiday"
+                return True
+        return False
+
+    def has_approved_leave(day: date) -> bool:
         for l_start, l_end in approved_leave:
             if l_start <= day <= l_end:
-                return "leave"
-        return None
+                return True
+        return False
 
     counts = {"present": 0, "absent": 0, "leave": 0}
     excluded_days = 0
     days: list[AttendanceDayBreakdown] = []
     current = start_date
     while current <= end_date:
-        reason = excluded_reason(current)
         status_value = by_date.get(current)
-        if reason:
+        if is_holiday(current):
             excluded_days += 1
-            days.append(AttendanceDayBreakdown(attendance_date=current, excluded_reason=reason))
+            days.append(AttendanceDayBreakdown(attendance_date=current, excluded_reason="holiday"))
+        elif has_approved_leave(current):
+            counts["leave"] += 1
+            days.append(AttendanceDayBreakdown(attendance_date=current, status=AttendanceStatus.leave))
         elif status_value is not None:
             counts[str(status_value.value if isinstance(status_value, AttendanceStatus) else status_value)] += 1
             days.append(AttendanceDayBreakdown(attendance_date=current, status=status_value))

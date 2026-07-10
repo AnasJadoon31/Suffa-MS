@@ -87,6 +87,9 @@ class AttendanceLogEntry(BaseModel):
     synced_at: datetime
     marked_by: AttendanceMarkerRead
     overridden: bool = False
+    source: str = "manual"
+    locked_reason: Optional[str] = None
+    leave_id: Optional[UUID] = None
 
 
 class TeacherAttendanceLogEntry(BaseModel):

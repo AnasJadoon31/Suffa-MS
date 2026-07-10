@@ -54,7 +54,7 @@ class HolidayRead(BaseModel):
 
 
 class LeaveCreate(BaseModel):
-    user_id: UUID
+    user_id: UUID | None = None
     start_date: date
     end_date: date
     reason: str | None = None

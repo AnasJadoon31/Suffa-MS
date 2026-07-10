@@ -409,7 +409,7 @@ async def attendance_report(
         rows.append(
             [student.admission_number, student.name, str(summary.present), str(summary.absent), str(summary.leave), str(summary.excluded_days)]
         )
-    headers = ["Admission #", "Name", "Present", "Absent", "Leave", "Excluded (holiday/leave)"]
+    headers = ["Admission #", "Name", "Present", "Absent", "Leave", "Excluded holidays"]
 
     filename = f"attendance-summary-{start_date}-to-{end_date}"
     if format == "csv":

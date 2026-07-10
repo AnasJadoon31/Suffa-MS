@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_madrasa, get_current_user, get_optional_user, require_permission
+from app.core.dependencies import get_current_madrasa, get_current_user, get_optional_user, require_permission, user_has_permission
 from app.db.session import get_session
 from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
 from app.modules.auth.models import User, UserRole
@@ -279,14 +279,28 @@ async def list_holidays(
 @router.post("/leave", response_model=LeaveRead)
 async def create_leave(
     payload: LeaveCreate,
-    current_user: User = Depends(require_permission("timetable.manage")),
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> LeaveRead:
-    target_user = await session.get(User, payload.user_id)
+    if payload.end_date < payload.start_date:
+        raise HTTPException(status_code=400, detail="End date must be on or after start date")
+
+    can_manage_leave = await user_has_permission(current_user, "timetable.manage", session)
+    target_user_id = payload.user_id or current_user.id
+    if target_user_id != current_user.id and not can_manage_leave:
+        raise HTTPException(status_code=403, detail="You can only request leave for your own account")
+
+    target_user = await session.get(User, target_user_id)
     if target_user is None or target_user.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Person not found")
-    leave = Leave(madrasa_id=madrasa.id, **payload.model_dump())
+    leave = Leave(
+        madrasa_id=madrasa.id,
+        user_id=target_user_id,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        reason=payload.reason,
+    )
     session.add(leave)
     await session.commit()
     await session.refresh(leave)
@@ -295,14 +309,19 @@ async def create_leave(
 
 @router.get("/leave", response_model=list[LeaveRead])
 async def list_leave(
-    current_user: User = Depends(require_permission("timetable.manage")),
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     user_id: UUID | None = None,
 ) -> list[LeaveRead]:
+    can_manage_leave = await user_has_permission(current_user, "timetable.manage", session)
     stmt = select(Leave).where(Leave.madrasa_id == madrasa.id)
     if user_id:
+        if user_id != current_user.id and not can_manage_leave:
+            raise HTTPException(status_code=403, detail="You can only view your own leave records")
         stmt = stmt.where(Leave.user_id == user_id)
+    elif not can_manage_leave:
+        stmt = stmt.where(Leave.user_id == current_user.id)
     result = await session.execute(stmt.order_by(Leave.start_date))
     return await _leave_reads(session, list(result.scalars().all()), madrasa.id)
 
