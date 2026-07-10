@@ -18,6 +18,15 @@ function resolvePerson(record: Leave, personByUserId: Map<string, { name: string
   };
 }
 
+type PersonType = "" | "teacher" | "student";
+
+type PersonOption = {
+  userId: string;
+  name: string;
+  type: Exclude<PersonType, "">;
+  code: string;
+};
+
 export function LeaveView() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("timetable.manage");
@@ -25,6 +34,7 @@ export function LeaveView() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [form, setForm] = useState({ user_id: "", start_date: "", end_date: "", reason: "" });
+  const [personType, setPersonType] = useState<PersonType>("");
   const [personSearchDraft, setPersonSearchDraft] = useState("");
   const [personSearchQuery, setPersonSearchQuery] = useState("");
   const [searchDraft, setSearchDraft] = useState("");
@@ -52,21 +62,30 @@ export function LeaveView() {
     return people;
   }, [teachers, students]);
 
-  const filteredTeachers = useMemo(() => {
-    const query = personSearchQuery.trim().toLowerCase();
-    if (!query) return teachers;
-    return teachers.filter((teacher) => (
-      [teacher.name, teacher.employee_code, "teacher"].some((value) => value.toLowerCase().includes(query))
-    ));
-  }, [personSearchQuery, teachers]);
+  const personOptions = useMemo<PersonOption[]>(() => [
+    ...teachers.map((teacher) => ({
+      userId: teacher.user_id,
+      name: teacher.name,
+      type: "teacher" as const,
+      code: teacher.employee_code,
+    })),
+    ...students.map((student) => ({
+      userId: student.user_id,
+      name: student.name,
+      type: "student" as const,
+      code: student.admission_number,
+    })),
+  ], [students, teachers]);
 
-  const filteredStudents = useMemo(() => {
+  const filteredPersonOptions = useMemo(() => {
+    if (!personType) return [];
     const query = personSearchQuery.trim().toLowerCase();
-    if (!query) return students;
-    return students.filter((student) => (
-      [student.name, student.admission_number, "student"].some((value) => value.toLowerCase().includes(query))
+    const typedPeople = personOptions.filter((person) => person.type === personType);
+    if (!query) return typedPeople;
+    return typedPeople.filter((person) => (
+      [person.name, person.code, person.type].some((value) => value.toLowerCase().includes(query))
     ));
-  }, [personSearchQuery, students]);
+  }, [personOptions, personSearchQuery, personType]);
 
   const filteredLeave = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -84,6 +103,27 @@ export function LeaveView() {
       ].some((value) => value.toLowerCase().includes(query));
     });
   }, [leave, personByUserId, searchQuery]);
+
+  const applyPersonSearch = () => {
+    if (!personType) return;
+    const query = personSearchDraft.trim();
+    const loweredQuery = query.toLowerCase();
+    const matches = personOptions.filter((person) => (
+      person.type === personType
+      && (!loweredQuery || [person.name, person.code, person.type].some((value) => value.toLowerCase().includes(loweredQuery)))
+    ));
+
+    setPersonSearchQuery(query);
+    setForm({ ...form, user_id: matches.length === 1 ? matches[0].userId : "" });
+  };
+
+  const resetPersonSearch = () => {
+    setPersonSearchDraft("");
+    setPersonSearchQuery("");
+    setForm({ ...form, user_id: "" });
+  };
+
+  const showActionColumn = canManage && filteredLeave.some((record) => record.status === "pending");
 
   if (!canManage) {
     return (
@@ -111,6 +151,7 @@ export function LeaveView() {
           try {
             await operationsApi.createLeave(form);
             setForm({ user_id: "", start_date: "", end_date: "", reason: "" });
+            setPersonType("");
             setPersonSearchDraft("");
             setPersonSearchQuery("");
             await load();
@@ -120,16 +161,31 @@ export function LeaveView() {
         }}
       >
         <label>
+          Person type
+          <select
+            required
+            value={personType}
+            onChange={(e) => {
+              setPersonType(e.target.value as PersonType);
+              resetPersonSearch();
+            }}
+          >
+            <option value="">Select type...</option>
+            <option value="teacher">Teacher</option>
+            <option value="student">Student</option>
+          </select>
+        </label>
+        <label>
           Find person
           <input
-            placeholder="Name, code, admission #, or type"
+            disabled={!personType}
+            placeholder={personType === "teacher" ? "Name or employee code" : personType === "student" ? "Name or admission #" : "Select type first"}
             value={personSearchDraft}
             onChange={(e) => setPersonSearchDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                setForm({ ...form, user_id: "" });
-                setPersonSearchQuery(personSearchDraft);
+                applyPersonSearch();
               }
             }}
           />
@@ -137,23 +193,17 @@ export function LeaveView() {
         <div className="headerActions">
           <button
             className="secondaryAction"
+            disabled={!personType}
             type="button"
-            onClick={() => {
-              setForm({ ...form, user_id: "" });
-              setPersonSearchQuery(personSearchDraft);
-            }}
+            onClick={applyPersonSearch}
           >
             <Search size={16} /> Search
           </button>
-          {personSearchQuery && (
+          {(personSearchQuery || personSearchDraft || form.user_id) && (
             <button
               className="secondaryAction"
               type="button"
-              onClick={() => {
-                setPersonSearchDraft("");
-                setPersonSearchQuery("");
-                setForm({ ...form, user_id: "" });
-              }}
+              onClick={resetPersonSearch}
             >
               Clear
             </button>
@@ -161,20 +211,12 @@ export function LeaveView() {
         </div>
         <label>
           Person
-          <select required value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}>
-            <option value="">Select...</option>
-            <optgroup label="Teachers">
-              {filteredTeachers.map((teacher) => (
-                <option key={teacher.user_id} value={teacher.user_id}>{teacher.name}</option>
-              ))}
-              {personSearchQuery && filteredTeachers.length === 0 && <option disabled>No matching teachers</option>}
-            </optgroup>
-            <optgroup label="Students">
-              {filteredStudents.map((student) => (
-                <option key={student.user_id} value={student.user_id}>{student.name}</option>
-              ))}
-              {personSearchQuery && filteredStudents.length === 0 && <option disabled>No matching students</option>}
-            </optgroup>
+          <select required disabled={!personType} value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}>
+            <option value="">{personType ? "Select..." : "Select type first"}</option>
+            {filteredPersonOptions.map((person) => (
+              <option key={person.userId} value={person.userId}>{person.name} ({person.code})</option>
+            ))}
+            {personType && filteredPersonOptions.length === 0 && <option disabled>No matching people</option>}
           </select>
         </label>
         <label>
@@ -236,7 +278,7 @@ export function LeaveView() {
           <span>End</span>
           <span>Reason</span>
           <span>Status</span>
-          <span></span>
+          {showActionColumn && <span>Actions</span>}
         </div>
         {leave.length === 0 && <p className="emptyState">No leave records.</p>}
         {leave.length > 0 && filteredLeave.length === 0 && <p className="emptyState">No leave records match this search.</p>}
@@ -251,18 +293,20 @@ export function LeaveView() {
               <span>{record.end_date}</span>
               <span>{record.reason || "-"}</span>
               <span>{displayType(record.status)}</span>
-              <span>
-                {canManage && record.status === "pending" && (
-                  <>
-                    <button className="tableAction" type="button" onClick={async () => { await operationsApi.setLeaveStatus(record.id, "approved"); await load(); }}>
-                      <CheckCircle2 size={14} />
-                    </button>
-                    <button className="tableAction" type="button" onClick={async () => { await operationsApi.setLeaveStatus(record.id, "rejected"); await load(); }}>
-                      <XCircle size={14} />
-                    </button>
-                  </>
-                )}
-              </span>
+              {showActionColumn && (
+                <span>
+                  {record.status === "pending" && (
+                    <>
+                      <button className="tableAction" type="button" onClick={async () => { await operationsApi.setLeaveStatus(record.id, "approved"); await load(); }}>
+                        <CheckCircle2 size={14} />
+                      </button>
+                      <button className="tableAction" type="button" onClick={async () => { await operationsApi.setLeaveStatus(record.id, "rejected"); await load(); }}>
+                        <XCircle size={14} />
+                      </button>
+                    </>
+                  )}
+                </span>
+              )}
             </div>
           );
         })}
