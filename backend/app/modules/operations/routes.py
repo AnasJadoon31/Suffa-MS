@@ -96,6 +96,64 @@ def _scope_dump(scope) -> dict:
     return scope.model_dump(mode="json") if hasattr(scope, "model_dump") else scope
 
 
+def _role_value(role: UserRole | str | None) -> str | None:
+    if role is None:
+        return None
+    return role.value if isinstance(role, UserRole) else str(role)
+
+
+async def _leave_reads(session: AsyncSession, rows: list[Leave], madrasa_id: UUID) -> list[LeaveRead]:
+    user_ids = list({row.user_id for row in rows})
+    users_by_id: dict[UUID, User] = {}
+    teachers_by_user_id: dict[UUID, TeacherProfile] = {}
+    students_by_user_id: dict[UUID, StudentProfile] = {}
+
+    if user_ids:
+        users = await session.execute(select(User).where(User.id.in_(user_ids), User.madrasa_id == madrasa_id))
+        users_by_id = {user.id: user for user in users.scalars().all()}
+
+        teachers = await session.execute(
+            select(TeacherProfile).where(TeacherProfile.user_id.in_(user_ids), TeacherProfile.madrasa_id == madrasa_id)
+        )
+        teachers_by_user_id = {teacher.user_id: teacher for teacher in teachers.scalars().all()}
+
+        students = await session.execute(
+            select(StudentProfile).where(StudentProfile.user_id.in_(user_ids), StudentProfile.madrasa_id == madrasa_id)
+        )
+        students_by_user_id = {student.user_id: student for student in students.scalars().all()}
+
+    enriched: list[LeaveRead] = []
+    for row in rows:
+        user = users_by_id.get(row.user_id)
+        teacher = teachers_by_user_id.get(row.user_id)
+        student = students_by_user_id.get(row.user_id)
+        person_name: str | None = None
+        person_type: str | None = None
+
+        if user is not None and user.role == UserRole.teacher and teacher:
+            person_name = teacher.name
+            person_type = "teacher"
+        elif user is not None and user.role == UserRole.student and student:
+            person_name = student.name
+            person_type = "student"
+        elif teacher:
+            person_name = teacher.name
+            person_type = "teacher"
+        elif student:
+            person_name = student.name
+            person_type = "student"
+        elif user:
+            person_name = user.username
+            person_type = _role_value(user.role)
+
+        data = LeaveRead.model_validate(row).model_dump()
+        data["person_name"] = person_name
+        data["person_type"] = person_type
+        enriched.append(LeaveRead(**data))
+
+    return enriched
+
+
 # ------------------------------------------------------------- Timetable
 
 @router.post("/timetable", response_model=TimetableSlotRead)
@@ -225,16 +283,19 @@ async def create_leave(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> LeaveRead:
+    target_user = await session.get(User, payload.user_id)
+    if target_user is None or target_user.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Person not found")
     leave = Leave(madrasa_id=madrasa.id, **payload.model_dump())
     session.add(leave)
     await session.commit()
     await session.refresh(leave)
-    return LeaveRead.model_validate(leave)
+    return (await _leave_reads(session, [leave], madrasa.id))[0]
 
 
 @router.get("/leave", response_model=list[LeaveRead])
 async def list_leave(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("timetable.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     user_id: UUID | None = None,
@@ -243,7 +304,7 @@ async def list_leave(
     if user_id:
         stmt = stmt.where(Leave.user_id == user_id)
     result = await session.execute(stmt.order_by(Leave.start_date))
-    return [LeaveRead.model_validate(row) for row in result.scalars().all()]
+    return await _leave_reads(session, list(result.scalars().all()), madrasa.id)
 
 
 @router.post("/leave/{leave_id}/status", response_model=LeaveRead)
@@ -262,7 +323,7 @@ async def set_leave_status(
     leave.status = status_value
     await session.commit()
     await session.refresh(leave)
-    return LeaveRead.model_validate(leave)
+    return (await _leave_reads(session, [leave], madrasa.id))[0]
 
 
 # --------------------------------------------------------------- Resources
@@ -663,5 +724,3 @@ async def upsert_setting(
     await session.commit()
     await session.refresh(setting)
     return SettingRead.model_validate(setting)
-
-

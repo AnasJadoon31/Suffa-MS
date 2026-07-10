@@ -25,7 +25,8 @@ void i18next.use(initReactI18next).init({
 
         descDashboard: "Everything that needs your attention today, in one place.",
         descAttendance: "Mark the roster — works offline, syncs when you're back online.",
-        descTimetable: "Class schedule, holiday calendar, and leave requests.",
+        descTimetable: "Class schedule and holiday calendar.",
+        descLeave: "Teacher and student leave requests.",
         descAnnouncements: "Notices for classes, teachers, and parents.",
         descAcademics: "Programs, classes, sections, courses, and sessions.",
         descAssessments: "Assignments, grading pipeline, and published results.",
@@ -256,7 +257,8 @@ void i18next.use(initReactI18next).init({
 
         descDashboard: "آج جن چیزوں پر توجہ درکار ہے، سب ایک جگہ۔",
         descAttendance: "حاضری لگائیں — آف لائن بھی کام کرتی ہے، آن لائن ہوتے ہی سنک۔",
-        descTimetable: "کلاس شیڈول، تعطیلات کا کیلنڈر، اور رخصت کی درخواستیں۔",
+        descTimetable: "کلاس شیڈول اور تعطیلات کا کیلنڈر۔",
+        descLeave: "اساتذہ اور طلبہ کی رخصت کی درخواستیں۔",
         descAnnouncements: "جماعتوں، اساتذہ اور والدین کے لیے اطلاعات۔",
         descAcademics: "پروگرام، جماعتیں، سیکشنز، کورسز اور سیشنز۔",
         descAssessments: "اسائنمنٹس، گریڈنگ کا نظام، اور شائع شدہ نتائج۔",

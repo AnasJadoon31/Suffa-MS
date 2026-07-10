@@ -283,7 +283,10 @@ export interface TimetableSlot {
   day_of_week: number; period: number; start_time: string; end_time: string;
 }
 export interface Holiday { id: string; name: string; start_date: string; end_date: string }
-export interface Leave { id: string; user_id: string; start_date: string; end_date: string; reason: string | null; status: string }
+export interface Leave {
+  id: string; user_id: string; person_name: string | null; person_type: string | null;
+  start_date: string; end_date: string; reason: string | null; status: string;
+}
 export interface ResourceCategory { id: string; name: string }
 export interface ResourceItem {
   id: string; category_id: string; title: string; description: string | null;

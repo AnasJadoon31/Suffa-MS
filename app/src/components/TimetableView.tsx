@@ -1,13 +1,13 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { CalendarClock, CheckCircle2, LayoutGrid, List, Plus, Trash2, XCircle } from "lucide-react";
+import { CalendarClock, LayoutGrid, List, Plus, Trash2 } from "lucide-react";
 
 import { academicsApi, type AcademicClass, type Course, type Section, type Teacher } from "../lib/endpoints";
-import { operationsApi, type Holiday, type Leave, type TimetableSlot } from "../lib/endpoints";
-import { peopleApi, type Student } from "../lib/endpoints";
+import { operationsApi, type Holiday, type TimetableSlot } from "../lib/endpoints";
+import { peopleApi } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
 
-type Tab = "timetable" | "holidays" | "leave";
+type Tab = "timetable" | "holidays";
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -20,7 +20,7 @@ export function TimetableView() {
     <section className="modulePanel">
       <div className="moduleHeader">
         <h2>Timetable</h2>
-        <p className="notice">Class schedule, holidays, and leave requests.</p>
+        <p className="notice">Class schedule and holiday calendar.</p>
       </div>
       <div className="formActions" style={{ marginBottom: 16 }}>
         <button className={tab === "timetable" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("timetable")}>
@@ -29,13 +29,9 @@ export function TimetableView() {
         <button className={tab === "holidays" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("holidays")}>
           Holidays
         </button>
-        <button className={tab === "leave" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("leave")}>
-          Leave
-        </button>
       </div>
       {tab === "timetable" && <TimetableTab canManage={canManage} />}
       {tab === "holidays" && <HolidaysTab canManage={canManage} />}
-      {tab === "leave" && <LeaveTab canManage={canManage} />}
     </section>
   );
 }
@@ -312,93 +308,6 @@ function HolidaysTab({ canManage }: Readonly<{ canManage: boolean }>) {
         {holidays.length === 0 && <p className="emptyState">No holidays recorded.</p>}
         {holidays.map((h) => (
           <div className="dataRow" key={h.id}><span>{h.name}</span><span>{h.start_date}</span><span>{h.end_date}</span></div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function LeaveTab({ canManage }: Readonly<{ canManage: boolean }>) {
-  const [leave, setLeave] = useState<Leave[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [form, setForm] = useState({ user_id: "", start_date: "", end_date: "", reason: "" });
-  const [error, setError] = useState("");
-
-  const load = async () => {
-    const { data } = await cachedFetch("leave", () => operationsApi.listLeave());
-    setLeave(data);
-  };
-  useEffect(() => {
-    void load();
-    void peopleApi.listTeachers().then(setTeachers);
-    void peopleApi.listStudents().then(setStudents);
-  }, []);
-
-  const personByUserId = new Map<string, { name: string; role: string }>();
-  for (const t of teachers) personByUserId.set(t.user_id, { name: t.name, role: "Teacher" });
-  for (const s of students) personByUserId.set(s.user_id, { name: s.name, role: "Student" });
-
-  return (
-    <>
-      <form
-        className="inlineForm"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setError("");
-          try {
-            await operationsApi.createLeave(form);
-            setForm({ user_id: "", start_date: "", end_date: "", reason: "" });
-            await load();
-          } catch (err: any) {
-            setError(err.response?.data?.detail ?? "Failed to submit leave");
-          }
-        }}
-      >
-        <label>
-          Person
-          <select required value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}>
-            <option value="">Select…</option>
-            <optgroup label="Teachers">
-              {teachers.map((t) => <option key={t.user_id} value={t.user_id}>{t.name}</option>)}
-            </optgroup>
-            <optgroup label="Students">
-              {students.map((s) => <option key={s.user_id} value={s.user_id}>{s.name}</option>)}
-            </optgroup>
-          </select>
-        </label>
-        <label>Start<input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
-        <label>End<input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
-        <label>Reason<input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></label>
-        <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Request leave</button></div>
-      </form>
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <div className="dataTable">
-        <div className="dataRow header"><span>Person</span><span>Start</span><span>End</span><span>Reason</span><span>Status</span><span></span></div>
-        {leave.length === 0 && <p className="emptyState">No leave records.</p>}
-        {leave.map((l) => (
-          <div className="dataRow" key={l.id}>
-            <span>
-              {personByUserId.get(l.user_id)?.name ?? l.user_id}
-              {personByUserId.get(l.user_id) && <small> ({personByUserId.get(l.user_id)?.role})</small>}
-            </span>
-            <span>{l.start_date}</span>
-            <span>{l.end_date}</span>
-            <span>{l.reason ?? "—"}</span>
-            <span>{l.status}</span>
-            <span>
-              {canManage && l.status === "pending" && (
-                <>
-                  <button className="tableAction" type="button" onClick={async () => { await operationsApi.setLeaveStatus(l.id, "approved"); await load(); }}>
-                    <CheckCircle2 size={14} />
-                  </button>
-                  <button className="tableAction" type="button" onClick={async () => { await operationsApi.setLeaveStatus(l.id, "rejected"); await load(); }}>
-                    <XCircle size={14} />
-                  </button>
-                </>
-              )}
-            </span>
-          </div>
         ))}
       </div>
     </>

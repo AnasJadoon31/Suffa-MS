@@ -64,6 +64,8 @@ class LeaveRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     user_id: UUID
+    person_name: str | None = None
+    person_type: str | None = None
     start_date: date
     end_date: date
     reason: str | None
