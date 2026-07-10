@@ -45,14 +45,14 @@ export function BlogView() {
           }}
         >
           <label>Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-          <label style={{ gridColumn: "span 2" }}>
-            Body
+          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>Body</span>
             <RichTextEditor
               value={form.body}
               onChange={(body) => setForm((current) => ({ ...current, body }))}
               placeholder="Write the post…"
             />
-          </label>
+          </div>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Save draft</button></div>
         </form>
       )}

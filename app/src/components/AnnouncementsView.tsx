@@ -117,14 +117,14 @@ export function AnnouncementsView() {
             <label>Publish at<input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} /></label>
             <label>Expires at<input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} /></label>
           </div>
-          <label style={{ gridColumn: "1 / -1" }}>
-            Body
+          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>Body</span>
             <RichTextEditor
               value={form.body}
               onChange={(html) => setForm({ ...form, body: html })}
               placeholder="Announcement content..."
             />
-          </label>
+          </div>
           <div className="formActions">
             <button className="primaryAction" type="submit"><Plus size={16} /> Post announcement</button>
           </div>
@@ -216,13 +216,13 @@ export function AnnouncementsView() {
                 <label>Publish at<input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} /></label>
                 <label>Expires at<input type="datetime-local" value={editForm.expires_at} onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })} /></label>
               </div>
-              <label>
-                Body
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>Body</span>
                 <RichTextEditor
                   value={editForm.body}
                   onChange={(html) => setEditForm({ ...editForm, body: html })}
                 />
-              </label>
+              </div>
               
               {editError && <p className="notice" style={{ color: "var(--rose)" }}>{editError}</p>}
               

@@ -18,9 +18,9 @@ type RichTextEditorProps = Readonly<{
 
 const FONT_OPTIONS = [
   { label: "Default", value: "" },
-  { label: "Serif", value: "Georgia, serif" },
-  { label: "Sans-serif", value: "Arial, sans-serif" },
-  { label: "Urdu (Nastaliq)", value: "'Noto Nastaliq Urdu', serif" },
+  { label: "Serif", value: "Georgia" },
+  { label: "Sans-serif", value: "Arial" },
+  { label: "Urdu (Nastaliq)", value: "Noto Nastaliq Urdu" },
 ];
 
 export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
