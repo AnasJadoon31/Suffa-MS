@@ -612,69 +612,145 @@ button:disabled {
   font-weight: 750;
 }
 
-.attendanceActionGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.attendanceActionButton {
-  min-height: 112px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--ink);
-  text-align: start;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.05s ease;
-}
-
-.attendanceActionButton:hover {
-  border-color: var(--brand);
-  background: var(--brand-soft);
-}
-
-.attendanceActionButton:active {
-  transform: translateY(1px);
-}
-
-.attendanceActionButton.primary {
-  border-color: #9bc7a9;
-  background: var(--leaf-soft);
-}
-
-.attendanceActionButton span:not(.attendanceClassIcon) {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.attendanceActionButton strong,
-.attendanceActionButton small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.attendanceActionButton small {
-  color: var(--muted);
-}
-
 .attendanceModeSection {
   display: grid;
   gap: 12px;
   margin-top: 16px;
 }
 
-.attendanceStudentPicker {
-  grid-template-columns: minmax(220px, 420px);
-  margin-bottom: 0;
+.attendanceCalendar {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.attendanceCalendarNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.attendanceCalendarWeekdays,
+.attendanceCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.attendanceCalendarWeekdays span {
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 750;
+  color: var(--muted);
+}
+
+.attendanceCalendarDay {
+  min-height: 56px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.attendanceCalendarDay.blank {
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+
+.attendanceCalendarDay:not(:disabled):hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.attendanceCalendarDay.today {
+  border-color: var(--brand);
+  font-weight: 800;
+}
+
+.attendanceCalendarDay.selected {
+  border-color: var(--brand-deep);
+  background: var(--brand-soft);
+}
+
+.attendanceCalendarDay.future {
+  color: var(--faint);
+  cursor: not-allowed;
+  background: var(--surface-2);
+}
+
+.attendanceCalendarDay.present {
+  background: var(--leaf-soft);
+  color: var(--leaf);
+}
+
+.attendanceCalendarDay.absent {
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.attendanceCalendarDay.leave {
+  background: var(--saffron-soft);
+  color: var(--saffron);
+}
+
+.attendanceCalendarDayNumber {
+  font-size: 0.85rem;
+}
+
+.attendanceCalendarDayStat {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.attendanceStudentSplit {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.attendanceStudentList {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.attendanceStudentSearchInput {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.attendanceStudentListButton {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: start;
+  cursor: pointer;
+}
+
+.attendanceStudentListButton.active {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  font-weight: 750;
+}
+
+.attendanceStudentListButton small {
+  display: block;
+  color: var(--muted);
 }
 
 .attendanceHistoryTable .dataRow {
@@ -1354,7 +1430,7 @@ html[dir="rtl"] .navGroupLabel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .attendanceActionGrid {
+  .attendanceStudentSplit {
     grid-template-columns: 1fr;
   }
 }
@@ -1396,11 +1472,11 @@ html[dir="rtl"] .navGroupLabel {
     display: none;
   }
 
-  .attendanceActionButton {
-    grid-template-columns: auto minmax(0, 1fr);
+  .attendanceCalendarDay {
+    min-height: 44px;
   }
 
-  .attendanceActionButton > svg {
+  .attendanceCalendarDayStat {
     display: none;
   }
 

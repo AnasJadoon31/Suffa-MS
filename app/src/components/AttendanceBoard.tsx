@@ -2,17 +2,16 @@ import {
   ArrowLeft,
   BookOpen,
   ChevronRight,
-  ClipboardCheck,
   CloudUpload,
-  History,
+  Pencil,
   Save,
-  UserSearch,
   UsersRound,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AttendanceStatus } from "../data/mockData";
+import { AttendanceCalendar, monthRange, toDateKey, type ClassDayStats, type StudentDayStatus } from "./AttendanceCalendar";
 import { useAttendanceOutbox } from "../hooks/useAttendanceOutbox";
 import { useAuth } from "../lib/AuthContext";
 import {
@@ -26,7 +25,7 @@ import {
 import { cachedFetch } from "../lib/offlineCache";
 
 const attendanceOptions = ["present", "absent", "leave"] as const;
-type AttendanceMode = "overview" | "classHistory" | "studentHistory" | "markToday";
+type AttendanceTab = "calendar" | "studentHistory";
 
 export type AttendanceBoardProps = Readonly<Record<string, never>>;
 
@@ -39,6 +38,29 @@ function formatDateTime(value: string): string {
 
 function wasCapturedOffline(entry: AttendanceLogEntry): boolean {
   return new Date(entry.synced_at).getTime() - new Date(entry.marked_at).getTime() > 60_000;
+}
+
+function buildClassDayStats(month: Date, totalStudents: number, entries: AttendanceLogEntry[]): ClassDayStats {
+  const stats: ClassDayStats = {};
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const todayKey = toDateKey(new Date());
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const key = toDateKey(new Date(month.getFullYear(), month.getMonth(), day));
+    if (key > todayKey) continue;
+    stats[key] = { present: 0, total: totalStudents };
+  }
+  for (const entry of entries) {
+    if (entry.status === "present" && stats[entry.attendance_date]) {
+      stats[entry.attendance_date].present += 1;
+    }
+  }
+  return stats;
+}
+
+function buildStudentDayStatus(entries: AttendanceLogEntry[]): StudentDayStatus {
+  const map: StudentDayStatus = {};
+  for (const entry of entries) map[entry.attendance_date] = entry.status;
+  return map;
 }
 
 function AttendanceHistoryTable({
@@ -91,18 +113,14 @@ function AttendanceHistoryTable({
 
 export function AttendanceBoard({}: AttendanceBoardProps) {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [marked, setMarked] = useState<Record<string, AttendanceStatus>>({});
   const [classes, setClasses] = useState<AttendanceClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
-  const [activeMode, setActiveMode] = useState<AttendanceMode>("overview");
+  const [activeTab, setActiveTab] = useState<AttendanceTab>("calendar");
   const [roster, setRoster] = useState<AttendanceRoster | null>(null);
-  const [classHistory, setClassHistory] = useState<ClassAttendanceHistory | null>(null);
-  const [studentHistory, setStudentHistory] = useState<StudentAttendanceHistory | null>(null);
-  const [selectedStudentId, setSelectedStudentId] = useState("");
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [isLoadingRoster, setIsLoadingRoster] = useState(false);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [hasUnsavedMarks, setHasUnsavedMarks] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -114,6 +132,21 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
   const markedCount = Object.keys(marked).length;
 
+  // Calendar tab
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => toDateKey(new Date()));
+  const [editingToday, setEditingToday] = useState(false);
+  const [classHistory, setClassHistory] = useState<ClassAttendanceHistory | null>(null);
+  const [isLoadingClassHistory, setIsLoadingClassHistory] = useState(false);
+
+  // Student history tab
+  const [studentMonth, setStudentMonth] = useState(() => new Date());
+  const [studentSelectedDate, setStudentSelectedDate] = useState<string | null>(null);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [studentHistory, setStudentHistory] = useState<StudentAttendanceHistory | null>(null);
+  const [isLoadingStudentHistory, setIsLoadingStudentHistory] = useState(false);
+
   async function handleOverride(entry: (typeof lockedEntries)[number]): Promise<void> {
     const reason = window.prompt(t("overrideReasonPrompt") ?? "Reason for overriding locked attendance day:");
     if (!reason) return;
@@ -122,17 +155,23 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
   function selectClass(classId: string): void {
     setSelectedClassId(classId);
-    setActiveMode("overview");
+    setActiveTab("calendar");
+    setCalendarMonth(new Date());
+    setSelectedDate(toDateKey(new Date()));
+    setEditingToday(false);
     setClassHistory(null);
     setStudentHistory(null);
     setSelectedStudentId("");
+    setStudentSearch("");
+    setStudentSelectedDate(null);
     setHasUnsavedMarks(false);
     setSaveMessage("");
+    setMarked({});
   }
 
   function returnToClasses(): void {
     setSelectedClassId(null);
-    setActiveMode("overview");
+    setActiveTab("calendar");
     setClassHistory(null);
     setStudentHistory(null);
     setSelectedStudentId("");
@@ -187,42 +226,44 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   }, [selectedClassId, t]);
 
   useEffect(() => {
-    if (!selectedClassId || activeMode !== "classHistory") return;
+    if (!selectedClassId) return;
     void (async () => {
-      setIsLoadingHistory(true);
+      setIsLoadingClassHistory(true);
       setError("");
       try {
-        setClassHistory(await attendanceApi.classHistory(selectedClassId));
+        setClassHistory(await attendanceApi.classHistory(selectedClassId, monthRange(calendarMonth)));
       } catch (err: any) {
         setClassHistory(null);
         setError(err.response?.data?.detail ?? t("failedLoadAttendanceHistory"));
       } finally {
-        setIsLoadingHistory(false);
+        setIsLoadingClassHistory(false);
       }
     })();
-  }, [activeMode, selectedClassId, t]);
+  }, [selectedClassId, calendarMonth, t]);
 
   useEffect(() => {
-    if (activeMode === "studentHistory" && !selectedStudentId && roster?.students.length) {
+    if (activeTab === "studentHistory" && !selectedStudentId && roster?.students.length) {
       setSelectedStudentId(roster.students[0].id);
     }
-  }, [activeMode, roster, selectedStudentId]);
+  }, [activeTab, roster, selectedStudentId]);
 
   useEffect(() => {
-    if (!selectedClassId || activeMode !== "studentHistory" || !selectedStudentId) return;
+    if (!selectedClassId || activeTab !== "studentHistory" || !selectedStudentId) return;
     void (async () => {
-      setIsLoadingHistory(true);
+      setIsLoadingStudentHistory(true);
       setError("");
       try {
-        setStudentHistory(await attendanceApi.studentHistory(selectedClassId, selectedStudentId));
+        setStudentHistory(
+          await attendanceApi.studentHistory(selectedClassId, selectedStudentId, monthRange(studentMonth)),
+        );
       } catch (err: any) {
         setStudentHistory(null);
         setError(err.response?.data?.detail ?? t("failedLoadAttendanceHistory"));
       } finally {
-        setIsLoadingHistory(false);
+        setIsLoadingStudentHistory(false);
       }
     })();
-  }, [activeMode, selectedClassId, selectedStudentId, t]);
+  }, [activeTab, selectedClassId, selectedStudentId, studentMonth, t]);
 
   function mark(studentId: string, status: AttendanceStatus): void {
     setMarked((current) => ({ ...current, [studentId]: status }));
@@ -231,12 +272,38 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   }
 
   async function saveAttendance(): Promise<void> {
-    if (!sessionId || markedCount === 0) return;
+    if (!sessionId || markedCount === 0 || !roster || !user) return;
     setIsSavingAttendance(true);
     setError("");
     try {
       await queueAttendanceBatch(marked);
+      const todayKey = toDateKey(new Date());
+      const nowIso = new Date().toISOString();
+      const optimisticEntries: AttendanceLogEntry[] = Object.entries(marked).map(([studentId, status]) => {
+        const student = roster.students.find((item) => item.id === studentId);
+        return {
+          id: `optimistic-${studentId}-${todayKey}`,
+          attendance_date: todayKey,
+          student_id: studentId,
+          student_name: student?.name ?? "",
+          admission_number: student?.admission_number ?? "",
+          status,
+          marked_at: nowIso,
+          synced_at: nowIso,
+          marked_by: { id: user.id, username: user.username, display_name: user.username, role: user.role },
+          overridden: false,
+        };
+      });
+      setClassHistory((current) => {
+        const base = current ?? { session_id: sessionId, session_name: "", class_id: selectedClassId ?? "", class_name: "", entries: [] };
+        const untouched = base.entries.filter(
+          (entry) => !(entry.attendance_date === todayKey && marked[entry.student_id]),
+        );
+        return { ...base, entries: [...untouched, ...optimisticEntries] };
+      });
       setHasUnsavedMarks(false);
+      setEditingToday(false);
+      setMarked({});
       setSaveMessage(navigator.onLine ? t("attendanceSavedSyncing") : t("attendanceSavedOffline"));
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedSaveAttendance"));
@@ -247,6 +314,39 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
   const headerTitle = roster ? roster.class_name : t("chooseAttendanceClass");
   const headerEyebrow = roster ? `${t("sessionLabel")}: ${roster.session_name}` : t("classesHeading");
+
+  const todayKey = toDateKey(new Date());
+  const totalStudents = roster?.students.length ?? 0;
+  const dayStats = buildClassDayStats(calendarMonth, totalStudents, classHistory?.entries ?? []);
+  const selectedDayEntries = selectedDate
+    ? (classHistory?.entries ?? []).filter((entry) => entry.attendance_date === selectedDate)
+    : [];
+  const isSelectedToday = selectedDate === todayKey;
+  const showMarkForm = isSelectedToday && (selectedDayEntries.length === 0 || editingToday);
+
+  const studentDayStatus = buildStudentDayStatus(studentHistory?.entries ?? []);
+  const studentDayEntries = studentSelectedDate
+    ? (studentHistory?.entries ?? []).filter((entry) => entry.attendance_date === studentSelectedDate)
+    : [];
+  const filteredStudents = (roster?.students ?? []).filter((student) => {
+    const query = studentSearch.trim().toLowerCase();
+    if (!query) return true;
+    return student.name.toLowerCase().includes(query) || student.admission_number.toLowerCase().includes(query);
+  });
+
+  function handleSelectClassDate(date: string): void {
+    setSelectedDate(date);
+    setEditingToday(false);
+    setMarked({});
+  }
+
+  function startEditingToday(): void {
+    const prefill: Record<string, AttendanceStatus> = {};
+    for (const entry of selectedDayEntries) prefill[entry.student_id] = entry.status;
+    setMarked(prefill);
+    setEditingToday(true);
+    setHasUnsavedMarks(false);
+  }
 
   return (
     <section className="attendancePanel">
@@ -260,44 +360,16 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </div>
         {selectedClassId && (
           <div className="headerActions">
-            {activeMode !== "overview" && (
-              <button className="secondaryAction" type="button" onClick={() => setActiveMode("overview")}>
-                <ArrowLeft size={17} />
-                {t("classOverview")}
-              </button>
-            )}
             <button className="secondaryAction" type="button" onClick={returnToClasses}>
-              <BookOpen size={17} />
+              <ArrowLeft size={17} />
               {t("classesHeading")}
             </button>
-            {activeMode === "markToday" && (
-              <>
-                <button
-                  className="primaryAction"
-                  type="button"
-                  onClick={() => void saveAttendance()}
-                  disabled={!sessionId || !hasUnsavedMarks || markedCount === 0 || isSavingAttendance}
-                >
-                  <Save size={18} />
-                  {t("saveAttendance")}
-                </button>
-                <button
-                  className="secondaryAction"
-                  type="button"
-                  onClick={() => void sync()}
-                  disabled={isSyncing || entries.length === 0}
-                >
-                  <CloudUpload size={18} />
-                  {t("syncNow")}
-                </button>
-              </>
-            )}
           </div>
         )}
       </header>
 
       {error && <p className="notice notice-warning">{error}</p>}
-      {activeMode === "markToday" && saveMessage && <p className="notice">{saveMessage}</p>}
+      {saveMessage && <p className="notice">{saveMessage}</p>}
 
       {lockedEntries.length > 0 && (
         <div className="notice notice-warning">
@@ -343,119 +415,164 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </div>
       )}
 
-      {selectedClassId && activeMode === "overview" && (
-        <div className="attendanceActionGrid" aria-label={t("attendanceOptions")}>
-          <button className="attendanceActionButton" type="button" onClick={() => setActiveMode("classHistory")}>
-            <span className="attendanceClassIcon" aria-hidden="true"><History size={18} /></span>
-            <span>
-              <strong>{t("classAttendanceHistory")}</strong>
-              <small>{roster ? t("studentCount", { count: roster.students.length }) : t("loadingLabel")}</small>
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </button>
-          <button className="attendanceActionButton" type="button" onClick={() => setActiveMode("studentHistory")}>
-            <span className="attendanceClassIcon" aria-hidden="true"><UserSearch size={18} /></span>
-            <span>
-              <strong>{t("studentAttendanceHistory")}</strong>
-              <small>{t("studentLabel")}</small>
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </button>
-          <button className="attendanceActionButton primary" type="button" onClick={() => setActiveMode("markToday")}>
-            <span className="attendanceClassIcon" aria-hidden="true"><ClipboardCheck size={18} /></span>
-            <span>
-              <strong>{t("markTodayAttendance")}</strong>
-              <small>{t("todayLabel")}</small>
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </button>
-        </div>
-      )}
-
-      {selectedClassId && activeMode === "classHistory" && (
-        <section className="attendanceModeSection">
-          <div className="moduleHeader"><h2>{t("classAttendanceHistory")}</h2></div>
-          {isLoadingHistory ? (
-            <p className="emptyState">{t("loadingLabel")}</p>
-          ) : (
-            <AttendanceHistoryTable entries={classHistory?.entries ?? []} includeStudent />
-          )}
-        </section>
-      )}
-
-      {selectedClassId && activeMode === "studentHistory" && (
-        <section className="attendanceModeSection">
-          <div className="moduleHeader"><h2>{t("studentAttendanceHistory")}</h2></div>
-          <div className="inlineForm attendanceStudentPicker">
-            <label>
-              {t("studentLabel")}
-              <select value={selectedStudentId} onChange={(event) => setSelectedStudentId(event.target.value)}>
-                {roster?.students.map((student) => (
-                  <option key={student.id} value={student.id}>
-                    {student.name} ({student.admission_number})
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {isLoadingRoster || isLoadingHistory ? (
-            <p className="emptyState">{t("loadingLabel")}</p>
-          ) : selectedStudentId ? (
-            <AttendanceHistoryTable entries={studentHistory?.entries ?? []} includeStudent={false} />
-          ) : (
-            <p className="emptyState">{t("noActiveStudentsToMark")}</p>
-          )}
-        </section>
-      )}
-
-      {selectedClassId && activeMode === "markToday" && (
-        <div className="roster">
-          {isLoadingRoster && <p className="emptyState">{t("loadingLabel")}</p>}
-          {!isLoadingRoster && roster?.students.map((student) => {
-            const status = marked[student.id];
-            return (
-              <article className="rosterRow" key={student.id}>
-                <div>
-                  <strong>{student.name}</strong>
-                  <small>{student.admission_number}{student.section_name ? ` - ${student.section_name}` : ""}</small>
-                </div>
-                <div className="statusButtons" aria-label={`Attendance for ${student.name}`}>
-                  {attendanceOptions.map((option) => (
-                    <button
-                      className={status === option ? `statusButton active ${option}` : "statusButton"}
-                      key={option}
-                      type="button"
-                      disabled={!sessionId}
-                      onClick={() => mark(student.id, option)}
-                    >
-                      {t(option)}
-                    </button>
-                  ))}
-                </div>
-              </article>
-            );
-          })}
-          {!isLoadingRoster && roster?.students.length === 0 && <p className="emptyState">{t("noActiveStudentsToMark")}</p>}
-        </div>
-      )}
-
-      {selectedClassId && activeMode === "markToday" && (
-        <footer className="outboxStrip">
-          <span>{t("outbox")}</span>
-          <strong>{entries.length}</strong>
-          <span>{t("markedStudents")}</span>
-          <strong>{markedCount}</strong>
-          <small>{t("outboxHelp")}</small>
+      {selectedClassId && (
+        <div className="formActions" style={{ marginTop: 16 }}>
           <button
-            className="primaryAction"
+            className={activeTab === "calendar" ? "primaryAction" : "secondaryAction"}
             type="button"
-            onClick={() => void saveAttendance()}
-            disabled={!sessionId || !hasUnsavedMarks || markedCount === 0 || isSavingAttendance}
+            onClick={() => setActiveTab("calendar")}
           >
-            <Save size={18} />
-            {t("saveAttendance")}
+            {t("calendarTab")}
           </button>
-        </footer>
+          <button
+            className={activeTab === "studentHistory" ? "primaryAction" : "secondaryAction"}
+            type="button"
+            onClick={() => setActiveTab("studentHistory")}
+          >
+            {t("studentAttendanceHistory")}
+          </button>
+        </div>
+      )}
+
+      {selectedClassId && activeTab === "calendar" && (
+        <>
+          <AttendanceCalendar
+            mode="class"
+            month={calendarMonth}
+            onMonthChange={(next) => {
+              setCalendarMonth(next);
+              setSelectedDate(null);
+              setEditingToday(false);
+            }}
+            selectedDate={selectedDate}
+            onSelectDate={handleSelectClassDate}
+            classDayStats={dayStats}
+          />
+
+          <section className="attendanceModeSection">
+            {isLoadingClassHistory && <p className="emptyState">{t("loadingLabel")}</p>}
+            {!isLoadingClassHistory && !selectedDate && <p className="emptyState">{t("selectDayPrompt")}</p>}
+
+            {!isLoadingClassHistory && selectedDate && showMarkForm && (
+              <div className="roster">
+                {isLoadingRoster && <p className="emptyState">{t("loadingLabel")}</p>}
+                {!isLoadingRoster && roster?.students.map((student) => {
+                  const status = marked[student.id];
+                  return (
+                    <article className="rosterRow" key={student.id}>
+                      <div>
+                        <strong>{student.name}</strong>
+                        <small>{student.admission_number}{student.section_name ? ` - ${student.section_name}` : ""}</small>
+                      </div>
+                      <div className="statusButtons" aria-label={`Attendance for ${student.name}`}>
+                        {attendanceOptions.map((option) => (
+                          <button
+                            className={status === option ? `statusButton active ${option}` : "statusButton"}
+                            key={option}
+                            type="button"
+                            disabled={!sessionId}
+                            onClick={() => mark(student.id, option)}
+                          >
+                            {t(option)}
+                          </button>
+                        ))}
+                      </div>
+                    </article>
+                  );
+                })}
+                {!isLoadingRoster && roster?.students.length === 0 && <p className="emptyState">{t("noActiveStudentsToMark")}</p>}
+
+                <footer className="outboxStrip">
+                  <span>{t("outbox")}</span>
+                  <strong>{entries.length}</strong>
+                  <span>{t("markedStudents")}</span>
+                  <strong>{markedCount}</strong>
+                  <small>{t("outboxHelp")}</small>
+                  <button
+                    className="primaryAction"
+                    type="button"
+                    onClick={() => void saveAttendance()}
+                    disabled={!sessionId || !hasUnsavedMarks || markedCount === 0 || isSavingAttendance}
+                  >
+                    <Save size={18} />
+                    {t("saveAttendance")}
+                  </button>
+                  <button
+                    className="secondaryAction"
+                    type="button"
+                    onClick={() => void sync()}
+                    disabled={isSyncing || entries.length === 0}
+                  >
+                    <CloudUpload size={18} />
+                    {t("syncNow")}
+                  </button>
+                </footer>
+              </div>
+            )}
+
+            {!isLoadingClassHistory && selectedDate && !showMarkForm && (
+              <>
+                <AttendanceHistoryTable entries={selectedDayEntries} includeStudent />
+                {isSelectedToday && (
+                  <button className="secondaryAction" type="button" onClick={startEditingToday}>
+                    <Pencil size={16} />
+                    {t("editAttendance")}
+                  </button>
+                )}
+              </>
+            )}
+          </section>
+        </>
+      )}
+
+      {selectedClassId && activeTab === "studentHistory" && (
+        <div className="attendanceStudentSplit">
+          <div className="attendanceStudentList">
+            <input
+              className="attendanceStudentSearchInput"
+              type="text"
+              placeholder={t("searchStudentPlaceholder") ?? ""}
+              value={studentSearch}
+              onChange={(event) => setStudentSearch(event.target.value)}
+            />
+            {filteredStudents.map((student) => (
+              <button
+                className={student.id === selectedStudentId ? "attendanceStudentListButton active" : "attendanceStudentListButton"}
+                type="button"
+                key={student.id}
+                onClick={() => {
+                  setSelectedStudentId(student.id);
+                  setStudentSelectedDate(null);
+                }}
+              >
+                <strong>{student.name}</strong>
+                <small>{student.admission_number}</small>
+              </button>
+            ))}
+            {filteredStudents.length === 0 && <p className="emptyState">{t("noStudentsFound")}</p>}
+          </div>
+
+          <div>
+            <AttendanceCalendar
+              mode="student"
+              month={studentMonth}
+              onMonthChange={(next) => {
+                setStudentMonth(next);
+                setStudentSelectedDate(null);
+              }}
+              selectedDate={studentSelectedDate}
+              onSelectDate={setStudentSelectedDate}
+              studentDayStatus={studentDayStatus}
+            />
+            <section className="attendanceModeSection">
+              {isLoadingStudentHistory && <p className="emptyState">{t("loadingLabel")}</p>}
+              {!isLoadingStudentHistory && !studentSelectedDate && <p className="emptyState">{t("selectDayPrompt")}</p>}
+              {!isLoadingStudentHistory && studentSelectedDate && (
+                <AttendanceHistoryTable entries={studentDayEntries} includeStudent={false} />
+              )}
+            </section>
+          </div>
+        </div>
       )}
     </section>
   );

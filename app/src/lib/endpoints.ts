@@ -143,15 +143,24 @@ export interface StudentAttendanceHistory extends ClassAttendanceHistory {
   student: AttendanceRosterStudent;
 }
 
+export interface AttendanceDateRange {
+  start_date?: string;
+  end_date?: string;
+}
+
 export const attendanceApi = {
   listClasses: () => api.get<AttendanceClassOption[]>("/api/v1/attendance/classes").then((r) => r.data),
   classRoster: (classId: string) =>
     api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`).then((r) => r.data),
-  classHistory: (classId: string) =>
-    api.get<ClassAttendanceHistory>(`/api/v1/attendance/classes/${classId}/history`).then((r) => r.data),
-  studentHistory: (classId: string, studentId: string) =>
+  classHistory: (classId: string, range?: AttendanceDateRange) =>
     api
-      .get<StudentAttendanceHistory>(`/api/v1/attendance/classes/${classId}/students/${studentId}/history`)
+      .get<ClassAttendanceHistory>(`/api/v1/attendance/classes/${classId}/history`, { params: range })
+      .then((r) => r.data),
+  studentHistory: (classId: string, studentId: string, range?: AttendanceDateRange) =>
+    api
+      .get<StudentAttendanceHistory>(`/api/v1/attendance/classes/${classId}/students/${studentId}/history`, {
+        params: range,
+      })
       .then((r) => r.data),
 };
 
