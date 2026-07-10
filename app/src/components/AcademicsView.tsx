@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Plus } from "lucide-react";
+import { CheckCircle2, Plus, Edit2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import axios from "axios";
 
 import {
   type AcademicClass,
@@ -60,6 +61,33 @@ export function AcademicsView() {
     setCourses(courseByClass);
     setAssignments(await academicsApi.listTeacherAssignments());
   };
+
+  const handleError = (e: unknown) => {
+    if (axios.isAxiosError(e) && e.response?.status === 409) {
+      alert(e.response.data.detail || "Cannot delete this record because it is in use.");
+    } else {
+      console.error(e);
+      alert("An error occurred.");
+    }
+  };
+
+  // Generic delete handler
+  const handleDelete = async (action: () => Promise<void>) => {
+    if (!window.confirm("Are you sure you want to delete this record?")) return;
+    try {
+      await action();
+      await refreshAll();
+    } catch (e) {
+      handleError(e);
+    }
+  };
+
+  // Edit states
+  const [editingProgram, setEditingProgram] = useState<Program | null>(null);
+  const [editingClass, setEditingClass] = useState<AcademicClass | null>(null);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [editingSection, setEditingSection] = useState<Section | null>(null);
+  const [editingSession, setEditingSession] = useState<AcademicSession | null>(null);
 
   useEffect(() => {
     void refreshAll();
@@ -140,9 +168,34 @@ export function AcademicsView() {
                 </div>
               </form>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span></div>
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>Actions</span></div>
                 {programs.length === 0 && <p className="emptyState">{t("noProgramsYet")}</p>}
-                {programs.map((p) => <div className="dataRow" key={p.id}><span>{p.name}</span></div>)}
+                {programs.map((p) => (
+                  <div className="dataRow" key={p.id}>
+                    {editingProgram?.id === p.id ? (
+                      <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                        e.preventDefault();
+                        try {
+                          await academicsApi.updateProgram(p.id, { name: editingProgram.name });
+                          setEditingProgram(null);
+                          await refreshAll();
+                        } catch (err) { handleError(err); }
+                      }}>
+                        <input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
+                        <button className="primaryAction" type="submit">Save</button>
+                        <button className="secondaryAction" type="button" onClick={() => setEditingProgram(null)}>Cancel</button>
+                      </form>
+                    ) : (
+                      <>
+                        <span>{p.name}</span>
+                        <span className="actions">
+                          <button className="iconBtn" title="Edit" onClick={() => setEditingProgram(p)}><Edit2 size={16} /></button>
+                          <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteProgram(p.id))}><Trash2 size={16} /></button>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
             </>
           )}
@@ -176,12 +229,36 @@ export function AcademicsView() {
                 </div>
               </form>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span></div>
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span><span>Actions</span></div>
                 {classes.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
                 {classes.map((c) => (
                   <div className="dataRow" key={c.id}>
-                    <span>{c.name}</span>
-                    <span>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
+                    {editingClass?.id === c.id ? (
+                      <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                        e.preventDefault();
+                        try {
+                          await academicsApi.updateClass(c.id, { name: editingClass.name, program_id: editingClass.program_id });
+                          setEditingClass(null);
+                          await refreshAll();
+                        } catch (err) { handleError(err); }
+                      }}>
+                        <input autoFocus value={editingClass.name} onChange={e => setEditingClass({ ...editingClass, name: e.target.value })} />
+                        <select value={editingClass.program_id} onChange={e => setEditingClass({ ...editingClass, program_id: e.target.value })}>
+                          {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                        <button className="primaryAction" type="submit">Save</button>
+                        <button className="secondaryAction" type="button" onClick={() => setEditingClass(null)}>Cancel</button>
+                      </form>
+                    ) : (
+                      <>
+                        <span>{c.name}</span>
+                        <span>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
+                        <span className="actions">
+                          <button className="iconBtn" title="Edit" onClick={() => setEditingClass(c)}><Edit2 size={16} /></button>
+                          <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteClass(c.id))}><Trash2 size={16} /></button>
+                        </span>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -209,9 +286,34 @@ export function AcademicsView() {
                 </div>
               </form>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span></div>
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>Actions</span></div>
                 {allCourses.length === 0 && <p className="emptyState">No courses yet.</p>}
-                {allCourses.map((c) => <div className="dataRow" key={c.id}><span>{c.name}</span></div>)}
+                {allCourses.map((c) => (
+                  <div className="dataRow" key={c.id}>
+                    {editingCourse?.id === c.id ? (
+                      <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                        e.preventDefault();
+                        try {
+                          await academicsApi.updateCourse(c.id, { name: editingCourse.name });
+                          setEditingCourse(null);
+                          await refreshAll();
+                        } catch (err) { handleError(err); }
+                      }}>
+                        <input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
+                        <button className="primaryAction" type="submit">Save</button>
+                        <button className="secondaryAction" type="button" onClick={() => setEditingCourse(null)}>Cancel</button>
+                      </form>
+                    ) : (
+                      <>
+                        <span>{c.name}</span>
+                        <span className="actions">
+                          <button className="iconBtn" title="Edit" onClick={() => setEditingCourse(c)}><Edit2 size={16} /></button>
+                          <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteCourse(c.id))}><Trash2 size={16} /></button>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
             </>
           )}
@@ -275,10 +377,48 @@ export function AcademicsView() {
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("classLabel")}</span><span>{t("sectionsCol")}</span><span>{t("coursesCol")}</span></div>
                 {classes.map((c) => (
-                  <div className="dataRow" key={c.id}>
-                    <span>{c.name}</span>
-                    <span>{(sections[c.id] ?? []).map((s) => s.name).join(", ") || "—"}</span>
-                    <span>{(courses[c.id] ?? []).map((co) => co.name).join(", ") || "—"}</span>
+                  <div className="dataRow" key={c.id} style={{ alignItems: "flex-start", gap: "1rem" }}>
+                    <span><strong>{c.name}</strong></span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {(sections[c.id] ?? []).map((s) => (
+                        <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          {editingSection?.id === s.id ? (
+                            <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                              e.preventDefault();
+                              try {
+                                await academicsApi.updateSection(c.id, s.id, { name: editingSection.name });
+                                setEditingSection(null);
+                                await refreshAll();
+                              } catch (err) { handleError(err); }
+                            }}>
+                              <input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} />
+                              <button className="primaryAction" type="submit">Save</button>
+                              <button className="secondaryAction" type="button" onClick={() => setEditingSection(null)}>Cancel</button>
+                            </form>
+                          ) : (
+                            <>
+                              <span>{s.name}</span>
+                              <span className="actions" style={{ marginLeft: "auto" }}>
+                                <button className="iconBtn" title="Edit" onClick={() => setEditingSection(s)}><Edit2 size={14} /></button>
+                                <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteSection(c.id, s.id))}><Trash2 size={14} /></button>
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                      {!(sections[c.id]?.length > 0) && "—"}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {(courses[c.id] ?? []).map((co) => (
+                        <div key={co.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span>{co.name}</span>
+                          <span className="actions" style={{ marginLeft: "auto" }}>
+                            <button className="iconBtn" title="Unassign" onClick={() => handleDelete(() => academicsApi.unassignCourseFromClass(c.id, co.id))}><Trash2 size={14} /></button>
+                          </span>
+                        </div>
+                      ))}
+                      {!(courses[c.id]?.length > 0) && "—"}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -306,20 +446,45 @@ export function AcademicsView() {
                 </div>
               </form>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("spanCol")}</span><span>{t("activeCol")}</span><span></span></div>
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("spanCol")}</span><span>{t("activeCol")}</span><span>Actions</span></div>
                 {sessions.length === 0 && <p className="emptyState">{t("noSessionsYet")}</p>}
                 {sessions.map((s) => (
                   <div className="dataRow" key={s.id}>
-                    <span>{s.name}</span>
-                    <span>{s.gregorian_start} → {s.gregorian_end}</span>
-                    <span>{s.is_active ? <CheckCircle2 size={16} color="var(--leaf)" /> : "—"}</span>
-                    <span>
-                      {!s.is_active && (
-                        <button className="tableAction" type="button" onClick={async () => { await academicsApi.activateSession(s.id); await refreshAll(); }}>
-                          {t("activateBtn")}
-                        </button>
-                      )}
-                    </span>
+                    {editingSession?.id === s.id ? (
+                      <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                        e.preventDefault();
+                        try {
+                          await academicsApi.updateSession(s.id, {
+                            name: editingSession.name, gregorian_start: editingSession.gregorian_start,
+                            gregorian_end: editingSession.gregorian_end, hijri_span: editingSession.hijri_span
+                          });
+                          setEditingSession(null);
+                          await refreshAll();
+                        } catch (err) { handleError(err); }
+                      }}>
+                        <input autoFocus value={editingSession.name} onChange={e => setEditingSession({ ...editingSession, name: e.target.value })} style={{width: 80}} />
+                        <input type="date" value={editingSession.gregorian_start} onChange={e => setEditingSession({ ...editingSession, gregorian_start: e.target.value })} />
+                        <input type="date" value={editingSession.gregorian_end} onChange={e => setEditingSession({ ...editingSession, gregorian_end: e.target.value })} />
+                        <input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} style={{width: 80}} />
+                        <button className="primaryAction" type="submit">Save</button>
+                        <button className="secondaryAction" type="button" onClick={() => setEditingSession(null)}>Cancel</button>
+                      </form>
+                    ) : (
+                      <>
+                        <span>{s.name}</span>
+                        <span>{s.gregorian_start} → {s.gregorian_end}</span>
+                        <span>{s.is_active ? <CheckCircle2 size={16} color="var(--leaf)" /> : "—"}</span>
+                        <span className="actions" style={{ gap: "8px" }}>
+                          {!s.is_active && (
+                            <button className="tableAction" type="button" onClick={async () => { await academicsApi.activateSession(s.id); await refreshAll(); }}>
+                              {t("activateBtn")}
+                            </button>
+                          )}
+                          <button className="iconBtn" title="Edit" onClick={() => setEditingSession(s)}><Edit2 size={16} /></button>
+                          {!s.is_active && <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteSession(s.id))}><Trash2 size={16} /></button>}
+                        </span>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>

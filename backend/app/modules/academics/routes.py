@@ -20,19 +20,25 @@ from app.modules.academics.models import (
     Section,
     TeacherAssignment,
 )
+from app.modules.operations.models import TimetableSlot
 from app.modules.people.models import StudentProfile, TeacherProfile
 from app.modules.academics.schemas import (
     AcademicClassCreate,
     AcademicClassRead,
+    AcademicClassUpdate,
     AcademicSessionCreate,
     AcademicSessionRead,
+    AcademicSessionUpdate,
     ClassCourseAssignRequest,
     CourseCreate,
     CourseRead,
+    CourseUpdate,
     ProgramCreate,
     ProgramRead,
+    ProgramUpdate,
     SectionCreate,
     SectionRead,
+    SectionUpdate,
     StudentEnrollRequest,
     TeacherAssignmentCreate,
     TeacherAssignmentRead,
@@ -74,6 +80,51 @@ async def list_programs(
     return [ProgramRead.model_validate(p) for p in result.scalars().all()]
 
 
+@router.put("/programs/{program_id}", response_model=ProgramRead)
+async def update_program(
+    program_id: UUID,
+    payload: ProgramUpdate,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> ProgramRead:
+    program = await session.get(Program, program_id)
+    if not program or program.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Program not found")
+    
+    if payload.name is not None:
+        program.name = payload.name
+        
+    await session.commit()
+    await session.refresh(program)
+    return ProgramRead.model_validate(program)
+
+
+@router.delete("/programs/{program_id}")
+async def delete_program(
+    program_id: UUID,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    program = await session.get(Program, program_id)
+    if not program or program.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Program not found")
+
+    # Check dependencies
+    class_exists = await session.scalar(select(AcademicClass.id).where(AcademicClass.program_id == program_id).limit(1))
+    if class_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Program because it has classes assigned to it.")
+
+    enroll_exists = await session.scalar(select(Enrollment.id).where(Enrollment.program_id == program_id).limit(1))
+    if enroll_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Program because students are enrolled in it.")
+
+    await session.delete(program)
+    await session.commit()
+    return {"status": "success"}
+
+
 # ------------------------------------------------------------------- Classes
 
 @router.post("/classes", response_model=AcademicClassRead)
@@ -101,6 +152,63 @@ async def list_classes(
     return [AcademicClassRead.model_validate(c) for c in result.scalars().all()]
 
 
+@router.put("/classes/{class_id}", response_model=AcademicClassRead)
+async def update_class(
+    class_id: UUID,
+    payload: AcademicClassUpdate,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AcademicClassRead:
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+    
+    if payload.name is not None:
+        academic_class.name = payload.name
+    if payload.program_id is not None:
+        academic_class.program_id = payload.program_id
+    if payload.default_portal_enabled is not None:
+        academic_class.default_portal_enabled = payload.default_portal_enabled
+        
+    await session.commit()
+    await session.refresh(academic_class)
+    return AcademicClassRead.model_validate(academic_class)
+
+
+@router.delete("/classes/{class_id}")
+async def delete_class(
+    class_id: UUID,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Check dependencies
+    section_exists = await session.scalar(select(Section.id).where(Section.class_id == class_id).limit(1))
+    if section_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Class because it has sections assigned to it.")
+
+    class_course_exists = await session.scalar(select(ClassCourse.id).where(ClassCourse.class_id == class_id).limit(1))
+    if class_course_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Class because it has courses assigned to it.")
+
+    teacher_assign_exists = await session.scalar(select(TeacherAssignment.id).where(TeacherAssignment.class_id == class_id).limit(1))
+    if teacher_assign_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Class because it has teacher assignments.")
+
+    enroll_exists = await session.scalar(select(Enrollment.id).where(Enrollment.class_id == class_id).limit(1))
+    if enroll_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Class because students are enrolled in it.")
+
+    await session.delete(academic_class)
+    await session.commit()
+    return {"status": "success"}
+
+
 # ------------------------------------------------------------------ Sections
 
 @router.post("/classes/{class_id}/sections", response_model=SectionRead)
@@ -125,9 +233,70 @@ async def list_sections(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
 ) -> list[SectionRead]:
-    stmt = select(Section).where(Section.class_id == class_id, Section.madrasa_id == madrasa.id)
+    # Ensure class belongs to this madrasa
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+        
+    stmt = select(Section).where(Section.class_id == class_id)
     result = await session.execute(stmt)
     return [SectionRead.model_validate(s) for s in result.scalars().all()]
+
+
+@router.put("/classes/{class_id}/sections/{section_id}", response_model=SectionRead)
+async def update_section(
+    class_id: UUID,
+    section_id: UUID,
+    payload: SectionUpdate,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> SectionRead:
+    section = await session.get(Section, section_id)
+    if not section or section.class_id != class_id:
+        raise HTTPException(status_code=404, detail="Section not found")
+        
+    # verify class belongs to madrasa
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+    
+    if payload.name is not None:
+        section.name = payload.name
+        
+    await session.commit()
+    await session.refresh(section)
+    return SectionRead.model_validate(section)
+
+
+@router.delete("/classes/{class_id}/sections/{section_id}")
+async def delete_section(
+    class_id: UUID,
+    section_id: UUID,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    section = await session.get(Section, section_id)
+    if not section or section.class_id != class_id:
+        raise HTTPException(status_code=404, detail="Section not found")
+        
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Check dependencies
+    enroll_exists = await session.scalar(select(Enrollment.id).where(Enrollment.section_id == section_id).limit(1))
+    if enroll_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Section because students are enrolled in it.")
+
+    timetable_exists = await session.scalar(select(TimetableSlot.id).where(TimetableSlot.section_id == section_id).limit(1))
+    if timetable_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Section because it has timetable slots scheduled.")
+
+    await session.delete(section)
+    await session.commit()
+    return {"status": "success"}
 
 
 # ------------------------------------------------------------------- Courses
@@ -156,6 +325,53 @@ async def list_all_courses(
     result = await session.execute(stmt)
     return [CourseRead.model_validate(c) for c in result.scalars().all()]
 
+
+@router.put("/courses/{course_id}", response_model=CourseRead)
+async def update_course(
+    course_id: UUID,
+    payload: CourseUpdate,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> CourseRead:
+    course = await session.get(Course, course_id)
+    if not course or course.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    if payload.name is not None:
+        course.name = payload.name
+        
+    await session.commit()
+    await session.refresh(course)
+    return CourseRead.model_validate(course)
+
+
+@router.delete("/courses/{course_id}")
+async def delete_course(
+    course_id: UUID,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    course = await session.get(Course, course_id)
+    if not course or course.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Check dependencies
+    class_course_exists = await session.scalar(select(ClassCourse.id).where(ClassCourse.course_id == course_id).limit(1))
+    if class_course_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Course because it is assigned to one or more classes.")
+
+    teacher_assign_exists = await session.scalar(select(TeacherAssignment.id).where(TeacherAssignment.course_id == course_id).limit(1))
+    if teacher_assign_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Course because it is assigned to a teacher.")
+
+    await session.delete(course)
+    await session.commit()
+    return {"status": "success"}
+
+
+# ------------------------------------------------------------------- Course Assignments
 
 @router.post("/classes/{class_id}/courses/assign", response_model=dict[str, str])
 async def assign_course_to_class(
@@ -196,6 +412,46 @@ async def list_assigned_courses(
     return [CourseRead.model_validate(c) for c in result.scalars().all()]
 
 
+@router.delete("/classes/{class_id}/courses/{course_id}")
+async def unassign_class_course(
+    class_id: UUID,
+    course_id: UUID,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    stmt = select(ClassCourse).where(ClassCourse.class_id == class_id, ClassCourse.course_id == course_id)
+    result = await session.execute(stmt)
+    class_course = result.scalars().first()
+    if not class_course:
+        raise HTTPException(status_code=404, detail="Course is not assigned to this class")
+
+    # Check dependencies for this specific class and course
+    teacher_assign_exists = await session.scalar(
+        select(TeacherAssignment.id)
+        .where(TeacherAssignment.class_id == class_id, TeacherAssignment.course_id == course_id)
+        .limit(1)
+    )
+    if teacher_assign_exists:
+        raise HTTPException(status_code=409, detail="Cannot unassign Course because it has a teacher assigned for this class.")
+
+    timetable_exists = await session.scalar(
+        select(TimetableSlot.id)
+        .where(TimetableSlot.class_id == class_id, TimetableSlot.course_id == course_id)
+        .limit(1)
+    )
+    if timetable_exists:
+        raise HTTPException(status_code=409, detail="Cannot unassign Course because it is scheduled in the timetable for this class.")
+
+    await session.delete(class_course)
+    await session.commit()
+    return {"status": "success"}
+
+
 # ------------------------------------------------------------------ Sessions
 
 @router.post("/sessions", response_model=AcademicSessionRead)
@@ -222,6 +478,65 @@ async def list_sessions(
 ) -> list[AcademicSessionRead]:
     result = await session.execute(select(AcademicSession).where(AcademicSession.madrasa_id == madrasa.id))
     return [AcademicSessionRead.model_validate(row) for row in result.scalars().all()]
+
+
+@router.put("/sessions/{session_id}", response_model=AcademicSessionRead)
+async def update_session(
+    session_id: UUID,
+    payload: AcademicSessionUpdate,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AcademicSessionRead:
+    academic_session = await session.get(AcademicSession, session_id)
+    if not academic_session or academic_session.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    if payload.is_active and not academic_session.is_active:
+        await _deactivate_all_sessions(session, madrasa.id)
+
+    if payload.name is not None:
+        academic_session.name = payload.name
+    if payload.gregorian_start is not None:
+        academic_session.gregorian_start = payload.gregorian_start
+    if payload.gregorian_end is not None:
+        academic_session.gregorian_end = payload.gregorian_end
+    if payload.hijri_span is not None:
+        academic_session.hijri_span = payload.hijri_span
+    if payload.is_active is not None:
+        academic_session.is_active = payload.is_active
+        
+    await session.commit()
+    await session.refresh(academic_session)
+    return AcademicSessionRead.model_validate(academic_session)
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: UUID,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    academic_session = await session.get(AcademicSession, session_id)
+    if not academic_session or academic_session.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Check dependencies
+    enroll_exists = await session.scalar(select(Enrollment.id).where(Enrollment.session_id == session_id).limit(1))
+    if enroll_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Session because students are enrolled in it.")
+
+    teacher_assign_exists = await session.scalar(select(TeacherAssignment.id).where(TeacherAssignment.session_id == session_id).limit(1))
+    if teacher_assign_exists:
+        raise HTTPException(status_code=409, detail="Cannot delete Session because it has teacher assignments.")
+
+    if academic_session.is_active:
+        raise HTTPException(status_code=409, detail="Cannot delete an active session. Please activate another session first.")
+
+    await session.delete(academic_session)
+    await session.commit()
+    return {"status": "success"}
 
 
 @router.post("/sessions/{session_id}/activate", response_model=AcademicSessionRead)

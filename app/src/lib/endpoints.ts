@@ -15,25 +15,48 @@ export const academicsApi = {
   today: () => api.get<{ gregorian: string; hijri: string }>("/api/v1/academics/today").then((r) => r.data),
   listPrograms: () => api.get<Program[]>("/api/v1/academics/programs").then((r) => r.data),
   createProgram: (name: string) => api.post<Program>("/api/v1/academics/programs", { name }).then((r) => r.data),
+  updateProgram: (id: string, payload: { name: string }) => api.put<Program>(`/api/v1/academics/programs/${id}`, payload).then((r) => r.data),
+  deleteProgram: (id: string) => api.delete(`/api/v1/academics/programs/${id}`).then((r) => r.data),
+
   listClasses: () => api.get<AcademicClass[]>("/api/v1/academics/classes").then((r) => r.data),
   createClass: (program_id: string, name: string) =>
     api.post<AcademicClass>("/api/v1/academics/classes", { program_id, name }).then((r) => r.data),
+  updateClass: (id: string, payload: { program_id?: string; name?: string; default_portal_enabled?: boolean }) =>
+    api.put<AcademicClass>(`/api/v1/academics/classes/${id}`, payload).then((r) => r.data),
+  deleteClass: (id: string) => api.delete(`/api/v1/academics/classes/${id}`).then((r) => r.data),
+
   listSections: (classId: string) =>
     api.get<Section[]>(`/api/v1/academics/classes/${classId}/sections`).then((r) => r.data),
   createSection: (classId: string, name: string) =>
     api.post<Section>(`/api/v1/academics/classes/${classId}/sections`, { name }).then((r) => r.data),
+  updateSection: (classId: string, id: string, payload: { name: string }) =>
+    api.put<Section>(`/api/v1/academics/classes/${classId}/sections/${id}`, payload).then((r) => r.data),
+  deleteSection: (classId: string, id: string) =>
+    api.delete(`/api/v1/academics/classes/${classId}/sections/${id}`).then((r) => r.data),
+
   listAllCourses: () =>
     api.get<Course[]>("/api/v1/academics/courses").then((r) => r.data),
   listCourses: (classId: string) =>
     api.get<Course[]>(`/api/v1/academics/classes/${classId}/courses`).then((r) => r.data),
   createCourse: (name: string) =>
     api.post<Course>("/api/v1/academics/courses", { name }).then((r) => r.data),
+  updateCourse: (id: string, payload: { name: string }) =>
+    api.put<Course>(`/api/v1/academics/courses/${id}`, payload).then((r) => r.data),
+  deleteCourse: (id: string) =>
+    api.delete(`/api/v1/academics/courses/${id}`).then((r) => r.data),
+
   assignCourseToClass: (classId: string, courseId: string) =>
     api.post(`/api/v1/academics/classes/${classId}/courses/assign`, { course_id: courseId }).then((r) => r.data),
+  unassignCourseFromClass: (classId: string, courseId: string) =>
+    api.delete(`/api/v1/academics/classes/${classId}/courses/${courseId}`).then((r) => r.data),
   listSessions: () => api.get<AcademicSession[]>("/api/v1/academics/sessions").then((r) => r.data),
   createSession: (payload: {
     name: string; gregorian_start: string; gregorian_end: string; hijri_span: string; is_active?: boolean;
   }) => api.post<AcademicSession>("/api/v1/academics/sessions", payload).then((r) => r.data),
+  updateSession: (id: string, payload: {
+    name?: string; gregorian_start?: string; gregorian_end?: string; hijri_span?: string; is_active?: boolean;
+  }) => api.put<AcademicSession>(`/api/v1/academics/sessions/${id}`, payload).then((r) => r.data),
+  deleteSession: (id: string) => api.delete(`/api/v1/academics/sessions/${id}`).then((r) => r.data),
   activateSession: (id: string) =>
     api.post<AcademicSession>(`/api/v1/academics/sessions/${id}/activate`).then((r) => r.data),
   listTeacherAssignments: () =>

@@ -14,12 +14,22 @@ class ProgramRead(BaseModel):
     created_at: datetime
 
 
+class ProgramUpdate(BaseModel):
+    name: str | None = None
+
+
 class AcademicClassRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     program_id: UUID
     name: str
     default_portal_enabled: bool
+
+
+class AcademicClassUpdate(BaseModel):
+    program_id: UUID | None = None
+    name: str | None = None
+    default_portal_enabled: bool | None = None
 
 
 class SectionRead(BaseModel):
@@ -29,10 +39,17 @@ class SectionRead(BaseModel):
     name: str
 
 
+class SectionUpdate(BaseModel):
+    name: str | None = None
+
+
 class CourseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
+
+class CourseUpdate(BaseModel):
+    name: str | None = None
 
 class ClassCourseAssignRequest(BaseModel):
     course_id: UUID
@@ -81,6 +98,14 @@ class AcademicSessionRead(BaseModel):
     gregorian_end: date
     hijri_span: str
     is_active: bool
+
+
+class AcademicSessionUpdate(BaseModel):
+    name: str | None = None
+    gregorian_start: date | None = None
+    gregorian_end: date | None = None
+    hijri_span: str | None = None
+    is_active: bool | None = None
 
 
 class AcademicClassCreate(BaseModel):
