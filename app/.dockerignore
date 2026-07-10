@@ -1,3 +1,17 @@
 node_modules
 dist
+build
+coverage
+.cache
+.vite
 .env
+.env.*
+.git
+.gitignore
+*.log
+npm-debug.log*
+.DS_Store
+.vscode
+.idea
+Dockerfile
+.dockerignore

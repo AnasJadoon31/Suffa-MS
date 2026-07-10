@@ -5,7 +5,8 @@ WORKDIR /web
 ARG NEXT_PUBLIC_API_BASE
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,id=suffa-ms-web-npm,target=/root/.npm \
+    npm ci --no-audit --no-fund
 COPY . .
 RUN mkdir -p public
 RUN npm run build
