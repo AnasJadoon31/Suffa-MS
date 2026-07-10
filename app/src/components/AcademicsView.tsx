@@ -173,7 +173,7 @@ export function AcademicsView() {
                 {programs.map((p) => (
                   <div className="dataRow" key={p.id}>
                     {editingProgram?.id === p.id ? (
-                      <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                      <form style={{ display: "contents" }} onSubmit={async (e) => {
                         e.preventDefault();
                         try {
                           await academicsApi.updateProgram(p.id, { name: editingProgram.name });
@@ -181,9 +181,13 @@ export function AcademicsView() {
                           await refreshAll();
                         } catch (err) { handleError(err); }
                       }}>
-                        <input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
-                        <button className="primaryAction" type="submit">Save</button>
-                        <button className="secondaryAction" type="button" onClick={() => setEditingProgram(null)}>Cancel</button>
+                        <span>
+                          <input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
+                        </span>
+                        <span className="actions" style={{ gap: "8px" }}>
+                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
+                          <button className="tableAction" type="button" onClick={() => setEditingProgram(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
+                        </span>
                       </form>
                     ) : (
                       <>
@@ -234,7 +238,7 @@ export function AcademicsView() {
                 {classes.map((c) => (
                   <div className="dataRow" key={c.id}>
                     {editingClass?.id === c.id ? (
-                      <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                      <form style={{ display: "contents" }} onSubmit={async (e) => {
                         e.preventDefault();
                         try {
                           await academicsApi.updateClass(c.id, { name: editingClass.name, program_id: editingClass.program_id });
@@ -242,12 +246,18 @@ export function AcademicsView() {
                           await refreshAll();
                         } catch (err) { handleError(err); }
                       }}>
-                        <input autoFocus value={editingClass.name} onChange={e => setEditingClass({ ...editingClass, name: e.target.value })} />
-                        <select value={editingClass.program_id} onChange={e => setEditingClass({ ...editingClass, program_id: e.target.value })}>
-                          {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                        <button className="primaryAction" type="submit">Save</button>
-                        <button className="secondaryAction" type="button" onClick={() => setEditingClass(null)}>Cancel</button>
+                        <span>
+                          <input autoFocus value={editingClass.name} onChange={e => setEditingClass({ ...editingClass, name: e.target.value })} />
+                        </span>
+                        <span>
+                          <select value={editingClass.program_id} onChange={e => setEditingClass({ ...editingClass, program_id: e.target.value })}>
+                            {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </select>
+                        </span>
+                        <span className="actions" style={{ gap: "8px" }}>
+                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
+                          <button className="tableAction" type="button" onClick={() => setEditingClass(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
+                        </span>
                       </form>
                     ) : (
                       <>
@@ -291,7 +301,7 @@ export function AcademicsView() {
                 {allCourses.map((c) => (
                   <div className="dataRow" key={c.id}>
                     {editingCourse?.id === c.id ? (
-                      <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                      <form style={{ display: "contents" }} onSubmit={async (e) => {
                         e.preventDefault();
                         try {
                           await academicsApi.updateCourse(c.id, { name: editingCourse.name });
@@ -299,9 +309,13 @@ export function AcademicsView() {
                           await refreshAll();
                         } catch (err) { handleError(err); }
                       }}>
-                        <input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
-                        <button className="primaryAction" type="submit">Save</button>
-                        <button className="secondaryAction" type="button" onClick={() => setEditingCourse(null)}>Cancel</button>
+                        <span>
+                          <input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
+                        </span>
+                        <span className="actions" style={{ gap: "8px" }}>
+                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
+                          <button className="tableAction" type="button" onClick={() => setEditingCourse(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
+                        </span>
                       </form>
                     ) : (
                       <>
@@ -383,7 +397,7 @@ export function AcademicsView() {
                       {(sections[c.id] ?? []).map((s) => (
                         <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           {editingSection?.id === s.id ? (
-                            <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                            <form style={{ display: "flex", gap: "8px", alignItems: "center" }} onSubmit={async (e) => {
                               e.preventDefault();
                               try {
                                 await academicsApi.updateSection(c.id, s.id, { name: editingSection.name });
@@ -391,9 +405,9 @@ export function AcademicsView() {
                                 await refreshAll();
                               } catch (err) { handleError(err); }
                             }}>
-                              <input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} />
-                              <button className="primaryAction" type="submit">Save</button>
-                              <button className="secondaryAction" type="button" onClick={() => setEditingSection(null)}>Cancel</button>
+                              <input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} style={{ padding: "4px 8px", minHeight: "30px", width: "120px" }} />
+                              <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
+                              <button className="tableAction" type="button" onClick={() => setEditingSection(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
                             </form>
                           ) : (
                             <>
@@ -451,7 +465,7 @@ export function AcademicsView() {
                 {sessions.map((s) => (
                   <div className="dataRow" key={s.id}>
                     {editingSession?.id === s.id ? (
-                      <form className="inlineForm" style={{ margin: 0, padding: 0 }} onSubmit={async (e) => {
+                      <form style={{ display: "contents" }} onSubmit={async (e) => {
                         e.preventDefault();
                         try {
                           await academicsApi.updateSession(s.id, {
@@ -462,12 +476,21 @@ export function AcademicsView() {
                           await refreshAll();
                         } catch (err) { handleError(err); }
                       }}>
-                        <input autoFocus value={editingSession.name} onChange={e => setEditingSession({ ...editingSession, name: e.target.value })} style={{width: 80}} />
-                        <input type="date" value={editingSession.gregorian_start} onChange={e => setEditingSession({ ...editingSession, gregorian_start: e.target.value })} />
-                        <input type="date" value={editingSession.gregorian_end} onChange={e => setEditingSession({ ...editingSession, gregorian_end: e.target.value })} />
-                        <input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} style={{width: 80}} />
-                        <button className="primaryAction" type="submit">Save</button>
-                        <button className="secondaryAction" type="button" onClick={() => setEditingSession(null)}>Cancel</button>
+                        <span>
+                          <input autoFocus value={editingSession.name} onChange={e => setEditingSession({ ...editingSession, name: e.target.value })} />
+                        </span>
+                        <span style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <input type="date" value={editingSession.gregorian_start} onChange={e => setEditingSession({ ...editingSession, gregorian_start: e.target.value })} />
+                          <span style={{ color: "var(--muted)", border: "none", padding: 0 }}>→</span>
+                          <input type="date" value={editingSession.gregorian_end} onChange={e => setEditingSession({ ...editingSession, gregorian_end: e.target.value })} />
+                        </span>
+                        <span>
+                          <input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} />
+                        </span>
+                        <span className="actions" style={{ gap: "8px" }}>
+                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
+                          <button className="tableAction" type="button" onClick={() => setEditingSession(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
+                        </span>
                       </form>
                     ) : (
                       <>
