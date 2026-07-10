@@ -3,6 +3,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: suffa-ms-backend
     environment:
       DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD}@bidci6fpu9mwov6ebann77tz:5432/suffa_ms
       REDIS_URL: redis://suffa-ms-redis:6379/0
@@ -30,9 +31,7 @@ services:
     restart: unless-stopped
 
   worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: suffa-ms-backend
     command: arq app.worker.WorkerSettings
     environment:
       DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD}@bidci6fpu9mwov6ebann77tz:5432/suffa_ms
@@ -40,6 +39,7 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       DEFAULT_TENANT: ${DEFAULT_TENANT:-suffa}
     depends_on:
+      - backend
       - redis
     networks:
       - default

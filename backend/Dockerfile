@@ -3,9 +3,9 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
-
+# All requirements ship prebuilt manylinux wheels for this base image (verified
+# against cp312/manylinux2014_x86_64) - no compiler toolchain needed at build
+# or runtime, so skip apt-get entirely to save the layer.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
