@@ -50,6 +50,7 @@ async def perform_rollover(
             next_class_id = mapping_dict[old_enrollment.class_id]
             if next_class_id is not None:
                 new_enrollment = Enrollment(
+                    madrasa_id=madrasa_id,
                     student_id=old_enrollment.student_id,
                     session_id=new_session.id,
                     program_id=old_enrollment.program_id,
@@ -65,6 +66,7 @@ async def perform_rollover(
         
         for old_assignment in old_assignments:
             new_assignment = TeacherAssignment(
+                madrasa_id=madrasa_id,
                 teacher_id=old_assignment.teacher_id,
                 session_id=new_session.id,
                 class_id=old_assignment.class_id,
