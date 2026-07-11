@@ -2,10 +2,10 @@ from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
+from app.db.base import Base, IdMixin, PortableJSONB, TenantMixin, TimestampMixin
 
 
 class Assignment(Base, IdMixin, TenantMixin, TimestampMixin):
@@ -18,7 +18,7 @@ class Assignment(Base, IdMixin, TenantMixin, TimestampMixin):
     attachment_key: Mapped[str] = mapped_column(String(255), nullable=True)
     due_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # Null/empty = whole class (FR-ASG-02); populated = only these students.
-    target_student_ids: Mapped[list] = mapped_column(JSONB, nullable=True)
+    target_student_ids: Mapped[list] = mapped_column(PortableJSONB, nullable=True)
     created_by_id: Mapped[UUID] = mapped_column(ForeignKey("teacher_profiles.id"), nullable=True)
 
 
@@ -37,7 +37,7 @@ class GradingScheme(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "grading_schemes"
 
     name: Mapped[str] = mapped_column(String(160))
-    bands: Mapped[list] = mapped_column(JSONB)
+    bands: Mapped[list] = mapped_column(PortableJSONB)
 
 
 class ExamType(Base, IdMixin, TenantMixin, TimestampMixin):

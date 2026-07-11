@@ -1,8 +1,12 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import JSON, DateTime, ForeignKey, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+# JSONB on Postgres, plain JSON on other dialects (sqlite in tests).
+PortableJSONB = JSON().with_variant(JSONB(), "postgresql")
 
 
 class Base(DeclarativeBase):

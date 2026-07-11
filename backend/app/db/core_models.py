@@ -3,10 +3,9 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
+from app.db.base import Base, IdMixin, PortableJSONB, TenantMixin, TimestampMixin
 
 
 class FileObject(Base, IdMixin, TenantMixin, TimestampMixin):
@@ -26,6 +25,6 @@ class AuditLog(Base, IdMixin, TenantMixin, TimestampMixin):
     action: Mapped[str] = mapped_column(String(160), index=True)
     entity_name: Mapped[str] = mapped_column(String(80), index=True)
     entity_id: Mapped[str] = mapped_column(String(80))
-    old_values: Mapped[dict] = mapped_column(JSONB)
-    new_values: Mapped[dict] = mapped_column(JSONB)
+    old_values: Mapped[dict] = mapped_column(PortableJSONB)
+    new_values: Mapped[dict] = mapped_column(PortableJSONB)
     action_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))

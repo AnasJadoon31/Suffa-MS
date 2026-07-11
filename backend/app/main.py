@@ -36,8 +36,15 @@ def create_app() -> FastAPI:
             return response
         except Exception as e:
             process_time = time.time() - start_time
-            logger.error(f"{request.method} {request.url.path} - 500 - {process_time:.4f}s - {type(e).__name__}: {str(e)}")
-            raise
+            logger.error(
+                f"{request.method} {request.url.path} - 500 - {process_time:.4f}s - {type(e).__name__}: {str(e)}",
+                exc_info=True,
+            )
+            # Return (not re-raise) so the response still passes through
+            # CORSMiddleware; a raise would surface in Starlette's outermost
+            # ServerErrorMiddleware, whose response carries no CORS headers and
+            # shows up in browsers as a bogus CORS failure.
+            return JSONResponse(status_code=500, content={"detail": "Internal server error"})
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

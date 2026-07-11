@@ -2,10 +2,10 @@ from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, Integer, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
+from app.db.base import Base, IdMixin, PortableJSONB, TenantMixin, TimestampMixin
 
 
 class TimetableSlot(Base, IdMixin, TenantMixin, TimestampMixin):
@@ -53,7 +53,7 @@ class Resource(Base, IdMixin, TenantMixin, TimestampMixin):
     description: Mapped[str] = mapped_column(Text, nullable=True)
     file_key: Mapped[str] = mapped_column(String(255), nullable=True)
     video_url: Mapped[str] = mapped_column(String(255), nullable=True)
-    visibility_scope: Mapped[dict] = mapped_column(JSONB) # e.g. {"all": true} or {"classes": [id1, id2]}
+    visibility_scope: Mapped[dict] = mapped_column(PortableJSONB) # e.g. {"all": true} or {"classes": [id1, id2]}
     created_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
 
 
@@ -62,8 +62,8 @@ class Form(Base, IdMixin, TenantMixin, TimestampMixin):
 
     title: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text)
-    fields_definition: Mapped[list] = mapped_column(JSONB) # Array of field definitions
-    visibility_scope: Mapped[dict] = mapped_column(JSONB)
+    fields_definition: Mapped[list] = mapped_column(PortableJSONB) # Array of field definitions
+    visibility_scope: Mapped[dict] = mapped_column(PortableJSONB)
     open_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     open_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     allow_multiple: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -76,7 +76,7 @@ class FormResponse(Base, IdMixin, TenantMixin, TimestampMixin):
     form_id: Mapped[UUID] = mapped_column(ForeignKey("forms.id"), index=True)
     student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"), index=True)
     submitted_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
-    response_data: Mapped[dict] = mapped_column(JSONB)
+    response_data: Mapped[dict] = mapped_column(PortableJSONB)
 
 
 class Announcement(Base, IdMixin, TenantMixin, TimestampMixin):
@@ -85,7 +85,7 @@ class Announcement(Base, IdMixin, TenantMixin, TimestampMixin):
     title: Mapped[str] = mapped_column(String(160))
     body: Mapped[str] = mapped_column(Text)
     attachment_link: Mapped[str] = mapped_column(String(500), nullable=True)
-    audience_scope: Mapped[dict] = mapped_column(JSONB) # e.g. {"all": true} or {"classes": [id1, id2]}
+    audience_scope: Mapped[dict] = mapped_column(PortableJSONB) # e.g. {"all": true} or {"classes": [id1, id2]}
     publish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
