@@ -27,6 +27,12 @@ services:
       - default
       - coolify
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   worker:
     image: suffa-ms-backend
@@ -54,6 +60,11 @@ services:
     ports:
       - "5173:80"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   web:
     build:
@@ -66,6 +77,11 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   coolify:

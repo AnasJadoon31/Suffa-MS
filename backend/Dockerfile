@@ -7,7 +7,8 @@ WORKDIR /app
 # against cp312/manylinux2014_x86_64) - no compiler toolchain needed at build
 # or runtime, so skip apt-get entirely to save the layer.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,id=suffa-ms-backend-pip,target=/root/.cache/pip \
+    pip install -r requirements.txt
 
 COPY . .
 RUN chmod +x entrypoint.sh

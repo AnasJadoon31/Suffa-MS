@@ -3,7 +3,8 @@ WORKDIR /app
 ARG VITE_API_BASE
 ENV VITE_API_BASE=$VITE_API_BASE
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,id=suffa-ms-app-npm,target=/root/.npm \
+    npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
