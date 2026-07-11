@@ -12,7 +12,7 @@ from app.core.audit import record_audit
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
 from app.db.session import get_session
 from app.modules.auth.models import User, UserRole
-from app.modules.academics.models import AcademicClass, AcademicSession, Course, Enrollment, Madrasa, Section, TeacherAssignment
+from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section, TeacherAssignment
 from app.modules.attendance.models import AttendanceCorrection, StudentAttendance, TeacherAttendance
 from app.modules.attendance.schemas import (
     AttendanceClassRead,
@@ -285,12 +285,16 @@ async def attendance_classes(
     ).all()
     student_counts = {row[0]: row[1] for row in count_rows}
 
-    course_stmt = select(Course.class_id, Course.name).where(
-        Course.madrasa_id == madrasa.id,
-        Course.class_id.in_(class_ids),
+    course_stmt = (
+        select(ClassCourse.class_id, Course.name)
+        .join(Course, Course.id == ClassCourse.course_id)
+        .where(
+            ClassCourse.madrasa_id == madrasa.id,
+            ClassCourse.class_id.in_(class_ids),
+        )
     )
     if assigned_course_ids:
-        course_stmt = course_stmt.where(Course.id.in_(assigned_course_ids))
+        course_stmt = course_stmt.where(ClassCourse.course_id.in_(assigned_course_ids))
     course_rows = (await session.execute(course_stmt.order_by(Course.name))).all()
     course_names: defaultdict[UUID, list[str]] = defaultdict(list)
     for class_id, course_name in course_rows:

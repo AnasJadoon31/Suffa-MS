@@ -11,7 +11,7 @@ from app.core.dependencies import get_current_madrasa, get_current_user, require
 from app.core.hijri import to_hijri_string
 from app.core.pdf import render_result_card_pdf
 from app.db.session import get_session
-from app.modules.academics.models import AcademicSession, Course, Enrollment, Madrasa, TeacherAssignment
+from app.modules.academics.models import AcademicSession, ClassCourse, Course, Enrollment, Madrasa, TeacherAssignment
 from app.modules.assessments.models import Assignment, ExamType, GradingScheme, Mark, ResultPublication, Submission
 from app.modules.assessments.schemas import (
     AssignmentCreate,
@@ -99,11 +99,32 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
-async def _course_class_id(session: AsyncSession, course_id: UUID) -> UUID:
+async def _require_course_scope(
+    session: AsyncSession,
+    current_user: User,
+    madrasa_id: UUID,
+    course_id: UUID,
+) -> None:
+    """Courses are shared across classes (via ClassCourse), so a teacher is in
+    scope when assigned to this course for any class in the active session."""
     course = await session.get(Course, course_id)
-    if course is None:
+    if course is None or course.madrasa_id != madrasa_id:
         raise HTTPException(status_code=404, detail="Course not found")
-    return course.class_id
+    if current_user.role == UserRole.principal:
+        return
+    teacher = await _teacher_profile(session, current_user)
+    if teacher is None:
+        raise HTTPException(status_code=403, detail="Not assigned to this course")
+    active_session_id = await _active_session_id(session, madrasa_id)
+    assigned = await session.execute(
+        select(TeacherAssignment).where(
+            TeacherAssignment.teacher_id == teacher.id,
+            TeacherAssignment.course_id == course_id,
+            TeacherAssignment.session_id == active_session_id,
+        )
+    )
+    if assigned.scalar_one_or_none() is None:
+        raise HTTPException(status_code=403, detail="Not assigned to this course")
 
 
 # ------------------------------------------------------------------- Assignments
@@ -339,8 +360,7 @@ async def create_exam_type(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> ExamTypeRead:
-    class_id = await _course_class_id(session, payload.course_id)
-    await _require_class_course_scope(session, current_user, madrasa.id, class_id, payload.course_id)
+    await _require_course_scope(session, current_user, madrasa.id, payload.course_id)
 
     exam_type = ExamType(
         madrasa_id=madrasa.id,
@@ -381,8 +401,7 @@ async def enter_mark(
     exam_type = await session.get(ExamType, payload.exam_type_id)
     if exam_type is None or exam_type.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Exam type not found")
-    class_id = await _course_class_id(session, exam_type.course_id)
-    await _require_class_course_scope(session, current_user, madrasa.id, class_id, exam_type.course_id)
+    await _require_course_scope(session, current_user, madrasa.id, exam_type.course_id)
 
     teacher = await _teacher_profile(session, current_user)
     existing = (
@@ -533,7 +552,9 @@ async def _build_session_result(session: AsyncSession, madrasa_id: UUID, student
             row
             for row in (
                 await session.execute(
-                    select(Course.id).where(Course.class_id == enrollment.class_id, Course.madrasa_id == madrasa_id)
+                    select(ClassCourse.course_id).where(
+                        ClassCourse.class_id == enrollment.class_id, ClassCourse.madrasa_id == madrasa_id
+                    )
                 )
             ).scalars().all()
         ]

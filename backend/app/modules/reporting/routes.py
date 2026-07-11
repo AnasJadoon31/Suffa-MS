@@ -12,7 +12,7 @@ from app.core.dependencies import get_current_madrasa, get_current_user, require
 from app.core.pdf import render_table_pdf
 from app.db.core_models import AuditLog
 from app.db.session import get_session
-from app.modules.academics.models import AcademicClass, AcademicSession, Course, Enrollment, Madrasa, TeacherAssignment
+from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, TeacherAssignment
 from app.modules.assessments.models import Assignment, ResultPublication, Submission
 from app.modules.assessments.routes import (
     _build_session_result,
@@ -456,7 +456,8 @@ async def results_report(
     courses = (
         await session.execute(
             select(Course.id, Course.name)
-            .where(Course.class_id == class_id, Course.madrasa_id == madrasa.id)
+            .join(ClassCourse, ClassCourse.course_id == Course.id)
+            .where(ClassCourse.class_id == class_id, ClassCourse.madrasa_id == madrasa.id)
             .order_by(Course.name)
         )
     ).all()
