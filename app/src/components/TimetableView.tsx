@@ -6,6 +6,8 @@ import { operationsApi, type TimetableSlot } from "../lib/endpoints";
 import { peopleApi } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
+import { Input, Select } from "./ui/Field";
+
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -99,17 +101,17 @@ function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
           <div className="inlineForm">
             <label>
               Class
-              <select value={gridClassId} onChange={(e) => { setGridClassId(e.target.value); setGridSectionId(""); }}>
+              <Select value={gridClassId} onChange={(e) => { setGridClassId(e.target.value); setGridSectionId(""); }}>
                 <option value="">Select…</option>
                 {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              </Select>
             </label>
             <label>
               Section
-              <select value={gridSectionId} onChange={(e) => setGridSectionId(e.target.value)} disabled={!gridClassId}>
+              <Select value={gridSectionId} onChange={(e) => setGridSectionId(e.target.value)} disabled={!gridClassId}>
                 <option value="">Select…</option>
                 {(sections[gridClassId] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              </Select>
             </label>
           </div>
 
@@ -176,49 +178,49 @@ function TimetableTab({ canManage }: Readonly<{ canManage: boolean }>) {
         >
           <label>
             Class
-            <select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: "", course_id: "" })}>
+            <Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: "", course_id: "" })}>
               <option value="">Select…</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
           <label>
             Section
-            <select required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}>
+            <Select required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}>
               <option value="">Select…</option>
               {(sections[form.class_id] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            </Select>
           </label>
           <label>
             Course
-            <select required value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
+            <Select required value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
               <option value="">Select…</option>
               {(courses[form.class_id] ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
           <label>
             Teacher
-            <select required value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })}>
+            <Select required value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })}>
               <option value="">Select…</option>
               {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            </Select>
           </label>
           <label>
             Day
-            <select value={form.day_of_week} onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}>
+            <Select value={form.day_of_week} onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}>
               {DAY_NAMES.map((d, i) => <option key={d} value={i}>{d}</option>)}
-            </select>
+            </Select>
           </label>
           <label>
             Period
-            <input required type="number" min={1} value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} />
+            <Input required type="number" min={1} value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} />
           </label>
           <label>
             Start time
-            <input required type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+            <Input required type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
           </label>
           <label>
             End time
-            <input required type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
+            <Input required type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
           </label>
           <div className="formActions">
             <button className="primaryAction" type="submit"><Plus size={16} /> Add slot</button>

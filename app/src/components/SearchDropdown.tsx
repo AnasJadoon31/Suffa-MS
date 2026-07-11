@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { Input } from "./ui/Field";
+
 
 type SearchDropdownProps<T> = Readonly<{
   id: string;
@@ -35,7 +37,7 @@ export function SearchDropdown<T>({
   return (
     <div className="searchDropdown">
       <label htmlFor={id}>{label}</label>
-      <input
+      <Input
         id={id}
         disabled={disabled}
         placeholder={placeholder}

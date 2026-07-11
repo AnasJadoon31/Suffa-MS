@@ -4,6 +4,8 @@ import { Download, FolderPlus, Plus, Video } from "lucide-react";
 import { filesApi, operationsApi, type ResourceCategory, type ResourceItem } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
+import { Input, Select } from "./ui/Field";
+
 
 export function ResourcesView() {
   const { hasPermission } = useAuth();
@@ -52,7 +54,7 @@ export function ResourcesView() {
             await refreshAll();
           }}
         >
-          <label>Category name<input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="e.g. Tajweed" /></label>
+          <label>Category name<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="e.g. Tajweed" /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><FolderPlus size={16} /> Add category</button></div>
         </form>
       )}
@@ -60,7 +62,7 @@ export function ResourcesView() {
       <div className="moduleToolbar">
         <div className="searchBox">
           <label htmlFor="resource-category">Category</label>
-          <select
+          <Select
             id="resource-category"
             value={categoryFilter}
             onChange={(e) => {
@@ -70,7 +72,7 @@ export function ResourcesView() {
           >
             <option value="">All categories</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          </Select>
         </div>
       </div>
 
@@ -106,15 +108,15 @@ export function ResourcesView() {
         >
           <label>
             Category
-            <select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+            <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
               <option value="">Select…</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
-          <label>Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-          <label>Description<input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <label>Video URL<input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder="optional" /></label>
-          <label>File<input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
+          <label>Title<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+          <label>Description<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
+          <label>Video URL<Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder="optional" /></label>
+          <label>File<Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Add resource</button></div>
         </form>
       )}

@@ -20,6 +20,7 @@ import { ReportsView } from "./components/ReportsView";
 import { ResourcesView } from "./components/ResourcesView";
 import { SalaryView } from "./components/SalaryView";
 import { SettingsView } from "./components/SettingsView";
+import { SessionSwitcher } from "./components/SessionSwitcher";
 import { SetPasswordPage } from "./components/SetPasswordPage";
 import { initialsOf, RoleBadge, Sidebar } from "./components/Sidebar";
 import { TimetableView } from "./components/TimetableView";
@@ -132,6 +133,7 @@ function Workspace() {
                 </span>
               </span>
             )}
+            <SessionSwitcher />
             <button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>
               <Languages size={16} />
               {isUrdu ? "English" : "اردو"}

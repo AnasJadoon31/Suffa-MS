@@ -39,6 +39,7 @@ from app.modules.academics.schemas import (
     SectionCreate,
     SectionRead,
     SectionUpdate,
+    SessionRolloverRequest,
     StudentEnrollRequest,
     TeacherAssignmentCreate,
     TeacherAssignmentRead,
@@ -554,6 +555,20 @@ async def activate_session(
     await session.commit()
     await session.refresh(record)
     return AcademicSessionRead.model_validate(record)
+
+
+from .rollover_service import perform_rollover
+
+@router.post("/sessions/{session_id}/rollover", response_model=AcademicSessionRead)
+async def rollover_session(
+    session_id: UUID,
+    payload: SessionRolloverRequest,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AcademicSessionRead:
+    new_session = await perform_rollover(session, madrasa.id, session_id, payload)
+    return AcademicSessionRead.model_validate(new_session)
 
 
 async def _deactivate_all_sessions(session: AsyncSession, madrasa_id: UUID) -> None:

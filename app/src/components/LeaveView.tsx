@@ -5,6 +5,8 @@ import { operationsApi, peopleApi, type Leave, type Student, type Teacher } from
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
 import { SearchDropdown } from "./SearchDropdown";
+import { Input, Select } from "./ui/Field";
+
 
 function displayType(type: string | null | undefined): string {
   if (!type) return "Unknown";
@@ -152,7 +154,7 @@ export function LeaveView() {
           <>
             <label>
               Person type
-              <select
+              <Select
                 required
                 value={personType}
                 onChange={(e) => {
@@ -163,7 +165,7 @@ export function LeaveView() {
                 <option value="">Select type...</option>
                 <option value="teacher">Teacher</option>
                 <option value="student">Student</option>
-              </select>
+              </Select>
             </label>
             <SearchDropdown
               id="leave-person-search"
@@ -200,15 +202,15 @@ export function LeaveView() {
         )}
         <label>
           Start
-          <input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+          <Input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
         </label>
         <label>
           End
-          <input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+          <Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
         </label>
         <label>
           Reason
-          <select required value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}>
+          <Select required value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}>
             <option value="">Select reason...</option>
             <option value="Sick Leave">Sick Leave</option>
             <option value="Casual Leave">Casual Leave</option>
@@ -217,7 +219,7 @@ export function LeaveView() {
             <option value="Bereavement Leave">Bereavement Leave</option>
             <option value="Unpaid Leave">Unpaid Leave</option>
             <option value="Other">Other</option>
-          </select>
+          </Select>
         </label>
         <div className="formActions">
           <button className="primaryAction" type="submit"><Plus size={16} /> Request leave</button>
@@ -235,7 +237,7 @@ export function LeaveView() {
       >
         <label className="searchBox">
           Search leave
-          <input
+          <Input
             placeholder="Name, type, status, date, or reason"
             value={searchDraft}
             onChange={(e) => setSearchDraft(e.target.value)}
@@ -281,7 +283,7 @@ export function LeaveView() {
               <span>{record.reason || "-"}</span>
               <span>
                 {canManage ? (
-                  <select
+                  <Select
                     value={record.status}
                     onChange={async (event) => {
                       await operationsApi.setLeaveStatus(record.id, event.target.value);
@@ -291,7 +293,7 @@ export function LeaveView() {
                     <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
-                  </select>
+                  </Select>
                 ) : (
                   displayType(record.status)
                 )}

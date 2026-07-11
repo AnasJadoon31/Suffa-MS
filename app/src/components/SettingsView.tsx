@@ -3,6 +3,8 @@ import { Plus, Settings as SettingsIcon } from "lucide-react";
 
 import { operationsApi, type MadrasaSetting } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { Input } from "./ui/Field";
+
 
 export function SettingsView() {
   const { hasPermission } = useAuth();
@@ -39,8 +41,8 @@ export function SettingsView() {
             }
           }}
         >
-          <label>Key<input required value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} placeholder="e.g. content_language" /></label>
-          <label>Value<input required value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} /></label>
+          <label>Key<Input required value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} placeholder="e.g. content_language" /></label>
+          <label>Value<Input required value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Save</button></div>
         </form>
       )}

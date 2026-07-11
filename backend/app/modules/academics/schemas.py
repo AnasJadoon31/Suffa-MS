@@ -136,3 +136,16 @@ class TeacherAssignmentRead(BaseModel):
     session_id: UUID
     class_id: UUID
     course_id: UUID
+
+class RolloverMapping(BaseModel):
+    current_class_id: UUID
+    next_class_id: UUID | None  # None indicates students should graduate (not be enrolled)
+
+
+class SessionRolloverRequest(BaseModel):
+    name: str
+    gregorian_start: date
+    gregorian_end: date
+    hijri_span: str
+    class_mappings: list[RolloverMapping]
+    copy_teacher_assignments: bool = False

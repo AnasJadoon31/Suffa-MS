@@ -1081,12 +1081,7 @@ button:disabled {
   justify-content: flex-end;
 }
 
-.searchBox input,
-.searchDropdown input,
-.inlineForm input,
-.inlineForm select,
-.settingsGrid select,
-.settingsGrid input {
+.mms-input {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--line-strong);
@@ -1095,14 +1090,17 @@ button:disabled {
   background: var(--surface);
   color: var(--ink);
   font: inherit;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.searchBox input:hover,
-.searchDropdown input:hover,
-.inlineForm input:hover,
-.inlineForm select:hover {
+.mms-input:hover {
   border-color: var(--brand);
+}
+
+.mms-input:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand-light);
 }
 
 .searchDropdown {

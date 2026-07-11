@@ -57,6 +57,9 @@ export const academicsApi = {
     name?: string; gregorian_start?: string; gregorian_end?: string; hijri_span?: string; is_active?: boolean;
   }) => api.put<AcademicSession>(`/api/v1/academics/sessions/${id}`, payload).then((r) => r.data),
   deleteSession: (id: string) => api.delete(`/api/v1/academics/sessions/${id}`).then((r) => r.data),
+  rolloverSession: (id: string, payload: {
+    name: string; gregorian_start: string; gregorian_end: string; hijri_span: string; class_mappings: { current_class_id: string; next_class_id: string | null }[]; copy_teacher_assignments: boolean;
+  }) => api.post<AcademicSession>(`/api/v1/academics/sessions/${id}/rollover`, payload).then((r) => r.data),
   activateSession: (id: string) =>
     api.post<AcademicSession>(`/api/v1/academics/sessions/${id}/activate`).then((r) => r.data),
   listTeacherAssignments: () =>

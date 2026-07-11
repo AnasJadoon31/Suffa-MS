@@ -4,6 +4,8 @@ import { CheckCircle2, ClipboardList, MessageCircle, Plus, XCircle } from "lucid
 import { academicsApi, type Program } from "../lib/endpoints";
 import { operationsApi, type AdmissionApplication, type ContactEnquiry } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { Input, Select } from "./ui/Field";
+
 
 export function AdmissionsView() {
   const { hasPermission } = useAuth();
@@ -55,17 +57,17 @@ export function AdmissionsView() {
           }
         }}
       >
-        <label>Applicant name<input required value={form.applicant_name} onChange={(e) => setForm({ ...form, applicant_name: e.target.value })} /></label>
-        <label>Guardian contact<input required value={form.guardian_contact} onChange={(e) => setForm({ ...form, guardian_contact: e.target.value })} /></label>
+        <label>Applicant name<Input required value={form.applicant_name} onChange={(e) => setForm({ ...form, applicant_name: e.target.value })} /></label>
+        <label>Guardian contact<Input required value={form.guardian_contact} onChange={(e) => setForm({ ...form, guardian_contact: e.target.value })} /></label>
         <label>
           Program
-          <select value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+          <Select value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
             <option value="">Select…</option>
             {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          </Select>
         </label>
-        <label>Date of birth<input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
-        <label>Notes<input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
+        <label>Date of birth<Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
+        <label>Notes<Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Submit application</button></div>
       </form>
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}

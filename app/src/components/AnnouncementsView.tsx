@@ -4,6 +4,8 @@ import { ChevronDown, ChevronRight, Megaphone, Pencil, Plus, Trash2 } from "luci
 import { operationsApi, type Announcement, type Scope } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { RichTextEditor } from "./RichTextEditor";
+import { Input, Select } from "./ui/Field";
+
 
 function toScope(audience: string): Scope {
   if (audience === "students") return { all: false, classes: [], roles: ["student"] };
@@ -104,18 +106,18 @@ export function AnnouncementsView() {
 
       {canPost && (
         <form className="inlineForm" onSubmit={handleCreate}>
-          <label>Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+          <label>Title<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
           <label>Target Audience
-            <select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
+            <Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
               <option value="all">All</option>
               <option value="teachers">Teachers</option>
               <option value="students">Students</option>
-            </select>
+            </Select>
           </label>
-          <label>Attachment link<input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder="optional" /></label>
+          <label>Attachment link<Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder="optional" /></label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <label>Publish at<input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} /></label>
-            <label>Expires at<input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} /></label>
+            <label>Publish at<Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} /></label>
+            <label>Expires at<Input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} /></label>
           </div>
           <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
             <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>Body</span>
@@ -203,18 +205,18 @@ export function AnnouncementsView() {
           <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginTop: 0, marginBottom: "1.5rem" }}>Edit Announcement</h3>
             <form className="inlineForm" style={{ gridTemplateColumns: "1fr", gap: "1.25rem", border: "none", padding: 0 }} onSubmit={handleUpdate}>
-              <label>Title<input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></label>
+              <label>Title<Input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></label>
               <label>Target Audience
-                <select value={editForm.audience} onChange={(e) => setEditForm({ ...editForm, audience: e.target.value })}>
+                <Select value={editForm.audience} onChange={(e) => setEditForm({ ...editForm, audience: e.target.value })}>
                   <option value="all">All</option>
                   <option value="teachers">Teachers</option>
                   <option value="students">Students</option>
-                </select>
+                </Select>
               </label>
-              <label>Attachment link<input value={editForm.attachment_link} onChange={(e) => setEditForm({ ...editForm, attachment_link: e.target.value })} /></label>
+              <label>Attachment link<Input value={editForm.attachment_link} onChange={(e) => setEditForm({ ...editForm, attachment_link: e.target.value })} /></label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                <label>Publish at<input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} /></label>
-                <label>Expires at<input type="datetime-local" value={editForm.expires_at} onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })} /></label>
+                <label>Publish at<Input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} /></label>
+                <label>Expires at<Input type="datetime-local" value={editForm.expires_at} onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })} /></label>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>Body</span>

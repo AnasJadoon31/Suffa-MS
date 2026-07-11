@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { LogIn, Building2, KeyRound, Loader2 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { api } from "../lib/api";
+import { Input } from "./ui/Field";
+
 
 export function LoginScreen() {
   const { login } = useAuth();
@@ -78,7 +80,7 @@ export function LoginScreen() {
                 <label>Madrasa ID</label>
                 <div className="input-with-icon">
                   <Building2 size={18} className="input-icon" />
-                  <input
+                  <Input
                     type="text"
                     value={tenant}
                     onChange={(e) => setTenant(e.target.value)}
@@ -92,7 +94,7 @@ export function LoginScreen() {
                 <label>Username</label>
                 <div className="input-with-icon">
                   <span className="input-icon">@</span>
-                  <input
+                  <Input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -106,7 +108,7 @@ export function LoginScreen() {
                 <label>Password</label>
                 <div className="input-with-icon">
                   <KeyRound size={18} className="input-icon" />
-                  <input
+                  <Input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

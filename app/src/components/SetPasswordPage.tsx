@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { KeyRound } from "lucide-react";
 
 import { api } from "../lib/api";
+import { Input } from "./ui/Field";
+
 
 export function SetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -56,13 +58,13 @@ export function SetPasswordPage() {
                 <div className="form-group">
                   <label>New password</label>
                   <div className="input-with-icon">
-                    <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <Input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
                   </div>
                 </div>
                 <div className="form-group">
                   <label>Confirm password</label>
                   <div className="input-with-icon">
-                    <input type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                    <Input type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                   </div>
                 </div>
                 <button type="submit" className="login-button">Set password</button>

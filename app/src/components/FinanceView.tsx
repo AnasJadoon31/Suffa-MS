@@ -5,6 +5,8 @@ import { financeApi, type Donation, type Donor, type Payment, type PaymentCatego
 import { peopleApi, type Student } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { SearchDropdown } from "./SearchDropdown";
+import { Input, Select } from "./ui/Field";
+
 
 type Tab = "contributions" | "donations" | "summary";
 
@@ -49,7 +51,7 @@ export function FinanceView() {
             }
           }}
         >
-          <label>New category<input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="e.g. Tuition" /></label>
+          <label>New category<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="e.g. Tuition" /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Add category</button></div>
         </form>
       )}
@@ -124,14 +126,14 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
           />
           <label>
             Category
-            <select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+            <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
               <option value="">Select…</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
-          <label>Amount<input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
-          <label>Date<input required type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></label>
-          <label>Note<input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+          <label>Amount<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+          <label>Date<Input required type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></label>
+          <label>Note<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Record payment</button></div>
         </form>
       )}
@@ -216,8 +218,8 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
             }
           }}
         >
-          <label>Donor name<input required value={donorForm.name} onChange={(e) => setDonorForm({ ...donorForm, name: e.target.value })} /></label>
-          <label>Contact<input required value={donorForm.contact} onChange={(e) => setDonorForm({ ...donorForm, contact: e.target.value })} /></label>
+          <label>Donor name<Input required value={donorForm.name} onChange={(e) => setDonorForm({ ...donorForm, name: e.target.value })} /></label>
+          <label>Contact<Input required value={donorForm.contact} onChange={(e) => setDonorForm({ ...donorForm, contact: e.target.value })} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Add donor</button></div>
         </form>
       )}
@@ -261,14 +263,14 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
           />
           <label>
             Category
-            <select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+            <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
               <option value="">Select…</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
-          <label>Amount<input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
-          <label>Date<input required type="date" value={form.donation_date} onChange={(e) => setForm({ ...form, donation_date: e.target.value })} /></label>
-          <label>Note<input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+          <label>Amount<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+          <label>Date<Input required type="date" value={form.donation_date} onChange={(e) => setForm({ ...form, donation_date: e.target.value })} /></label>
+          <label>Note<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Record donation</button></div>
         </form>
       )}
@@ -332,8 +334,8 @@ function SummaryTab() {
   return (
     <>
       <div className="inlineForm">
-        <label>From<input type="date" value={range.date_from} onChange={(e) => setRange({ ...range, date_from: e.target.value })} /></label>
-        <label>To<input type="date" value={range.date_to} onChange={(e) => setRange({ ...range, date_to: e.target.value })} /></label>
+        <label>From<Input type="date" value={range.date_from} onChange={(e) => setRange({ ...range, date_from: e.target.value })} /></label>
+        <label>To<Input type="date" value={range.date_to} onChange={(e) => setRange({ ...range, date_to: e.target.value })} /></label>
         <div className="formActions"><button className="secondaryAction" type="button" onClick={load}>Refresh</button></div>
       </div>
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}

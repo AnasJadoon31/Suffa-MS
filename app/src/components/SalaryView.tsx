@@ -4,6 +4,8 @@ import { Banknote, Plus } from "lucide-react";
 import { financeApi, type SalaryPayment, type SalaryRecord } from "../lib/endpoints";
 import { peopleApi, type Teacher } from "../lib/endpoints";
 import { SearchDropdown } from "./SearchDropdown";
+import { Input, Select } from "./ui/Field";
+
 
 export function SalaryView() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -103,8 +105,8 @@ export function SalaryView() {
               }
             }}
           >
-            <label>Monthly amount<input required type="number" min={0} value={salaryForm.amount} onChange={(e) => setSalaryForm({ ...salaryForm, amount: e.target.value })} placeholder={record ? String(record.amount) : ""} /></label>
-            <label>Effective from<input required type="date" value={salaryForm.effective_from} onChange={(e) => setSalaryForm({ ...salaryForm, effective_from: e.target.value })} /></label>
+            <label>Monthly amount<Input required type="number" min={0} value={salaryForm.amount} onChange={(e) => setSalaryForm({ ...salaryForm, amount: e.target.value })} placeholder={record ? String(record.amount) : ""} /></label>
+            <label>Effective from<Input required type="date" value={salaryForm.effective_from} onChange={(e) => setSalaryForm({ ...salaryForm, effective_from: e.target.value })} /></label>
             <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Save salary</button></div>
           </form>
           {record && (
@@ -132,18 +134,18 @@ export function SalaryView() {
               }
             }}
           >
-            <label>Amount<input required type="number" min={0} value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} /></label>
-            <label>Payment date<input required type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} /></label>
-            <label>Period covered<input required value={paymentForm.period_covered} onChange={(e) => setPaymentForm({ ...paymentForm, period_covered: e.target.value })} placeholder="e.g. June 2026" /></label>
+            <label>Amount<Input required type="number" min={0} value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} /></label>
+            <label>Payment date<Input required type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} /></label>
+            <label>Period covered<Input required value={paymentForm.period_covered} onChange={(e) => setPaymentForm({ ...paymentForm, period_covered: e.target.value })} placeholder="e.g. June 2026" /></label>
             <label>
               Method
-              <select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}>
+              <Select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}>
                 <option value="cash">Cash</option>
                 <option value="bank_transfer">Bank transfer</option>
                 <option value="cheque">Cheque</option>
-              </select>
+              </Select>
             </label>
-            <label>Note<input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} /></label>
+            <label>Note<Input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} /></label>
             <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Record payment</button></div>
           </form>
 

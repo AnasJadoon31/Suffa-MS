@@ -4,6 +4,8 @@ import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { operationsApi, type Holiday } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
+import { Input } from "./ui/Field";
+
 
 type HolidayForm = {
   name: string;
@@ -89,9 +91,9 @@ export function HolidaysView() {
             }
           }}
         >
-          <label>Name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>Start<input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
-          <label>End<input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
+          <label>Name<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+          <label>Start<Input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
+          <label>End<Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Add holiday</button></div>
         </form>
       )}
@@ -113,7 +115,7 @@ export function HolidaysView() {
             <div className="dataRow" key={holiday.id}>
               <span>
                 {isEditing ? (
-                  <input
+                  <Input
                     required
                     value={editForm.name}
                     onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
@@ -122,7 +124,7 @@ export function HolidaysView() {
               </span>
               <span>
                 {isEditing ? (
-                  <input
+                  <Input
                     required
                     type="date"
                     value={editForm.start_date}
@@ -132,7 +134,7 @@ export function HolidaysView() {
               </span>
               <span>
                 {isEditing ? (
-                  <input
+                  <Input
                     required
                     type="date"
                     value={editForm.end_date}

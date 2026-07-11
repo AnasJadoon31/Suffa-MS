@@ -15,6 +15,8 @@ import { peopleApi, type Student } from "../lib/endpoints";
 import { messagingApi } from "../lib/endpoints";
 import { filesApi } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { Input, Select } from "./ui/Field";
+
 
 type Tab = "assignments" | "grading" | "results";
 
@@ -126,33 +128,33 @@ function AssignmentsTab({
         >
           <label>
             {t("classLabel")}
-            <select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })}>
+            <Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })}>
               <option value="">{t("selectEllipsis")}</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
           <label>
             {t("courseLabel")}
-            <select required value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
+            <Select required value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
               <option value="">{t("selectEllipsis")}</option>
               {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
           <label>
             {t("titleLabel")}
-            <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           </label>
           <label>
             {t("instructionsLabel")}
-            <input required value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} />
+            <Input required value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} />
           </label>
           <label>
             {t("dueDateLabel")}
-            <input required type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
+            <Input required type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
           </label>
           <label>
             {t("attachmentLabel")}
-            <input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
+            <Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
           </label>
           <div className="formActions">
             <button className="primaryAction" type="submit"><Plus size={16} /> {t("createAssignmentBtn")}</button>
@@ -211,7 +213,7 @@ function SubmissionRow({ submission, onGraded }: Readonly<{ submission: Submissi
       <span>{new Date(submission.submitted_at).toLocaleString()}</span>
       <span>{submission.is_late ? t("lateLabel") : t("onTimeLabel")}</span>
       <span>
-        <input style={{ width: 60 }} value={mark} onChange={(e) => setMark(e.target.value)} />
+        <Input style={{ width: 60 }} value={mark} onChange={(e) => setMark(e.target.value)} />
       </span>
       <span>
         <button
@@ -280,10 +282,10 @@ function GradingTab({ courses, canManage }: Readonly<{ courses: Course[]; canMan
             }
           }}
         >
-          <label>{t("schemeNameLabel")}<input required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} /></label>
+          <label>{t("schemeNameLabel")}<Input required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} /></label>
           <label style={{ gridColumn: "span 2" }}>
             {t("bandsLabel")}
-            <input required value={schemeForm.bandsText} onChange={(e) => setSchemeForm({ ...schemeForm, bandsText: e.target.value })} />
+            <Input required value={schemeForm.bandsText} onChange={(e) => setSchemeForm({ ...schemeForm, bandsText: e.target.value })} />
           </label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addSchemeBtn")}</button></div>
         </form>
@@ -322,19 +324,19 @@ function GradingTab({ courses, canManage }: Readonly<{ courses: Course[]; canMan
         >
           <label>
             {t("courseLabel")}
-            <select required value={examForm.course_id} onChange={(e) => setExamForm({ ...examForm, course_id: e.target.value })}>
+            <Select required value={examForm.course_id} onChange={(e) => setExamForm({ ...examForm, course_id: e.target.value })}>
               <option value="">{t("selectEllipsis")}</option>
               {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
-          <label>{t("examNameLabel")}<input required value={examForm.name} onChange={(e) => setExamForm({ ...examForm, name: e.target.value })} placeholder="Midterm" /></label>
-          <label>{t("weightageLabel")}<input required type="number" value={examForm.weightage} onChange={(e) => setExamForm({ ...examForm, weightage: e.target.value })} placeholder="40" /></label>
+          <label>{t("examNameLabel")}<Input required value={examForm.name} onChange={(e) => setExamForm({ ...examForm, name: e.target.value })} placeholder="Midterm" /></label>
+          <label>{t("weightageLabel")}<Input required type="number" value={examForm.weightage} onChange={(e) => setExamForm({ ...examForm, weightage: e.target.value })} placeholder="40" /></label>
           <label>
             {t("gradingSchemeLabel")}
-            <select required value={examForm.grading_scheme_id} onChange={(e) => setExamForm({ ...examForm, grading_scheme_id: e.target.value })}>
+            <Select required value={examForm.grading_scheme_id} onChange={(e) => setExamForm({ ...examForm, grading_scheme_id: e.target.value })}>
               <option value="">{t("selectEllipsis")}</option>
               {schemes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            </Select>
           </label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addExamTypeBtn")}</button></div>
         </form>
@@ -371,13 +373,13 @@ function GradingTab({ courses, canManage }: Readonly<{ courses: Course[]; canMan
       >
         <label>
           {t("examTypeLabel")}
-          <select required value={markForm.exam_type_id} onChange={(e) => setMarkForm({ ...markForm, exam_type_id: e.target.value })}>
+          <Select required value={markForm.exam_type_id} onChange={(e) => setMarkForm({ ...markForm, exam_type_id: e.target.value })}>
             <option value="">{t("selectEllipsis")}</option>
             {examTypes.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
-          </select>
+          </Select>
         </label>
-        <label>{t("studentIdLabel")}<input required value={markForm.student_id} onChange={(e) => setMarkForm({ ...markForm, student_id: e.target.value })} /></label>
-        <label>{t("scoreLabel")}<input required type="number" value={markForm.score} onChange={(e) => setMarkForm({ ...markForm, score: e.target.value })} /></label>
+        <label>{t("studentIdLabel")}<Input required value={markForm.student_id} onChange={(e) => setMarkForm({ ...markForm, student_id: e.target.value })} /></label>
+        <label>{t("scoreLabel")}<Input required type="number" value={markForm.score} onChange={(e) => setMarkForm({ ...markForm, score: e.target.value })} /></label>
         <div className="formActions"><button className="primaryAction" type="submit">{t("saveMarkBtn")}</button></div>
       </form>
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
@@ -423,17 +425,17 @@ function ResultsTab({
       <div className="inlineForm">
         <label>
           {t("studentLabel")}
-          <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
+          <Select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
             <option value="">{t("selectEllipsis")}</option>
             {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          </Select>
         </label>
         <label>
           {t("sessionLabel")}
-          <select value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
+          <Select value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
             <option value="">{t("selectEllipsis")}</option>
             {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          </Select>
         </label>
         <div className="formActions">
           <button className="secondaryAction" type="button" onClick={lookup} disabled={!studentId || !sessionId}>{t("viewResultBtn")}</button>

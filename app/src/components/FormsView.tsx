@@ -3,6 +3,8 @@ import { Plus, Send, Trash2 } from "lucide-react";
 
 import { operationsApi, type FormDef, type FormFieldDefinition, type FormResponse } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { Input, Select } from "./ui/Field";
+
 
 const FIELD_TYPES = ["text", "textarea", "radio", "checkbox_group", "dropdown", "label"];
 
@@ -68,32 +70,32 @@ export function FormsView() {
           }}
         >
           <div className="inlineForm" style={{ margin: 0, padding: 0, border: "none", background: "none" }}>
-            <label>Title<input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></label>
-            <label>Description<input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} /></label>
+            <label>Title<Input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></label>
+            <label>Description<Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} /></label>
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} /> Allow multiple submissions
+              <Input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} /> Allow multiple submissions
             </label>
           </div>
 
           <div style={{ display: "grid", gap: 8 }}>
             {fields.map((f, i) => (
               <div key={i} className="inlineForm" style={{ margin: 0 }}>
-                <label>Key<input required value={f.key} onChange={(e) => updateField(fields, setFields, i, { key: e.target.value })} placeholder="field_key" /></label>
-                <label>Label<input required value={f.label} onChange={(e) => updateField(fields, setFields, i, { label: e.target.value })} /></label>
+                <label>Key<Input required value={f.key} onChange={(e) => updateField(fields, setFields, i, { key: e.target.value })} placeholder="field_key" /></label>
+                <label>Label<Input required value={f.label} onChange={(e) => updateField(fields, setFields, i, { label: e.target.value })} /></label>
                 <label>
                   Type
-                  <select value={f.type} onChange={(e) => updateField(fields, setFields, i, { type: e.target.value })}>
+                  <Select value={f.type} onChange={(e) => updateField(fields, setFields, i, { type: e.target.value })}>
                     {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 {(f.type === "radio" || f.type === "checkbox_group" || f.type === "dropdown") && (
                   <label>
                     Options (comma separated)
-                    <input value={f.options.join(", ")} onChange={(e) => updateField(fields, setFields, i, { options: e.target.value.split(",").map((o) => o.trim()).filter(Boolean) })} />
+                    <Input value={f.options.join(", ")} onChange={(e) => updateField(fields, setFields, i, { options: e.target.value.split(",").map((o) => o.trim()).filter(Boolean) })} />
                   </label>
                 )}
                 <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <input type="checkbox" checked={f.required} onChange={(e) => updateField(fields, setFields, i, { required: e.target.checked })} /> Required
+                  <Input type="checkbox" checked={f.required} onChange={(e) => updateField(fields, setFields, i, { required: e.target.checked })} /> Required
                 </label>
                 <div className="formActions">
                   <button className="tableAction" type="button" onClick={() => setFields(fields.filter((_, idx) => idx !== i))}>
@@ -147,7 +149,7 @@ export function FormsView() {
             {selected.fields_definition.map((f) => (
               <label key={f.key}>
                 {f.label}
-                <input
+                <Input
                   required={f.required}
                   value={answers[f.key] ?? ""}
                   onChange={(e) => setAnswers({ ...answers, [f.key]: e.target.value })}

@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../lib/AuthContext";
 import { type Student, type Teacher, messagingApi, peopleApi } from "../lib/endpoints";
 import { SearchDropdown } from "./SearchDropdown";
+import { Input } from "./ui/Field";
+
 
 function SendCredentialsButton({
   subjectType,
@@ -175,15 +177,15 @@ function TeachersTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
         <form className="inlineForm" onSubmit={onSubmit}>
           <label>
             {t("usernameLabel")}
-            <input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+            <Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
           </label>
           <label>
             {t("fullNameLabel")}
-            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </label>
           <label>
             {t("whatsappNumberLabel")}
-            <input value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} />
+            <Input value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} />
           </label>
           <div className="formActions">
             <button className="primaryAction" type="submit">
@@ -296,15 +298,15 @@ function StudentsTab({ canCreate }: Readonly<{ canCreate: boolean }>) {
         <form className="inlineForm" onSubmit={onSubmit}>
           <label>
             {t("usernameLabel")}
-            <input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+            <Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
           </label>
           <label>
             {t("fullNameLabel")}
-            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </label>
           <label>
             {t("dobLabel")}
-            <input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
+            <Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
           </label>
           <div className="formActions">
             <button className="primaryAction" type="submit">

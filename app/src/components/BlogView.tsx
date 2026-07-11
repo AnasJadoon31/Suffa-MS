@@ -4,6 +4,8 @@ import { CheckCircle2, Newspaper, Plus } from "lucide-react";
 import { operationsApi, type BlogPost } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { RichTextEditor } from "./RichTextEditor";
+import { Input } from "./ui/Field";
+
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -44,7 +46,7 @@ export function BlogView() {
             }
           }}
         >
-          <label>Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+          <label>Title<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
           <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
             <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>Body</span>
             <RichTextEditor

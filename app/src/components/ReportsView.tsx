@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "../lib/AuthContext";
 import { academicsApi, type AcademicClass, type AcademicSession, reportingApi } from "../lib/endpoints";
+import { Input, Select } from "./ui/Field";
+
 
 export function ReportsView() {
   const { hasPermission } = useAuth();
@@ -42,11 +44,11 @@ export function ReportsView() {
       <div className="inlineForm">
         <label>
           Start date
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </label>
         <label>
           End date
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </label>
       </div>
 
@@ -55,10 +57,10 @@ export function ReportsView() {
         <div className="inlineForm">
           <label>
             Class
-            <select value={classId} onChange={(e) => setClassId(e.target.value)}>
+            <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
               <option value="">Select…</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
           <div className="formActions">
             <button
@@ -95,17 +97,17 @@ export function ReportsView() {
           <div className="inlineForm">
             <label>
               Class
-              <select value={classId} onChange={(e) => setClassId(e.target.value)}>
+              <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
                 <option value="">Select…</option>
                 {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              </Select>
             </label>
             <label>
               Session
-              <select value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
+              <Select value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
                 <option value="">Select…</option>
                 {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              </Select>
             </label>
             <div className="formActions">
               <button

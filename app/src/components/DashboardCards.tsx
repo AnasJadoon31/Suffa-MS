@@ -14,6 +14,8 @@ import {
   reportingApi,
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
+import { Input } from "./ui/Field";
+
 
 export type DashboardCardsProps = Readonly<Record<string, never>>;
 
@@ -228,7 +230,7 @@ function DueAssignmentRow({ assignment, onSubmitted }: Readonly<{ assignment: St
         <span> — {t("submittedLabel")}</span>
       ) : (
         <>
-          <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           <button className="tableAction" type="button" disabled={!file} onClick={() => void submit()}>
             {t("submitBtn")}
           </button>

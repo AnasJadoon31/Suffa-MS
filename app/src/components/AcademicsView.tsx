@@ -13,6 +13,9 @@ import {
   academicsApi,
 } from "../lib/endpoints";
 import { peopleApi, type Teacher } from "../lib/endpoints";
+import { RolloverWizard } from "./RolloverWizard";
+import { Input, Select } from "./ui/Field";
+
 
 export function AcademicsView() {
   const { t } = useTranslation();
@@ -35,6 +38,7 @@ export function AcademicsView() {
   const [assignCourseId, setAssignCourseId] = useState("");
   const [sessionForm, setSessionForm] = useState({ name: "", gregorian_start: "", gregorian_end: "", hijri_span: "" });
   const [assignForm, setAssignForm] = useState({ teacher_id: "", session_id: "", class_id: "", course_id: "" });
+  const [rolloverSourceSession, setRolloverSourceSession] = useState<AcademicSession | null>(null);
 
   const [activeTab, setActiveTab] = useState<"programs" | "classes" | "courses" | "sections" | "sessions" | "assignments">("programs");
 
@@ -161,7 +165,7 @@ export function AcademicsView() {
               >
                 <label>
                   {t("programNameLabel")}
-                  <input required value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder="e.g. Hifz" />
+                  <Input required value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder="e.g. Hifz" />
                 </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addProgramBtn")}</button>
@@ -182,7 +186,7 @@ export function AcademicsView() {
                         } catch (err) { handleError(err); }
                       }}>
                         <span>
-                          <input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
+                          <Input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
                           <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
@@ -219,14 +223,14 @@ export function AcademicsView() {
               >
                 <label>
                   {t("programLabel")}
-                  <select required value={classProgramId} onChange={(e) => setClassProgramId(e.target.value)}>
+                  <Select required value={classProgramId} onChange={(e) => setClassProgramId(e.target.value)}>
                     <option value="">{t("selectEllipsis")}</option>
                     {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   {t("classNameLabel")}
-                  <input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Darja 1" />
+                  <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Darja 1" />
                 </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addClassBtn")}</button>
@@ -247,12 +251,12 @@ export function AcademicsView() {
                         } catch (err) { handleError(err); }
                       }}>
                         <span>
-                          <input autoFocus value={editingClass.name} onChange={e => setEditingClass({ ...editingClass, name: e.target.value })} />
+                          <Input autoFocus value={editingClass.name} onChange={e => setEditingClass({ ...editingClass, name: e.target.value })} />
                         </span>
                         <span>
-                          <select value={editingClass.program_id} onChange={e => setEditingClass({ ...editingClass, program_id: e.target.value })}>
+                          <Select value={editingClass.program_id} onChange={e => setEditingClass({ ...editingClass, program_id: e.target.value })}>
                             {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                          </select>
+                          </Select>
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
                           <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
@@ -289,7 +293,7 @@ export function AcademicsView() {
               >
                 <label>
                   {t("courseNameLabel")}
-                  <input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="e.g. Quran" />
+                  <Input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="e.g. Quran" />
                 </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addCourseBtn")}</button>
@@ -310,7 +314,7 @@ export function AcademicsView() {
                         } catch (err) { handleError(err); }
                       }}>
                         <span>
-                          <input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
+                          <Input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
                           <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
@@ -347,14 +351,14 @@ export function AcademicsView() {
               >
                 <label>
                   {t("classLabel")}
-                  <select required value={sectionClassId} onChange={(e) => setSectionClassId(e.target.value)}>
+                  <Select required value={sectionClassId} onChange={(e) => setSectionClassId(e.target.value)}>
                     <option value="">{t("selectEllipsis")}</option>
                     {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   {t("sectionNameLabel")}
-                  <input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder="e.g. A" />
+                  <Input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder="e.g. A" />
                 </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSectionBtn")}</button>
@@ -372,17 +376,17 @@ export function AcademicsView() {
               >
                 <label>
                   {t("classLabel")}
-                  <select required value={courseClassId} onChange={(e) => setCourseClassId(e.target.value)}>
+                  <Select required value={courseClassId} onChange={(e) => setCourseClassId(e.target.value)}>
                     <option value="">{t("selectEllipsis")}</option>
                     {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   Course
-                  <select required value={assignCourseId} onChange={(e) => setAssignCourseId(e.target.value)}>
+                  <Select required value={assignCourseId} onChange={(e) => setAssignCourseId(e.target.value)}>
                     <option value="">{t("selectEllipsis")}</option>
                     {allCourses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> Assign</button>
@@ -405,7 +409,7 @@ export function AcademicsView() {
                                 await refreshAll();
                               } catch (err) { handleError(err); }
                             }}>
-                              <input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} style={{ padding: "4px 8px", minHeight: "30px", width: "120px" }} />
+                              <Input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} style={{ padding: "4px 8px", minHeight: "30px", width: "120px" }} />
                               <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
                               <button className="tableAction" type="button" onClick={() => setEditingSection(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
                             </form>
@@ -451,10 +455,10 @@ export function AcademicsView() {
                   await refreshAll();
                 }}
               >
-                <label>{t("nameLabel")}<input required value={sessionForm.name} onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })} placeholder="2026" /></label>
-                <label>{t("startLabel")}<input required type="date" value={sessionForm.gregorian_start} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_start: e.target.value })} /></label>
-                <label>{t("endLabel")}<input required type="date" value={sessionForm.gregorian_end} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_end: e.target.value })} /></label>
-                <label>{t("hijriSpanLabel")}<input required value={sessionForm.hijri_span} onChange={(e) => setSessionForm({ ...sessionForm, hijri_span: e.target.value })} placeholder="1447-1448" /></label>
+                <label>{t("nameLabel")}<Input required value={sessionForm.name} onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })} placeholder="2026" /></label>
+                <label>{t("startLabel")}<Input required type="date" value={sessionForm.gregorian_start} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_start: e.target.value })} /></label>
+                <label>{t("endLabel")}<Input required type="date" value={sessionForm.gregorian_end} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_end: e.target.value })} /></label>
+                <label>{t("hijriSpanLabel")}<Input required value={sessionForm.hijri_span} onChange={(e) => setSessionForm({ ...sessionForm, hijri_span: e.target.value })} placeholder="1447-1448" /></label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSessionBtn")}</button>
                 </div>
@@ -477,15 +481,15 @@ export function AcademicsView() {
                         } catch (err) { handleError(err); }
                       }}>
                         <span>
-                          <input autoFocus value={editingSession.name} onChange={e => setEditingSession({ ...editingSession, name: e.target.value })} />
+                          <Input autoFocus value={editingSession.name} onChange={e => setEditingSession({ ...editingSession, name: e.target.value })} />
                         </span>
                         <span style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                          <input type="date" value={editingSession.gregorian_start} onChange={e => setEditingSession({ ...editingSession, gregorian_start: e.target.value })} />
+                          <Input type="date" value={editingSession.gregorian_start} onChange={e => setEditingSession({ ...editingSession, gregorian_start: e.target.value })} />
                           <span style={{ color: "var(--muted)", border: "none", padding: 0 }}>→</span>
-                          <input type="date" value={editingSession.gregorian_end} onChange={e => setEditingSession({ ...editingSession, gregorian_end: e.target.value })} />
+                          <Input type="date" value={editingSession.gregorian_end} onChange={e => setEditingSession({ ...editingSession, gregorian_end: e.target.value })} />
                         </span>
                         <span>
-                          <input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} />
+                          <Input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} />
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
                           <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
@@ -501,6 +505,11 @@ export function AcademicsView() {
                           {!s.is_active && (
                             <button className="tableAction" type="button" onClick={async () => { await academicsApi.activateSession(s.id); await refreshAll(); }}>
                               {t("activateBtn")}
+                            </button>
+                          )}
+                          {s.is_active && (
+                            <button className="tableAction" type="button" onClick={() => setRolloverSourceSession(s)} style={{ color: "var(--brand-deep)" }}>
+                              Year-End Rollover
                             </button>
                           )}
                           <button className="iconBtn" title="Edit" onClick={() => setEditingSession(s)}><Edit2 size={16} /></button>
@@ -529,31 +538,31 @@ export function AcademicsView() {
               >
                 <label>
                   {t("teacherLabel")}
-                  <select required value={assignForm.teacher_id} onChange={(e) => setAssignForm({ ...assignForm, teacher_id: e.target.value })}>
+                  <Select required value={assignForm.teacher_id} onChange={(e) => setAssignForm({ ...assignForm, teacher_id: e.target.value })}>
                     <option value="">{t("selectEllipsis")}</option>
                     {teachers.map((t_res) => <option key={t_res.id} value={t_res.id}>{t_res.name}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   {t("sessionLabel")}
-                  <select required value={assignForm.session_id} onChange={(e) => setAssignForm({ ...assignForm, session_id: e.target.value })}>
+                  <Select required value={assignForm.session_id} onChange={(e) => setAssignForm({ ...assignForm, session_id: e.target.value })}>
                     <option value="">{t("selectEllipsis")}</option>
                     {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   {t("classLabel")}
-                  <select required value={assignForm.class_id} onChange={(e) => setAssignForm({ ...assignForm, class_id: e.target.value })}>
+                  <Select required value={assignForm.class_id} onChange={(e) => setAssignForm({ ...assignForm, class_id: e.target.value })}>
                     <option value="">{t("selectEllipsis")}</option>
                     {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   {t("courseNameLabel")}
-                  <select required value={assignForm.course_id} onChange={(e) => setAssignForm({ ...assignForm, course_id: e.target.value })}>
+                  <Select required value={assignForm.course_id} onChange={(e) => setAssignForm({ ...assignForm, course_id: e.target.value })}>
                     <option value="">{t("selectEllipsis")}</option>
                     {(courses[assignForm.class_id] ?? allCourses).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("assignBtn")}</button>
@@ -574,6 +583,18 @@ export function AcademicsView() {
           )}
         </div>
       </div>
+      
+      {rolloverSourceSession && (
+        <RolloverWizard
+          sourceSession={rolloverSourceSession}
+          classes={classes}
+          onClose={() => setRolloverSourceSession(null)}
+          onSuccess={async () => {
+            setRolloverSourceSession(null);
+            await refreshAll();
+          }}
+        />
+      )}
     </section>
   );
 }

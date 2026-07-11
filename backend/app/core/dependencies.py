@@ -12,7 +12,7 @@ from app.core.security import ALGORITHM
 from app.core.permissions import registry
 from app.db.session import get_session
 from app.modules.auth.models import User, UserPermission, UserRole
-from app.modules.academics.models import Madrasa
+from app.modules.academics.models import Madrasa, AcademicSession
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="api/auth/token", auto_error=False)
@@ -79,6 +79,41 @@ async def get_current_madrasa(
         raise HTTPException(status_code=404, detail="Madrasa not found")
 
     return madrasa
+
+
+async def get_context_session(
+    request: Request,
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    x_academic_session_id: Optional[str] = Header(None, alias="X-Academic-Session-Id"),
+    session: AsyncSession = Depends(get_session)
+) -> AcademicSession:
+    """Resolves the current academic session context based on header or fallback to active session."""
+    if x_academic_session_id:
+        try:
+            session_uuid = UUID(x_academic_session_id)
+            stmt = select(AcademicSession).where(
+                AcademicSession.id == session_uuid,
+                AcademicSession.madrasa_id == madrasa.id
+            )
+            result = await session.execute(stmt)
+            academic_session = result.scalar_one_or_none()
+            if academic_session:
+                return academic_session
+        except ValueError:
+            pass # Invalid UUID, fallback to active session
+            
+    # Fallback to the active session
+    stmt = select(AcademicSession).where(
+        AcademicSession.madrasa_id == madrasa.id,
+        AcademicSession.is_active == True
+    )
+    result = await session.execute(stmt)
+    academic_session = result.scalar_one_or_none()
+    
+    if not academic_session:
+        raise HTTPException(status_code=404, detail="No active academic session found for this madrasa.")
+    
+    return academic_session
 
 
 async def user_has_permission(user: User, code: str, session: AsyncSession) -> bool:

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Select } from "./ui/Field";
 import {
   AlignLeft,
   AlignRight,
@@ -62,7 +63,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         <button type="button" title="Numbered list" onMouseDown={(e) => { e.preventDefault(); exec("insertOrderedList"); }}><ListOrdered size={14} /></button>
         <button type="button" title="Left-to-right" onMouseDown={(e) => { e.preventDefault(); setDirection("ltr"); }}><AlignLeft size={14} /></button>
         <button type="button" title="Right-to-left (Urdu)" onMouseDown={(e) => { e.preventDefault(); setDirection("rtl"); }}><AlignRight size={14} /></button>
-        <select
+        <Select
           title="Font"
           defaultValue=""
           onChange={(e) => {
@@ -70,7 +71,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
           }}
         >
           {FONT_OPTIONS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
-        </select>
+        </Select>
       </div>
       <div
         ref={editorRef}

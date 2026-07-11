@@ -29,6 +29,8 @@ import {
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
 import { SearchDropdown } from "./SearchDropdown";
+import { Input } from "./ui/Field";
+
 
 const attendanceOptions = ["present", "absent", "leave"] as const;
 type AttendanceTab = "calendar" | "studentHistory";
@@ -715,7 +717,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       {attendanceMode === "students" && selectedClassId && activeTab === "studentHistory" && (
         <div className="attendanceStudentSplit">
           <div className="attendanceStudentList">
-            <input
+            <Input
               className="attendanceStudentSearchInput"
               type="text"
               placeholder={t("searchStudentPlaceholder") ?? ""}
