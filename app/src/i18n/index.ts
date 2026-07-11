@@ -22,6 +22,8 @@ void i18next.use(initReactI18next).init({
         roleStudent: "Student",
         logout: "Logout",
         todayLabel: "Today",
+        sessionActiveSuffix: "(Active)",
+        sessionViewOnlyBanner: "You are viewing the archived session “{{name}}” — everything is read-only. Switch to the active session to make changes.",
 
         descDashboard: "Everything that needs your attention today, in one place.",
         descAttendance: "Mark the roster — works offline, syncs when you're back online.",
@@ -257,6 +259,8 @@ void i18next.use(initReactI18next).init({
         roleStudent: "طالب علم",
         logout: "لاگ آؤٹ",
         todayLabel: "آج",
+        sessionActiveSuffix: "(فعال)",
+        sessionViewOnlyBanner: "آپ محفوظ شدہ سیشن «{{name}}» دیکھ رہے ہیں — سب کچھ صرف دیکھنے کے لیے ہے۔ تبدیلی کے لیے فعال سیشن پر جائیں۔",
 
         descDashboard: "آج جن چیزوں پر توجہ درکار ہے، سب ایک جگہ۔",
         descAttendance: "حاضری لگائیں — آف لائن بھی کام کرتی ہے، آن لائن ہوتے ہی سنک۔",

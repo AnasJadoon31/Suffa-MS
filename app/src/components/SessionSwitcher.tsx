@@ -1,36 +1,37 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { academicsApi, type AcademicSession } from "../lib/endpoints";
+import { useAuth } from "../lib/AuthContext";
 import { Select } from "./ui/Field";
 
-
 export function SessionSwitcher() {
+  const { t } = useTranslation();
+  const { user, updateSelectedSession } = useAuth();
   const [sessions, setSessions] = useState<AcademicSession[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    academicsApi.listSessions().then((data) => {
-      setSessions(data);
-      const stored = localStorage.getItem("mms_session_id");
-      if (stored && data.some(s => s.id === stored)) {
-        setSelectedId(stored);
-      } else {
-        const active = data.find((s) => s.is_active);
-        if (active) {
-          setSelectedId(active.id);
-          localStorage.setItem("mms_session_id", active.id);
-        }
-      }
-    }).catch(console.error);
+    academicsApi.listSessions().then(setSessions).catch(console.error);
   }, []);
+
+  const activeSession = sessions.find((s) => s.is_active);
+  const selectedId = user?.selected_session_id ?? activeSession?.id ?? "";
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value;
-    if (newId) {
-      localStorage.setItem("mms_session_id", newId);
-      setSelectedId(newId);
-      // Reload to ensure all components refetch their data with the new session header
-      window.location.reload();
-    }
+    if (!newId || newId === selectedId) return;
+    setSaving(true);
+    // Selecting the active session clears the stored preference so the user
+    // follows whatever session is active, even after the next rollover.
+    void updateSelectedSession(newId === activeSession?.id ? null : newId)
+      .then(() => {
+        // Reload so every view refetches with the new session context.
+        window.location.reload();
+      })
+      .catch((err) => {
+        console.error(err);
+        setSaving(false);
+      });
   };
 
   if (sessions.length === 0) {
@@ -42,13 +43,37 @@ export function SessionSwitcher() {
       className="inputField"
       value={selectedId}
       onChange={handleChange}
+      disabled={saving}
       style={{ padding: "4px 8px", fontSize: "0.85rem", minHeight: "32px", height: "auto", width: "auto", marginRight: "8px" }}
     >
       {sessions.map((s) => (
         <option key={s.id} value={s.id}>
-          {s.name} {s.is_active ? "(Active)" : ""}
+          {s.name} {s.is_active ? t("sessionActiveSuffix") : ""}
         </option>
       ))}
     </Select>
+  );
+}
+
+/** Banner shown when the user is viewing a non-active (archived/future)
+ * academic session — the backend rejects writes in that state. */
+export function SessionReadOnlyBanner() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const [sessions, setSessions] = useState<AcademicSession[]>([]);
+
+  useEffect(() => {
+    if (!user?.selected_session_id) return;
+    academicsApi.listSessions().then(setSessions).catch(console.error);
+  }, [user?.selected_session_id]);
+
+  if (!user?.selected_session_id) return null;
+  const selected = sessions.find((s) => s.id === user.selected_session_id);
+  if (!selected || selected.is_active) return null;
+
+  return (
+    <div className="sessionReadOnlyBanner" role="status">
+      {t("sessionViewOnlyBanner", { name: selected.name })}
+    </div>
   );
 }

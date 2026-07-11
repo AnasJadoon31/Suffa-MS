@@ -10,9 +10,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.audit import record_audit
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.teaching_scope import taught_class_ids, taught_pairs
 from app.db.session import get_session
 from app.modules.auth.models import User, UserRole
-from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section, TeacherAssignment
+from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section
 from app.modules.attendance.models import AttendanceCorrection, StudentAttendance, TeacherAttendance
 from app.modules.attendance.schemas import (
     AttendanceClassRead,
@@ -176,14 +177,10 @@ async def _teacher_assignment_class_ids(
     teacher_id = await _current_teacher_id(current_user, session, madrasa_id)
     if teacher_id is None:
         return set()
-    result = await session.execute(
-        select(TeacherAssignment.class_id).where(
-            TeacherAssignment.madrasa_id == madrasa_id,
-            TeacherAssignment.teacher_id == teacher_id,
-            TeacherAssignment.session_id == session_id,
-        )
+    # Timetable slots ∪ legacy TeacherAssignment rows (IMPLEMENT.md §4).
+    return await taught_class_ids(
+        session, madrasa_id=madrasa_id, teacher_id=teacher_id, session_id=session_id
     )
-    return set(result.scalars().all())
 
 
 async def _assert_can_mark_class(
@@ -250,17 +247,11 @@ async def attendance_classes(
         teacher_id = await _current_teacher_id(current_user, session, madrasa.id)
         if teacher_id is None:
             return []
-        assignments = (
-            await session.execute(
-                select(TeacherAssignment.class_id, TeacherAssignment.course_id).where(
-                    TeacherAssignment.madrasa_id == madrasa.id,
-                    TeacherAssignment.teacher_id == teacher_id,
-                    TeacherAssignment.session_id == active_session.id,
-                )
-            )
-        ).all()
-        assigned_class_ids = {row[0] for row in assignments}
-        assigned_course_ids = {row[1] for row in assignments}
+        pairs = await taught_pairs(
+            session, madrasa_id=madrasa.id, teacher_id=teacher_id, session_id=active_session.id
+        )
+        assigned_class_ids = {pair.class_id for pair in pairs}
+        assigned_course_ids = {pair.course_id for pair in pairs}
         if not assigned_class_ids:
             return []
         class_stmt = class_stmt.where(AcademicClass.id.in_(assigned_class_ids))

@@ -5,7 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user, get_current_madrasa, require_permission
+from app.core.dependencies import (
+    ensure_writable_session,
+    get_current_user,
+    get_current_madrasa,
+    require_permission,
+)
 from app.core.hijri import to_hijri_string
 from app.db.session import get_session
 from app.modules.auth.models import User
@@ -594,6 +599,7 @@ async def create_teacher_assignment(
     teacher = await session.get(TeacherProfile, payload.teacher_id)
     if teacher is None or teacher.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Teacher not found")
+    await ensure_writable_session(session, madrasa.id, payload.session_id)
     assignment = TeacherAssignment(madrasa_id=madrasa.id, **payload.model_dump())
     session.add(assignment)
     await session.commit()
@@ -638,6 +644,8 @@ async def enroll_student(
     student = result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+
+    await ensure_writable_session(session, madrasa.id, payload.session_id)
 
     # One enrollment per (student, session) — re-enrolling moves the student
     # to the new program/class/section instead of stacking duplicate rows.

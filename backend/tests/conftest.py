@@ -6,9 +6,12 @@ graph, and middleware stack — the layer where the production 500s lived.
 """
 from datetime import date
 from types import SimpleNamespace
+from uuid import UUID
 
 import pytest
+from fastapi import Request
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -168,12 +171,17 @@ async def seed(db_sessionmaker):
 
 
 def _make_client(db_sessionmaker, seed, acting_user):
+    """The dependency_overrides dict is app-global, so two live clients would
+    clobber each other's acting user. Instead the override resolves the user
+    per-request from an X-Test-User-Id header each client sets as a default."""
     async def override_get_session():
         async with db_sessionmaker() as session:
             yield session
 
-    async def override_get_current_user():
-        return acting_user
+    async def override_get_current_user(request: Request):
+        user_id = UUID(request.headers["x-test-user-id"])
+        async with db_sessionmaker() as session:
+            return (await session.execute(select(User).where(User.id == user_id))).scalar_one()
 
     fastapi_app.dependency_overrides[get_session] = override_get_session
     fastapi_app.dependency_overrides[get_current_user] = override_get_current_user
@@ -182,6 +190,7 @@ def _make_client(db_sessionmaker, seed, acting_user):
         base_url="http://testserver",
         headers={
             "X-Madrasa": seed.madrasa.slug,
+            "X-Test-User-Id": str(acting_user.id),
             "Origin": "https://app.example.com",
         },
     )

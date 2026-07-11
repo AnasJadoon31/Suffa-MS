@@ -23,7 +23,7 @@ export function RoleBadge({ role }: Readonly<{ role: string }>) {
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const { t } = useTranslation();
-  const { hasPermission, user, madrasa, logout } = useAuth();
+  const { hasPermission, hasFeature, user, madrasa, logout } = useAuth();
 
   return (
     <aside className="sidebar">
@@ -37,7 +37,11 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
       <nav className="navScroll" aria-label="Primary">
         {navGroups.map((group) => {
-          const visible = group.items.filter((item) => !item.permission || hasPermission(item.permission));
+          const visible = group.items.filter(
+            (item) =>
+              (!item.permission || hasPermission(item.permission)) &&
+              (!item.feature || hasFeature(item.feature))
+          );
           if (visible.length === 0) return null;
           return (
             <div className="navGroup" key={group.labelKey}>

@@ -7,11 +7,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
-from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.dependencies import (
+    ensure_writable_session,
+    get_current_madrasa,
+    get_current_user,
+    require_permission,
+    user_has_permission,
+)
 from app.core.hijri import to_hijri_string
 from app.core.pdf import render_result_card_pdf
+from app.core.teaching_scope import teacher_teaches
 from app.db.session import get_session
-from app.modules.academics.models import AcademicSession, ClassCourse, Course, Enrollment, Madrasa, TeacherAssignment
+from app.modules.academics.models import AcademicSession, ClassCourse, Course, Enrollment, Madrasa
 from app.modules.assessments.models import Assignment, ExamType, GradingScheme, Mark, ResultPublication, Submission
 from app.modules.assessments.schemas import (
     AssignmentCreate,
@@ -81,15 +88,15 @@ async def _require_class_course_scope(
         raise HTTPException(status_code=403, detail="Not assigned to this class/course")
 
     active_session_id = await _active_session_id(session, madrasa_id)
-    assigned = await session.execute(
-        select(TeacherAssignment).where(
-            TeacherAssignment.teacher_id == teacher.id,
-            TeacherAssignment.class_id == class_id,
-            TeacherAssignment.course_id == course_id,
-            TeacherAssignment.session_id == active_session_id,
-        )
-    )
-    if assigned.scalar_one_or_none() is None:
+    # Timetable slots are the source of truth (∪ legacy TeacherAssignment rows).
+    if not await teacher_teaches(
+        session,
+        madrasa_id=madrasa_id,
+        teacher_id=teacher.id,
+        session_id=active_session_id,
+        class_id=class_id,
+        course_id=course_id,
+    ):
         raise HTTPException(status_code=403, detail="Not assigned to this class/course")
 
 
@@ -116,14 +123,13 @@ async def _require_course_scope(
     if teacher is None:
         raise HTTPException(status_code=403, detail="Not assigned to this course")
     active_session_id = await _active_session_id(session, madrasa_id)
-    assigned = await session.execute(
-        select(TeacherAssignment).where(
-            TeacherAssignment.teacher_id == teacher.id,
-            TeacherAssignment.course_id == course_id,
-            TeacherAssignment.session_id == active_session_id,
-        )
-    )
-    if assigned.scalar_one_or_none() is None:
+    if not await teacher_teaches(
+        session,
+        madrasa_id=madrasa_id,
+        teacher_id=teacher.id,
+        session_id=active_session_id,
+        course_id=course_id,
+    ):
         raise HTTPException(status_code=403, detail="Not assigned to this course")
 
 
@@ -587,6 +593,7 @@ async def publish_results(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, object]:
+    await ensure_writable_session(session, madrasa.id, payload.session_id)
     published_count = 0
     for student_id in payload.student_ids:
         existing = (

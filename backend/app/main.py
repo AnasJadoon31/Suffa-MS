@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.dependencies import require_feature
 from app.core.logging import setup_logging
 from app.modules.academics.routes import router as academics_router
 from app.modules.assessments.routes import router as assessments_router
@@ -13,6 +14,7 @@ from app.modules.finance.routes import router as finance_router
 from app.modules.messaging.routes import router as messaging_router
 from app.modules.operations.routes import router as operations_router
 from app.modules.people.routes import router as people_router
+from app.modules.platform.routes import router as platform_router
 from app.modules.reporting.routes import router as reporting_router
 
 
@@ -64,13 +66,30 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+    app.include_router(platform_router, prefix="/api/v1/platform", tags=["platform"])
     app.include_router(academics_router, prefix="/api/v1/academics", tags=["academics"])
     app.include_router(people_router, prefix="/api/v1/people", tags=["people"])
-    app.include_router(attendance_router, prefix="/api/v1/attendance", tags=["attendance"])
-    app.include_router(assessments_router, prefix="/api/v1/assessments", tags=["assessments"])
-    app.include_router(finance_router, prefix="/api/v1/finance", tags=["finance"])
+    # Feature-gated modules: a madrasa_features row with enabled=false switches
+    # the whole router off for that tenant (403). Absent row = enabled.
+    app.include_router(
+        attendance_router, prefix="/api/v1/attendance", tags=["attendance"],
+        dependencies=[Depends(require_feature("attendance"))],
+    )
+    app.include_router(
+        assessments_router, prefix="/api/v1/assessments", tags=["assessments"],
+        dependencies=[Depends(require_feature("assessments"))],
+    )
+    app.include_router(
+        finance_router, prefix="/api/v1/finance", tags=["finance"],
+        dependencies=[Depends(require_feature("finance"))],
+    )
     app.include_router(files_router, prefix="/api/v1/files", tags=["files"])
-    app.include_router(messaging_router, prefix="/api/v1/messaging", tags=["messaging"])
+    app.include_router(
+        messaging_router, prefix="/api/v1/messaging", tags=["messaging"],
+        dependencies=[Depends(require_feature("messaging"))],
+    )
+    # operations bundles several features (timetable, holidays, forms, blog…);
+    # those are gated per-route as their screens are reworked.
     app.include_router(operations_router, prefix="/api/v1/operations", tags=["operations"])
     app.include_router(reporting_router, prefix="/api/v1/reporting", tags=["reporting"])
 

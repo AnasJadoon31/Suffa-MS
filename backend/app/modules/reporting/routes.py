@@ -10,9 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission
 from app.core.pdf import render_table_pdf
+from app.core.teaching_scope import taught_pairs
 from app.db.core_models import AuditLog
 from app.db.session import get_session
-from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, TeacherAssignment
+from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section, TeacherAssignment
 from app.modules.assessments.models import Assignment, ResultPublication, Submission
 from app.modules.assessments.routes import (
     _build_session_result,
@@ -208,23 +209,30 @@ async def _teacher_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
 
     active_session_id = await _active_session_id(session, madrasa.id)
 
-    assignment_rows = (
-        await session.execute(
-            select(TeacherAssignment.class_id, TeacherAssignment.course_id, AcademicClass.name, Course.name)
-            .join(AcademicClass, AcademicClass.id == TeacherAssignment.class_id)
-            .join(Course, Course.id == TeacherAssignment.course_id)
-            .where(
-                TeacherAssignment.madrasa_id == madrasa.id,
-                TeacherAssignment.teacher_id == teacher.id,
-                TeacherAssignment.session_id == active_session_id,
-            )
-        )
-    ).all()
+    pairs = await taught_pairs(
+        session, madrasa_id=madrasa.id, teacher_id=teacher.id, session_id=active_session_id
+    )
+    class_names = dict(
+        (await session.execute(select(AcademicClass.id, AcademicClass.name).where(AcademicClass.madrasa_id == madrasa.id))).all()
+    )
+    course_names = dict(
+        (await session.execute(select(Course.id, Course.name).where(Course.madrasa_id == madrasa.id))).all()
+    )
+    section_names = dict(
+        (await session.execute(select(Section.id, Section.name).where(Section.madrasa_id == madrasa.id))).all()
+    )
     my_classes = [
-        {"class_id": str(class_id), "course_id": str(course_id), "class_name": class_name, "course_name": course_name}
-        for class_id, course_id, class_name, course_name in assignment_rows
+        {
+            "class_id": str(pair.class_id),
+            "course_id": str(pair.course_id),
+            "section_id": str(pair.section_id) if pair.section_id else None,
+            "class_name": class_names.get(pair.class_id),
+            "course_name": course_names.get(pair.course_id),
+            "section_name": section_names.get(pair.section_id) if pair.section_id else None,
+        }
+        for pair in pairs
     ]
-    class_ids = {row[0] for row in assignment_rows}
+    class_ids = {pair.class_id for pair in pairs}
 
     pending_submissions = 0
     if class_ids:

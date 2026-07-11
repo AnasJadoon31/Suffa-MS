@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, Integer, UniqueConstraint
@@ -11,6 +12,12 @@ from app.db.base import Base, IdMixin, PortableJSONB, TenantMixin, TimestampMixi
 class TimetableSlot(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "timetable_slots"
 
+    # Timetables are per academic session; the slot is also the source of
+    # truth for "which teacher teaches which course in which section"
+    # (IMPLEMENT.md §4). Nullable only for pre-migration legacy rows.
+    session_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("academic_sessions.id"), index=True, nullable=True
+    )
     class_id: Mapped[UUID] = mapped_column(ForeignKey("classes.id"), index=True)
     section_id: Mapped[UUID] = mapped_column(ForeignKey("sections.id"), index=True)
     course_id: Mapped[UUID] = mapped_column(ForeignKey("courses.id"), index=True)

@@ -47,6 +47,8 @@ export type NavItem = Readonly<{
   descKey: string;
   icon: typeof ClipboardCheck;
   permission?: string;
+  /** Per-madrasa feature flag key (super-admin controlled); unset = always on. */
+  feature?: string;
 }>;
 
 export type NavGroup = Readonly<{
@@ -62,41 +64,41 @@ export const navGroups: readonly NavGroup[] = [
   {
     labelKey: "groupDaily",
     items: [
-      { id: "attendance", labelKey: "attendance", descKey: "descAttendance", icon: CalendarDays, permission: "attendance.take" },
-      { id: "timetable", labelKey: "timetable", descKey: "descTimetable", icon: CalendarClock },
-      { id: "holidays", labelKey: "holidays", descKey: "descHolidays", icon: CalendarX },
-      { id: "leave", labelKey: "leave", descKey: "descLeave", icon: CalendarCheck },
-      { id: "announcements", labelKey: "announcements", descKey: "descAnnouncements", icon: Megaphone }
+      { id: "attendance", labelKey: "attendance", descKey: "descAttendance", icon: CalendarDays, permission: "attendance.take", feature: "attendance" },
+      { id: "timetable", labelKey: "timetable", descKey: "descTimetable", icon: CalendarClock, feature: "timetable" },
+      { id: "holidays", labelKey: "holidays", descKey: "descHolidays", icon: CalendarX, feature: "holidays" },
+      { id: "leave", labelKey: "leave", descKey: "descLeave", icon: CalendarCheck, feature: "leave" },
+      { id: "announcements", labelKey: "announcements", descKey: "descAnnouncements", icon: Megaphone, feature: "announcements" }
     ]
   },
   {
     labelKey: "groupTeaching",
     items: [
       { id: "academics", labelKey: "academics", descKey: "descAcademics", icon: Boxes, permission: "academics.manage" },
-      { id: "assessments", labelKey: "assessments", descKey: "descAssessments", icon: ClipboardList, permission: "assignments.create" },
-      { id: "resources", labelKey: "resources", descKey: "descResources", icon: FolderOpen },
-      { id: "forms", labelKey: "forms", descKey: "descForms", icon: FileText }
+      { id: "assessments", labelKey: "assessments", descKey: "descAssessments", icon: ClipboardList, permission: "assignments.create", feature: "assessments" },
+      { id: "resources", labelKey: "resources", descKey: "descResources", icon: FolderOpen, feature: "resources" },
+      { id: "forms", labelKey: "forms", descKey: "descForms", icon: FileText, feature: "forms" }
     ]
   },
   {
     labelKey: "groupPeople",
     items: [
       { id: "people", labelKey: "people", descKey: "descPeople", icon: UsersRound, permission: "students.view" },
-      { id: "admissions", labelKey: "admissions", descKey: "descAdmissions", icon: ClipboardCheck }
+      { id: "admissions", labelKey: "admissions", descKey: "descAdmissions", icon: ClipboardCheck, feature: "admissions" }
     ]
   },
   {
     labelKey: "groupFinance",
     items: [
-      { id: "finance", labelKey: "finance", descKey: "descFinance", icon: Landmark, permission: "finance.reports.view" },
-      { id: "salary", labelKey: "salary", descKey: "descSalary", icon: Banknote, permission: "teachers.salary.manage" },
-      { id: "reports", labelKey: "reports", descKey: "descReports", icon: FileDown, permission: "attendance.take" }
+      { id: "finance", labelKey: "finance", descKey: "descFinance", icon: Landmark, permission: "finance.reports.view", feature: "finance" },
+      { id: "salary", labelKey: "salary", descKey: "descSalary", icon: Banknote, permission: "teachers.salary.manage", feature: "salary" },
+      { id: "reports", labelKey: "reports", descKey: "descReports", icon: FileDown, permission: "attendance.take", feature: "reports" }
     ]
   },
   {
     labelKey: "groupSite",
     items: [
-      { id: "blog", labelKey: "blog", descKey: "descBlog", icon: Newspaper },
+      { id: "blog", labelKey: "blog", descKey: "descBlog", icon: Newspaper, feature: "blog" },
       { id: "settings", labelKey: "settings", descKey: "descSettings", icon: Settings, permission: "academics.manage" }
     ]
   }

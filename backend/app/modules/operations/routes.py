@@ -6,9 +6,25 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_madrasa, get_current_user, get_optional_user, require_permission, user_has_permission
+from app.core.dependencies import (
+    get_context_session,
+    get_current_madrasa,
+    get_current_user,
+    get_optional_user,
+    require_active_session,
+    require_permission,
+    user_has_permission,
+)
 from app.db.session import get_session
-from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
+from app.modules.academics.models import (
+    AcademicClass,
+    AcademicSession,
+    Course,
+    Enrollment,
+    Madrasa,
+    Section,
+)
+from app.modules.operations.audience import get_viewer_context, scope_allows
 from app.modules.auth.models import User, UserRole
 from app.modules.operations.models import (
     AdmissionApplication,
@@ -103,6 +119,11 @@ def _scope_dump(scope) -> dict:
     return scope.model_dump(mode="json") if hasattr(scope, "model_dump") else scope
 
 
+def _aware_dt(value: datetime) -> datetime:
+    # sqlite (tests) returns naive datetimes; Postgres returns tz-aware.
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
 def _role_value(role: UserRole | str | None) -> str | None:
     if role is None:
         return None
@@ -168,14 +189,69 @@ async def _leave_reads(session: AsyncSession, rows: list[Leave], madrasa_id: UUI
 
 # ------------------------------------------------------------- Timetable
 
+def _minutes(value: str) -> int:
+    hours, minutes = value.split(":")
+    return int(hours) * 60 + int(minutes)
+
+
+def _overlaps(a_start: str, a_end: str, b_start: str, b_end: str) -> bool:
+    return _minutes(a_start) < _minutes(b_end) and _minutes(b_start) < _minutes(a_end)
+
+
 @router.post("/timetable", response_model=TimetableSlotRead)
 async def create_timetable_slot(
     payload: TimetableSlotCreate,
     current_user: User = Depends(require_permission("timetable.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
+    context_session: AcademicSession = Depends(require_active_session),
     session: AsyncSession = Depends(get_session),
 ) -> TimetableSlotRead:
-    slot = TimetableSlot(madrasa_id=madrasa.id, **payload.model_dump())
+    if _minutes(payload.end_time) <= _minutes(payload.start_time):
+        raise HTTPException(status_code=400, detail="end_time must be after start_time")
+
+    section = await session.get(Section, payload.section_id)
+    if section is None or section.madrasa_id != madrasa.id or section.class_id != payload.class_id:
+        raise HTTPException(status_code=400, detail="Section does not belong to the given class")
+    teacher = await session.get(TeacherProfile, payload.teacher_id)
+    if teacher is None or teacher.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    # Conflict detection: the same teacher or the same section cannot be in
+    # two overlapping slots on the same day of the same session.
+    day_slots = (
+        await session.execute(
+            select(TimetableSlot).where(
+                TimetableSlot.madrasa_id == madrasa.id,
+                TimetableSlot.session_id == context_session.id,
+                TimetableSlot.day_of_week == payload.day_of_week,
+            )
+        )
+    ).scalars().all()
+    for other in day_slots:
+        if not _overlaps(payload.start_time, payload.end_time, other.start_time, other.end_time):
+            continue
+        if other.teacher_id == payload.teacher_id:
+            raise HTTPException(status_code=409, detail=f"Teacher already has a slot {other.start_time}–{other.end_time} that day")
+        if other.section_id == payload.section_id:
+            raise HTTPException(status_code=409, detail=f"Section already has a slot {other.start_time}–{other.end_time} that day")
+
+    period = payload.period
+    if period is None:
+        # Auto-derive: 1 + number of distinct earlier start times for this
+        # section on this day.
+        earlier = {
+            other.start_time
+            for other in day_slots
+            if other.section_id == payload.section_id and _minutes(other.start_time) < _minutes(payload.start_time)
+        }
+        period = len(earlier) + 1
+
+    slot = TimetableSlot(
+        madrasa_id=madrasa.id,
+        session_id=context_session.id,
+        **payload.model_dump(exclude={"period"}),
+        period=period,
+    )
     session.add(slot)
     await session.commit()
     await session.refresh(slot)
@@ -197,24 +273,56 @@ async def delete_timetable_slot(
     return {"status": "deleted"}
 
 
+def _enriched_slot(row) -> TimetableSlotRead:
+    slot, class_name, section_name, course_name, teacher_name = row
+    data = TimetableSlotRead.model_validate(slot).model_dump()
+    data.update(
+        class_name=class_name,
+        section_name=section_name,
+        course_name=course_name,
+        teacher_name=teacher_name,
+    )
+    return TimetableSlotRead(**data)
+
+
 @router.get("/timetable", response_model=list[TimetableSlotRead])
 async def list_timetable(
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
+    context_session: AcademicSession = Depends(get_context_session),
     session: AsyncSession = Depends(get_session),
     class_id: UUID | None = None,
     section_id: UUID | None = None,
     teacher_id: UUID | None = None,
+    course_id: UUID | None = None,
+    day_of_week: int | None = None,
 ) -> list[TimetableSlotRead]:
-    stmt = select(TimetableSlot).where(TimetableSlot.madrasa_id == madrasa.id)
+    stmt = (
+        select(TimetableSlot, AcademicClass.name, Section.name, Course.name, TeacherProfile.name)
+        .join(AcademicClass, AcademicClass.id == TimetableSlot.class_id)
+        .join(Section, Section.id == TimetableSlot.section_id)
+        .join(Course, Course.id == TimetableSlot.course_id)
+        .join(TeacherProfile, TeacherProfile.id == TimetableSlot.teacher_id)
+        .where(
+            TimetableSlot.madrasa_id == madrasa.id,
+            # Legacy rows predating session stamping stay visible everywhere.
+            (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
+        )
+    )
     if class_id:
         stmt = stmt.where(TimetableSlot.class_id == class_id)
     if section_id:
         stmt = stmt.where(TimetableSlot.section_id == section_id)
     if teacher_id:
         stmt = stmt.where(TimetableSlot.teacher_id == teacher_id)
-    result = await session.execute(stmt.order_by(TimetableSlot.day_of_week, TimetableSlot.period))
-    return [TimetableSlotRead.model_validate(row) for row in result.scalars().all()]
+    if course_id:
+        stmt = stmt.where(TimetableSlot.course_id == course_id)
+    if day_of_week is not None:
+        stmt = stmt.where(TimetableSlot.day_of_week == day_of_week)
+    result = await session.execute(
+        stmt.order_by(TimetableSlot.day_of_week, TimetableSlot.start_time, Section.name)
+    )
+    return [_enriched_slot(row) for row in result.all()]
 
 
 @router.get("/timetable/me", response_model=list[TimetableSlotRead])
@@ -265,7 +373,7 @@ async def my_timetable(
 @router.post("/holidays", response_model=HolidayRead)
 async def create_holiday(
     payload: HolidayCreate,
-    current_user: User = Depends(require_permission("timetable.manage")),
+    current_user: User = Depends(require_permission("holidays.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> HolidayRead:
@@ -293,7 +401,7 @@ async def list_holidays(
 async def update_holiday(
     holiday_id: UUID,
     payload: HolidayUpdate,
-    current_user: User = Depends(require_permission("timetable.manage")),
+    current_user: User = Depends(require_permission("holidays.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> HolidayRead:
@@ -312,7 +420,7 @@ async def update_holiday(
 @router.delete("/holidays/{holiday_id}")
 async def delete_holiday(
     holiday_id: UUID,
-    current_user: User = Depends(require_permission("timetable.manage")),
+    current_user: User = Depends(require_permission("holidays.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
@@ -377,7 +485,7 @@ async def list_leave(
 async def set_leave_status(
     leave_id: UUID,
     status_value: str,
-    current_user: User = Depends(require_permission("timetable.manage")),
+    current_user: User = Depends(require_permission("leave.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> LeaveRead:
@@ -455,8 +563,8 @@ async def list_resources(
         stmt = stmt.where(Resource.category_id == category_id)
     result = await session.execute(stmt.order_by(Resource.title))
     rows = result.scalars().all()
-    viewer_class_id = await _viewer_class_id(session, current_user, madrasa.id)
-    return [ResourceRead.model_validate(row) for row in rows if _visible(row.visibility_scope, viewer_class_id, current_user.role.value)]
+    ctx = await get_viewer_context(session, current_user, madrasa.id)
+    return [ResourceRead.model_validate(row) for row in rows if scope_allows(row.visibility_scope, ctx)]
 
 
 # ------------------------------------------------------------------ Forms
@@ -493,8 +601,8 @@ async def list_forms(
 ) -> list[FormRead]:
     result = await session.execute(select(Form).where(Form.madrasa_id == madrasa.id).order_by(Form.title))
     rows = result.scalars().all()
-    viewer_class_id = await _viewer_class_id(session, current_user, madrasa.id)
-    return [FormRead.model_validate(row) for row in rows if _visible(row.visibility_scope, viewer_class_id, current_user.role.value)]
+    ctx = await get_viewer_context(session, current_user, madrasa.id)
+    return [FormRead.model_validate(row) for row in rows if scope_allows(row.visibility_scope, ctx)]
 
 
 @router.get("/forms/{form_id}", response_model=FormRead)
@@ -599,20 +707,38 @@ async def list_announcements(
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    audience: str | None = None,  # teachers | students | all — the admin tabs
+    q: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
 ) -> list[AnnouncementRead]:
     now = datetime.now(UTC)
-    result = await session.execute(
-        select(Announcement).where(Announcement.madrasa_id == madrasa.id).order_by(Announcement.created_at.desc())
-    )
-    rows = result.scalars().all()
-    viewer_class_id = await _viewer_class_id(session, current_user, madrasa.id)
+    stmt = select(Announcement).where(Announcement.madrasa_id == madrasa.id)
+    if q:
+        pattern = f"%{q}%"
+        stmt = stmt.where(Announcement.title.ilike(pattern) | Announcement.body.ilike(pattern))
+    if date_from:
+        stmt = stmt.where(Announcement.created_at >= date_from)
+    if date_to:
+        stmt = stmt.where(Announcement.created_at <= date_to)
+    rows = (await session.execute(stmt.order_by(Announcement.created_at.desc()))).scalars().all()
+    ctx = await get_viewer_context(session, current_user, madrasa.id)
+
+    def _audience_tab(row: Announcement) -> bool:
+        if audience in (None, "all"):
+            return True
+        scope = row.audience_scope or {}
+        roles = scope.get("roles") or []
+        wanted = "teacher" if audience == "teachers" else "student"
+        # No role gate = addressed to everyone, shows on every tab.
+        return not roles or wanted in roles
 
     def _live(row: Announcement) -> bool:
-        if row.publish_at and now < row.publish_at:
+        if row.publish_at and now < _aware_dt(row.publish_at):
             return False
-        if row.expires_at and now > row.expires_at:
+        if row.expires_at and now > _aware_dt(row.expires_at):
             return False
-        return _visible(row.audience_scope, viewer_class_id, current_user.role.value)
+        return scope_allows(row.audience_scope, ctx) and _audience_tab(row)
 
     return [AnnouncementRead.model_validate(row) for row in rows if _live(row)]
 
@@ -727,7 +853,7 @@ async def create_admission_application(
 
 @router.get("/admissions", response_model=list[AdmissionApplicationRead])
 async def list_admission_applications(
-    current_user: User = Depends(require_permission("students.provision")),
+    current_user: User = Depends(require_permission("admissions.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> list[AdmissionApplicationRead]:
@@ -741,7 +867,7 @@ async def list_admission_applications(
 async def set_admission_status(
     application_id: UUID,
     status_value: str,
-    current_user: User = Depends(require_permission("students.provision")),
+    current_user: User = Depends(require_permission("admissions.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> AdmissionApplicationRead:
@@ -819,7 +945,7 @@ async def list_settings(
 @router.put("/settings", response_model=SettingRead)
 async def upsert_setting(
     payload: SettingUpsert,
-    current_user: User = Depends(require_permission("academics.manage")),
+    current_user: User = Depends(require_permission("settings.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> SettingRead:

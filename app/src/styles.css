@@ -1677,3 +1677,13 @@ html[dir="rtl"] .navGroupLabel {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+.sessionReadOnlyBanner {
+  margin: 12px 24px 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid #f0c36d;
+  background: #fdf3d7;
+  color: #7a5b12;
+  font-size: 0.9rem;
+}

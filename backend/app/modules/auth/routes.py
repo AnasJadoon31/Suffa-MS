@@ -11,13 +11,20 @@ from app.core.permissions import registry
 from app.core.rate_limit import LOGIN_LOCKOUT_SECONDS, LOGIN_MAX_ATTEMPTS, assert_not_locked_out, clear_failures, record_failure
 from app.core.security import ALGORITHM, hash_password, verify_password, issue_token
 from app.core.tenancy import TenantContext, get_tenant
-from app.core.dependencies import get_current_user, get_current_madrasa, require_permission
+from app.core.dependencies import (
+    get_current_user,
+    get_current_madrasa,
+    get_enabled_features,
+    require_permission,
+)
 from app.db.session import get_session
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
 from app.modules.auth.service import UsernameTakenError, provision_login
-from app.modules.academics.models import Madrasa
+from app.modules.academics.models import AcademicSession, Madrasa
 from app.modules.auth.schemas import (
     LoginRequest,
+    PermissionGrant,
+    PermissionGrantRead,
     PermissionGrantRequest,
     ProvisionUserRequest,
     ProvisionUserResponse,
@@ -25,6 +32,7 @@ from app.modules.auth.schemas import (
     SetPasswordRequest,
     TokenResponse,
     CurrentUserResponse,
+    UpdateMeRequest,
     UserRead,
     MadrasaRead
 )
@@ -75,8 +83,38 @@ async def get_me(
     return CurrentUserResponse(
         user=UserRead.model_validate(current_user),
         madrasa=MadrasaRead.model_validate(madrasa),
-        permissions=permissions
+        permissions=permissions,
+        features=await get_enabled_features(madrasa.id, session),
     )
+
+
+@router.patch("/me", response_model=CurrentUserResponse)
+async def update_me(
+    payload: UpdateMeRequest,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> CurrentUserResponse:
+    # Re-fetch within this request's session: get_current_user may hand back an
+    # instance bound elsewhere, and mutations must be tracked here to persist.
+    user = await session.get(User, current_user.id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if payload.preferred_language is not None:
+        user.preferred_language = payload.preferred_language
+
+    if payload.clear_selected_session:
+        user.selected_session_id = None
+    elif payload.selected_session_id is not None:
+        academic_session = await session.get(AcademicSession, payload.selected_session_id)
+        if academic_session is None or academic_session.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Academic session not found")
+        user.selected_session_id = academic_session.id
+
+    await session.commit()
+    await session.refresh(user)
+    return await get_me(current_user=user, madrasa=madrasa, session=session)
 
 
 @router.post("/provision", response_model=ProvisionUserResponse)
@@ -155,11 +193,16 @@ async def grant_permissions(
     if current_user.role != UserRole.principal:
         raise HTTPException(status_code=403, detail="Only the Principal can grant permissions")
 
+    # Normalise both request forms into (code, scope_type, scope_id) tuples.
+    requested = [PermissionGrant(code=code) for code in payload.permission_codes] + payload.grants
     try:
-        for code in payload.permission_codes:
-            registry.require_known(code)
+        for grant in requested:
+            registry.require_known(grant.code)
     except KeyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    for grant in requested:
+        if (grant.scope_type is None) != (grant.scope_id is None):
+            raise HTTPException(status_code=400, detail=f"Grant {grant.code}: scope_type and scope_id must be set together")
 
     target = await session.get(User, payload.user_id)
     if target is None or target.madrasa_id != madrasa.id:
@@ -167,13 +210,24 @@ async def grant_permissions(
 
     existing_stmt = select(UserPermission).where(UserPermission.user_id == payload.user_id)
     existing = (await session.execute(existing_stmt)).scalars().all()
-    old_codes = sorted(item.permission_code for item in existing)
+    old_grants = sorted(
+        f"{item.permission_code}:{item.scope_type or '*'}:{item.scope_id or '*'}" for item in existing
+    )
     for item in existing:
         await session.delete(item)
 
-    new_codes = sorted(set(payload.permission_codes))
-    for code in new_codes:
-        session.add(UserPermission(user_id=payload.user_id, permission_code=code, granted_by_id=current_user.id))
+    deduped = {(g.code, g.scope_type, g.scope_id) for g in requested}
+    for code, scope_type, scope_id in sorted(deduped, key=lambda g: (g[0], str(g[1]), str(g[2]))):
+        session.add(
+            UserPermission(
+                user_id=payload.user_id,
+                permission_code=code,
+                granted_by_id=current_user.id,
+                scope_type=str(scope_type) if scope_type else None,
+                scope_id=scope_id,
+            )
+        )
+    new_grants = sorted(f"{c}:{st or '*'}:{sid or '*'}" for c, st, sid in deduped)
 
     record_audit(
         session,
@@ -182,9 +236,29 @@ async def grant_permissions(
         action="permissions.grant",
         entity_name="user",
         entity_id=str(payload.user_id),
-        old_values={"permission_codes": old_codes},
-        new_values={"permission_codes": new_codes},
+        old_values={"grants": old_grants},
+        new_values={"grants": new_grants},
     )
     await session.commit()
 
-    return {"user_id": payload.user_id, "permission_codes": new_codes, "audited": True}
+    return {"user_id": payload.user_id, "grants": new_grants, "audited": True}
+
+
+@router.get("/users/{user_id}/permissions", response_model=list[PermissionGrantRead])
+async def list_user_permissions(
+    user_id: UUID,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[PermissionGrantRead]:
+    if current_user.role != UserRole.principal and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Only the Principal can view another user's permissions")
+
+    target = await session.get(User, user_id)
+    if target is None or target.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await session.execute(
+        select(UserPermission).where(UserPermission.user_id == user_id).order_by(UserPermission.permission_code)
+    )
+    return [PermissionGrantRead.model_validate(row) for row in result.scalars().all()]

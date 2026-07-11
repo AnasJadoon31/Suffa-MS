@@ -1,193 +1,244 @@
-# Remaining work vs MMS-SRS v1.0
+# TO_IMPLEMENT — Full portal audit backlog (2026-07-11)
 
-Status snapshot after the auth/permissions, people, operations, assessments, finance,
-and reporting passes + the 5-screen demo UI (login, academics setup, people,
-attendance, assessments, dashboard), followed by a full pass closing every item
-below (attendance lock/override, messaging, dashboards, reporting exports,
-result-card PDFs, rate limiting, audit coverage, i18n, storage wiring, and the
-public marketing site).
+Findings from a manual walkthrough of all three portals (admin/principal, teacher,
+student), organized as an actionable backlog. Design decisions and architecture for
+the large cross-cutting items live in `IMPLEMENT.md` — this file is the checklist.
+(The previous SRS-v1.0 checklist was fully complete and has been cleaned out per
+the CLAUDE.md procedure.)
 
-## Attendance (§4.4.2, §4.9)
+Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** UX/polish
 
-- [x] Enforce the 23:59 lock. Sync now rejects late writes (`locked` list in the
-      response) instead of silently accepting them.
-- [x] Post-lock override endpoint: `POST /attendance/override`, gated by the
-      `attendance.edit_locked` permission, mandatory `reason`, full audit entry
-      via `record_audit` (action `attendance.override`).
-- [x] Teacher check-in/check-out — `AttendanceEntry` sync schema now carries
-      `check_in`/`check_out` and the sync route persists them onto
-      `TeacherAttendance`.
-- [x] Attendance summary report per student/class/date-range, excluding
-      holidays and approved leave (`GET /attendance/summary/{subject_type}/{id}`,
-      plus the class-scoped CSV/PDF export under `/reporting/reports/attendance`).
-- [x] Missing-attendance drill-down — dashboard now returns
-      `missing_sync_teacher_list` alongside the count.
+---
 
-## Messaging (§4.16)
+## A. Cross-cutting (whole app)
 
-- [x] `POST /messaging/whatsapp-link` looks up `MessageTemplate` by code +
-      recipient language instead of taking a raw template string.
-- [x] `POST /messaging/send-report` — prefilled from a student's published
-      result, sent to the primary guardian.
-- [x] `POST /messaging/send-credentials` — wired to whichever profile
-      (teacher/student→guardian) owns the freshly provisioned login.
-- [x] `MessageLog` is now written on every dispatch. (Also dropped the
-      `recipient_id → users.id` FK since recipients are polymorphic —
-      guardians/students/teachers, not always a `users` row.)
-- [x] Basic template CRUD (`GET/POST /messaging/templates`) plus default
-      `performance_report`/`credentials` templates seeded in `bootstrap.py`.
+- [ ] **[P1] Complete Urdu i18n.** Language toggle exists but most views have zero
+      `t()` calls (`AdmissionsView`, `BlogView`, `FinanceView`, `HolidaysView`,
+      `ReportsView`, `ResourcesView`, `RolloverWizard`, and more are 100% hardcoded
+      English). Every non-user-entered string — buttons, labels, headers, empty
+      states, toasts, validation messages — must go through `app/src/i18n/index.ts`
+      (or split per-view bundles; see IMPLEMENT.md §2). Include RTL layout support
+      for Urdu.
+- [ ] **[P1] Names, not UUIDs.** Several screens render raw IDs (timetable slots,
+      course mapping, marks, etc.). Backend list endpoints must join/embed display
+      names; frontend must never show a UUID.
+- [ ] **[P2] Progressive Web App.** Add `vite-plugin-pwa` (manifest, service worker,
+      install prompt, offline shell — attendance outbox already exists in
+      `useAttendanceOutbox.ts`, extend caching to read views). Proper mobile styles:
+      navbar drawer instead of fixed sidebar, quick-links/action grid on dashboard,
+      touch-friendly hit targets.
+- [ ] **[P3] Checkbox size.** Global CSS fix in `app/src/styles.css` — checkboxes
+      render oversized everywhere (Forms view especially).
+- [ ] **[P2] Personal settings page (all roles).** Change password, phone, preferred
+      language, profile photo. Backend: `PATCH /auth/me`, `POST /auth/change-password`.
+- [x] **[P1] Super-admin tier (backend).** `super_admin` role, `madrasa_features`
+      flags, `/platform` onboarding + feature endpoints, router gating, nav
+      filtering. Remaining: super-admin UI (route tree in the SPA).
+- [ ] **[P1] OWASP pass.** Systematic review: tenant isolation on every route
+      (RLS + application scoping per CLAUDE.md mandate), IDOR checks on all
+      `/{id}` endpoints, rate limiting coverage (`core/rate_limit.py` exists —
+      verify applied to auth + public endpoints), password policy, session/token
+      expiry + idle logout, file-upload validation (`core/storage.py`), audit-log
+      coverage, security headers, CSRF posture for the public form endpoints,
+      dependency audit. See IMPLEMENT.md §9.
+- [x] **[P1] Per-role/per-login session selection.** Now a server-side per-user
+      preference (`users.selected_session_id`) + in-memory header; shared
+      localStorage key removed.
+- [x] **[P1] Non-active sessions read-only (core).** `require_active_session` /
+      `ensure_writable_session` guards + archived-session banner. Remaining:
+      apply the guard to every mutating route as screens are reworked, and
+      disable mutating controls per-view.
 
-## Dashboards & Reporting (§4.18)
+## B. Admin portal
 
-- [x] Teacher dashboard (my classes, pending submissions, today's timetable)
-      and Student dashboard (today's timetable, latest result, due
-      assignments, resources, announcements) — `GET /reporting/dashboard` now
-      branches on role; frontend `DashboardCards.tsx` renders per-role.
-- [x] Report generation by scope + period, PDF/CSV export —
-      `GET /reporting/reports/attendance` and `/reporting/reports/finance`,
-      both real queries with `format=csv|pdf`. The old in-memory `reports`
-      mock module (and its generic `/{module_key}` scaffolding) was removed
-      from the operations router.
+### B0. Delegation (mini-admins) — every admin screen
+- [ ] **[P2]** Per-screen "Assign to teachers…" control that grants not the whole
+      screen but selected features of it. See IMPLEMENT.md §3.
+      **Backend done:** feature codes (`holidays.manage`, `leave.manage`,
+      `admissions.manage`, `settings.manage`), scoped grants
+      (`scope_type`/`scope_id`), scoped checks, grant/list API.
+      **Remaining:** "Delegate…" modal UI per screen; teacher portal renders
+      delegated screens from effective permissions.
 
-## Assessments (§4.10, §4.11)
+### B2. Attendance
+- [ ] **[P2]** Admin override of *teacher* attendance (mark/correct teacher
+      check-in/out from admin screen; `attendance.edit_locked` flow exists for
+      students — extend to teachers).
 
-- [x] Result-card PDF (bilingual English/Urdu, Hijri+Gregorian date) —
-      `GET /assessments/results/card` (staff) and `/results/card/me` (portal
-      student), built with `reportlab` + `hijri-converter` +
-      `arabic-reshaper`/`python-bidi` for correct Urdu shaping, using the
-      bundled Noto Nastaliq Urdu font (`backend/app/assets/fonts/`).
+### B3. Timetable
+- [ ] **[P3]** Weekly Grid tab first, List second.
+- [ ] **[P2]** Bulk upload of slots (CSV/XLSX import + grid multi-create).
+- [x] **[P2]** List sorting + filters: by class, course, teacher, day —
+      backend done (name-enriched, session-scoped); UI hookup pending.
+- [x] **[P2]** Auto-derive periods + conflict detection (teacher/section
+      overlap → 409) — backend done.
+- [x] **[P2]** Timetable is now the source of truth for teacher assignments
+      (backend: `core/teaching_scope.py`, wired into assessments, attendance,
+      dashboards). Remaining: UI grouping "who teaches what where" and
+      removing the Teacher Assignment tab (B7-j).
 
-## Frontend screens not built (backend is real for all of these)
+### B4. Holidays
+- [ ] **[P3]** Filters (date range, category, scope).
+- [ ] **[P2]** Categories (religious, national, madrasa-specific, exam break…).
+- [ ] **[P2]** Class-scoped holidays: a holiday can apply to specific classes only.
+      Attendance/timetable logic must respect scope.
 
-- [x] Timetable / Holidays / Leave — screen added (`TimetableView.tsx`).
-- [x] Resources — screen added (`ResourcesView.tsx`), wired to the real
-      presign upload/download endpoints.
-- [x] Forms — screen added (`FormsView.tsx`): builder + response viewer.
-- [x] Announcements — screen added (`AnnouncementsView.tsx`).
-- [x] Finance (contributions/donations/summary) — screen added
-      (`FinanceView.tsx`).
-- [x] Salary — screen added (`SalaryView.tsx`).
-- [x] Blog / Admissions — real tables, real routes, screens
-      (`BlogView.tsx`, `AdmissionsView.tsx`). Admission submission is
-      unauthenticated (walk-in/public intake); review gated by
-      `students.provision`. Public blog listing is now anonymous-readable
-      (published-only) for the marketing site.
-- [x] Settings — real `madrasa_settings` key/value table, route, and screen
-      (`SettingsView.tsx`).
-- [x] Reports — screen added (`ReportsView.tsx`), scope+period CSV/PDF export
-      for attendance and finance.
+### B5. Leave
+- [ ] **[P3]** Filters everywhere.
+- [ ] **[P2]** Separate Teachers / Students tabs.
+- [ ] **[P2]** Student tab: class filter + every applicable filter (status, type,
+      date range, section).
+- [ ] **[P3]** Per-tab search.
 
-## Public marketing site (§4.18 FR-WEB)
+### B6. Announcements
+- [ ] **[P2]** Categories.
+- [x] **[P3]** Search — backend `q` param done; UI pending.
+- [x] **[P2]** Three audience tabs + date filtering — backend
+      (`audience=teachers|students|all`, `date_from`/`date_to`) done; UI
+      tabs pending.
 
-- [x] Blog section fetches real published posts server-side
-      (`web/src/lib/api.ts` → `GET /operations/blog?published_only=true`,
-      now anonymous-readable).
-- [x] Contact enquiry storage — new `ContactEnquiry` model/table
-      (`contact_enquiries`), public `POST /operations/enquiries`, staff
-      `GET`/status-update endpoints gated by the new
-      `contact.enquiries.view` permission, reviewed from `AdmissionsView.tsx`.
-- [x] Admission application flow — `AdmissionForm.tsx` posts to the existing
-      (already-public) `POST /operations/admissions`.
-- [x] `NEXT_PUBLIC_API_BASE` wired up (`web/.env.example` added); both forms
-      and the blog fetch go through `web/src/lib/api.ts`.
+### B7. Academics
+- [ ] **[P3]** (b) Classes: sort, filters, clearer UI.
+- [ ] **[P2]** (d) Merge Sections into the Classes tab — sections are created and
+      managed inline under their class (they're already FK-linked:
+      `Section.class_id`). Kill the separate Sections tab.
+- [ ] **[P2]** (e) Course mapping stays class-level (`ClassCourse` — already
+      class-scoped ✓); make the UI reflect that clearly.
+- [ ] **[P3]** (f) Course mapping: filters + sorting.
+- [x] **[P1]** (g) Session switching leaks across roles/logins — fixed via
+      per-user server-side preference (see A).
+- [ ] **[P2]** (h) Rollover wizard: per-module copy-or-fresh choices — timetables,
+      announcements, holidays, resources, forms, grading schemes, fee structures,
+      etc. (`RolloverWizard.tsx` currently covers only enrollments/assignments).
+- [x] **[P1]** (i) Only active session actionable, others view-only — core
+      guards + banner in (see A); per-route adoption continues with screens.
+- [ ] **[P2]** (j) Remove Teacher Assignment tab; assignments derive from timetable
+      slots (see IMPLEMENT.md §4).
+- [ ] **[P2]** (k) Per-class portal-access config: classes whose students get no
+      portal produce guardian logins instead (`User.portal_enabled` exists per-user;
+      add class-level default + guardian-login provisioning).
 
-## Security / NFR (§5)
+### B8. Assessments
+- [ ] **[P2]** (a–c) Categories, sorting, edit/delete for assessments.
+- [ ] **[P1]** (d–e) Redesign Grading course-wise, with filters, categories, tabs.
+- [ ] **[P2]** (f–h) Results redesign: section-wise and class-wise spreadsheet view
+      with column show/hide, report-style export (PDF/XLSX), per-section footer
+      summary listing course → teacher. See IMPLEMENT.md §5.
+- [x] **[P2]** (i) Teacher assigned in timetable automatically gets assessments +
+      attendance roster access (derived scope — done, tested). Remaining:
+      admin view of all teachers' assessments organized/sorted.
+- [ ] **[P2]** (j) Admin (and delegates) can publish an assignment to all classes.
+- [ ] **[P2]** Teacher teaching same course in multiple sections can publish one
+      assignment to several sections at once (teacher portal).
+- [ ] **[P2]** Teachers create assignments for own sections; admin can override
+      and assign to sections / course-enrolled students / whole classes.
 
-- [x] Rate limiting / lockout on auth endpoints — Redis-backed
-      (`app/core/rate_limit.py`), 5 failed attempts locks the
-      `(tenant, username)` pair for 15 minutes. Consistent across all
-      gunicorn workers since state lives in Redis, not in-process memory.
-- [x] Audit log now also covers attendance overrides
-      (`attendance.override`) and mark overwrites
-      (`assessments.mark_overwrite`), on top of the existing permission
-      grants and user provisioning entries.
+### B9. Resources
+- [x] **[P2]** Audience model for resources/forms/announcements (§6 resolver:
+      all/roles/classes/sections/courses/users) — backend done; audience-picker
+      UI pending.
+- [ ] **[P2]** Global + per-section resources; assignable by admin or teacher.
+- [ ] **[P2]** Admin browses resources by class and section.
+- [ ] **[P2]** Per-teacher categories; admin sees all categories + own global ones;
+      admin can override any teacher's resources.
+- [ ] **[P2]** Audience targeting: group (teachers/students), section, course
+      enrollment, class.
 
-## i18n / RTL (§3.6)
+### B10. Forms
+- [ ] **[P3]** Categories + organization; fix giant checkboxes.
+- [ ] **[P2]** Audience assignment (group / all / sections / course-enrolled /
+      classes).
+- [ ] **[P2]** Teachers with form permission can create/manage forms for their
+      sections; admin overrides. Others respond-only.
 
-- [x] Academics, People, and Assessments screens (+ their inline forms) now
-      use `t()` throughout, with matching `en`/`ur` entries in
-      `app/src/i18n/index.ts`.
-- [x] Urdu font now actually loads: `NotoNastaliqUrdu-{Regular,Bold}.ttf`
-      bundled under `app/public/fonts/` and registered via `@font-face` in
-      `styles.css` (previously referenced a font family that was never
-      shipped, so it silently fell back).
-- [x] Real Hijri date conversion — `app/core/hijri.py` (via
-      `hijri-converter`), surfaced through `GET /academics/today` and shown
-      in the app topbar, and used for the Gregorian+Hijri date line on
-      result-card PDFs.
+### B11. People
+- [ ] **[P2]** Reorganize: categorized list (name + username) with row actions —
+      view-person modal (full formatted details) and send-login-link icon.
+- [ ] **[P2]** "Add Teacher" top-right → modal with complete formal details
+      (qualifications, CNIC, joining date, emergency contact, etc. — extend
+      `TeacherProfile`).
+- [ ] **[P2]** Same treatment for students.
+- [ ] **[P2]** Students categorized by class; enrollment to class/courses and
+      section selection all handled from People.
+- [ ] **[P2]** Full guardian details per student (`Guardian`/`StudentGuardian`
+      exist — surface in UI); guardian login link when class portal access is off.
+- [ ] **[P2]** Donators tab (see B13).
+- [ ] **[P2]** From a Teacher row: record salary; from a Student row: record fee.
 
-## Storage
+### B12. Admissions
+- [ ] **[P2]** Split into two: "Students in Person" (manual add; lives with People
+      flow) and "Forms".
+- [ ] **[P2]** Public admission forms per program, shareable like Google Forms;
+      submissions land in a Registrations tab.
+- [ ] **[P2]** Contact form as W3Forms-style public-key endpoint for the main
+      website (`ContactEnquiry` model exists; add public key + public POST route).
 
-- [x] Assignment attachments — teachers can attach a file when creating an
-      assignment (presign-upload), students/teachers can download it.
-- [x] Assignment submissions — students upload their work from the dashboard
-      "Due assignments" list (presign-upload → `POST .../submissions`);
-      teachers can download a submitted file from the submissions table.
-- [x] Result-card PDFs are generated and streamed on demand rather than
-      round-tripped through object storage (no stale-cache concern, and the
-      SRS requirement was "a downloadable bilingual PDF exists", not
-      "stored in MinIO").
+### B13. Finance
+- [ ] **[P2]** (a) Fees organized by class/course with filters.
+- [ ] **[P2]** (b) Fee visible inside a selected student's record (Students in
+      Person screen).
+- [ ] **[P2]** (c) Donators auto-listed in People (new tab).
+- [ ] **[P3]** (d) Donation filters.
+- [ ] **[P2]** (e) Donator click-through → full donation history + add donation.
+- [ ] **[P2]** (f) Add fee/salary directly from People rows.
 
-## Found via full SRS re-read (2026-07-09) — not covered above, not previously tracked
+### B15. Reports
+- [ ] **[P2]** Organized/sorted report centre: report per section, per course,
+      donors, salary, student fee — every scope × period combination, CSV/PDF.
 
-Everything above closed the items this file already knew about. A full pass
-against `MMS-SRS.pdf` (not just this file) turned up gaps the file never
-mentioned. All closed in the 2026-07-09 pass:
+### B16. Blog
+- [ ] **[P3]** Card/preview UI instead of a table.
+- [ ] **[P2]** Edit + delete.
+- [ ] **[P2]** Public read endpoint for the marketing site.
 
-- [x] **Same-day attendance correction (FR-TCH-ATT-04, FR-STU-04, Must).**
-      Fixed at three layers. Client: `idempotency_key` is now deterministic
-      per `(student, session, day)` and the outbox upserts by key, so a
-      re-mark replaces the queued entry. Server: `/attendance/sync` now looks
-      up the existing row by key *and* by `(subject, session, date)`; a
-      same-day re-mark before the lock updates the row in place and writes an
-      `AttendanceCorrection` (old → new snapshot, actor, reason) — the table
-      is live now, and `/attendance/override` writes correction rows too.
-      DB: unique constraints `uq_student_attendance_day` /
-      `uq_teacher_attendance_day` on `(subject, session_id, attendance_date)`
-      via migration `f9d24a7c81e3`, which also collapses pre-existing
-      duplicates to the most recent mark. (Also fixed: `TeacherAttendance`
-      was missing the `overridden` attribute the DB column and `build_record`
-      both expected — teacher sync would have crashed.)
-- [x] **Results/scope report (FR-RPT-04, Should).**
-      `GET /reporting/reports/results?class_id&session_id[&section_id]&format=csv|pdf`
-      — one row per enrolled student, one column per class course plus
-      Overall, built on `_build_session_result`. Exposed in `ReportsView.tsx`
-      ("Results (gradesheet)" section, gated by `assessments.marks.enter`).
-- [x] **Finance audit trail (NFR 5.3).** `create_payment`, `create_donation`,
-      `set_salary`, and `record_salary_payment` now call `record_audit`
-      (actions `finance.payment_create`, `finance.donation_create`,
-      `finance.salary_set`, `finance.salary_payment_create`).
-- [x] **Receipt PDF (FR-FIN-04, Should).** `render_receipt_pdf` in
-      `core/pdf.py`; `GET /finance/payments/{id}/receipt` and
-      `/finance/donations/{id}/receipt` stream the PDF;
-      `POST .../receipt-share` builds a wa.me link from the new seeded
-      `receipt` template (guardian for payments, donor contact for
-      donations) and logs to `MessageLog`. Buttons on both FinanceView
-      tables (PDF + WhatsApp).
-- [x] **Blog WYSIWYG editor (FR-WEB-02, Must).** New `RichTextEditor.tsx`
-      (contentEditable + toolbar: bold/italic/underline, heading/paragraph,
-      lists, LTR/RTL toggle for Urdu, font choice incl. Noto Nastaliq Urdu) —
-      no new dependency. Body is stored as HTML; the staff table and the
-      marketing site's excerpt strip tags for display.
-- [x] **Offline timetable/reference-data caching (FR-TT-02, Must; §3.4).**
-      Dexie v2 adds a `refCache` table; `lib/offlineCache.ts#cachedFetch` is a
-      network-first read-through cache that serves the last good copy when
-      the fetch fails. Wired into TimetableView (slots + holidays + leave,
-      with an "offline copy from …" banner), AttendanceBoard (active session
-      + roster, so marking works fully offline), DashboardCards (today's
-      timetable per role), and ResourcesView.
-- [x] **WhatsApp template content aligned with Appendix C.** Seeded
-      `performance_report`/`credentials` templates now carry the exact spec
-      wording and variables (`{guardian_name}`, `{class_name}`, `{session}`,
-      `{summary_line}`, `{result_link}`, `{madrasa_name}`, `{setup_link}`,
-      `{student_name}`); `send-report` accepts an optional `result_link`
-      (frontend passes the app origin) and `send-credentials` passes the new
-      variables. Legacy `{results}`/`{url}` keys are still populated so
-      templates seeded before this change keep rendering. Note: bootstrap
-      seeds only missing codes — an existing DB keeps its old template rows
-      until they're edited or deleted (template CRUD exists for that).
+### B17. Settings
+- [ ] **[P1]** Replace key/value editor with a real settings page: categorized,
+      typed controls (see IMPLEMENT.md §7). Keep `MadrasaSetting` as storage but
+      define a typed catalogue.
+- [ ] **[P2]** Madrasa details section (name, address, contacts) visible to all
+      madrasa members.
+- [ ] **[P2]** Madrasa logo upload.
+- [ ] **[P2]** Idle/logout timeout per role.
+- [ ] **[P2]** Feature-flag section is super-admin-only; admin can override all
+      *settings* but never super-admin *feature flags*.
 
-Not a gap: permission catalogue (Appendix A) is fully covered; the two extra
-codes present (`messaging.templates.manage`, `contact.enquiries.view`) are
-legitimate additions for the template-CRUD and contact-enquiry features built
-this session, consistent with FR-RBAC-06 ("catalogue is extensible").
+## C. Teacher portal
+
+- [ ] **[P2]** Dashboard: direct "open class list" per taught section with course
+      name; all student actions on that page.
+- [ ] **[P2]** Assessments page = admin's, scoped to taught sections (derived from
+      timetable, IMPLEMENT.md §4).
+- [ ] **[P2]** Attendance page = admin's, scoped to taught sections, only if admin
+      allows (permission-gated).
+- [ ] **[P3]** Timetable: grid view only, own sections only.
+- [ ] **[P3]** Holidays: own classes + global only.
+- [ ] **[P3]** Announcements: teacher-audience + global only.
+- [ ] **[P2]** Resources: upload for own sections if allowed; global resources
+      visible; global upload if allowed; per-teacher permission toggles by admin.
+- [ ] **[P3]** Forms: related only.
+- [ ] **[P2]** Profile settings (missing entirely).
+- [ ] **[P2]** Salary view (own salary records/payments — read-only).
+
+## D. Student portal
+
+- [ ] **[P2]** Dashboard redesign: own attendance calendar, test scores, organized
+      layout.
+- [ ] **[P3]** Scope everything to self: own attendance, own timetable, related
+      announcements/resources/forms only.
+- [ ] **[P1]** Remove from student nav: Admissions, Blog, Fee tracking (leaks
+      admin views today — audit `navItems` role filtering in
+      `app/src/data/mockData.ts` and enforce server-side too).
+- [ ] **[P2]** Personal settings page.
+
+## E. Additional findings (self-audit, "look for other things")
+
+- [ ] **[P2]** Route-level authorization audit: nav hiding is not authorization —
+      every backend route needs role/permission checks verified by tests
+      (`backend/tests/`).
+- [ ] **[P3]** Empty/loading/error states standardized across views.
+- [ ] **[P3]** Date handling: Hijri support exists (`core/hijri.py`) — surface
+      dual dates consistently in UI.
+- [ ] **[P2]** Pagination on all list endpoints (People, announcements, resources…)
+      — large madrasas will choke on unpaginated lists.
+- [ ] **[P3]** Toast/confirm patterns for destructive actions (delete assessment,
+      delete slot…).

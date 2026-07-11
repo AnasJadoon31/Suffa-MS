@@ -8,6 +8,15 @@ export const api = axios.create({
   }
 });
 
+// Academic-session context header. Held in memory (not localStorage) so two
+// logins on the same browser can't clobber each other; the server-side
+// preference (users.selected_session_id) is the durable source of truth.
+let academicSessionId: string | null = null;
+
+export function setAcademicSessionId(id: string | null): void {
+  academicSessionId = id;
+}
+
 // Request Interceptor
 api.interceptors.request.use(
   (config) => {
@@ -15,10 +24,14 @@ api.interceptors.request.use(
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
-    
+
     const tenant = localStorage.getItem("mms_tenant") || "suffa";
     config.headers["X-Madrasa"] = tenant;
-    
+
+    if (academicSessionId) {
+      config.headers["X-Academic-Session-Id"] = academicSessionId;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

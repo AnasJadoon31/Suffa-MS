@@ -5,13 +5,18 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 # ------------------------------------------------------------------ Scope
-# Shared visibility/audience shape used by Resource, Form, Announcement:
-# {"all": true} or {"classes": [id1, id2]}.
+# Shared visibility/audience shape used by Resource, Form, Announcement —
+# resolved by app/modules/operations/audience.py (IMPLEMENT.md §6).
+# {"all": true} / {"roles": ["teacher"]} / any-of {classes, sections,
+# courses, users}.
 
 class Scope(BaseModel):
     all: bool = False
-    classes: list[UUID] = []
     roles: list[str] = []
+    classes: list[UUID] = []
+    sections: list[UUID] = []
+    courses: list[UUID] = []
+    users: list[UUID] = []
 
 
 # -------------------------------------------------------------- Timetable
@@ -22,14 +27,17 @@ class TimetableSlotCreate(BaseModel):
     course_id: UUID
     teacher_id: UUID
     day_of_week: int = Field(ge=0, le=6, description="0=Monday .. 6=Sunday")
-    period: int = Field(ge=1)
-    start_time: str
-    end_time: str
+    # Omitted = auto-derived from the slot's start-time position within the
+    # section's day (IMPLEMENT.md §4).
+    period: int | None = Field(default=None, ge=1)
+    start_time: str = Field(pattern=r"^\d{2}:\d{2}$")
+    end_time: str = Field(pattern=r"^\d{2}:\d{2}$")
 
 
 class TimetableSlotRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    session_id: UUID | None = None
     class_id: UUID
     section_id: UUID
     course_id: UUID
@@ -38,6 +46,11 @@ class TimetableSlotRead(BaseModel):
     period: int
     start_time: str
     end_time: str
+    # Display names so the UI never has to render raw ids.
+    class_name: str | None = None
+    section_name: str | None = None
+    course_name: str | None = None
+    teacher_name: str | None = None
 
 
 class HolidayCreate(BaseModel):

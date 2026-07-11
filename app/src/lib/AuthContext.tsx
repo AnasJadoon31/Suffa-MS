@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { api } from "./api";
+import { api, setAcademicSessionId } from "./api";
 
 export interface User {
   id: string;
@@ -7,6 +7,7 @@ export interface User {
   role: string;
   status: string;
   preferred_language: string;
+  selected_session_id: string | null;
 }
 
 export interface Madrasa {
@@ -22,8 +23,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   hasPermission: (code: string) => boolean;
+  hasFeature: (key: string) => boolean;
   login: (token: string, tenant: string) => Promise<void>;
   logout: () => void;
+  updateSelectedSession: (sessionId: string | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [madrasa, setMadrasa] = useState<Madrasa | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [features, setFeatures] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProfile = async () => {
@@ -40,10 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(res.data.user);
       setMadrasa(res.data.madrasa);
       setPermissions(res.data.permissions ?? []);
+      setFeatures(res.data.features ?? {});
+      setAcademicSessionId(res.data.user?.selected_session_id ?? null);
     } catch (err) {
       setUser(null);
       setMadrasa(null);
       setPermissions([]);
+      setFeatures({});
+      setAcademicSessionId(null);
       localStorage.removeItem("mms_token");
     } finally {
       setIsLoading(false);
@@ -79,13 +87,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setMadrasa(null);
     setPermissions([]);
+    setAcademicSessionId(null);
+  };
+
+  const updateSelectedSession = async (sessionId: string | null) => {
+    const payload = sessionId
+      ? { selected_session_id: sessionId }
+      : { clear_selected_session: true };
+    const res = await api.patch("/api/v1/auth/me", payload);
+    setUser(res.data.user);
+    setAcademicSessionId(res.data.user?.selected_session_id ?? null);
   };
 
   const hasPermission = (code: string) => user?.role === "principal" || permissions.includes(code);
+  // Missing key = enabled: flags are subtractive, set only by the super admin.
+  const hasFeature = (key: string) => features[key] !== false;
 
   return (
     <AuthContext.Provider
-      value={{ user, madrasa, permissions, isAuthenticated: !!user, isLoading, hasPermission, login, logout }}
+      value={{ user, madrasa, permissions, isAuthenticated: !!user, isLoading, hasPermission, hasFeature, login, logout, updateSelectedSession }}
     >
       {children}
     </AuthContext.Provider>
