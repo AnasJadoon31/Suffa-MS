@@ -7,6 +7,11 @@ import App from "./App";
 import { AuthProvider } from "./lib/AuthContext";
 import "./i18n";
 import "./styles.css";
+import { registerSW } from "virtual:pwa-register";
+
+// Auto-updating service worker (vite-plugin-pwa); reloads seamlessly on new
+// deploys instead of serving stale bundles.
+registerSW({ immediate: true });
 
 const queryClient = new QueryClient();
 

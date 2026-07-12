@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { Download, FolderPlus, Plus, Video } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
-import { filesApi, operationsApi, type ResourceCategory, type ResourceItem } from "../lib/endpoints";
+import { filesApi, operationsApi, type ResourceCategory, type ResourceItem, type Scope } from "../lib/endpoints";
+import { AudiencePicker } from "./AudiencePicker";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
 import { Input, Select } from "./ui/Field";
 
 
 export function ResourcesView() {
+  const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const canManage = hasPermission("resources.manage");
   const [categories, setCategories] = useState<ResourceCategory[]>([]);
@@ -15,6 +18,7 @@ export function ResourcesView() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [form, setForm] = useState({ category_id: "", title: "", description: "", video_url: "" });
+  const [audience, setAudience] = useState<Scope>({ all: true });
   const [file, setFile] = useState<File | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -38,8 +42,8 @@ export function ResourcesView() {
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
-        <h2>Resources</h2>
-        <p className="notice">Study material for classes and students.</p>
+        <h2>{t("resources")}</h2>
+        <p className="notice">{t("descResources")}</p>
       </div>
 
       {canManage && (
@@ -54,14 +58,14 @@ export function ResourcesView() {
             await refreshAll();
           }}
         >
-          <label>Category name<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="e.g. Tajweed" /></label>
-          <div className="formActions"><button className="primaryAction" type="submit"><FolderPlus size={16} /> Add category</button></div>
+          <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="e.g. Tajweed" /></label>
+          <div className="formActions"><button className="primaryAction" type="submit"><FolderPlus size={16} /> {t("addCategoryBtn")}</button></div>
         </form>
       )}
 
       <div className="moduleToolbar">
         <div className="searchBox">
-          <label htmlFor="resource-category">Category</label>
+          <label htmlFor="resource-category">{t("categoryCol")}</label>
           <Select
             id="resource-category"
             value={categoryFilter}
@@ -70,7 +74,7 @@ export function ResourcesView() {
               void loadResources(e.target.value);
             }}
           >
-            <option value="">All categories</option>
+            <option value="">{t("allCategories")}</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </div>
@@ -95,37 +99,38 @@ export function ResourcesView() {
               }
               await operationsApi.createResource({
                 category_id: form.category_id, title: form.title, description: form.description || undefined,
-                file_key, video_url: form.video_url || undefined,
+                file_key, video_url: form.video_url || undefined, visibility_scope: audience,
               });
               setForm({ category_id: form.category_id, title: "", description: "", video_url: "" });
               setFile(null);
-              setNotice("Resource added.");
+              setNotice(t("resourceAdded"));
               await refreshAll();
             } catch (err: any) {
-              setError(err.response?.data?.detail ?? "Failed to add resource");
+              setError(err.response?.data?.detail ?? t("failedAddResource"));
             }
           }}
         >
           <label>
-            Category
+            {t("categoryCol")}
             <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
-              <option value="">Select…</option>
+              <option value="">{t("selectEllipsis")}</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           </label>
-          <label>Title<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-          <label>Description<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <label>Video URL<Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder="optional" /></label>
-          <label>File<Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
-          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Add resource</button></div>
+          <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+          <label>{t("descriptionLabel")}<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
+          <label>{t("videoUrlLabel")}<Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder={t("optionalPlaceholder")} /></label>
+          <label>{t("fileLabel")}<Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
+          <AudiencePicker value={audience} onChange={setAudience} />
+          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addResourceBtn")}</button></div>
         </form>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 
       <div className="dataTable">
-        <div className="dataRow header"><span>Title</span><span>Category</span><span>Description</span><span></span></div>
-        {resources.length === 0 && <p className="emptyState">No resources yet.</p>}
+        <div className="dataRow header"><span>{t("titleCol")}</span><span>{t("categoryCol")}</span><span>{t("descriptionLabel")}</span><span></span></div>
+        {resources.length === 0 && <p className="emptyState">{t("noResourcesYet")}</p>}
         {resources.map((r) => (
           <ResourceRow key={r.id} resource={r} categoryName={categories.find((c) => c.id === r.category_id)?.name ?? "—"} />
         ))}
@@ -135,6 +140,7 @@ export function ResourcesView() {
 }
 
 function ResourceRow({ resource, categoryName }: Readonly<{ resource: ResourceItem; categoryName: string }>) {
+  const { t } = useTranslation();
   return (
     <div className="dataRow">
       <span>{resource.title}</span>
@@ -143,7 +149,7 @@ function ResourceRow({ resource, categoryName }: Readonly<{ resource: ResourceIt
       <span>
         {resource.video_url && (
           <a className="tableAction" href={resource.video_url} target="_blank" rel="noreferrer">
-            <Video size={14} /> Watch
+            <Video size={14} /> {t("watchBtn")}
           </a>
         )}
         {resource.file_key && (
@@ -155,7 +161,7 @@ function ResourceRow({ resource, categoryName }: Readonly<{ resource: ResourceIt
               window.open(url, "_blank", "noreferrer");
             }}
           >
-            <Download size={14} /> Download
+            <Download size={14} /> {t("downloadBtn")}
           </button>
         )}
       </span>

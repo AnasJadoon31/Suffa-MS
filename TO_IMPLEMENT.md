@@ -12,23 +12,17 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
 
 ## A. Cross-cutting (whole app)
 
-- [ ] **[P1] Complete Urdu i18n.** Language toggle exists but most views have zero
-      `t()` calls (`AdmissionsView`, `BlogView`, `FinanceView`, `HolidaysView`,
-      `ReportsView`, `ResourcesView`, `RolloverWizard`, and more are 100% hardcoded
-      English). Every non-user-entered string — buttons, labels, headers, empty
-      states, toasts, validation messages — must go through `app/src/i18n/index.ts`
-      (or split per-view bundles; see IMPLEMENT.md §2). Include RTL layout support
-      for Urdu.
+- [x] **[P1] Complete Urdu i18n.** Every view now renders through i18next
+      (en + ur); RTL flips with the language toggle. Remaining niceties:
+      per-view namespace split + ESLint no-literal-string rule (IMPLEMENT §2).
 - [ ] **[P1] Names, not UUIDs.** Several screens render raw IDs (timetable slots,
       course mapping, marks, etc.). Backend list endpoints must join/embed display
       names; frontend must never show a UUID.
-- [ ] **[P2] Progressive Web App.** Add `vite-plugin-pwa` (manifest, service worker,
-      install prompt, offline shell — attendance outbox already exists in
-      `useAttendanceOutbox.ts`, extend caching to read views). Proper mobile styles:
-      navbar drawer instead of fixed sidebar, quick-links/action grid on dashboard,
-      touch-friendly hit targets.
-- [ ] **[P3] Checkbox size.** Global CSS fix in `app/src/styles.css` — checkboxes
-      render oversized everywhere (Forms view especially).
+- [x] **[P2] Progressive Web App.** vite-plugin-pwa (autoUpdate SW, manifest,
+      icons, network-first API read cache), mobile navbar drawer, dashboard
+      quick-links grid, checkbox/touch sizing fixed.
+- [x] **[P3] Checkbox size.** Global CSS fix in `app/src/styles.css` — checkboxes
+      normalized to 1rem everywhere (Forms view especially).
 - [x] **[P2] Personal settings (backend).** `PATCH /auth/me` +
       `POST /auth/change-password` done. Remaining: settings page UI.
 - [x] **[P1] Super-admin tier (backend).** `super_admin` role, `madrasa_features`

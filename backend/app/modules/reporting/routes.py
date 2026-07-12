@@ -348,6 +348,27 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
             if a.id not in submitted_assignment_ids and (not a.target_student_ids or str(student.id) in a.target_student_ids)
         ]
 
+    # Own attendance for the calendar view (last ~2 months of statuses).
+    my_attendance: dict[str, str] = {}
+    if active_session_id is not None:
+        from datetime import timedelta
+
+        window_start = datetime.now(timezone.utc).date() - timedelta(days=62)
+        attendance_rows = (
+            await session.execute(
+                select(StudentAttendance.attendance_date, StudentAttendance.status).where(
+                    StudentAttendance.madrasa_id == madrasa.id,
+                    StudentAttendance.student_id == student.id,
+                    StudentAttendance.session_id == active_session_id,
+                    StudentAttendance.attendance_date >= window_start,
+                )
+            )
+        ).all()
+        my_attendance = {
+            str(day): str(status.value if isinstance(status, AttendanceStatus) else status)
+            for day, status in attendance_rows
+        }
+
     viewer_class_id = enrollment.class_id if enrollment else None
 
     resource_rows = (
@@ -371,6 +392,7 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
 
     return {
         "role": "student",
+        "my_attendance": my_attendance,
         "today_timetable": today_timetable,
         "latest_result": latest_result,
         "due_assignments": due_assignments,

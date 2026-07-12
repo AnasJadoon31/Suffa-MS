@@ -324,3 +324,25 @@ async def test_security_headers_present(client):
     response = await client.get("/api/v1/operations/holidays")
     assert response.headers.get("x-content-type-options") == "nosniff"
     assert response.headers.get("x-frame-options") == "DENY"
+
+
+async def test_timetable_export_pdf(client, seed, db_sessionmaker):
+    async with db_sessionmaker() as db:
+        db.add(
+            TimetableSlot(
+                madrasa_id=seed.madrasa.id, session_id=seed.old_session.id,
+                class_id=seed.class_a.id, section_id=seed.sections.a1.id,
+                course_id=seed.course.id, teacher_id=seed.teacher.id,
+                day_of_week=0, period=1, start_time="08:00", end_time="08:40",
+            )
+        )
+        await db.commit()
+
+    response = await client.get("/api/v1/operations/timetable/export", params={"format": "pdf"})
+    assert response.status_code == 200
+    assert response.content[:4] == b"%PDF"
+
+    empty = await client.get(
+        "/api/v1/operations/timetable/export", params={"class_id": str(seed.class_b.id)}
+    )
+    assert empty.status_code == 404

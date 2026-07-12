@@ -1,6 +1,10 @@
-import { AlertTriangle, CircleDollarSign, ClipboardCheck, GraduationCap, LogIn, LogOut, UserRoundCog } from "lucide-react";
+import { AlertTriangle, CalendarDays, CircleDollarSign, ClipboardCheck, ExternalLink, GraduationCap, LogIn, LogOut, UserRoundCog } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { AttendanceCalendar, toDateKey, type StudentDayStatus } from "./AttendanceCalendar";
+import { navItems, type ViewId } from "../data/mockData";
+import { useAuth } from "../lib/AuthContext";
 
 import {
   type DashboardData,
@@ -17,13 +21,39 @@ import { cachedFetch } from "../lib/offlineCache";
 import { Input } from "./ui/Field";
 
 
-export type DashboardCardsProps = Readonly<Record<string, never>>;
+export type DashboardCardsProps = Readonly<{ onNavigate?: (view: ViewId) => void }>;
 
 function formatTime(value: string | null | undefined): string {
   return value ? value.slice(0, 5) : "—";
 }
 
-export function DashboardCards({}: DashboardCardsProps) {
+function QuickLinks({ onNavigate }: Readonly<{ onNavigate?: (view: ViewId) => void }>) {
+  const { t } = useTranslation();
+  const { hasPermission, hasFeature, user } = useAuth();
+  if (!onNavigate) return null;
+  const visible = navItems.filter(
+    (item) =>
+      item.id !== "dashboard" &&
+      (!item.permission || hasPermission(item.permission)) &&
+      (!item.feature || hasFeature(item.feature)) &&
+      (!item.roles || (user && item.roles.includes(user.role)))
+  );
+  return (
+    <nav className="quickLinks" aria-label={t("quickLinksLabel")}>
+      {visible.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button key={item.id} type="button" className="quickLink" onClick={() => onNavigate(item.id)}>
+            <Icon size={18} />
+            <span>{t(item.labelKey)}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function DashboardCards({ onNavigate }: DashboardCardsProps) {
   const [data, setData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
@@ -32,9 +62,18 @@ export function DashboardCards({}: DashboardCardsProps) {
   }, []);
 
   if (!data) return null;
-  if (data.role === "teacher") return <TeacherDashboardCards data={data} />;
-  if (data.role === "student") return <StudentDashboardCards data={data} />;
-  return <PrincipalDashboardCards data={data} />;
+  return (
+    <>
+      <QuickLinks onNavigate={onNavigate} />
+      {data.role === "teacher" ? (
+        <TeacherDashboardCards data={data} onNavigate={onNavigate} />
+      ) : data.role === "student" ? (
+        <StudentDashboardCards data={data} />
+      ) : (
+        <PrincipalDashboardCards data={data} />
+      )}
+    </>
+  );
 }
 
 function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }>) {
@@ -104,7 +143,8 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
   );
 }
 
-function TeacherDashboardCards({ data }: Readonly<{ data: TeacherDashboard }>) {
+function TeacherDashboardCards({ data, onNavigate }: Readonly<{ data: TeacherDashboard; onNavigate?: (view: ViewId) => void }>) {
+  const { t } = useTranslation();
   const [attendance, setAttendance] = useState(data.today_attendance);
   const [logs, setLogs] = useState<TeacherAttendanceLogEntry[]>([]);
   const [error, setError] = useState("");
@@ -160,6 +200,26 @@ function TeacherDashboardCards({ data }: Readonly<{ data: TeacherDashboard }>) {
           <strong>{attendance?.check_in ? formatTime(attendance.check_in) : "Not in"}</strong>
           <small>Out: {formatTime(attendance?.check_out)}</small>
         </article>
+      </section>
+      <section className="modulePanel">
+        <div className="moduleHeader"><h2>{t("myClassesHeading")}</h2></div>
+        {data.my_classes.length === 0 && <p className="emptyState">{t("noCoursesAssigned")}</p>}
+        <div className="dataTable">
+          {data.my_classes.map((entry, index) => (
+            <div className="dataRow" key={index}>
+              <span>{entry.class_name}{entry.section_name ? ` / ${entry.section_name}` : ""}</span>
+              <span>{entry.course_name}</span>
+              <span>
+                <button className="tableAction" type="button" onClick={() => onNavigate?.("attendance")}>
+                  <ExternalLink size={14} /> {t("openClassListBtn")}
+                </button>
+                <button className="tableAction" type="button" onClick={() => onNavigate?.("assessments")}>
+                  <ExternalLink size={14} /> {t("assessments")}
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
       </section>
       <section className="modulePanel">
         <div className="moduleHeader"><h2>Time in / time out</h2></div>
@@ -242,61 +302,97 @@ function DueAssignmentRow({ assignment, onSubmitted }: Readonly<{ assignment: St
 }
 
 function StudentDashboardCards({ data }: Readonly<{ data: StudentDashboard }>) {
+  const { t } = useTranslation();
+  const [month, setMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(toDateKey(new Date()));
+
+  const statuses = (data.my_attendance ?? {}) as StudentDayStatus;
+  const counts = Object.values(statuses).reduce(
+    (acc, status) => ({ ...acc, [status]: (acc[status] ?? 0) + 1 }),
+    {} as Record<string, number>
+  );
+
   return (
     <>
       <section className="metricGrid" aria-label="Dashboard summary">
         <article className="metricCard">
-          <span>Overall score</span>
+          <span>{t("overallScoreLabel")}</span>
           <strong>{data.latest_result?.overall_score ?? "—"}</strong>
-          <small>{data.latest_result?.published ? "Published" : "Not published yet"}</small>
+          <small>{data.latest_result?.published ? t("publishedLabel") : t("notPublishedLabel")}</small>
           {data.latest_result?.published && (
             <button
               className="secondaryAction"
               type="button"
               onClick={() => void assessmentsApi.downloadMyResultCard(data.latest_result!.session_id)}
             >
-              Download result card
+              {t("downloadResultCardBtn")}
             </button>
           )}
         </article>
         <article className="metricCard">
-          <span>Due assignments</span>
+          <span>{t("dueAssignmentsHeading")}</span>
           <strong>{data.due_assignments.length}</strong>
-          <small>Not yet submitted</small>
+          <small>{t("notSubmittedLabel")}</small>
+        </article>
+        <article className="metricCard">
+          <CalendarDays size={20} />
+          <span>{t("attendance")}</span>
+          <strong>{counts.present ?? 0} / {Object.keys(statuses).length || "—"}</strong>
+          <small>{t("attendanceSummaryLine", { absent: counts.absent ?? 0, leave: counts.leave ?? 0 })}</small>
         </article>
       </section>
-      <section className="modulePanel">
-        <div className="moduleHeader"><h2>Today's timetable</h2></div>
-        {data.today_timetable.length === 0 && <p className="emptyState">No periods today.</p>}
-        <ul>
-          {data.today_timetable.map((slot, i) => (
-            <li key={i}>{slot.start_time} – {slot.end_time} (period {slot.period})</li>
-          ))}
-        </ul>
-      </section>
-      <section className="modulePanel">
-        <div className="moduleHeader"><h2>Due assignments</h2></div>
-        {data.due_assignments.length === 0 && <p className="emptyState">Nothing due.</p>}
-        <ul>
-          {data.due_assignments.map((a) => (
-            <DueAssignmentRow key={a.id} assignment={a} onSubmitted={() => { /* list refreshes on next dashboard load */ }} />
-          ))}
-        </ul>
-      </section>
-      <section className="modulePanel">
-        <div className="moduleHeader"><h2>Announcements</h2></div>
-        {data.announcements.length === 0 && <p className="emptyState">No announcements.</p>}
-        <ul>
-          {data.announcements.map((a) => <li key={a.id}>{a.title}</li>)}
-        </ul>
-      </section>
-      <section className="modulePanel">
-        <div className="moduleHeader"><h2>Resources</h2></div>
-        {data.resources.length === 0 && <p className="emptyState">No resources shared yet.</p>}
-        <ul>
-          {data.resources.map((r) => <li key={r.id}>{r.title}</li>)}
-        </ul>
-      </section>
+
+      <div className="dashboardColumns">
+        <section className="modulePanel">
+          <div className="moduleHeader"><h2>{t("myAttendanceHeading")}</h2></div>
+          <AttendanceCalendar
+            month={month}
+            onMonthChange={setMonth}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            mode="student"
+            studentDayStatus={statuses}
+          />
+        </section>
+
+        <div>
+          <section className="modulePanel">
+            <div className="moduleHeader"><h2>{t("todaysTimetableHeading")}</h2></div>
+            {data.today_timetable.length === 0 && <p className="emptyState">{t("noPeriodsToday")}</p>}
+            <ul>
+              {data.today_timetable.map((slot, i) => (
+                <li key={i}>{slot.start_time} – {slot.end_time} ({t("periodLabel", { period: slot.period })})</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="modulePanel">
+            <div className="moduleHeader"><h2>{t("dueAssignmentsHeading")}</h2></div>
+            {data.due_assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
+            <ul>
+              {data.due_assignments.map((a) => (
+                <DueAssignmentRow key={a.id} assignment={a} onSubmitted={() => { /* refreshes next load */ }} />
+              ))}
+            </ul>
+          </section>
+
+          <section className="modulePanel">
+            <div className="moduleHeader"><h2>{t("announcements")}</h2></div>
+            {data.announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsYet")}</p>}
+            <ul>
+              {data.announcements.map((a) => <li key={a.id}>{a.title}</li>)}
+            </ul>
+          </section>
+
+          <section className="modulePanel">
+            <div className="moduleHeader"><h2>{t("resources")}</h2></div>
+            {data.resources.length === 0 && <p className="emptyState">{t("noResourcesShared")}</p>}
+            <ul>
+              {data.resources.map((r) => <li key={r.id}>{r.title}</li>)}
+            </ul>
+          </section>
+        </div>
+      </div>
     </>
   );
 }

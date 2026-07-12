@@ -58,7 +58,9 @@ export const academicsApi = {
   }) => api.put<AcademicSession>(`/api/v1/academics/sessions/${id}`, payload).then((r) => r.data),
   deleteSession: (id: string) => api.delete(`/api/v1/academics/sessions/${id}`).then((r) => r.data),
   rolloverSession: (id: string, payload: {
-    name: string; gregorian_start: string; gregorian_end: string; hijri_span: string; class_mappings: { current_class_id: string; next_class_id: string | null }[]; copy_teacher_assignments: boolean;
+    name: string; gregorian_start: string; gregorian_end: string; hijri_span: string;
+    class_mappings: { current_class_id: string; next_class_id: string | null }[];
+    copy_teacher_assignments: boolean; copy_timetable?: boolean; copy_holidays?: boolean; shift_holiday_dates?: boolean;
   }) => api.post<AcademicSession>(`/api/v1/academics/sessions/${id}/rollover`, payload).then((r) => r.data),
   activateSession: (id: string) =>
     api.post<AcademicSession>(`/api/v1/academics/sessions/${id}/activate`).then((r) => r.data),
@@ -377,13 +379,17 @@ export interface PrincipalDashboard {
 export interface TimetableEntry { course_id: string; period: number; start_time: string; end_time: string }
 export interface TeacherDashboard {
   role: "teacher";
-  my_classes: { class_id: string; course_id: string; class_name: string; course_name: string }[];
+  my_classes: {
+    class_id: string; course_id: string; class_name: string; course_name: string;
+    section_id: string | null; section_name: string | null;
+  }[];
   pending_submissions: number;
   today_timetable: TimetableEntry[];
   today_attendance: TeacherAttendanceToday | null;
 }
 export interface StudentDashboard {
   role: "student";
+  my_attendance: Record<string, "present" | "absent" | "leave">;
   today_timetable: TimetableEntry[];
   latest_result: SessionResult | null;
   due_assignments: { id: string; title: string; due_date: string; course_id: string }[];
@@ -411,13 +417,19 @@ export const reportingApi = {
     downloadReport("/api/v1/reporting/reports/attendance", params as Record<string, string>, format),
   downloadFinanceReport: (params: { start_date: string; end_date: string }, format: "csv" | "pdf") =>
     downloadReport("/api/v1/reporting/reports/finance", params, format),
+  downloadSalaryReport: (params: { start_date: string; end_date: string }, format: "csv" | "pdf") =>
+    downloadReport("/api/v1/reporting/reports/salary", params, format),
+  downloadDonationsReport: (params: { start_date: string; end_date: string; donor_id?: string }, format: "csv" | "pdf") =>
+    downloadReport("/api/v1/reporting/reports/donations", params as Record<string, string>, format),
   downloadResultsReport: (params: { class_id: string; session_id: string; section_id?: string }, format: "csv" | "pdf") =>
     downloadReport("/api/v1/reporting/reports/results", params as Record<string, string>, format),
 };
 
 // -------------------------------------------------------------- Operations
 
-export interface Scope { all: boolean; classes: string[]; roles?: string[] }
+export interface Scope {
+  all: boolean; roles?: string[]; classes?: string[]; sections?: string[]; courses?: string[]; users?: string[];
+}
 export interface TimetableSlot {
   id: string; session_id: string | null;
   class_id: string; section_id: string; course_id: string; teacher_id: string;
@@ -460,6 +472,12 @@ export interface Announcement {
 
 export interface TypedSetting { key: string; category: string; type: string; label: string; value: string }
 
+export interface AdmissionForm {
+  id: string; program_id: string; title: string; description: string;
+  fields_definition: unknown[]; public_token: string; is_open: boolean;
+  created_at: string; program_name: string | null;
+}
+
 export const operationsApi = {
   listTimetable: (params?: {
     class_id?: string; section_id?: string; teacher_id?: string; course_id?: string; day_of_week?: number;
@@ -469,6 +487,8 @@ export const operationsApi = {
     class_id: string; section_id: string; course_id: string; teacher_id: string;
     day_of_week: number; period?: number; start_time: string; end_time: string;
   }) => api.post<TimetableSlot>("/api/v1/operations/timetable", payload).then((r) => r.data),
+  exportTimetablePdf: (classId?: string) =>
+    downloadReport("/api/v1/operations/timetable/export", classId ? { class_id: classId } : {}, "pdf"),
   importTimetable: (rows: TimetableImportRow[], dryRun: boolean) =>
     api.post<TimetableImportResponse>("/api/v1/operations/timetable/import", { rows, dry_run: dryRun }).then((r) => r.data),
   deleteTimetableSlot: (id: string) => api.delete(`/api/v1/operations/timetable/${id}`).then((r) => r.data),
@@ -525,9 +545,17 @@ export const operationsApi = {
     api.get<BlogPost[]>("/api/v1/operations/blog", { params: { published_only: publishedOnly } }).then((r) => r.data),
   createBlogPost: (payload: { title: string; body: string; published?: boolean; publish_at?: string }) =>
     api.post<BlogPost>("/api/v1/operations/blog", payload).then((r) => r.data),
+  updateBlogPost: (id: string, payload: { title?: string; body?: string }) =>
+    api.put<BlogPost>(`/api/v1/operations/blog/${id}`, payload).then((r) => r.data),
+  deleteBlogPost: (id: string) => api.delete(`/api/v1/operations/blog/${id}`).then((r) => r.data),
   publishBlogPost: (id: string) => api.post<BlogPost>(`/api/v1/operations/blog/${id}/publish`).then((r) => r.data),
 
   listAdmissions: () => api.get<AdmissionApplication[]>("/api/v1/operations/admissions").then((r) => r.data),
+  listAdmissionForms: () => api.get<AdmissionForm[]>("/api/v1/operations/admission-forms").then((r) => r.data),
+  createAdmissionForm: (payload: { program_id: string; title: string; description?: string }) =>
+    api.post<AdmissionForm>("/api/v1/operations/admission-forms", payload).then((r) => r.data),
+  updateAdmissionForm: (id: string, payload: { title?: string; description?: string; is_open?: boolean }) =>
+    api.put<AdmissionForm>(`/api/v1/operations/admission-forms/${id}`, payload).then((r) => r.data),
   createAdmission: (payload: {
     applicant_name: string; guardian_contact: string; program_id?: string; date_of_birth?: string; notes?: string;
   }) => api.post<AdmissionApplication>("/api/v1/operations/admissions", payload).then((r) => r.data),
@@ -551,7 +579,8 @@ export interface BlogPost {
 }
 export interface AdmissionApplication {
   id: string; applicant_name: string; guardian_contact: string; program_id: string | null;
-  date_of_birth: string | null; notes: string | null; status: string; created_at: string;
+  date_of_birth: string | null; notes: string | null; status: string;
+  form_id: string | null; extra_data: Record<string, unknown> | null; created_at: string;
 }
 export interface ContactEnquiry {
   id: string; name: string; contact: string; message: string; status: string; created_at: string;
@@ -589,7 +618,7 @@ export const financeApi = {
   listCategories: () => api.get<PaymentCategory[]>("/api/v1/finance/categories").then((r) => r.data),
   createCategory: (name: string) => api.post<PaymentCategory>("/api/v1/finance/categories", { name }).then((r) => r.data),
 
-  listPayments: (params?: { student_id?: string; category_id?: string; date_from?: string; date_to?: string }) =>
+  listPayments: (params?: { student_id?: string; class_id?: string; category_id?: string; date_from?: string; date_to?: string }) =>
     api.get<Payment[]>("/api/v1/finance/payments", { params }).then((r) => r.data),
   createPayment: (payload: {
     student_id: string; category_id: string; amount: number; currency?: string; payment_date: string; note?: string;

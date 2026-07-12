@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { LayoutGrid, List, Plus, Trash2, Upload, Users } from "lucide-react";
+import { FileDown, LayoutGrid, List, Plus, Trash2, Upload, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -87,6 +87,11 @@ export function TimetableView() {
         {canManage && (
           <button className={viewMode === "import" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setViewMode("import")}>
             <Upload size={16} /> {t("importTab")}
+          </button>
+        )}
+        {canManage && (
+          <button className="secondaryAction" type="button" onClick={() => void operationsApi.exportTimetablePdf()}>
+            <FileDown size={16} /> {t("exportTimetablePdfBtn")}
           </button>
         )}
       </div>

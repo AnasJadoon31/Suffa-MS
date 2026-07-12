@@ -1,4 +1,4 @@
-import { CalendarDays, Languages } from "lucide-react";
+import { CalendarDays, Languages, Menu } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Route, Routes } from "react-router-dom";
@@ -60,11 +60,13 @@ function Workspace() {
   const { t, i18n } = useTranslation();
   const { isAuthenticated, isLoading, user, madrasa } = useAuth();
   const [activeView, setActiveViewState] = useState<ViewId>(loadInitialView);
+  const [navOpen, setNavOpen] = useState(false);
   const [today, setToday] = useState<{ gregorian: string; hijri: string } | null>(null);
   const isUrdu = i18n.language === "ur";
 
   const setActiveView = (view: ViewId) => {
     setActiveViewState(view);
+    setNavOpen(false);
     localStorage.setItem(VIEW_STORAGE_KEY, view);
   };
 
@@ -85,7 +87,7 @@ function Workspace() {
       case "dashboard":
         return (
           <>
-            <DashboardCards />
+            <DashboardCards onNavigate={setActiveView} />
           </>
         );
       case "attendance":
@@ -141,9 +143,18 @@ function Workspace() {
 
   return (
     <main className="appShell">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      <Sidebar activeView={activeView} onViewChange={setActiveView} mobileOpen={navOpen} />
+      {navOpen && <div className="navOverlay" onClick={() => setNavOpen(false)} />}
       <section className="workspace">
         <header className="topbar">
+          <button
+            className="iconButton navToggle"
+            type="button"
+            aria-label={t("openMenu")}
+            onClick={() => setNavOpen((v) => !v)}
+          >
+            <Menu size={20} />
+          </button>
           <div className="topbarContext">
             <h1>{activeItem ? t(activeItem.labelKey) : t("appName")}</h1>
             <p className="viewDescription">{activeItem ? t(activeItem.descKey) : ""}</p>

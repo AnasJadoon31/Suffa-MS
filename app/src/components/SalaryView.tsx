@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Banknote, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { financeApi, type SalaryPayment, type SalaryRecord } from "../lib/endpoints";
 import { peopleApi, type Teacher } from "../lib/endpoints";
@@ -8,6 +9,7 @@ import { Input, Select } from "./ui/Field";
 
 
 export function SalaryView() {
+  const { t } = useTranslation();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [teacherId, setTeacherId] = useState("");
   const [teacherSearch, setTeacherSearch] = useState("");
@@ -47,15 +49,15 @@ export function SalaryView() {
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
-        <h2><Banknote size={18} /> Salary</h2>
-        <p className="notice">Teacher salary records and payment history.</p>
+        <h2><Banknote size={18} /> {t("salary")}</h2>
+        <p className="notice">{t("descSalary")}</p>
       </div>
 
       <div className="moduleToolbar">
         <SearchDropdown
           id="salary-teacher"
-          label="Teacher"
-          placeholder="Search teacher name or code"
+          label={t("teacherLabel")}
+          placeholder={t("teacherSearchPlaceholder")}
           items={matchingTeachers}
           value={teacherSearch}
           getKey={(teacher) => teacher.id}
@@ -69,7 +71,7 @@ export function SalaryView() {
             setTeacherSearch(`${teacher.name} (${teacher.employee_code})`);
             void loadTeacher(teacher.id);
           }}
-          emptyLabel="No matching teachers"
+          emptyLabel={t("noTeachersYet")}
         />
         {(teacherSearch || teacherId) && (
           <div className="formActions">
@@ -81,7 +83,7 @@ export function SalaryView() {
                 void loadTeacher("");
               }}
             >
-              Clear
+              {t("cancelBtn")}
             </button>
           </div>
         )}
@@ -99,18 +101,18 @@ export function SalaryView() {
               try {
                 const updated = await financeApi.setSalary(teacherId, { amount: Number(salaryForm.amount), effective_from: salaryForm.effective_from });
                 setRecord(updated);
-                setNotice("Salary record saved.");
+                setNotice(t("salarySaved"));
               } catch (err: any) {
-                setError(err.response?.data?.detail ?? "Failed to save salary");
+                setError(err.response?.data?.detail ?? t("failedSaveSalary"));
               }
             }}
           >
-            <label>Monthly amount<Input required type="number" min={0} value={salaryForm.amount} onChange={(e) => setSalaryForm({ ...salaryForm, amount: e.target.value })} placeholder={record ? String(record.amount) : ""} /></label>
-            <label>Effective from<Input required type="date" value={salaryForm.effective_from} onChange={(e) => setSalaryForm({ ...salaryForm, effective_from: e.target.value })} /></label>
-            <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Save salary</button></div>
+            <label>{t("monthlyAmountLabel")}<Input required type="number" min={0} value={salaryForm.amount} onChange={(e) => setSalaryForm({ ...salaryForm, amount: e.target.value })} placeholder={record ? String(record.amount) : ""} /></label>
+            <label>{t("effectiveFromLabel")}<Input required type="date" value={salaryForm.effective_from} onChange={(e) => setSalaryForm({ ...salaryForm, effective_from: e.target.value })} /></label>
+            <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("saveSalaryBtn")}</button></div>
           </form>
           {record && (
-            <p className="notice">Current: {record.currency} {record.amount} / month, effective {record.effective_from}</p>
+            <p className="notice">{t("currentSalaryLine", { currency: record.currency, amount: record.amount, date: record.effective_from })}</p>
           )}
           {notice && <p className="notice">{notice}</p>}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
@@ -130,28 +132,28 @@ export function SalaryView() {
                 setPaymentForm({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
                 setPayments(await financeApi.listSalaryPayments(teacherId));
               } catch (err: any) {
-                setError(err.response?.data?.detail ?? "Failed to record payment");
+                setError(err.response?.data?.detail ?? t("failedRecordPayment"));
               }
             }}
           >
-            <label>Amount<Input required type="number" min={0} value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} /></label>
-            <label>Payment date<Input required type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} /></label>
-            <label>Period covered<Input required value={paymentForm.period_covered} onChange={(e) => setPaymentForm({ ...paymentForm, period_covered: e.target.value })} placeholder="e.g. June 2026" /></label>
+            <label>{t("amountCol")}<Input required type="number" min={0} value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} /></label>
+            <label>{t("dateCol")}<Input required type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} /></label>
+            <label>{t("periodCoveredCol")}<Input required value={paymentForm.period_covered} onChange={(e) => setPaymentForm({ ...paymentForm, period_covered: e.target.value })} placeholder="e.g. June 2026" /></label>
             <label>
-              Method
+              {t("methodCol")}
               <Select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}>
-                <option value="cash">Cash</option>
-                <option value="bank_transfer">Bank transfer</option>
-                <option value="cheque">Cheque</option>
+                <option value="cash">{t("methodCash")}</option>
+                <option value="bank_transfer">{t("methodBank")}</option>
+                <option value="cheque">{t("methodCheque")}</option>
               </Select>
             </label>
-            <label>Note<Input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} /></label>
-            <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> Record payment</button></div>
+            <label>{t("notesLabel")}<Input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} /></label>
+            <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordSalaryBtn")}</button></div>
           </form>
 
           <div className="dataTable">
-            <div className="dataRow header"><span>Date</span><span>Period</span><span>Amount</span><span>Method</span><span>Note</span></div>
-            {payments.length === 0 && <p className="emptyState">No salary payments recorded.</p>}
+            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span></div>
+            {payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
             {payments.map((p) => (
               <div className="dataRow" key={p.id}>
                 <span>{p.payment_date}</span>

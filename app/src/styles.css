@@ -1875,3 +1875,122 @@ input[type="radio"] {
   gap: 8px;
   margin-bottom: 12px;
 }
+
+/* ------------------------------------------------------ Student dashboard */
+
+.dashboardColumns {
+  display: grid;
+  grid-template-columns: minmax(300px, 420px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .dashboardColumns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --------------------------------------------------------- Mobile drawer */
+
+.navToggle {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .navToggle {
+    display: inline-flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 40;
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+    box-shadow: 0 0 24px rgba(15, 23, 42, 0.25);
+  }
+
+  [dir="rtl"] .sidebar {
+    transform: translateX(105%);
+  }
+
+  .sidebar.sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .navOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    z-index: 30;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* --------------------------------------------------------------- Blog cards */
+
+.blogGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.blogCard {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.blogCard header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.blogCard h3 { margin: 0; font-size: 1rem; }
+.blogCard p { margin: 0; font-size: 0.88rem; color: var(--muted, #475569); }
+
+.badge {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badgePublished { background: #d1fae5; color: #065f46; }
+.badgeDraft { background: #e2e8f0; color: #334155; }
+
+/* ------------------------------------------------------ Dashboard quick links */
+
+.quickLinks {
+  display: none;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .quickLinks { display: grid; }
+}
+
+.quickLink {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  font-size: 0.78rem;
+  cursor: pointer;
+}

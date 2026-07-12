@@ -7,6 +7,7 @@ import { useAuth } from "../lib/AuthContext";
 export type SidebarProps = Readonly<{
   activeView: ViewId;
   onViewChange: (view: ViewId) => void;
+  mobileOpen?: boolean;
 }>;
 
 export function initialsOf(name: string): string {
@@ -21,12 +22,12 @@ export function RoleBadge({ role }: Readonly<{ role: string }>) {
   return <span className={`roleBadge role-${role}`}>{t(labelKey)}</span>;
 }
 
-export function Sidebar({ activeView, onViewChange }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, mobileOpen = false }: SidebarProps) {
   const { t } = useTranslation();
   const { hasPermission, hasFeature, user, madrasa, logout } = useAuth();
 
   return (
-    <aside className="sidebar">
+    <aside className={mobileOpen ? "sidebar sidebarOpen" : "sidebar"}>
       <div className="brand">
         <span className="brandMark">م</span>
         <div className="brandText">

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { LogIn, Building2, KeyRound, Loader2 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { api } from "../lib/api";
@@ -6,6 +7,7 @@ import { Input } from "./ui/Field";
 
 
 export function LoginScreen() {
+  const { t } = useTranslation();
   const { login } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -48,15 +50,15 @@ export function LoginScreen() {
         <div className="login-hero">
           <div className="hero-content">
             <h1>MMS</h1>
-            <p>Next-generation Madrasa Management System.</p>
+            <p>{t("loginTagline")}</p>
             <div className="hero-stats">
               <div className="stat-card">
-                <h3>Offline-First</h3>
-                <span>Syncs seamlessly</span>
+                <h3>{t("loginOfflineTitle")}</h3>
+                <span>{t("loginOfflineSub")}</span>
               </div>
               <div className="stat-card">
-                <h3>Multi-Tenant</h3>
-                <span>Secure by design</span>
+                <h3>{t("loginTenantTitle")}</h3>
+                <span>{t("loginTenantSub")}</span>
               </div>
             </div>
           </div>
@@ -69,50 +71,50 @@ export function LoginScreen() {
               <div className="login-icon-wrapper">
                 <LogIn size={28} />
               </div>
-              <h2>Welcome Back</h2>
-              <p>Sign in to your workspace</p>
+              <h2>{t("welcomeBack")}</h2>
+              <p>{t("signInSubtitle")}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="login-form">
               {error && <div className="login-error slide-in">{error}</div>}
 
               <div className="form-group">
-                <label>Madrasa ID</label>
+                <label>{t("madrasaIdLabel")}</label>
                 <div className="input-with-icon">
                   <Building2 size={18} className="input-icon" />
                   <Input
                     type="text"
                     value={tenant}
                     onChange={(e) => setTenant(e.target.value)}
-                    placeholder="e.g., suffa"
+                    placeholder="suffa"
                     required
                   />
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Username</label>
+                <label>{t("usernameLabel")}</label>
                 <div className="input-with-icon">
                   <span className="input-icon">@</span>
                   <Input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
+                    placeholder={t("usernamePlaceholder")}
                     required
                   />
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Password</label>
+                <label>{t("passwordLabel")}</label>
                 <div className="input-with-icon">
                   <KeyRound size={18} className="input-icon" />
                   <Input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder={t("passwordPlaceholder")}
                     required
                   />
                 </div>

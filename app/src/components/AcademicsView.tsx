@@ -9,7 +9,6 @@ import {
   type Course,
   type Program,
   type Section,
-  type TeacherAssignment,
   academicsApi,
 } from "../lib/endpoints";
 import { peopleApi, type Teacher } from "../lib/endpoints";
@@ -25,7 +24,6 @@ export function AcademicsView() {
   const [courses, setCourses] = useState<Record<string, Course[]>>({});
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [sessions, setSessions] = useState<AcademicSession[]>([]);
-  const [assignments, setAssignments] = useState<TeacherAssignment[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
 
   const [programName, setProgramName] = useState("");
@@ -37,10 +35,9 @@ export function AcademicsView() {
   const [courseName, setCourseName] = useState("");
   const [assignCourseId, setAssignCourseId] = useState("");
   const [sessionForm, setSessionForm] = useState({ name: "", gregorian_start: "", gregorian_end: "", hijri_span: "" });
-  const [assignForm, setAssignForm] = useState({ teacher_id: "", session_id: "", class_id: "", course_id: "" });
   const [rolloverSourceSession, setRolloverSourceSession] = useState<AcademicSession | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"programs" | "classes" | "courses" | "sections" | "sessions" | "assignments">("programs");
+  const [activeTab, setActiveTab] = useState<"programs" | "classes" | "courses" | "sessions">("programs");
 
   const refreshAll = async () => {
     const [p, c, s, t_res, ac] = await Promise.all([
@@ -63,7 +60,6 @@ export function AcademicsView() {
     }
     setSections(secByClass);
     setCourses(courseByClass);
-    setAssignments(await academicsApi.listTeacherAssignments());
   };
 
   const handleError = (e: unknown) => {
@@ -129,24 +125,10 @@ export function AcademicsView() {
           </button>
           <button
             type="button"
-            className={`tabButton ${activeTab === "sections" ? "active" : ""}`}
-            onClick={() => setActiveTab("sections")}
-          >
-            {t("sectionsCoursesHeading")}
-          </button>
-          <button
-            type="button"
             className={`tabButton ${activeTab === "sessions" ? "active" : ""}`}
             onClick={() => setActiveTab("sessions")}
           >
             {t("sessionsHeading")}
-          </button>
-          <button
-            type="button"
-            className={`tabButton ${activeTab === "assignments" ? "active" : ""}`}
-            onClick={() => setActiveTab("assignments")}
-          >
-            {t("teacherAssignmentsHeading")}
           </button>
         </div>
 
@@ -336,9 +318,9 @@ export function AcademicsView() {
             </>
           )}
 
-          {activeTab === "sections" && (
+          {activeTab === "classes" && (
             <>
-              <h3>{t("sectionsCoursesHeading")}</h3>
+              <h3 style={{ marginTop: 24 }}>{t("sectionsCoursesHeading")}</h3>
               <form
                 className="inlineForm"
                 onSubmit={async (e) => {
@@ -523,64 +505,7 @@ export function AcademicsView() {
             </>
           )}
 
-          {activeTab === "assignments" && (
-            <>
-              <h3>{t("teacherAssignmentsHeading")}</h3>
-              <form
-                className="inlineForm"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const { teacher_id, session_id, class_id, course_id } = assignForm;
-                  if (!teacher_id || !session_id || !class_id || !course_id) return;
-                  await academicsApi.createTeacherAssignment(assignForm);
-                  await refreshAll();
-                }}
-              >
-                <label>
-                  {t("teacherLabel")}
-                  <Select required value={assignForm.teacher_id} onChange={(e) => setAssignForm({ ...assignForm, teacher_id: e.target.value })}>
-                    <option value="">{t("selectEllipsis")}</option>
-                    {teachers.map((t_res) => <option key={t_res.id} value={t_res.id}>{t_res.name}</option>)}
-                  </Select>
-                </label>
-                <label>
-                  {t("sessionLabel")}
-                  <Select required value={assignForm.session_id} onChange={(e) => setAssignForm({ ...assignForm, session_id: e.target.value })}>
-                    <option value="">{t("selectEllipsis")}</option>
-                    {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </Select>
-                </label>
-                <label>
-                  {t("classLabel")}
-                  <Select required value={assignForm.class_id} onChange={(e) => setAssignForm({ ...assignForm, class_id: e.target.value })}>
-                    <option value="">{t("selectEllipsis")}</option>
-                    {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </Select>
-                </label>
-                <label>
-                  {t("courseNameLabel")}
-                  <Select required value={assignForm.course_id} onChange={(e) => setAssignForm({ ...assignForm, course_id: e.target.value })}>
-                    <option value="">{t("selectEllipsis")}</option>
-                    {(courses[assignForm.class_id] ?? allCourses).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </Select>
-                </label>
-                <div className="formActions">
-                  <button className="primaryAction" type="submit"><Plus size={16} /> {t("assignBtn")}</button>
-                </div>
-              </form>
-              <div className="dataTable">
-                <div className="dataRow header"><span>{t("teacherLabel")}</span><span>{t("classLabel")}</span><span>{t("courseNameLabel")}</span></div>
-                {assignments.length === 0 && <p className="emptyState">{t("noAssignmentsYet")}</p>}
-                {assignments.map((a) => (
-                  <div className="dataRow" key={a.id}>
-                    <span>{teachers.find((t_res) => t_res.id === a.teacher_id)?.name ?? a.teacher_id}</span>
-                    <span>{classes.find((c) => c.id === a.class_id)?.name ?? a.class_id}</span>
-                    <span>{allCourses.find((c) => c.id === a.course_id)?.name ?? a.course_id}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+          {/* Teacher assignments are managed on the Timetable screen (§4). */}
         </div>
       </div>
       

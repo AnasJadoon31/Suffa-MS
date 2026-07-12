@@ -3,6 +3,50 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-12 — Frontend phase 4 / finish (PWA, i18n sweep, exports)
+
+- **Timetable PDF export**: `GET /operations/timetable/export` — whole-madrasa
+  weekly grids (one time-window × days block per section, stacked in
+  class/section order), optional `class_id` filter; "Export PDF" button on the
+  Timetable screen. Tested (83rd backend test).
+- **PWA re-enabled properly**: `vite-plugin-pwa` with `registerType:
+  autoUpdate` (replaces the old kill-switch service worker that was parked to
+  fight stale bundles), manifest + placeholder icons, network-first runtime
+  caching for API GETs (offline dashboards/timetables), iOS meta tags.
+- **Mobile**: sidebar becomes an off-canvas drawer (hamburger in the topbar,
+  RTL-aware), dashboard gains a role-aware quick-links grid on small screens.
+- **i18n sweep complete**: FinanceView, SalaryView, ReportsView, BlogView,
+  ResourcesView, FormsView, RolloverWizard, LoginScreen, SetPasswordPage —
+  every view now renders through i18next in English and Urdu.
+  (~130 new strings this pass.)
+- **BlogView**: table → cards with publish/edit/delete (B16-a/b done).
+- **ReportsView**: report-centre layout with per-report cards; salary and
+  donations reports wired (B15).
+- **FinanceView**: class/category/date filters on contributions (B13-a),
+  donation filters, all translated.
+- **AudiencePicker** (§6 UI): shared everyone/teachers/students/classes/
+  sections control, wired into resource and form creation.
+- **RolloverWizard**: copy-options checkboxes (teacher assignments, timetable,
+  holidays + date-shift) matching the B7-h backend.
+
+## 2026-07-12 — Frontend phase 3 (dashboards, academics merge, admissions split)
+
+- **Student dashboard redesigned** (Student-1): metric cards (overall score,
+  due assignments, attendance ratio), own-attendance **calendar** (backend now
+  ships `my_attendance` — last 62 days of statuses — on the student
+  dashboard payload), two-column layout with timetable/assignments/
+  announcements/resources. All translated.
+- **Teacher dashboard**: "My classes" panel listing class/section/course with
+  one-click jump to the class list (attendance) and assessments (Teacher-1).
+- **AcademicsView** (B7-d/j): Sections tab merged into Classes (sections +
+  course mapping managed under the class list); Teacher Assignments tab
+  removed — assignments live on the Timetable screen.
+- **AdmissionsView split** (B12): three tabs — *Registrations* (walk-in form +
+  applications with Walk-in/Public-form source column), *Public forms*
+  (create per-program admission form, copy shareable public link,
+  close/reopen), *Enquiries* (contact-form inbox). Review gate moved to
+  `admissions.manage`.
+
 ## 2026-07-12 — Frontend phase 2 (timetable, people, delegation, platform)
 
 - **TimetableView rebuilt** (B3): Weekly grid is the first/default tab; List

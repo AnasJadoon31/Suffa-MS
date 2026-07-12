@@ -376,6 +376,68 @@ async def import_timetable(
     return TimetableImportResponse(dry_run=payload.dry_run or not all_ok, created=created, results=results)
 
 
+@router.get("/timetable/export")
+async def export_timetable(
+    current_user: User = Depends(require_permission("timetable.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    context_session: AcademicSession = Depends(get_context_session),
+    session: AsyncSession = Depends(get_session),
+    class_id: UUID | None = None,
+    format: str = "pdf",
+) -> "Response":
+    """Whole-madrasa timetable as a PDF: one weekly grid (periods × days) per
+    section, stacked in class/section order."""
+    from fastapi.responses import Response
+
+    from app.core.pdf import render_table_pdf
+
+    stmt = (
+        select(TimetableSlot, AcademicClass.name, Section.name, Course.name, TeacherProfile.name)
+        .join(AcademicClass, AcademicClass.id == TimetableSlot.class_id)
+        .join(Section, Section.id == TimetableSlot.section_id)
+        .join(Course, Course.id == TimetableSlot.course_id)
+        .join(TeacherProfile, TeacherProfile.id == TimetableSlot.teacher_id)
+        .where(
+            TimetableSlot.madrasa_id == madrasa.id,
+            (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
+        )
+    )
+    if class_id:
+        stmt = stmt.where(TimetableSlot.class_id == class_id)
+    rows = (await session.execute(stmt.order_by(AcademicClass.name, Section.name, TimetableSlot.start_time))).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No timetable slots to export")
+
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    # section key → {"label": str, "slots": {(day, start_time): cell}}
+    sections_grid: dict[tuple[str, str], dict] = {}
+    for slot, class_name, section_name, course_name, teacher_name in rows:
+        key = (class_name, section_name)
+        entry = sections_grid.setdefault(key, {"slots": {}})
+        entry["slots"][(slot.day_of_week, slot.start_time, slot.end_time)] = f"{course_name}\n{teacher_name}"
+
+    headers = ["Time"] + day_names
+    table_rows: list[list[str]] = []
+    for (class_name, section_name), entry in sections_grid.items():
+        table_rows.append([f"— {class_name} / {section_name} —"] + [""] * len(day_names))
+        # Distinct time windows for this section, ordered by start time.
+        windows = sorted({(start, end) for (_d, start, end) in entry["slots"]}, key=lambda w: w[0])
+        for start, end in windows:
+            row = [f"{start}–{end}"]
+            for day_index in range(len(day_names)):
+                row.append(entry["slots"].get((day_index, start, end), ""))
+            table_rows.append(row)
+
+    pdf_bytes = render_table_pdf(
+        "Timetable", f"{madrasa.name} — {context_session.name}", headers, table_rows
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="timetable.pdf"'},
+    )
+
+
 @router.delete("/timetable/{slot_id}")
 async def delete_timetable_slot(
     slot_id: UUID,
