@@ -3,6 +3,31 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-12 — Frontend phase 2 (timetable, people, delegation, platform)
+
+- **TimetableView rebuilt** (B3): Weekly grid is the first/default tab; List
+  gains class/section/course/teacher/day filters and uses server-side names;
+  slot create drops manual period (auto-derived); new **By teacher** tab
+  showing who teaches which course in which class/section (B7-j); new
+  **Import** tab — paste CSV lines, dry-run with per-row errors, commit only
+  when all rows pass. Teachers see only the grid, restricted to their own
+  sections (Teacher-4).
+- **PeopleView rebuilt** (§11/B11/B13): four tabs — Teachers, Students,
+  Guardians, **Donators**. Row actions: view-detail (eye) + login-link.
+  Teacher detail shows formal record + salary history + record-payment form;
+  student detail shows guardians + fee history + record-fee form; donator
+  detail shows donation history + add-donation form. Add-teacher/add-student
+  forms capture formal fields (CNIC/B-form, address, emergency contact,
+  qualifications, joining date). Students filterable by class. Guardians tab
+  creates guardians and issues **guardian portal logins** (B7-k).
+- **Delegation modal** (§3/B0): "Delegate…" button in every admin screen
+  header (principal only) — pick a teacher, tick that screen's feature codes,
+  optional class scope; grants for other screens are preserved.
+- **Platform console** (§1): super-admin login now lands on a dedicated
+  screen — onboard madrasa (name/slug/principal) and toggle per-madrasa
+  feature flags.
+- All new UI translated (en+ur), modal/detail/import styles added.
+
 ## 2026-07-12 — Frontend phase 1 (assessments + settings + filter UIs)
 
 - **AssessmentsView rebuilt** (B8 d–e):

@@ -16,10 +16,12 @@ import { HolidaysView } from "./components/HolidaysView";
 import { LeaveView } from "./components/LeaveView";
 import { LoginScreen } from "./components/LoginScreen";
 import { PeopleView } from "./components/PeopleView";
+import { PlatformView } from "./components/PlatformView";
 import { ReportsView } from "./components/ReportsView";
 import { ResourcesView } from "./components/ResourcesView";
 import { SalaryView } from "./components/SalaryView";
 import { SettingsView } from "./components/SettingsView";
+import { DelegateButton } from "./components/DelegateButton";
 import { SessionReadOnlyBanner, SessionSwitcher } from "./components/SessionSwitcher";
 import { SetPasswordPage } from "./components/SetPasswordPage";
 import { initialsOf, RoleBadge, Sidebar } from "./components/Sidebar";
@@ -29,6 +31,25 @@ import { academicsApi } from "./lib/endpoints";
 import { navItems, type ViewId } from "./data/mockData";
 
 const VIEW_STORAGE_KEY = "mms_active_view";
+
+// Screen → permission modules, for the per-screen "Delegate…" control (§3).
+const VIEW_MODULES: Partial<Record<ViewId, string[]>> = {
+  attendance: ["attendance"],
+  timetable: ["timetable"],
+  holidays: ["holidays"],
+  leave: ["leave"],
+  announcements: ["announcements"],
+  academics: ["academics"],
+  assessments: ["assignments", "assessments"],
+  resources: ["resources"],
+  forms: ["forms"],
+  people: ["people", "auth"],
+  admissions: ["admissions"],
+  finance: ["finance"],
+  salary: ["finance"],
+  blog: ["web"],
+  settings: ["settings"],
+};
 
 function loadInitialView(): ViewId {
   const stored = localStorage.getItem(VIEW_STORAGE_KEY);
@@ -112,6 +133,10 @@ function Workspace() {
     return <LoginScreen />;
   }
 
+  if (user?.role === "super_admin") {
+    return <PlatformView />;
+  }
+
   const activeItem = navItems.find((item) => item.id === activeView);
 
   return (
@@ -123,6 +148,7 @@ function Workspace() {
             <h1>{activeItem ? t(activeItem.labelKey) : t("appName")}</h1>
             <p className="viewDescription">{activeItem ? t(activeItem.descKey) : ""}</p>
           </div>
+          {VIEW_MODULES[activeView] && <DelegateButton modules={VIEW_MODULES[activeView]!} />}
           <div className="topbar-actions">
             {today && (
               <span className="dateChip" title={t("todayLabel")}>

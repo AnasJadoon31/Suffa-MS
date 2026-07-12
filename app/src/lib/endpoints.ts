@@ -82,26 +82,70 @@ export interface Student {
   portal_enabled: boolean; notes: string | null; created_at: string; set_password_url?: string;
 }
 export interface Guardian {
-  id: string; name: string; relationship: string; phone_numbers: string; preferred_language: string; created_at: string;
+  id: string; user_id: string | null; name: string; relationship: string; phone_numbers: string;
+  cnic: string | null; address: string | null; preferred_language: string; created_at: string;
 }
+
+export interface PermissionDef { code: string; label: string; module: string; scoped: boolean }
+export interface PermissionGrant {
+  permission_code: string; scope_type: string | null; scope_id: string | null;
+  granted_by_id: string; created_at: string;
+}
+
+export interface PlatformMadrasa { id: string; slug: string; name: string; content_language: string; created_at: string }
+export interface FeatureFlag { key: string; label: string; enabled: boolean }
+
+export const platformApi = {
+  listMadaris: () => api.get<PlatformMadrasa[]>("/api/v1/platform/madaris").then((r) => r.data),
+  createMadrasa: (payload: {
+    name: string; slug: string; content_language?: string; principal_username: string; disabled_features?: string[];
+  }) =>
+    api.post<{ madrasa_id: string; slug: string; principal_user_id: string; set_password_url: string }>(
+      "/api/v1/platform/madaris", payload
+    ).then((r) => r.data),
+  getFeatures: (madrasaId: string) =>
+    api.get<FeatureFlag[]>(`/api/v1/platform/madaris/${madrasaId}/features`).then((r) => r.data),
+  setFeatures: (madrasaId: string, features: Record<string, boolean>) =>
+    api.put<FeatureFlag[]>(`/api/v1/platform/madaris/${madrasaId}/features`, { features }).then((r) => r.data),
+};
+
+export const authApi = {
+  permissionCatalog: () => api.get<PermissionDef[]>("/api/v1/auth/permissions").then((r) => r.data),
+  userPermissions: (userId: string) =>
+    api.get<PermissionGrant[]>(`/api/v1/auth/users/${userId}/permissions`).then((r) => r.data),
+  setGrants: (userId: string, grants: { code: string; scope_type?: "class" | "section"; scope_id?: string }[]) =>
+    api.put("/api/v1/auth/permissions/grants", { user_id: userId, grants }).then((r) => r.data),
+};
 
 export const peopleApi = {
   listTeachers: (search?: string) =>
     api.get<Teacher[]>("/api/v1/people/teachers", { params: { search } }).then((r) => r.data),
-  createTeacher: (payload: { username: string; name: string; whatsapp_number?: string }) =>
+  createTeacher: (payload: {
+    username: string; name: string; whatsapp_number?: string; qualifications?: string; join_date?: string;
+    cnic?: string; address?: string; emergency_contact?: string;
+  }) =>
     api.post<Teacher>("/api/v1/people/teachers", payload).then((r) => r.data),
   deactivateTeacher: (id: string) => api.post(`/api/v1/people/teachers/${id}/deactivate`).then((r) => r.data),
 
   listStudents: (search?: string) =>
     api.get<Student[]>("/api/v1/people/students", { params: { search } }).then((r) => r.data),
-  createStudent: (payload: { username: string; name: string; date_of_birth: string; guardian_ids?: string[] }) =>
+  createStudent: (payload: {
+    username: string; name: string; date_of_birth: string; guardian_ids?: string[];
+    b_form_number?: string; address?: string;
+  }) =>
     api.post<Student>("/api/v1/people/students", payload).then((r) => r.data),
   deactivateStudent: (id: string) => api.post(`/api/v1/people/students/${id}/deactivate`).then((r) => r.data),
 
   listGuardians: (search?: string) =>
     api.get<Guardian[]>("/api/v1/people/guardians", { params: { search } }).then((r) => r.data),
-  createGuardian: (payload: { name: string; relationship: string; phone_numbers: string; student_ids?: string[] }) =>
+  createGuardian: (payload: {
+    name: string; relationship: string; phone_numbers: string; student_ids?: string[]; cnic?: string; address?: string;
+  }) =>
     api.post<Guardian>("/api/v1/people/guardians", payload).then((r) => r.data),
+  guardianCredentialsLink: (guardianId: string, username?: string) =>
+    api.post<{ username: string; set_password_url: string }>(
+      `/api/v1/people/guardians/${guardianId}/credentials-link`, { username }
+    ).then((r) => r.data),
   studentGuardians: (studentId: string) =>
     api.get<Guardian[]>(`/api/v1/people/students/${studentId}/guardians`).then((r) => r.data),
 
@@ -375,8 +419,18 @@ export const reportingApi = {
 
 export interface Scope { all: boolean; classes: string[]; roles?: string[] }
 export interface TimetableSlot {
-  id: string; class_id: string; section_id: string; course_id: string; teacher_id: string;
+  id: string; session_id: string | null;
+  class_id: string; section_id: string; course_id: string; teacher_id: string;
   day_of_week: number; period: number; start_time: string; end_time: string;
+  class_name: string | null; section_name: string | null; course_name: string | null; teacher_name: string | null;
+}
+export interface TimetableImportRow {
+  class_name: string; section_name: string; course_name: string; teacher_code: string;
+  day_of_week: number; start_time: string; end_time: string;
+}
+export interface TimetableImportResponse {
+  dry_run: boolean; created: number;
+  results: { row: number; ok: boolean; error: string | null }[];
 }
 export interface Holiday {
   id: string; name: string; category: string | null; start_date: string; end_date: string;
@@ -407,12 +461,16 @@ export interface Announcement {
 export interface TypedSetting { key: string; category: string; type: string; label: string; value: string }
 
 export const operationsApi = {
-  listTimetable: (params?: { class_id?: string; section_id?: string; teacher_id?: string }) =>
+  listTimetable: (params?: {
+    class_id?: string; section_id?: string; teacher_id?: string; course_id?: string; day_of_week?: number;
+  }) =>
     api.get<TimetableSlot[]>("/api/v1/operations/timetable", { params }).then((r) => r.data),
   createTimetableSlot: (payload: {
     class_id: string; section_id: string; course_id: string; teacher_id: string;
-    day_of_week: number; period: number; start_time: string; end_time: string;
+    day_of_week: number; period?: number; start_time: string; end_time: string;
   }) => api.post<TimetableSlot>("/api/v1/operations/timetable", payload).then((r) => r.data),
+  importTimetable: (rows: TimetableImportRow[], dryRun: boolean) =>
+    api.post<TimetableImportResponse>("/api/v1/operations/timetable/import", { rows, dry_run: dryRun }).then((r) => r.data),
   deleteTimetableSlot: (id: string) => api.delete(`/api/v1/operations/timetable/${id}`).then((r) => r.data),
 
   listHolidays: (params?: { category?: string; class_id?: string; date_from?: string; date_to?: string }) =>

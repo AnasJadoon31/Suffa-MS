@@ -1810,3 +1810,68 @@ input[type="radio"] {
 .savedTick {
   color: var(--emerald, #059669);
 }
+
+/* --------------------------------------------------------- Timetable import */
+
+.importTextarea {
+  width: 100%;
+  font-family: monospace;
+  font-size: 0.85rem;
+  padding: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.importExample {
+  background: var(--surface-2, #f8fafc);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  overflow-x: auto;
+}
+
+/* --------------------------------------------------------- Person detail */
+
+.detailPanel {
+  margin-top: 16px;
+  border: 1px solid var(--border, #e2e8f0);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 4px 16px;
+  margin: 0 0 16px;
+  font-size: 0.92rem;
+}
+
+.detailGrid dt { color: var(--muted, #64748b); }
+.detailGrid dd { margin: 0; }
+
+/* ------------------------------------------------------- Delegation modal */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modalCard {
+  background: var(--surface, #fff);
+  border-radius: 12px;
+  padding: 20px;
+  width: min(560px, 92vw);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.delegateList {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
