@@ -535,3 +535,82 @@ async def finance_report(
     if format == "csv":
         return _csv_response(filename, headers, rows)
     return _pdf_response(filename, "Finance Report", f"{start_date} to {end_date}", headers, rows)
+
+
+@router.get("/reports/salary")
+async def salary_report(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    format: str = Query("csv", pattern="^(csv|pdf)$"),
+    current_user: User = Depends(require_permission("teachers.salary.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Salary disbursements per teacher over a period (B15)."""
+    from app.modules.finance.models import SalaryPayment
+
+    rows_db = (
+        await session.execute(
+            select(
+                SalaryPayment.payment_date,
+                TeacherProfile.name,
+                TeacherProfile.employee_code,
+                SalaryPayment.period_covered,
+                SalaryPayment.method,
+                SalaryPayment.amount,
+                SalaryPayment.currency,
+            )
+            .join(TeacherProfile, TeacherProfile.id == SalaryPayment.teacher_id)
+            .where(
+                SalaryPayment.madrasa_id == madrasa.id,
+                SalaryPayment.payment_date >= start_date,
+                SalaryPayment.payment_date <= end_date,
+            )
+            .order_by(SalaryPayment.payment_date)
+        )
+    ).all()
+    rows = [
+        [str(payment_date), name, code, period, method, f"{amount:.2f}", currency]
+        for payment_date, name, code, period, method, amount, currency in rows_db
+    ]
+    headers = ["Date", "Teacher", "Employee #", "Period", "Method", "Amount", "Currency"]
+    filename = f"salary-report-{start_date}-to-{end_date}"
+    if format == "csv":
+        return _csv_response(filename, headers, rows)
+    return _pdf_response(filename, "Salary Report", f"{start_date} to {end_date}", headers, rows)
+
+
+@router.get("/reports/donations")
+async def donations_report(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    format: str = Query("csv", pattern="^(csv|pdf)$"),
+    donor_id: UUID | None = None,
+    current_user: User = Depends(require_permission("finance.reports.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Donations over a period, optionally for a single donor (B15)."""
+    stmt = (
+        select(Donation.donation_date, Donor.name, PaymentCategory.name, Donation.amount, Donation.currency)
+        .join(Donor, Donor.id == Donation.donor_id)
+        .join(PaymentCategory, PaymentCategory.id == Donation.category_id)
+        .where(
+            Donation.madrasa_id == madrasa.id,
+            Donation.donation_date >= start_date,
+            Donation.donation_date <= end_date,
+        )
+        .order_by(Donation.donation_date)
+    )
+    if donor_id:
+        stmt = stmt.where(Donation.donor_id == donor_id)
+    rows_db = (await session.execute(stmt)).all()
+    rows = [
+        [str(d), name, category, f"{amount:.2f}", currency]
+        for d, name, category, amount, currency in rows_db
+    ]
+    headers = ["Date", "Donor", "Category", "Amount", "Currency"]
+    filename = f"donations-report-{start_date}-to-{end_date}"
+    if format == "csv":
+        return _csv_response(filename, headers, rows)
+    return _pdf_response(filename, "Donations Report", f"{start_date} to {end_date}", headers, rows)

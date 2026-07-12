@@ -149,3 +149,10 @@ class SessionRolloverRequest(BaseModel):
     hijri_span: str
     class_mappings: list[RolloverMapping]
     copy_teacher_assignments: bool = False
+    # Per-module copy-or-start-fresh choices (B7-h). Everything defaults to
+    # "start fresh"; tick what should carry over into the new session.
+    copy_timetable: bool = False
+    copy_holidays: bool = False
+    # Shift copied holiday dates forward by the gap between the two sessions'
+    # start dates (e.g. a year), keeping them roughly in place on the calendar.
+    shift_holiday_dates: bool = True

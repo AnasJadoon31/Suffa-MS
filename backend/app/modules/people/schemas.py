@@ -12,6 +12,10 @@ class TeacherCreate(BaseModel):
     join_date: date | None = None
     employee_code: str | None = None
     preferred_language: str = "en"
+    cnic: str | None = None
+    address: str | None = None
+    emergency_contact: str | None = None
+    photo_file_id: UUID | None = None
 
 
 class TeacherUpdate(BaseModel):
@@ -20,6 +24,10 @@ class TeacherUpdate(BaseModel):
     qualifications: str | None = None
     join_date: date | None = None
     notes: str | None = None
+    cnic: str | None = None
+    address: str | None = None
+    emergency_contact: str | None = None
+    photo_file_id: UUID | None = None
 
 
 class TeacherRead(BaseModel):
@@ -33,6 +41,10 @@ class TeacherRead(BaseModel):
     join_date: date | None
     status: str
     notes: str | None
+    cnic: str | None = None
+    address: str | None = None
+    emergency_contact: str | None = None
+    photo_file_id: UUID | None = None
     created_at: datetime
 
 
@@ -48,6 +60,9 @@ class StudentCreate(BaseModel):
     portal_enabled: bool | None = None
     guardian_ids: list[UUID] = []
     preferred_language: str = "ur"
+    b_form_number: str | None = None
+    address: str | None = None
+    photo_file_id: UUID | None = None
 
 
 class StudentUpdate(BaseModel):
@@ -55,6 +70,9 @@ class StudentUpdate(BaseModel):
     date_of_birth: date | None = None
     portal_enabled: bool | None = None
     notes: str | None = None
+    b_form_number: str | None = None
+    address: str | None = None
+    photo_file_id: UUID | None = None
 
 
 class StudentRead(BaseModel):
@@ -67,6 +85,9 @@ class StudentRead(BaseModel):
     status: str
     portal_enabled: bool
     notes: str | None
+    b_form_number: str | None = None
+    address: str | None = None
+    photo_file_id: UUID | None = None
     created_at: datetime
 
 
@@ -78,6 +99,8 @@ class GuardianCreate(BaseModel):
     name: str
     relationship: str
     phone_numbers: str
+    cnic: str | None = None
+    address: str | None = None
     preferred_language: str = "ur"
     student_ids: list[UUID] = []
 
@@ -85,8 +108,17 @@ class GuardianCreate(BaseModel):
 class GuardianRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    user_id: UUID | None = None
     name: str
     relationship: str
     phone_numbers: str
+    cnic: str | None = None
+    address: str | None = None
     preferred_language: str
     created_at: datetime
+
+
+class GuardianCredentialsRequest(BaseModel):
+    # Required on first provisioning; ignored when the guardian already has a
+    # login (the link is simply re-issued).
+    username: str | None = None

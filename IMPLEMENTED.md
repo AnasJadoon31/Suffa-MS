@@ -3,6 +3,51 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-12 — Backend completion sweep (pre-frontend)
+
+Migrations `e5a1c7d9b304`, `f1b6d8e3a742`, `a2c4e6b8d150`. 82 tests green
+(12 new in `test_backend_sweep.py`).
+
+- **Auth/personal settings**: `POST /auth/change-password` (verifies current,
+  audited). Guardian logins (B7-k): `UserRole.parent`, `guardians.user_id`,
+  `POST /people/guardians/{id}/credentials-link` (provision first time,
+  re-issue after).
+- **People §11**: formal-record fields — teacher CNIC/address/emergency
+  contact/photo; student B-form/address/photo; guardian CNIC/address — across
+  models, schemas, create/update routes. `GET /people/students/{id}/guardians`.
+- **Holidays B4**: `category` + `class_ids` scoping + list filters
+  (category/class/date range); attendance summaries count class-scoped
+  holidays only for students of those classes.
+- **Leave B5**: `person_type` (teacher/student tabs), `status`, `class_id`,
+  date range, name search on `GET /operations/leave`; manage gate fixed to
+  `leave.manage`.
+- **Attendance B2**: verified existing `/attendance/override` already covers
+  teacher subjects incl. check-in/out — admin override is a UI-only gap.
+- **Finance B13**: payments filterable by `class_id` (active-session
+  enrollment); donations by category/date range.
+- **Public endpoints B12/B16** (`/api/v1/public`, token-keyed, rate-limited
+  with honeypots): `POST /contact/{public_key}` (W3Forms-style;
+  `madaris.public_key`), `GET /blog/{public_key}` published feed, admission
+  forms — admin CRUD `/operations/admission-forms` (per program, unique
+  `public_token`), public `GET`/`POST /admission-forms/{token}` landing in
+  the Registrations tab (`form_id` + `extra_data` on applications). Blog got
+  the missing `PUT`/`DELETE`.
+- **Rollover B7-h**: `copy_timetable` (slots re-stamped onto the new session)
+  and `copy_holidays` (+`shift_holiday_dates` shifts by the session-start
+  gap) options on the rollover request.
+- **Timetable import B3-b**: `POST /operations/timetable/import` — name-based
+  rows, dry-run with per-row errors, batch+DB conflict detection,
+  auto-periods; nothing commits unless every row is valid.
+- **Settings §7**: typed catalogue (`core/settings_catalog.py` — profile /
+  security incl. per-role idle timeouts / academics / attendance / finance /
+  portal), `GET /operations/settings/catalog` (categorised, defaults merged),
+  `PUT /operations/settings` now rejects unknown keys and type-invalid values.
+- **Reports B15**: `/reporting/reports/salary` and `/reporting/reports/donations`
+  (CSV/PDF, date-ranged, donor filter).
+- **Security §9**: security-headers middleware (nosniff, frame-deny,
+  referrer-policy, HSTS in prod), API docs disabled outside development
+  (`ENVIRONMENT` env var), generic `enforce_rate_limit` for public routes.
+
 ## 2026-07-12 — Assessments redesign, backend (IMPLEMENT.md §5)
 
 ### Assignment model & CRUD

@@ -12,6 +12,7 @@ from app.modules.auth.service import UsernameTakenError, provision_login, reissu
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 from app.modules.people.schemas import (
     GuardianCreate,
+    GuardianCredentialsRequest,
     GuardianRead,
     StudentCreate,
     StudentProvisionedRead,
@@ -79,6 +80,10 @@ async def create_teacher(
         whatsapp_number=payload.whatsapp_number,
         qualifications=payload.qualifications,
         join_date=payload.join_date,
+        cnic=payload.cnic,
+        address=payload.address,
+        emergency_contact=payload.emergency_contact,
+        photo_file_id=payload.photo_file_id,
     )
     session.add(profile)
     await session.commit()
@@ -206,6 +211,9 @@ async def create_student(
         name=payload.name,
         date_of_birth=payload.date_of_birth,
         portal_enabled=payload.portal_enabled if payload.portal_enabled is not None else True,
+        b_form_number=payload.b_form_number,
+        address=payload.address,
+        photo_file_id=payload.photo_file_id,
     )
     session.add(profile)
     await session.flush()
@@ -297,6 +305,25 @@ async def reissue_student_credentials(
     return {"username": user.username, "set_password_url": url}
 
 
+@router.get("/students/{student_id}/guardians", response_model=list[GuardianRead])
+async def list_student_guardians(
+    student_id: UUID,
+    current_user: User = Depends(require_permission("students.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[GuardianRead]:
+    await _get_or_404(session, StudentProfile, student_id, madrasa.id)
+    rows = (
+        await session.execute(
+            select(Guardian)
+            .join(StudentGuardian, StudentGuardian.guardian_id == Guardian.id)
+            .where(StudentGuardian.student_id == student_id)
+            .order_by(Guardian.name)
+        )
+    ).scalars().all()
+    return [GuardianRead.model_validate(row) for row in rows]
+
+
 # ---------------------------------------------------------------- Guardians
 
 @router.post("/guardians", response_model=GuardianRead)
@@ -311,6 +338,8 @@ async def create_guardian(
         name=payload.name,
         relationship=payload.relationship,
         phone_numbers=payload.phone_numbers,
+        cnic=payload.cnic,
+        address=payload.address,
         preferred_language=payload.preferred_language,
     )
     session.add(guardian)
@@ -325,6 +354,44 @@ async def create_guardian(
     await session.commit()
     await session.refresh(guardian)
     return GuardianRead.model_validate(guardian)
+
+
+@router.post("/guardians/{guardian_id}/credentials-link")
+async def guardian_credentials_link(
+    guardian_id: UUID,
+    payload: GuardianCredentialsRequest,
+    current_user: User = Depends(require_permission("students.send_credentials")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    """Provision (or re-issue) a guardian portal login — used when a student's
+    class has portal access switched off (B7-k)."""
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+
+    if guardian.user_id is not None:
+        user = await session.get(User, guardian.user_id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="Linked user account not found")
+        url = reissue_set_password_link(session, madrasa_id=madrasa.id, actor_id=current_user.id, user=user)
+        await session.commit()
+        return {"username": user.username, "set_password_url": url}
+
+    if not payload.username:
+        raise HTTPException(status_code=400, detail="username is required to provision a new guardian login")
+    try:
+        user, url = await provision_login(
+            session,
+            madrasa_id=madrasa.id,
+            actor_id=current_user.id,
+            username=payload.username,
+            role=UserRole.parent,
+            preferred_language=guardian.preferred_language,
+        )
+    except UsernameTakenError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    guardian.user_id = user.id
+    await session.commit()
+    return {"username": user.username, "set_password_url": url}
 
 
 @router.get("/guardians", response_model=list[GuardianRead])

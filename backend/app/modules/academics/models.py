@@ -1,3 +1,4 @@
+import secrets
 from typing import Optional
 from datetime import date
 from uuid import UUID
@@ -8,11 +9,18 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, IdMixin, SlugMixin, TenantMixin, TimestampMixin
 
 
+def _new_public_key() -> str:
+    return secrets.token_hex(16)
+
+
 class Madrasa(Base, IdMixin, SlugMixin, TimestampMixin):
     __tablename__ = "madaris"
 
     name: Mapped[str] = mapped_column(String(160))
     content_language: Mapped[str] = mapped_column(String(8), default="ur")
+    # W3Forms-style key for unauthenticated website integrations (contact
+    # form, public admission forms) — unguessable, rotatable.
+    public_key: Mapped[str] = mapped_column(String(64), unique=True, default=_new_public_key)
 
 
 class Program(Base, IdMixin, TenantMixin, TimestampMixin):

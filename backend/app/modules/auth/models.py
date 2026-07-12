@@ -13,6 +13,9 @@ class UserRole(StrEnum):
     principal = "principal"
     teacher = "teacher"
     student = "student"
+    # Guardian login — issued when a student's class has portal access off
+    # (B7-k); sees only their wards' data.
+    parent = "parent"
 
 
 class UserStatus(StrEnum):

@@ -19,6 +19,11 @@ class TeacherProfile(Base, IdMixin, TenantMixin, TimestampMixin):
     join_date: Mapped[date] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(24), default="active")
     notes: Mapped[str] = mapped_column(Text, nullable=True)
+    # Formal-record fields (§11): identity + contacts + photo.
+    cnic: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    emergency_contact: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    photo_file_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("file_objects.id"), nullable=True)
 
 
 class StudentProfile(Base, IdMixin, TenantMixin, TimestampMixin):
@@ -31,14 +36,22 @@ class StudentProfile(Base, IdMixin, TenantMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(String(24), default="active")
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     portal_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Formal-record fields (§11).
+    b_form_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    photo_file_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("file_objects.id"), nullable=True)
 
 
 class Guardian(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "guardians"
 
+    # Set once the guardian is provisioned a portal login (role=parent, B7-k).
+    user_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(160))
     relationship: Mapped[str] = mapped_column(String(80))
     phone_numbers: Mapped[str] = mapped_column(Text)
+    cnic: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     preferred_language: Mapped[str] = mapped_column(String(8), default="ur")
 
 

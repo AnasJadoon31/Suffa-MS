@@ -22,6 +22,7 @@ from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
 from app.modules.auth.service import UsernameTakenError, provision_login
 from app.modules.academics.models import AcademicSession, Madrasa
 from app.modules.auth.schemas import (
+    ChangePasswordRequest,
     LoginRequest,
     PermissionGrant,
     PermissionGrantRead,
@@ -125,7 +126,10 @@ async def provision_user(
     session: AsyncSession = Depends(get_session),
 ) -> ProvisionUserResponse:
     if payload.role == Role.parent:
-        raise HTTPException(status_code=400, detail="Guardians do not have logins in v1")
+        raise HTTPException(
+            status_code=400,
+            detail="Guardian logins are provisioned via POST /people/guardians/{id}/credentials-link",
+        )
 
     try:
         user, set_password_url = await provision_login(
@@ -174,6 +178,34 @@ async def set_password(
 
     user.password_hash = await hash_password(payload.password)
     user.status = UserStatus.active
+    await session.commit()
+    return {"status": "ok"}
+
+
+@router.post("/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    user = await session.get(User, current_user.id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not await verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    user.password_hash = await hash_password(payload.new_password)
+    record_audit(
+        session,
+        madrasa_id=user.madrasa_id or madrasa.id,
+        actor_id=user.id,
+        action="auth.change_password",
+        entity_name="user",
+        entity_id=str(user.id),
+        old_values=None,
+        new_values=None,
+    )
     await session.commit()
     return {"status": "ok"}
 

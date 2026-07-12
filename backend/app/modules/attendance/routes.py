@@ -1227,15 +1227,36 @@ async def compute_attendance_summary(
             )
         ).scalar_one_or_none()
 
-    holidays = (
+    # Class-scoped holidays (B4-c) only count for students of those classes;
+    # teachers and madrasa-wide holidays always count.
+    subject_class_id = None
+    if subject_type == "student":
+        subject_class_id = (
+            await session.execute(
+                select(Enrollment.class_id)
+                .join(AcademicSession, AcademicSession.id == Enrollment.session_id)
+                .where(
+                    Enrollment.student_id == subject_id,
+                    AcademicSession.is_active.is_(True),
+                )
+            )
+        ).scalar_one_or_none()
+
+    holiday_rows = (
         await session.execute(
-            select(Holiday.start_date, Holiday.end_date).where(
+            select(Holiday.start_date, Holiday.end_date, Holiday.class_ids).where(
                 Holiday.madrasa_id == madrasa_id,
                 Holiday.start_date <= end_date,
                 Holiday.end_date >= start_date,
             )
         )
     ).all()
+    holidays = [
+        (h_start, h_end)
+        for h_start, h_end, h_class_ids in holiday_rows
+        if not h_class_ids
+        or (subject_class_id is not None and str(subject_class_id) in h_class_ids)
+    ]
 
     approved_leave = []
     if subject_user_id is not None:

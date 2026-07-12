@@ -1,8 +1,8 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,7 @@ from app.modules.operations.audience import get_viewer_context, scope_allows
 from app.modules.auth.models import User, UserRole
 from app.modules.operations.models import (
     AdmissionApplication,
+    AdmissionForm,
     Announcement,
     BlogPost,
     ContactEnquiry,
@@ -43,11 +44,15 @@ from app.modules.operations.models import (
 from app.modules.operations.schemas import (
     AdmissionApplicationCreate,
     AdmissionApplicationRead,
+    AdmissionFormCreate,
+    AdmissionFormRead,
+    AdmissionFormUpdate,
     AnnouncementCreate,
     AnnouncementRead,
     AnnouncementUpdate,
     BlogPostCreate,
     BlogPostRead,
+    BlogPostUpdate,
     ContactEnquiryCreate,
     ContactEnquiryRead,
     FormCreate,
@@ -65,6 +70,10 @@ from app.modules.operations.schemas import (
     ResourceRead,
     SettingRead,
     SettingUpsert,
+    TypedSettingRead,
+    TimetableImportRequest,
+    TimetableImportResponse,
+    TimetableImportRowResult,
     TimetableSlotCreate,
     TimetableSlotRead,
 )
@@ -258,6 +267,115 @@ async def create_timetable_slot(
     return TimetableSlotRead.model_validate(slot)
 
 
+@router.post("/timetable/import", response_model=TimetableImportResponse)
+async def import_timetable(
+    payload: TimetableImportRequest,
+    current_user: User = Depends(require_permission("timetable.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    context_session: AcademicSession = Depends(require_active_session),
+    session: AsyncSession = Depends(get_session),
+) -> TimetableImportResponse:
+    """Bulk slot creation from parsed CSV rows (B3-b). Names are resolved
+    case-insensitively; dry_run validates (incl. conflicts against existing
+    slots and within the batch) without writing. Nothing is written unless
+    every row is valid."""
+    classes = {
+        name.casefold(): (cid, name)
+        for cid, name in (
+            await session.execute(select(AcademicClass.id, AcademicClass.name).where(AcademicClass.madrasa_id == madrasa.id))
+        ).all()
+    }
+    sections = {
+        (class_id, name.casefold()): sid
+        for sid, class_id, name in (
+            await session.execute(select(Section.id, Section.class_id, Section.name).where(Section.madrasa_id == madrasa.id))
+        ).all()
+    }
+    courses = {
+        name.casefold(): cid
+        for cid, name in (
+            await session.execute(select(Course.id, Course.name).where(Course.madrasa_id == madrasa.id))
+        ).all()
+    }
+    teachers = {
+        code.casefold(): tid
+        for tid, code in (
+            await session.execute(select(TeacherProfile.id, TeacherProfile.employee_code).where(TeacherProfile.madrasa_id == madrasa.id))
+        ).all()
+    }
+    existing = (
+        await session.execute(
+            select(TimetableSlot).where(
+                TimetableSlot.madrasa_id == madrasa.id,
+                TimetableSlot.session_id == context_session.id,
+            )
+        )
+    ).scalars().all()
+    busy = [(s.day_of_week, s.teacher_id, s.section_id, s.start_time, s.end_time) for s in existing]
+
+    results: list[TimetableImportRowResult] = []
+    staged: list[TimetableSlot] = []
+    for index, row in enumerate(payload.rows, start=1):
+        error: str | None = None
+        class_entry = classes.get(row.class_name.casefold())
+        if class_entry is None:
+            error = f"Unknown class: {row.class_name}"
+        else:
+            class_id = class_entry[0]
+            section_id = sections.get((class_id, row.section_name.casefold()))
+            course_id = courses.get(row.course_name.casefold())
+            teacher_id = teachers.get(row.teacher_code.casefold())
+            if section_id is None:
+                error = f"Unknown section: {row.section_name} in {row.class_name}"
+            elif course_id is None:
+                error = f"Unknown course: {row.course_name}"
+            elif teacher_id is None:
+                error = f"Unknown teacher code: {row.teacher_code}"
+            elif _minutes(row.end_time) <= _minutes(row.start_time):
+                error = "end_time must be after start_time"
+            else:
+                for day, busy_teacher, busy_section, b_start, b_end in busy:
+                    if day != row.day_of_week or not _overlaps(row.start_time, row.end_time, b_start, b_end):
+                        continue
+                    if busy_teacher == teacher_id:
+                        error = f"Teacher busy {b_start}\u2013{b_end}"
+                        break
+                    if busy_section == section_id:
+                        error = f"Section busy {b_start}\u2013{b_end}"
+                        break
+        if error is None:
+            earlier = {
+                b_start
+                for day, _bt, busy_section, b_start, _be in busy
+                if day == row.day_of_week and busy_section == section_id and _minutes(b_start) < _minutes(row.start_time)
+            }
+            staged.append(
+                TimetableSlot(
+                    madrasa_id=madrasa.id,
+                    session_id=context_session.id,
+                    class_id=class_id,
+                    section_id=section_id,
+                    course_id=course_id,
+                    teacher_id=teacher_id,
+                    day_of_week=row.day_of_week,
+                    period=len(earlier) + 1,
+                    start_time=row.start_time,
+                    end_time=row.end_time,
+                )
+            )
+            busy.append((row.day_of_week, teacher_id, section_id, row.start_time, row.end_time))
+        results.append(TimetableImportRowResult(row=index, ok=error is None, error=error))
+
+    all_ok = all(result.ok for result in results)
+    created = 0
+    if not payload.dry_run and all_ok:
+        for slot in staged:
+            session.add(slot)
+        created = len(staged)
+        await session.commit()
+    return TimetableImportResponse(dry_run=payload.dry_run or not all_ok, created=created, results=results)
+
+
 @router.delete("/timetable/{slot_id}")
 async def delete_timetable_slot(
     slot_id: UUID,
@@ -378,11 +496,28 @@ async def create_holiday(
     session: AsyncSession = Depends(get_session),
 ) -> HolidayRead:
     _ensure_valid_date_range(payload.start_date, payload.end_date)
-    holiday = Holiday(madrasa_id=madrasa.id, **payload.model_dump())
+    class_ids = await _validated_class_ids(session, madrasa.id, payload.class_ids)
+    holiday = Holiday(
+        madrasa_id=madrasa.id,
+        **payload.model_dump(exclude={"class_ids"}),
+        class_ids=class_ids,
+    )
     session.add(holiday)
     await session.commit()
     await session.refresh(holiday)
     return HolidayRead.model_validate(holiday)
+
+
+async def _validated_class_ids(
+    session: AsyncSession, madrasa_id: UUID, class_ids: list[UUID] | None
+) -> list[str] | None:
+    if not class_ids:
+        return None
+    for class_id in class_ids:
+        academic_class = await session.get(AcademicClass, class_id)
+        if academic_class is None or academic_class.madrasa_id != madrasa_id:
+            raise HTTPException(status_code=404, detail=f"Class {class_id} not found")
+    return [str(class_id) for class_id in class_ids]
 
 
 @router.get("/holidays", response_model=list[HolidayRead])
@@ -390,11 +525,23 @@ async def list_holidays(
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    category: str | None = None,
+    class_id: UUID | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[HolidayRead]:
-    result = await session.execute(
-        select(Holiday).where(Holiday.madrasa_id == madrasa.id).order_by(Holiday.start_date)
-    )
-    return [HolidayRead.model_validate(row) for row in result.scalars().all()]
+    stmt = select(Holiday).where(Holiday.madrasa_id == madrasa.id)
+    if category:
+        stmt = stmt.where(Holiday.category == category)
+    if date_from:
+        stmt = stmt.where(Holiday.end_date >= date_from)
+    if date_to:
+        stmt = stmt.where(Holiday.start_date <= date_to)
+    rows = (await session.execute(stmt.order_by(Holiday.start_date))).scalars().all()
+    if class_id is not None:
+        # Madrasa-wide holidays + those scoped to the class.
+        rows = [row for row in rows if not row.class_ids or str(class_id) in row.class_ids]
+    return [HolidayRead.model_validate(row) for row in rows]
 
 
 @router.put("/holidays/{holiday_id}", response_model=HolidayRead)
@@ -410,8 +557,10 @@ async def update_holiday(
     if holiday is None or holiday.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Holiday not found")
     holiday.name = payload.name
+    holiday.category = payload.category
     holiday.start_date = payload.start_date
     holiday.end_date = payload.end_date
+    holiday.class_ids = await _validated_class_ids(session, madrasa.id, payload.class_ids)
     await session.commit()
     await session.refresh(holiday)
     return HolidayRead.model_validate(holiday)
@@ -468,8 +617,14 @@ async def list_leave(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     user_id: UUID | None = None,
+    person_type: str | None = None,  # teacher | student — the two admin tabs
+    status_filter: str | None = Query(default=None, alias="status"),
+    class_id: UUID | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    q: str | None = None,
 ) -> list[LeaveRead]:
-    can_manage_leave = await user_has_permission(current_user, "timetable.manage", session)
+    can_manage_leave = await user_has_permission(current_user, "leave.manage", session)
     stmt = select(Leave).where(Leave.madrasa_id == madrasa.id)
     if user_id:
         if user_id != current_user.id and not can_manage_leave:
@@ -477,8 +632,39 @@ async def list_leave(
         stmt = stmt.where(Leave.user_id == user_id)
     elif not can_manage_leave:
         stmt = stmt.where(Leave.user_id == current_user.id)
+
+    if person_type in ("teacher", "student"):
+        stmt = stmt.join(User, User.id == Leave.user_id).where(User.role == UserRole(person_type))
+    if status_filter:
+        stmt = stmt.where(Leave.status == status_filter)
+    if date_from:
+        stmt = stmt.where(Leave.end_date >= date_from)
+    if date_to:
+        stmt = stmt.where(Leave.start_date <= date_to)
+    if class_id is not None:
+        # Students of the given class (active-session enrollment).
+        student_user_ids = (
+            await session.execute(
+                select(StudentProfile.user_id)
+                .join(Enrollment, Enrollment.student_id == StudentProfile.id)
+                .join(AcademicSession, AcademicSession.id == Enrollment.session_id)
+                .where(
+                    StudentProfile.madrasa_id == madrasa.id,
+                    Enrollment.class_id == class_id,
+                    AcademicSession.is_active.is_(True),
+                )
+            )
+        ).scalars().all()
+        if not student_user_ids:
+            return []
+        stmt = stmt.where(Leave.user_id.in_(student_user_ids))
+
     result = await session.execute(stmt.order_by(Leave.start_date))
-    return await _leave_reads(session, list(result.scalars().all()), madrasa.id)
+    reads = await _leave_reads(session, list(result.scalars().all()), madrasa.id)
+    if q:
+        needle = q.lower()
+        reads = [r for r in reads if r.person_name and needle in r.person_name.lower()]
+    return reads
 
 
 @router.post("/leave/{leave_id}/status", response_model=LeaveRead)
@@ -836,7 +1022,113 @@ async def publish_blog_post(
     return BlogPostRead.model_validate(post)
 
 
+@router.put("/blog/{post_id}", response_model=BlogPostRead)
+async def update_blog_post(
+    post_id: UUID,
+    payload: BlogPostUpdate,
+    current_user: User = Depends(require_permission("blog.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> BlogPostRead:
+    post = await session.get(BlogPost, post_id)
+    if post is None or post.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(post, field, value)
+    await session.commit()
+    await session.refresh(post)
+    return BlogPostRead.model_validate(post)
+
+
+@router.delete("/blog/{post_id}")
+async def delete_blog_post(
+    post_id: UUID,
+    current_user: User = Depends(require_permission("blog.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    post = await session.get(BlogPost, post_id)
+    if post is None or post.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    await session.delete(post)
+    await session.commit()
+    return {"status": "deleted"}
+
+
 # -------------------------------------------------------------- Admissions
+
+async def _admission_form_read(session: AsyncSession, form: AdmissionForm) -> AdmissionFormRead:
+    from app.modules.academics.models import Program
+
+    program = await session.get(Program, form.program_id)
+    data = AdmissionFormRead.model_validate(form).model_dump()
+    data["program_name"] = program.name if program else None
+    return AdmissionFormRead(**data)
+
+
+@router.post("/admission-forms", response_model=AdmissionFormRead)
+async def create_admission_form(
+    payload: AdmissionFormCreate,
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AdmissionFormRead:
+    from app.modules.academics.models import Program
+    import secrets as _secrets
+
+    program = await session.get(Program, payload.program_id)
+    if program is None or program.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Program not found")
+    form = AdmissionForm(
+        madrasa_id=madrasa.id,
+        program_id=payload.program_id,
+        title=payload.title,
+        description=payload.description,
+        fields_definition=[field.model_dump() for field in payload.fields],
+        public_token=_secrets.token_urlsafe(24),
+        created_by_id=current_user.id,
+    )
+    session.add(form)
+    await session.commit()
+    await session.refresh(form)
+    return await _admission_form_read(session, form)
+
+
+@router.get("/admission-forms", response_model=list[AdmissionFormRead])
+async def list_admission_forms(
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[AdmissionFormRead]:
+    rows = (
+        await session.execute(
+            select(AdmissionForm).where(AdmissionForm.madrasa_id == madrasa.id).order_by(AdmissionForm.created_at.desc())
+        )
+    ).scalars().all()
+    return [await _admission_form_read(session, row) for row in rows]
+
+
+@router.put("/admission-forms/{form_id}", response_model=AdmissionFormRead)
+async def update_admission_form(
+    form_id: UUID,
+    payload: AdmissionFormUpdate,
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AdmissionFormRead:
+    form = await session.get(AdmissionForm, form_id)
+    if form is None or form.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Admission form not found")
+    updates = payload.model_dump(exclude_unset=True)
+    if "fields" in updates:
+        fields = updates.pop("fields")
+        form.fields_definition = fields if fields is not None else []
+    for field, value in updates.items():
+        setattr(form, field, value)
+    await session.commit()
+    await session.refresh(form)
+    return await _admission_form_read(session, form)
+
 
 @router.post("/admissions", response_model=AdmissionApplicationRead)
 async def create_admission_application(
@@ -942,6 +1234,34 @@ async def list_settings(
     return [SettingRead.model_validate(row) for row in result.scalars().all()]
 
 
+@router.get("/settings/catalog", response_model=list[TypedSettingRead])
+async def list_settings_catalog(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[TypedSettingRead]:
+    """Every defined setting with its stored (or default) value, categorised —
+    drives the real settings page (§7). Readable by all madrasa members."""
+    from app.core.settings_catalog import CATALOG
+
+    stored = {
+        row.key: row.value
+        for row in (
+            await session.execute(select(MadrasaSetting).where(MadrasaSetting.madrasa_id == madrasa.id))
+        ).scalars().all()
+    }
+    return [
+        TypedSettingRead(
+            key=item.key,
+            category=item.category,
+            type=item.type,
+            label=item.label,
+            value=stored.get(item.key, item.default),
+        )
+        for item in CATALOG
+    ]
+
+
 @router.put("/settings", response_model=SettingRead)
 async def upsert_setting(
     payload: SettingUpsert,
@@ -949,6 +1269,13 @@ async def upsert_setting(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> SettingRead:
+    from app.core.settings_catalog import validate_setting
+
+    try:
+        validate_setting(payload.key, payload.value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     setting = (
         await session.execute(
             select(MadrasaSetting).where(MadrasaSetting.madrasa_id == madrasa.id, MadrasaSetting.key == payload.key)

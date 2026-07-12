@@ -114,7 +114,7 @@ async def perform_rollover(
         assignments_stmt = select(TeacherAssignment).where(TeacherAssignment.session_id == current_session_id)
         assignments_result = await session.execute(assignments_stmt)
         old_assignments = assignments_result.scalars().all()
-        
+
         for old_assignment in old_assignments:
             new_assignment = TeacherAssignment(
                 madrasa_id=madrasa_id,
@@ -124,7 +124,65 @@ async def perform_rollover(
                 course_id=old_assignment.course_id
             )
             session.add(new_assignment)
-            
+
+    if payload.copy_timetable:
+        # Timetables belong to classes, which persist across sessions — copy
+        # slots verbatim under the new session id (IMPLEMENT.md §10).
+        from app.modules.operations.models import TimetableSlot
+
+        slots = (
+            await session.execute(
+                select(TimetableSlot).where(
+                    TimetableSlot.madrasa_id == madrasa_id,
+                    TimetableSlot.session_id == current_session_id,
+                )
+            )
+        ).scalars().all()
+        for slot in slots:
+            session.add(
+                TimetableSlot(
+                    madrasa_id=madrasa_id,
+                    session_id=new_session.id,
+                    class_id=slot.class_id,
+                    section_id=slot.section_id,
+                    course_id=slot.course_id,
+                    teacher_id=slot.teacher_id,
+                    day_of_week=slot.day_of_week,
+                    period=slot.period,
+                    start_time=slot.start_time,
+                    end_time=slot.end_time,
+                )
+            )
+
+    if payload.copy_holidays:
+        from app.modules.operations.models import Holiday
+
+        shift = (
+            new_session.gregorian_start - current_session.gregorian_start
+            if payload.shift_holiday_dates
+            else None
+        )
+        holidays = (
+            await session.execute(
+                select(Holiday).where(
+                    Holiday.madrasa_id == madrasa_id,
+                    Holiday.start_date >= current_session.gregorian_start,
+                    Holiday.end_date <= current_session.gregorian_end,
+                )
+            )
+        ).scalars().all()
+        for holiday in holidays:
+            session.add(
+                Holiday(
+                    madrasa_id=madrasa_id,
+                    name=holiday.name,
+                    category=holiday.category,
+                    start_date=holiday.start_date + shift if shift else holiday.start_date,
+                    end_date=holiday.end_date + shift if shift else holiday.end_date,
+                    class_ids=holiday.class_ids,
+                )
+            )
+
     await session.commit()
     await session.refresh(new_session)
     return new_session

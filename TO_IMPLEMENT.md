@@ -29,8 +29,8 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       touch-friendly hit targets.
 - [ ] **[P3] Checkbox size.** Global CSS fix in `app/src/styles.css` — checkboxes
       render oversized everywhere (Forms view especially).
-- [ ] **[P2] Personal settings page (all roles).** Change password, phone, preferred
-      language, profile photo. Backend: `PATCH /auth/me`, `POST /auth/change-password`.
+- [x] **[P2] Personal settings (backend).** `PATCH /auth/me` +
+      `POST /auth/change-password` done. Remaining: settings page UI.
 - [x] **[P1] Super-admin tier (backend).** `super_admin` role, `madrasa_features`
       flags, `/platform` onboarding + feature endpoints, router gating, nav
       filtering. Remaining: super-admin UI (route tree in the SPA).
@@ -61,13 +61,14 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       delegated screens from effective permissions.
 
 ### B2. Attendance
-- [ ] **[P2]** Admin override of *teacher* attendance (mark/correct teacher
-      check-in/out from admin screen; `attendance.edit_locked` flow exists for
-      students — extend to teachers).
+- [x] **[P2]** Admin override of *teacher* attendance — backend already
+      supported (`/attendance/override` handles teacher subjects + check-in/
+      out). Remaining: admin screen control.
 
 ### B3. Timetable
 - [ ] **[P3]** Weekly Grid tab first, List second.
-- [ ] **[P2]** Bulk upload of slots (CSV/XLSX import + grid multi-create).
+- [x] **[P2]** Bulk upload of slots — backend `POST /operations/timetable/import`
+      (dry-run, per-row errors, conflicts). Remaining: upload UI.
 - [x] **[P2]** List sorting + filters: by class, course, teacher, day —
       backend done (name-enriched, session-scoped); UI hookup pending.
 - [x] **[P2]** Auto-derive periods + conflict detection (teacher/section
@@ -78,17 +79,14 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       removing the Teacher Assignment tab (B7-j).
 
 ### B4. Holidays
-- [ ] **[P3]** Filters (date range, category, scope).
-- [ ] **[P2]** Categories (religious, national, madrasa-specific, exam break…).
-- [ ] **[P2]** Class-scoped holidays: a holiday can apply to specific classes only.
-      Attendance/timetable logic must respect scope.
+- [x] **[P3]** Filters (date range, category, class) — backend done; UI pending.
+- [x] **[P2]** Categories — backend done.
+- [x] **[P2]** Class-scoped holidays — backend done incl. attendance summary
+      scope; UI pending.
 
 ### B5. Leave
-- [ ] **[P3]** Filters everywhere.
-- [ ] **[P2]** Separate Teachers / Students tabs.
-- [ ] **[P2]** Student tab: class filter + every applicable filter (status, type,
-      date range, section).
-- [ ] **[P3]** Per-tab search.
+- [x] **[P3/P2]** Backend done: `person_type` tabs, status/class/date filters,
+      name search. Remaining: tabbed UI.
 
 ### B6. Announcements
 - [ ] **[P2]** Categories.
@@ -107,9 +105,9 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
 - [ ] **[P3]** (f) Course mapping: filters + sorting.
 - [x] **[P1]** (g) Session switching leaks across roles/logins — fixed via
       per-user server-side preference (see A).
-- [ ] **[P2]** (h) Rollover wizard: per-module copy-or-fresh choices — timetables,
-      announcements, holidays, resources, forms, grading schemes, fee structures,
-      etc. (`RolloverWizard.tsx` currently covers only enrollments/assignments).
+- [~] **[P2]** (h) Rollover per-module options: timetable + holidays (with
+      date shift) done; announcements/resources/forms/grading/fee copies
+      remain, plus wizard UI checkboxes.
 - [x] **[P1]** (i) Only active session actionable, others view-only — core
       guards + banner in (see A); per-route adoption continues with screens.
 - [ ] **[P2]** (j) Remove Teacher Assignment tab; assignments derive from timetable
@@ -165,45 +163,43 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
 - [ ] **[P2]** Same treatment for students.
 - [ ] **[P2]** Students categorized by class; enrollment to class/courses and
       section selection all handled from People.
-- [ ] **[P2]** Full guardian details per student (`Guardian`/`StudentGuardian`
-      exist — surface in UI); guardian login link when class portal access is off.
+- [x] **[P2]** Guardian details + logins — backend done (guardian CNIC/address,
+      `GET /students/{id}/guardians`, parent-role credentials-link). UI pending.
 - [ ] **[P2]** Donators tab (see B13).
 - [ ] **[P2]** From a Teacher row: record salary; from a Student row: record fee.
 
 ### B12. Admissions
 - [ ] **[P2]** Split into two: "Students in Person" (manual add; lives with People
       flow) and "Forms".
-- [ ] **[P2]** Public admission forms per program, shareable like Google Forms;
-      submissions land in a Registrations tab.
-- [ ] **[P2]** Contact form as W3Forms-style public-key endpoint for the main
-      website (`ContactEnquiry` model exists; add public key + public POST route).
+- [x] **[P2]** Public admission forms per program — backend done (admin CRUD +
+      tokenized public form + submissions land as registrations). UI pending.
+- [x] **[P2]** Contact form public-key endpoint — done
+      (`POST /api/v1/public/contact/{public_key}`, honeypot + rate limit).
 
 ### B13. Finance
-- [ ] **[P2]** (a) Fees organized by class/course with filters.
+- [x] **[P2]** (a) Fees by class + category/date filters — backend done.
 - [ ] **[P2]** (b) Fee visible inside a selected student's record (Students in
       Person screen).
 - [ ] **[P2]** (c) Donators auto-listed in People (new tab).
-- [ ] **[P3]** (d) Donation filters.
+- [x] **[P3]** (d) Donation filters (donor/category/date) — backend done.
 - [ ] **[P2]** (e) Donator click-through → full donation history + add donation.
 - [ ] **[P2]** (f) Add fee/salary directly from People rows.
 
 ### B15. Reports
-- [ ] **[P2]** Organized/sorted report centre: report per section, per course,
-      donors, salary, student fee — every scope × period combination, CSV/PDF.
+- [~] **[P2]** Report centre: salary + donations reports added (plus existing
+      attendance/finance/results-export). Remaining: unified report-centre UI.
 
 ### B16. Blog
 - [ ] **[P3]** Card/preview UI instead of a table.
-- [ ] **[P2]** Edit + delete.
-- [ ] **[P2]** Public read endpoint for the marketing site.
+- [x] **[P2]** Edit + delete — done.
+- [x] **[P2]** Public read endpoint — done (`GET /api/v1/public/blog/{key}`).
 
 ### B17. Settings
-- [ ] **[P1]** Replace key/value editor with a real settings page: categorized,
-      typed controls (see IMPLEMENT.md §7). Keep `MadrasaSetting` as storage but
-      define a typed catalogue.
-- [ ] **[P2]** Madrasa details section (name, address, contacts) visible to all
-      madrasa members.
-- [ ] **[P2]** Madrasa logo upload.
-- [ ] **[P2]** Idle/logout timeout per role.
+- [~] **[P1]** Settings: typed catalogue + categorized `GET /settings/catalog`
+      + validated writes done (unknown keys rejected). Remaining: settings
+      page UI.
+- [x] **[P2]** Madrasa details + logo + per-role idle timeouts — catalogue
+      keys exist (profile/security categories); UI pending.
 - [ ] **[P2]** Feature-flag section is super-admin-only; admin can override all
       *settings* but never super-admin *feature flags*.
 

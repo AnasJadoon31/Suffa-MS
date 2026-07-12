@@ -11,7 +11,7 @@ from app.core.dependencies import get_current_madrasa, require_permission
 from app.core.hijri import to_hijri_string
 from app.core.pdf import render_receipt_pdf
 from app.db.session import get_session
-from app.modules.academics.models import Madrasa
+from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
 from app.modules.auth.models import User
 from app.modules.finance.models import Donation, Donor, Payment, PaymentCategory, SalaryPayment, SalaryRecord
 from app.modules.finance.schemas import (
@@ -130,6 +130,7 @@ async def list_payments(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     student_id: UUID | None = None,
+    class_id: UUID | None = None,
     category_id: UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
@@ -137,6 +138,19 @@ async def list_payments(
     stmt = select(Payment).where(Payment.madrasa_id == madrasa.id)
     if student_id:
         stmt = stmt.where(Payment.student_id == student_id)
+    if class_id:
+        # Fees organised by class (B13-a): students of the class in the
+        # active session.
+        class_student_ids = (
+            await session.execute(
+                select(Enrollment.student_id)
+                .join(AcademicSession, AcademicSession.id == Enrollment.session_id)
+                .where(Enrollment.class_id == class_id, AcademicSession.is_active.is_(True))
+            )
+        ).scalars().all()
+        if not class_student_ids:
+            return []
+        stmt = stmt.where(Payment.student_id.in_(class_student_ids))
     if category_id:
         stmt = stmt.where(Payment.category_id == category_id)
     if date_from:
@@ -264,10 +278,19 @@ async def list_donations(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     donor_id: UUID | None = None,
+    category_id: UUID | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[DonationRead]:
     stmt = select(Donation).where(Donation.madrasa_id == madrasa.id)
     if donor_id:
         stmt = stmt.where(Donation.donor_id == donor_id)
+    if category_id:
+        stmt = stmt.where(Donation.category_id == category_id)
+    if date_from:
+        stmt = stmt.where(Donation.donation_date >= date_from)
+    if date_to:
+        stmt = stmt.where(Donation.donation_date <= date_to)
     rows = (await session.execute(stmt.order_by(Donation.donation_date.desc()))).scalars().all()
     return [DonationRead.model_validate(row) for row in rows]
 

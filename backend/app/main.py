@@ -15,6 +15,7 @@ from app.modules.messaging.routes import router as messaging_router
 from app.modules.operations.routes import router as operations_router
 from app.modules.people.routes import router as people_router
 from app.modules.platform.routes import router as platform_router
+from app.modules.public.routes import router as public_router
 from app.modules.reporting.routes import router as reporting_router
 
 
@@ -23,8 +24,28 @@ import logging
 
 def create_app() -> FastAPI:
     setup_logging()
-    app = FastAPI(title="Madrasa Management System API", version="0.1.0")
-    
+    is_dev = settings.environment == "development"
+    app = FastAPI(
+        title="Madrasa Management System API",
+        version="0.1.0",
+        # Interactive docs stay off outside development (OWASP A05).
+        docs_url="/docs" if is_dev else None,
+        redoc_url="/redoc" if is_dev else None,
+        openapi_url="/openapi.json" if is_dev else None,
+    )
+
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        if not is_dev:
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+            )
+        return response
+
     @app.middleware("http")
     async def log_requests(request, call_next):
         logger = logging.getLogger("app.request")
@@ -67,6 +88,8 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(platform_router, prefix="/api/v1/platform", tags=["platform"])
+    # Unauthenticated website integrations, keyed by unguessable tokens.
+    app.include_router(public_router, prefix="/api/v1/public", tags=["public"])
     app.include_router(academics_router, prefix="/api/v1/academics", tags=["academics"])
     app.include_router(people_router, prefix="/api/v1/people", tags=["people"])
     # Feature-gated modules: a madrasa_features row with enabled=false switches

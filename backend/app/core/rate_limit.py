@@ -42,3 +42,24 @@ async def record_failure(key: str, window_seconds: int) -> None:
 
 async def clear_failures(key: str) -> None:
     await get_redis().delete(key)
+
+
+async def enforce_rate_limit(key: str, *, limit: int, window_seconds: int) -> None:
+    """Sliding-window counter for public endpoints: raises 429 once `key`
+    exceeds `limit` hits within `window_seconds`. Fails open when Redis is
+    unreachable (tests/dev) — availability of the public site wins over
+    strictness; the honeypot still filters bots."""
+    try:
+        client = get_redis()
+        current = await client.incr(key)
+        if current == 1:
+            await client.expire(key, window_seconds)
+        if current > limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many requests. Try again later.",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        return

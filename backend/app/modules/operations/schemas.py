@@ -53,24 +53,60 @@ class TimetableSlotRead(BaseModel):
     teacher_name: str | None = None
 
 
+class TimetableImportRow(BaseModel):
+    class_name: str
+    section_name: str
+    course_name: str
+    teacher_code: str
+    day_of_week: int = Field(ge=0, le=6)
+    start_time: str = Field(pattern=r"^\d{2}:\d{2}$")
+    end_time: str = Field(pattern=r"^\d{2}:\d{2}$")
+
+
+class TimetableImportRequest(BaseModel):
+    rows: list[TimetableImportRow]
+    # Dry-run resolves and validates everything and reports per-row errors
+    # without writing (B3-b).
+    dry_run: bool = True
+
+
+class TimetableImportRowResult(BaseModel):
+    row: int
+    ok: bool
+    error: str | None = None
+
+
+class TimetableImportResponse(BaseModel):
+    dry_run: bool
+    created: int
+    results: list[TimetableImportRowResult]
+
+
 class HolidayCreate(BaseModel):
     name: str
+    category: str | None = None
     start_date: date
     end_date: date
+    # Empty/None = madrasa-wide; else only these classes (B4-c).
+    class_ids: list[UUID] | None = None
 
 
 class HolidayUpdate(BaseModel):
     name: str
+    category: str | None = None
     start_date: date
     end_date: date
+    class_ids: list[UUID] | None = None
 
 
 class HolidayRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
+    category: str | None = None
     start_date: date
     end_date: date
+    class_ids: list | None = None
 
 
 class LeaveCreate(BaseModel):
@@ -213,6 +249,13 @@ class BlogPostCreate(BaseModel):
     publish_at: datetime | None = None
 
 
+class BlogPostUpdate(BaseModel):
+    title: str | None = None
+    body: str | None = None
+    published: bool | None = None
+    publish_at: datetime | None = None
+
+
 class BlogPostRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
@@ -225,6 +268,33 @@ class BlogPostRead(BaseModel):
 
 
 # -------------------------------------------------------------- Admissions
+
+class AdmissionFormCreate(BaseModel):
+    program_id: UUID
+    title: str
+    description: str = ""
+    fields: list[FormFieldDefinition] = []
+
+
+class AdmissionFormUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    fields: list[FormFieldDefinition] | None = None
+    is_open: bool | None = None
+
+
+class AdmissionFormRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    program_id: UUID
+    title: str
+    description: str
+    fields_definition: list
+    public_token: str
+    is_open: bool
+    created_at: datetime
+    program_name: str | None = None
+
 
 class AdmissionApplicationCreate(BaseModel):
     applicant_name: str
@@ -243,6 +313,8 @@ class AdmissionApplicationRead(BaseModel):
     date_of_birth: date | None
     notes: str | None
     status: str
+    form_id: UUID | None = None
+    extra_data: dict | None = None
     created_at: datetime
 
 
@@ -266,6 +338,14 @@ class ContactEnquiryRead(BaseModel):
 
 class SettingUpsert(BaseModel):
     key: str
+    value: str
+
+
+class TypedSettingRead(BaseModel):
+    key: str
+    category: str
+    type: str
+    label: str
     value: str
 
 

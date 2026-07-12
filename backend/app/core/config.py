@@ -7,6 +7,9 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # "development" keeps interactive API docs on; anything else switches
+    # them off and enables production posture.
+    environment: str = "development"
     database_url: str = "postgresql+asyncpg://mms:mms_password@localhost:5432/mms"
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str = "dev-only-change-me"

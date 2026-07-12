@@ -32,8 +32,13 @@ class Holiday(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "holidays"
 
     name: Mapped[str] = mapped_column(String(160))
+    # e.g. religious / national / madrasa / exam-break — free-form category.
+    category: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
+    # Null/empty = madrasa-wide; else the holiday applies only to these
+    # classes (B4-c) — attendance summaries respect this scope.
+    class_ids: Mapped[Optional[list]] = mapped_column(PortableJSONB, nullable=True)
 
 
 class Leave(Base, IdMixin, TenantMixin, TimestampMixin):
@@ -108,6 +113,23 @@ class BlogPost(Base, IdMixin, TenantMixin, TimestampMixin):
     author_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
 
 
+class AdmissionForm(Base, IdMixin, TenantMixin, TimestampMixin):
+    """Public admission form for one program — shareable like a Google Form
+    via its token (B12-c). Submissions land as AdmissionApplication rows."""
+
+    __tablename__ = "admission_forms"
+
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id"), index=True)
+    title: Mapped[str] = mapped_column(String(160))
+    description: Mapped[str] = mapped_column(Text, default="")
+    # Extra questions beyond the built-in applicant fields; same field shape
+    # as Form.fields_definition.
+    fields_definition: Mapped[list] = mapped_column(PortableJSONB, default=list)
+    public_token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    is_open: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+
+
 class AdmissionApplication(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "admission_applications"
 
@@ -117,6 +139,9 @@ class AdmissionApplication(Base, IdMixin, TenantMixin, TimestampMixin):
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(24), default="pending") # pending, accepted, rejected
+    # Set when the application arrived through a public admission form.
+    form_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("admission_forms.id"), nullable=True, index=True)
+    extra_data: Mapped[Optional[dict]] = mapped_column(PortableJSONB, nullable=True)
 
 
 class ContactEnquiry(Base, IdMixin, TenantMixin, TimestampMixin):
