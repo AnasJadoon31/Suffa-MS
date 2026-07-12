@@ -3,6 +3,38 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-12 — Assessments redesign, backend (IMPLEMENT.md §5)
+
+### Assignment model & CRUD
+- `assignments.section_id` (null = whole class), `category`, `batch_id`
+  (migration `d8f4a6b2c953`).
+- Multi-section publish: `POST /assessments/assignments` takes `section_ids[]`
+  — one row per section sharing a `batch_id`; teacher must teach the course in
+  every targeted section (timetable-derived, `assignments.create_any`
+  bypasses). Response is now a list, name-enriched (class/section/course/
+  teacher names — no raw ids).
+- `PUT …/{id}` gains `category` + `apply_to_batch` (fan the edit out to all
+  batch rows); new `DELETE …/{id}?whole_batch=` removes submissions too —
+  the missing delete/modify from the audit.
+- List: filters `section_id` (includes class-wide), `category`,
+  `created_by_id`, `sort=due_date|created_at|title`; students now see only
+  class-wide rows + their own section's (previously any section's).
+
+### Results matrix + export
+- `GET /assessments/results/matrix?section_id=|class_id=`: per section —
+  courses (with exam types, weightage, and the teacher who teaches that
+  course in that section, from §4 slots ∪ legacy assignments), students ×
+  courses cells (per-exam marks, weighted score, grade band), per-student
+  overall. Class form returns every section.
+- Authorization: principal / global `assessments.marks.enter`; teachers only
+  for sections they teach.
+- `GET /assessments/results/export?format=csv|pdf`: report-style output; each
+  section block ends with the "Course → Teacher" summary footer.
+
+Suite: 70 backend tests green (10 new in `test_assessments_redesign.py`).
+Frontend `AssessmentsView` redesign (course-wise grading UI, spreadsheet
+results with column show/hide) still pending — tracked in TO_IMPLEMENT B8.
+
 ## 2026-07-12 — Scope engine (IMPLEMENT.md build-order step 2)
 
 ### Timetable as source of truth (§4)

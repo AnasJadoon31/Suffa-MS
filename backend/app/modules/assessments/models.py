@@ -12,14 +12,20 @@ class Assignment(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "assignments"
 
     class_id: Mapped[UUID] = mapped_column(ForeignKey("classes.id"), index=True)
+    # Null = whole class; set = one section (IMPLEMENT.md §5).
+    section_id: Mapped[UUID] = mapped_column(ForeignKey("sections.id"), index=True, nullable=True)
     course_id: Mapped[UUID] = mapped_column(ForeignKey("courses.id"), index=True)
     title: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(60), nullable=True)
     instructions: Mapped[str] = mapped_column(Text)
     attachment_key: Mapped[str] = mapped_column(String(255), nullable=True)
     due_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # Null/empty = whole class (FR-ASG-02); populated = only these students.
     target_student_ids: Mapped[list] = mapped_column(PortableJSONB, nullable=True)
     created_by_id: Mapped[UUID] = mapped_column(ForeignKey("teacher_profiles.id"), nullable=True)
+    # Rows created by one multi-section publish share a batch id, so edits can
+    # fan out or a single copy can be detached later.
+    batch_id: Mapped[UUID] = mapped_column(nullable=True, index=True)
 
 
 class Submission(Base, IdMixin, TimestampMixin):

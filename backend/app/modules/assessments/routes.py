@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -18,7 +18,7 @@ from app.core.hijri import to_hijri_string
 from app.core.pdf import render_result_card_pdf
 from app.core.teaching_scope import teacher_teaches
 from app.db.session import get_session
-from app.modules.academics.models import AcademicSession, ClassCourse, Course, Enrollment, Madrasa
+from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section
 from app.modules.assessments.models import Assignment, ExamType, GradingScheme, Mark, ResultPublication, Submission
 from app.modules.assessments.schemas import (
     AssignmentCreate,
@@ -31,7 +31,14 @@ from app.modules.assessments.schemas import (
     GradingSchemeRead,
     MarkRead,
     MarkUpsert,
+    MatrixCourse,
+    MatrixCourseCell,
+    MatrixExamType,
+    MatrixMark,
+    MatrixStudentRow,
     PublishRequest,
+    ResultsMatrixResponse,
+    SectionResultMatrix,
     SessionResult,
     SubmissionCreate,
     SubmissionGrade,
@@ -135,13 +142,13 @@ async def _require_course_scope(
 
 # ------------------------------------------------------------------- Assignments
 
-@router.post("/assignments", response_model=AssignmentRead)
+@router.post("/assignments", response_model=list[AssignmentRead])
 async def create_assignment(
     payload: AssignmentCreate,
     current_user: User = Depends(require_permission("assignments.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
-) -> AssignmentRead:
+) -> list[AssignmentRead]:
     await _require_class_course_scope(
         session, current_user, madrasa.id, payload.class_id, payload.course_id, bypass_permission="assignments.create_any"
     )
@@ -149,21 +156,70 @@ async def create_assignment(
     if teacher is None and current_user.role != UserRole.principal:
         raise HTTPException(status_code=403, detail="Only teachers or the Principal can create assignments")
 
-    assignment = Assignment(
-        madrasa_id=madrasa.id,
-        class_id=payload.class_id,
-        course_id=payload.course_id,
-        title=payload.title,
-        instructions=payload.instructions,
-        attachment_key=payload.attachment_key,
-        due_date=payload.due_date,
-        target_student_ids=[str(sid) for sid in payload.target_student_ids] or None,
-        created_by_id=teacher.id if teacher else None,
-    )
-    session.add(assignment)
+    section_ids: list[UUID | None] = list(dict.fromkeys(payload.section_ids)) or [None]
+    for section_id in section_ids:
+        if section_id is None:
+            continue
+        section = await session.get(Section, section_id)
+        if section is None or section.madrasa_id != madrasa.id or section.class_id != payload.class_id:
+            raise HTTPException(status_code=400, detail="Section does not belong to the given class")
+        # Multi-section publish: the teacher must actually teach this course
+        # in every targeted section (admins/create_any bypass in scope check).
+        if teacher is not None and current_user.role == UserRole.teacher:
+            if not await user_has_permission(current_user, "assignments.create_any", session):
+                active_session_id = await _active_session_id(session, madrasa.id)
+                if not await teacher_teaches(
+                    session,
+                    madrasa_id=madrasa.id,
+                    teacher_id=teacher.id,
+                    session_id=active_session_id,
+                    course_id=payload.course_id,
+                    section_id=section_id,
+                ):
+                    raise HTTPException(status_code=403, detail="Not assigned to one of the targeted sections")
+
+    batch_id = uuid4() if len(section_ids) > 1 else None
+    created: list[Assignment] = []
+    for section_id in section_ids:
+        assignment = Assignment(
+            madrasa_id=madrasa.id,
+            class_id=payload.class_id,
+            section_id=section_id,
+            course_id=payload.course_id,
+            title=payload.title,
+            category=payload.category,
+            instructions=payload.instructions,
+            attachment_key=payload.attachment_key,
+            due_date=payload.due_date,
+            target_student_ids=[str(sid) for sid in payload.target_student_ids] or None,
+            created_by_id=teacher.id if teacher else None,
+            batch_id=batch_id,
+        )
+        session.add(assignment)
+        created.append(assignment)
     await session.commit()
-    await session.refresh(assignment)
-    return AssignmentRead.model_validate(assignment)
+    for assignment in created:
+        await session.refresh(assignment)
+    return await _assignment_reads(session, madrasa.id, created)
+
+
+async def _assignment_reads(session: AsyncSession, madrasa_id: UUID, rows: list[Assignment]) -> list[AssignmentRead]:
+    """Attach display names (class/section/course/teacher) to assignment rows."""
+    class_names = dict((await session.execute(select(AcademicClass.id, AcademicClass.name).where(AcademicClass.madrasa_id == madrasa_id))).all())
+    section_names = dict((await session.execute(select(Section.id, Section.name).where(Section.madrasa_id == madrasa_id))).all())
+    course_names = dict((await session.execute(select(Course.id, Course.name).where(Course.madrasa_id == madrasa_id))).all())
+    teacher_names = dict((await session.execute(select(TeacherProfile.id, TeacherProfile.name).where(TeacherProfile.madrasa_id == madrasa_id))).all())
+    reads = []
+    for row in rows:
+        data = AssignmentRead.model_validate(row).model_dump()
+        data.update(
+            class_name=class_names.get(row.class_id),
+            section_name=section_names.get(row.section_id) if row.section_id else None,
+            course_name=course_names.get(row.course_id),
+            teacher_name=teacher_names.get(row.created_by_id) if row.created_by_id else None,
+        )
+        reads.append(AssignmentRead(**data))
+    return reads
 
 
 @router.get("/assignments", response_model=list[AssignmentRead])
@@ -172,25 +228,57 @@ async def list_assignments(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     class_id: UUID | None = None,
+    section_id: UUID | None = None,
     course_id: UUID | None = None,
+    category: str | None = None,
+    created_by_id: UUID | None = None,
+    sort: str = "due_date",  # due_date | created_at | title
 ) -> list[AssignmentRead]:
     stmt = select(Assignment).where(Assignment.madrasa_id == madrasa.id)
     if class_id:
         stmt = stmt.where(Assignment.class_id == class_id)
+    if section_id:
+        stmt = stmt.where((Assignment.section_id == section_id) | (Assignment.section_id.is_(None)))
     if course_id:
         stmt = stmt.where(Assignment.course_id == course_id)
-    rows = (await session.execute(stmt.order_by(Assignment.due_date))).scalars().all()
+    if category:
+        stmt = stmt.where(Assignment.category == category)
+    if created_by_id:
+        stmt = stmt.where(Assignment.created_by_id == created_by_id)
+    order_column = {
+        "created_at": Assignment.created_at.desc(),
+        "title": Assignment.title,
+    }.get(sort, Assignment.due_date)
+    rows = (await session.execute(stmt.order_by(order_column))).scalars().all()
 
     student = await _student_profile(session, current_user)
-    if student is None:
-        return [AssignmentRead.model_validate(row) for row in rows]
+    if student is not None:
+        # Students: only their section's rows (or class-wide) and, when the
+        # assignment targets specific students, only if they're targeted.
+        enrollment = None
+        active_session_id = await _active_session_id(session, madrasa.id)
+        if active_session_id is not None:
+            enrollment = (
+                await session.execute(
+                    select(Enrollment).where(
+                        Enrollment.student_id == student.id,
+                        Enrollment.session_id == active_session_id,
+                    )
+                )
+            ).scalar_one_or_none()
 
-    def _visible(row: Assignment) -> bool:
-        if not row.target_student_ids:
-            return True
-        return str(student.id) in row.target_student_ids
+        def _visible(row: Assignment) -> bool:
+            if row.section_id is not None and (enrollment is None or enrollment.section_id != row.section_id):
+                return False
+            if enrollment is not None and row.class_id != enrollment.class_id:
+                return False
+            if not row.target_student_ids:
+                return True
+            return str(student.id) in row.target_student_ids
 
-    return [AssignmentRead.model_validate(row) for row in rows if _visible(row)]
+        rows = [row for row in rows if _visible(row)]
+
+    return await _assignment_reads(session, madrasa.id, rows)
 
 
 @router.get("/assignments/{assignment_id}", response_model=AssignmentRead)
@@ -216,15 +304,59 @@ async def update_assignment(
     await _require_class_course_scope(
         session, current_user, madrasa.id, assignment.class_id, assignment.course_id, bypass_permission="assignments.manage_all"
     )
-    updates = payload.model_dump(exclude_unset=True)
-    if "target_student_ids" in updates:
-        ids = updates.pop("target_student_ids")
-        assignment.target_student_ids = [str(sid) for sid in ids] if ids else None
-    for field, value in updates.items():
-        setattr(assignment, field, value)
+    targets = [assignment]
+    if payload.apply_to_batch and assignment.batch_id is not None:
+        targets = (
+            await session.execute(
+                select(Assignment).where(
+                    Assignment.madrasa_id == madrasa.id, Assignment.batch_id == assignment.batch_id
+                )
+            )
+        ).scalars().all()
+
+    updates = payload.model_dump(exclude_unset=True, exclude={"apply_to_batch"})
+    for row in targets:
+        row_updates = dict(updates)
+        if "target_student_ids" in row_updates:
+            ids = row_updates.pop("target_student_ids")
+            row.target_student_ids = [str(sid) for sid in ids] if ids else None
+        for field, value in row_updates.items():
+            setattr(row, field, value)
     await session.commit()
     await session.refresh(assignment)
     return AssignmentRead.model_validate(assignment)
+
+
+@router.delete("/assignments/{assignment_id}")
+async def delete_assignment(
+    assignment_id: UUID,
+    current_user: User = Depends(require_permission("assignments.create")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    whole_batch: bool = False,
+) -> dict[str, int | str]:
+    assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
+    await _require_class_course_scope(
+        session, current_user, madrasa.id, assignment.class_id, assignment.course_id, bypass_permission="assignments.manage_all"
+    )
+    targets = [assignment]
+    if whole_batch and assignment.batch_id is not None:
+        targets = (
+            await session.execute(
+                select(Assignment).where(
+                    Assignment.madrasa_id == madrasa.id, Assignment.batch_id == assignment.batch_id
+                )
+            )
+        ).scalars().all()
+    for row in targets:
+        submissions = (
+            await session.execute(select(Submission).where(Submission.assignment_id == row.id))
+        ).scalars().all()
+        for submission in submissions:
+            await session.delete(submission)
+        await session.delete(row)
+    await session.commit()
+    return {"status": "deleted", "count": len(targets)}
 
 
 @router.post("/assignments/{assignment_id}/submissions", response_model=SubmissionRead)
@@ -693,4 +825,297 @@ async def get_result_card(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="result-card-{student.admission_number}.pdf"'},
+    )
+
+
+# ------------------------------------------------- Results matrix (§5)
+
+async def _teacher_names_by_section_course(
+    session: AsyncSession, madrasa_id: UUID, session_id: UUID, class_id: UUID
+) -> dict[tuple[UUID | None, UUID], str]:
+    """(section_id, course_id) → teacher name, from timetable slots, with
+    class-wide legacy TeacherAssignment rows keyed (None, course_id)."""
+    from app.modules.academics.models import TeacherAssignment
+    from app.modules.operations.models import TimetableSlot
+
+    names: dict[tuple[UUID | None, UUID], str] = {}
+    slot_rows = (
+        await session.execute(
+            select(TimetableSlot.section_id, TimetableSlot.course_id, TeacherProfile.name)
+            .join(TeacherProfile, TeacherProfile.id == TimetableSlot.teacher_id)
+            .where(
+                TimetableSlot.madrasa_id == madrasa_id,
+                TimetableSlot.session_id == session_id,
+                TimetableSlot.class_id == class_id,
+            )
+            .distinct()
+        )
+    ).all()
+    for section_id, course_id, name in slot_rows:
+        names[(section_id, course_id)] = name
+    assignment_rows = (
+        await session.execute(
+            select(TeacherAssignment.course_id, TeacherProfile.name)
+            .join(TeacherProfile, TeacherProfile.id == TeacherAssignment.teacher_id)
+            .where(
+                TeacherAssignment.madrasa_id == madrasa_id,
+                TeacherAssignment.session_id == session_id,
+                TeacherAssignment.class_id == class_id,
+            )
+            .distinct()
+        )
+    ).all()
+    for course_id, name in assignment_rows:
+        names.setdefault((None, course_id), name)
+    return names
+
+
+async def _section_matrix(
+    session: AsyncSession, madrasa_id: UUID, section: Section, active_session_id: UUID
+) -> SectionResultMatrix:
+    academic_class = await session.get(AcademicClass, section.class_id)
+
+    course_rows = (
+        await session.execute(
+            select(Course)
+            .join(ClassCourse, ClassCourse.course_id == Course.id)
+            .where(ClassCourse.class_id == section.class_id)
+            .order_by(Course.name)
+        )
+    ).scalars().all()
+
+    exam_types_by_course: dict[UUID, list[ExamType]] = {}
+    for course in course_rows:
+        exam_types_by_course[course.id] = (
+            await session.execute(
+                select(ExamType).where(ExamType.course_id == course.id, ExamType.madrasa_id == madrasa_id)
+            )
+        ).scalars().all()
+
+    teacher_names = await _teacher_names_by_section_course(session, madrasa_id, active_session_id, section.class_id)
+    matrix_courses = [
+        MatrixCourse(
+            course_id=course.id,
+            course_name=course.name,
+            teacher_name=teacher_names.get((section.id, course.id)) or teacher_names.get((None, course.id)),
+            exam_types=[
+                MatrixExamType(id=et.id, name=et.name, weightage=et.weightage)
+                for et in exam_types_by_course[course.id]
+            ],
+        )
+        for course in course_rows
+    ]
+
+    students = (
+        await session.execute(
+            select(StudentProfile)
+            .join(Enrollment, Enrollment.student_id == StudentProfile.id)
+            .where(
+                Enrollment.section_id == section.id,
+                Enrollment.session_id == active_session_id,
+            )
+            .order_by(StudentProfile.name)
+        )
+    ).scalars().all()
+
+    all_exam_type_ids = [et.id for ets in exam_types_by_course.values() for et in ets]
+    marks: dict[tuple[UUID, UUID], float] = {}
+    if all_exam_type_ids and students:
+        mark_rows = (
+            await session.execute(
+                select(Mark).where(
+                    Mark.exam_type_id.in_(all_exam_type_ids),
+                    Mark.student_id.in_([s.id for s in students]),
+                )
+            )
+        ).scalars().all()
+        marks = {(m.student_id, m.exam_type_id): m.score for m in mark_rows}
+
+    scheme_cache: dict[UUID, GradingScheme | None] = {}
+
+    async def _scheme(scheme_id: UUID) -> GradingScheme | None:
+        if scheme_id not in scheme_cache:
+            scheme_cache[scheme_id] = await session.get(GradingScheme, scheme_id)
+        return scheme_cache[scheme_id]
+
+    student_rows: list[MatrixStudentRow] = []
+    for student in students:
+        cells: list[MatrixCourseCell] = []
+        scored: list[float] = []
+        for course in course_rows:
+            exam_types = exam_types_by_course[course.id]
+            cell_marks = [
+                MatrixMark(exam_type_id=et.id, score=marks.get((student.id, et.id)))
+                for et in exam_types
+            ]
+            weighted_sum = 0.0
+            total_weight = 0.0
+            last_scheme_id = None
+            for et in exam_types:
+                score = marks.get((student.id, et.id))
+                if score is None:
+                    continue
+                weighted_sum += score * et.weightage
+                total_weight += et.weightage
+                last_scheme_id = et.grading_scheme_id
+            raw_score = round(weighted_sum / total_weight, 2) if total_weight else None
+            band = None
+            if raw_score is not None and last_scheme_id is not None:
+                scheme = await _scheme(last_scheme_id)
+                if scheme is not None:
+                    band = _band_for_score(scheme.bands, raw_score)
+            if raw_score is not None:
+                scored.append(raw_score)
+            cells.append(MatrixCourseCell(course_id=course.id, raw_score=raw_score, band=band, marks=cell_marks))
+        student_rows.append(
+            MatrixStudentRow(
+                student_id=student.id,
+                name=student.name,
+                admission_number=student.admission_number,
+                courses=cells,
+                overall_score=round(sum(scored) / len(scored), 2) if scored else None,
+            )
+        )
+
+    return SectionResultMatrix(
+        class_id=section.class_id,
+        class_name=academic_class.name if academic_class else "",
+        section_id=section.id,
+        section_name=section.name,
+        courses=matrix_courses,
+        students=student_rows,
+    )
+
+
+async def _matrix_sections(
+    session: AsyncSession,
+    current_user: User,
+    madrasa: Madrasa,
+    section_id: UUID | None,
+    class_id: UUID | None,
+) -> tuple[UUID, list[Section]]:
+    if section_id is None and class_id is None:
+        raise HTTPException(status_code=400, detail="Pass section_id or class_id")
+    active_session_id = await _active_session_id(session, madrasa.id)
+    if active_session_id is None:
+        raise HTTPException(status_code=404, detail="No active academic session")
+
+    if section_id is not None:
+        section = await session.get(Section, section_id)
+        if section is None or section.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Section not found")
+        sections = [section]
+    else:
+        sections = (
+            await session.execute(
+                select(Section).where(Section.class_id == class_id, Section.madrasa_id == madrasa.id).order_by(Section.name)
+            )
+        ).scalars().all()
+        if not sections:
+            raise HTTPException(status_code=404, detail="Class has no sections")
+
+    # Authorization: principal (implicit) or global marks permission; a
+    # teacher may view sections they teach in (timetable ∪ legacy).
+    if current_user.role != UserRole.principal and not await user_has_permission(
+        current_user, "assessments.marks.enter", session
+    ):
+        teacher = await _teacher_profile(session, current_user)
+        if teacher is None:
+            raise HTTPException(status_code=403, detail="Not allowed to view these results")
+        for section in sections:
+            if not await teacher_teaches(
+                session,
+                madrasa_id=madrasa.id,
+                teacher_id=teacher.id,
+                session_id=active_session_id,
+                class_id=section.class_id,
+                section_id=section.id,
+            ):
+                raise HTTPException(status_code=403, detail="Not allowed to view these results")
+
+    return active_session_id, sections
+
+
+@router.get("/results/matrix", response_model=ResultsMatrixResponse)
+async def get_results_matrix(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    section_id: UUID | None = None,
+    class_id: UUID | None = None,
+) -> ResultsMatrixResponse:
+    active_session_id, sections = await _matrix_sections(session, current_user, madrasa, section_id, class_id)
+    return ResultsMatrixResponse(
+        session_id=active_session_id,
+        sections=[await _section_matrix(session, madrasa.id, s, active_session_id) for s in sections],
+    )
+
+
+@router.get("/results/export")
+async def export_results(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    section_id: UUID | None = None,
+    class_id: UUID | None = None,
+    format: str = "csv",  # csv | pdf
+) -> Response:
+    """Report-style export: one block per section, each ending with the
+    course → teacher summary the report footer requires (IMPLEMENT.md §5)."""
+    import csv
+    import io
+
+    from app.core.pdf import render_table_pdf
+
+    active_session_id, sections = await _matrix_sections(session, current_user, madrasa, section_id, class_id)
+    matrices = [await _section_matrix(session, madrasa.id, s, active_session_id) for s in sections]
+
+    if format == "pdf":
+        # One PDF per export; sections stacked as header rows inside the table.
+        headers = ["Student", "Adm #"]
+        first = matrices[0]
+        headers += [c.course_name for c in first.courses] + ["Overall"]
+        rows: list[list[str]] = []
+        for matrix in matrices:
+            rows.append([f"— {matrix.class_name} / {matrix.section_name} —"] + [""] * (len(headers) - 1))
+            for student in matrix.students:
+                rows.append(
+                    [student.name, student.admission_number]
+                    + [f"{c.raw_score} ({c.band})" if c.raw_score is not None else "—" for c in student.courses]
+                    + [str(student.overall_score) if student.overall_score is not None else "—"]
+                )
+            rows.append(["Course teachers:"] + [""] * (len(headers) - 1))
+            for course in matrix.courses:
+                rows.append([course.course_name, course.teacher_name or "—"] + [""] * (len(headers) - 2))
+        pdf_bytes = render_table_pdf(
+            "Results", f"{madrasa.name} — session results", headers, rows
+        )
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="results.pdf"'},
+        )
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    for matrix in matrices:
+        writer.writerow([f"{matrix.class_name} / {matrix.section_name}"])
+        writer.writerow(
+            ["Student", "Admission #"] + [c.course_name for c in matrix.courses] + ["Overall"]
+        )
+        for student in matrix.students:
+            writer.writerow(
+                [student.name, student.admission_number]
+                + [c.raw_score if c.raw_score is not None else "" for c in student.courses]
+                + [student.overall_score if student.overall_score is not None else ""]
+            )
+        writer.writerow([])
+        writer.writerow(["Course", "Teacher"])
+        for course in matrix.courses:
+            writer.writerow([course.course_name, course.teacher_name or ""])
+        writer.writerow([])
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="results.csv"'},
     )

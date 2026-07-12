@@ -7,7 +7,11 @@ from pydantic import BaseModel, ConfigDict, Field
 class AssignmentCreate(BaseModel):
     class_id: UUID
     course_id: UUID
+    # Empty = whole class; one or more ids = one assignment row per section
+    # (multi-section publish shares a batch_id, IMPLEMENT.md §5).
+    section_ids: list[UUID] = []
     title: str
+    category: str | None = Field(default=None, max_length=60)
     instructions: str
     attachment_key: str | None = None
     due_date: datetime
@@ -16,24 +20,35 @@ class AssignmentCreate(BaseModel):
 
 class AssignmentUpdate(BaseModel):
     title: str | None = None
+    category: str | None = None
     instructions: str | None = None
     attachment_key: str | None = None
     due_date: datetime | None = None
     target_student_ids: list[UUID] | None = None
+    # Apply the edit to every row sharing this assignment's batch_id.
+    apply_to_batch: bool = False
 
 
 class AssignmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     class_id: UUID
+    section_id: UUID | None = None
     course_id: UUID
     title: str
+    category: str | None = None
     instructions: str
     attachment_key: str | None
     due_date: datetime
     target_student_ids: list | None
     created_by_id: UUID | None
+    batch_id: UUID | None = None
     created_at: datetime
+    # Display names (never show raw ids in the UI).
+    class_name: str | None = None
+    section_name: str | None = None
+    course_name: str | None = None
+    teacher_name: str | None = None
 
 
 class SubmissionCreate(BaseModel):
@@ -119,6 +134,55 @@ class SessionResult(BaseModel):
     course_results: list[CourseResult]
     overall_score: float | None
     published: bool
+
+
+# ------------------------------------------------- Results matrix (§5)
+
+class MatrixExamType(BaseModel):
+    id: UUID
+    name: str
+    weightage: float
+
+
+class MatrixCourse(BaseModel):
+    course_id: UUID
+    course_name: str
+    teacher_name: str | None = None
+    exam_types: list[MatrixExamType] = []
+
+
+class MatrixMark(BaseModel):
+    exam_type_id: UUID
+    score: float | None = None
+
+
+class MatrixCourseCell(BaseModel):
+    course_id: UUID
+    raw_score: float | None = None
+    band: str | None = None
+    marks: list[MatrixMark] = []
+
+
+class MatrixStudentRow(BaseModel):
+    student_id: UUID
+    name: str
+    admission_number: str
+    courses: list[MatrixCourseCell] = []
+    overall_score: float | None = None
+
+
+class SectionResultMatrix(BaseModel):
+    class_id: UUID
+    class_name: str
+    section_id: UUID
+    section_name: str
+    courses: list[MatrixCourse] = []
+    students: list[MatrixStudentRow] = []
+
+
+class ResultsMatrixResponse(BaseModel):
+    session_id: UUID
+    sections: list[SectionResultMatrix] = []
 
 
 class PublishRequest(BaseModel):

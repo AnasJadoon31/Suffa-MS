@@ -119,19 +119,24 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       add class-level default + guardian-login provisioning).
 
 ### B8. Assessments
-- [ ] **[P2]** (a–c) Categories, sorting, edit/delete for assessments.
-- [ ] **[P1]** (d–e) Redesign Grading course-wise, with filters, categories, tabs.
-- [ ] **[P2]** (f–h) Results redesign: section-wise and class-wise spreadsheet view
-      with column show/hide, report-style export (PDF/XLSX), per-section footer
-      summary listing course → teacher. See IMPLEMENT.md §5.
+- [x] **[P2]** (a–c) Categories, sorting, edit/delete — backend done
+      (`category`, `sort=`, `DELETE ?whole_batch=`); UI pending.
+- [ ] **[P1]** (d–e) Redesign Grading course-wise, with filters, categories,
+      tabs — **frontend** (`AssessmentsView.tsx`); backend matrix ready.
+- [x] **[P2]** (f–h) Results backend done: `/assessments/results/matrix`
+      (section & class, exam breakdown, teacher per course) +
+      `/assessments/results/export` (CSV/PDF with course→teacher footer).
+      Remaining: on-screen spreadsheet UI with column show/hide.
 - [x] **[P2]** (i) Teacher assigned in timetable automatically gets assessments +
       attendance roster access (derived scope — done, tested). Remaining:
       admin view of all teachers' assessments organized/sorted.
 - [ ] **[P2]** (j) Admin (and delegates) can publish an assignment to all classes.
-- [ ] **[P2]** Teacher teaching same course in multiple sections can publish one
-      assignment to several sections at once (teacher portal).
-- [ ] **[P2]** Teachers create assignments for own sections; admin can override
-      and assign to sections / course-enrolled students / whole classes.
+- [x] **[P2]** Teacher teaching same course in multiple sections can publish one
+      assignment to several sections at once (`section_ids[]` + `batch_id`,
+      batch-wide edit/delete) — backend done; teacher-portal UI pending.
+- [x] **[P2]** Teachers create assignments for own sections (slot-derived
+      scope); admin overrides via `assignments.create_any`/`manage_all` —
+      backend done.
 
 ### B9. Resources
 - [x] **[P2]** Audience model for resources/forms/announcements (§6 resolver:
