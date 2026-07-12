@@ -3,6 +3,38 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-12 — Frontend phase 1 (assessments + settings + filter UIs)
+
+- **AssessmentsView rebuilt** (B8 d–e):
+  - *Assignments*: filter bar (class/section/course/category/sort), create
+    form with per-section multi-publish checkboxes + category, edit modal with
+    "apply to every section copy", delete with whole-batch confirm, list shows
+    names (class/section/course/teacher) — no UUIDs.
+  - *Grading*: course-wise — pick class → section tabs → course dropdown;
+    spreadsheet of students × exam types with inline mark cells (save on
+    blur/Enter), computed score + band columns; scheme/exam-type setup folded
+    behind a "Grading setup" toggle.
+  - *Results*: class picker → per-section sheets with course column show/hide,
+    publish-section button, per-student result-card/WhatsApp actions, CSV/PDF
+    export, and the course→teacher footer.
+- **SettingsView rebuilt** (§7): categorized typed controls from
+  `/operations/settings/catalog` (bool → yes/no select, int → number), save on
+  blur with tick feedback. Key/value editor gone.
+- **HolidaysView**: category + per-class scoping (checkbox picker) on
+  create/edit, filter bar (category/class/date range), "applies to" column.
+- **LeaveView**: All/Teachers/Students tabs, status + class + date-range
+  server filters (kept client search); manage gate fixed to `leave.manage`.
+- **AnnouncementsView**: All/Teachers/Students tabs, server search + date
+  filters.
+- **Nav**: student no longer sees Admissions/Blog (role gating on nav items,
+  on top of feature + permission gating).
+- **Global**: checkbox/radio normalised to 1rem (the "huge checkboxes" bug);
+  new `filterBar`/`sheet`/`settingsRow` styles; ~60 new i18n strings in en+ur.
+
+Frontend still pending: TimetableView (grid-first + import UI), PeopleView
+reorganisation, super-admin screen, delegation modal, dashboards redesign,
+full i18n sweep of untouched views, PWA/mobile.
+
 ## 2026-07-12 — Backend completion sweep (pre-frontend)
 
 Migrations `e5a1c7d9b304`, `f1b6d8e3a742`, `a2c4e6b8d150`. 82 tests green

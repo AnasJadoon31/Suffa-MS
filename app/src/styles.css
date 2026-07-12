@@ -1687,3 +1687,126 @@ html[dir="rtl"] .navGroupLabel {
   color: #7a5b12;
   font-size: 0.9rem;
 }
+
+/* ---------------------------------------------- Assessments redesign (§5) */
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.filterBar select,
+.filterBar input {
+  min-width: 140px;
+}
+
+.sectionPicker {
+  grid-column: 1 / -1;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.checkboxLabel input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent, #2563eb);
+}
+
+.sheetWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.sheet {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.sheet th,
+.sheet td {
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  border-inline-end: 1px solid var(--border, #eef2f7);
+  padding: 6px 10px;
+  text-align: start;
+  white-space: nowrap;
+}
+
+.sheet thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2, #f8fafc);
+  z-index: 1;
+}
+
+.sheet tbody tr:nth-child(even) {
+  background: var(--surface-2, #fafbfd);
+}
+
+.markInput {
+  width: 64px !important;
+  min-height: 30px !important;
+  padding: 2px 6px !important;
+  text-align: center;
+}
+
+.teacherSummary {
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+.teacherSummary ul {
+  margin: 4px 0 0;
+  padding-inline-start: 18px;
+}
+
+/* Global checkbox normalisation — fixes the oversized checkboxes complaint. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ------------------------------------------------------- Settings page (§7) */
+
+.settingsCategory {
+  margin: 0 0 12px;
+  text-transform: capitalize;
+}
+
+.settingsList {
+  display: grid;
+  gap: 10px;
+}
+
+.settingsRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) minmax(200px, 360px) 24px;
+  align-items: center;
+  gap: 12px;
+}
+
+.settingsLabel {
+  font-size: 0.92rem;
+}
+
+.savedTick {
+  color: var(--emerald, #059669);
+}

@@ -29,11 +29,22 @@ export function AnnouncementsView() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", body: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
   const [editError, setEditError] = useState("");
+  const [tab, setTab] = useState<"all" | "teachers" | "students">("all");
+  const [search, setSearch] = useState("");
+  const [dates, setDates] = useState({ date_from: "", date_to: "" });
 
-  const load = async () => setAnnouncements(await operationsApi.listAnnouncements());
+  const load = async () => {
+    const params: Parameters<typeof operationsApi.listAnnouncements>[0] = {};
+    if (canPost && tab !== "all") params.audience = tab;
+    if (search) params.q = search;
+    if (dates.date_from) params.date_from = dates.date_from;
+    if (dates.date_to) params.date_to = dates.date_to;
+    setAnnouncements(await operationsApi.listAnnouncements(params));
+  };
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, search, dates]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +144,19 @@ export function AnnouncementsView() {
         </form>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+
+      <div className="filterBar">
+        {canPost && (
+          <>
+            <button className={tab === "all" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("all")}>All</button>
+            <button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teachers")}>Teachers</button>
+            <button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("students")}>Students</button>
+          </>
+        )}
+        <Input placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input type="date" value={dates.date_from} onChange={(e) => setDates({ ...dates, date_from: e.target.value })} />
+        <Input type="date" value={dates.date_to} onChange={(e) => setDates({ ...dates, date_to: e.target.value })} />
+      </div>
 
       <div className="roster">
         {announcements.length === 0 && <p className="emptyState">No announcements yet.</p>}

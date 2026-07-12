@@ -40,7 +40,8 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
           const visible = group.items.filter(
             (item) =>
               (!item.permission || hasPermission(item.permission)) &&
-              (!item.feature || hasFeature(item.feature))
+              (!item.feature || hasFeature(item.feature)) &&
+              (!item.roles || (user && item.roles.includes(user.role)))
           );
           if (visible.length === 0) return null;
           return (

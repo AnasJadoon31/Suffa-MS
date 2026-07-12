@@ -49,6 +49,8 @@ export type NavItem = Readonly<{
   permission?: string;
   /** Per-madrasa feature flag key (super-admin controlled); unset = always on. */
   feature?: string;
+  /** Roles allowed to see this item; unset = every role. */
+  roles?: readonly string[];
 }>;
 
 export type NavGroup = Readonly<{
@@ -84,7 +86,7 @@ export const navGroups: readonly NavGroup[] = [
     labelKey: "groupPeople",
     items: [
       { id: "people", labelKey: "people", descKey: "descPeople", icon: UsersRound, permission: "students.view" },
-      { id: "admissions", labelKey: "admissions", descKey: "descAdmissions", icon: ClipboardCheck, feature: "admissions" }
+      { id: "admissions", labelKey: "admissions", descKey: "descAdmissions", icon: ClipboardCheck, feature: "admissions", roles: ["principal", "teacher"] }
     ]
   },
   {
@@ -98,7 +100,7 @@ export const navGroups: readonly NavGroup[] = [
   {
     labelKey: "groupSite",
     items: [
-      { id: "blog", labelKey: "blog", descKey: "descBlog", icon: Newspaper, feature: "blog" },
+      { id: "blog", labelKey: "blog", descKey: "descBlog", icon: Newspaper, feature: "blog", roles: ["principal", "teacher"] },
       { id: "settings", labelKey: "settings", descKey: "descSettings", icon: Settings, permission: "academics.manage" }
     ]
   }

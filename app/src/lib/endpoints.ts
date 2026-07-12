@@ -232,10 +232,28 @@ export const attendanceApi = {
 // --------------------------------------------------------------- Assessments
 
 export interface Assignment {
-  id: string; class_id: string; course_id: string; title: string; instructions: string;
+  id: string; class_id: string; section_id: string | null; course_id: string; title: string;
+  category: string | null; instructions: string;
   attachment_key: string | null; due_date: string; target_student_ids: string[] | null;
-  created_by_id: string; created_at: string;
+  created_by_id: string | null; batch_id: string | null; created_at: string;
+  class_name: string | null; section_name: string | null; course_name: string | null; teacher_name: string | null;
 }
+
+// ---------------------------------------------------- Results matrix (§5)
+export interface MatrixExamType { id: string; name: string; weightage: number }
+export interface MatrixCourse {
+  course_id: string; course_name: string; teacher_name: string | null; exam_types: MatrixExamType[];
+}
+export interface MatrixMark { exam_type_id: string; score: number | null }
+export interface MatrixCourseCell { course_id: string; raw_score: number | null; band: string | null; marks: MatrixMark[] }
+export interface MatrixStudentRow {
+  student_id: string; name: string; admission_number: string; courses: MatrixCourseCell[]; overall_score: number | null;
+}
+export interface SectionResultMatrix {
+  class_id: string; class_name: string; section_id: string; section_name: string;
+  courses: MatrixCourse[]; students: MatrixStudentRow[];
+}
+export interface ResultsMatrixResponse { session_id: string; sections: SectionResultMatrix[] }
 export interface Submission {
   id: string; assignment_id: string; student_id: string; submitted_at: string; file_key: string;
   mark: number | null; feedback: string | null; is_late: boolean;
@@ -248,11 +266,23 @@ export interface SessionResult {
 }
 
 export const assessmentsApi = {
-  listAssignments: (params?: { class_id?: string; course_id?: string }) =>
+  listAssignments: (params?: {
+    class_id?: string; section_id?: string; course_id?: string; category?: string; created_by_id?: string; sort?: string;
+  }) =>
     api.get<Assignment[]>("/api/v1/assessments/assignments", { params }).then((r) => r.data),
   createAssignment: (payload: {
-    class_id: string; course_id: string; title: string; instructions: string; due_date: string; attachment_key?: string;
-  }) => api.post<Assignment>("/api/v1/assessments/assignments", payload).then((r) => r.data),
+    class_id: string; course_id: string; section_ids?: string[]; title: string; category?: string;
+    instructions: string; due_date: string; attachment_key?: string;
+  }) => api.post<Assignment[]>("/api/v1/assessments/assignments", payload).then((r) => r.data),
+  updateAssignment: (id: string, payload: {
+    title?: string; category?: string; instructions?: string; due_date?: string; apply_to_batch?: boolean;
+  }) => api.put<Assignment>(`/api/v1/assessments/assignments/${id}`, payload).then((r) => r.data),
+  deleteAssignment: (id: string, wholeBatch = false) =>
+    api.delete(`/api/v1/assessments/assignments/${id}`, { params: { whole_batch: wholeBatch } }).then((r) => r.data),
+  resultsMatrix: (params: { section_id?: string; class_id?: string }) =>
+    api.get<ResultsMatrixResponse>("/api/v1/assessments/results/matrix", { params }).then((r) => r.data),
+  exportResults: (params: { section_id?: string; class_id?: string }, format: "csv" | "pdf") =>
+    downloadReport("/api/v1/assessments/results/export", params as Record<string, string>, format),
   listSubmissions: (assignmentId: string) =>
     api.get<Submission[]>(`/api/v1/assessments/assignments/${assignmentId}/submissions`).then((r) => r.data),
   submitAssignment: (assignmentId: string, fileKey: string) =>
@@ -348,7 +378,10 @@ export interface TimetableSlot {
   id: string; class_id: string; section_id: string; course_id: string; teacher_id: string;
   day_of_week: number; period: number; start_time: string; end_time: string;
 }
-export interface Holiday { id: string; name: string; start_date: string; end_date: string }
+export interface Holiday {
+  id: string; name: string; category: string | null; start_date: string; end_date: string;
+  class_ids: string[] | null;
+}
 export interface Leave {
   id: string; user_id: string; person_name: string | null; person_type: string | null;
   start_date: string; end_date: string; reason: string | null; status: string;
@@ -371,6 +404,8 @@ export interface Announcement {
   publish_at: string | null; expires_at: string | null; created_at: string;
 }
 
+export interface TypedSetting { key: string; category: string; type: string; label: string; value: string }
+
 export const operationsApi = {
   listTimetable: (params?: { class_id?: string; section_id?: string; teacher_id?: string }) =>
     api.get<TimetableSlot[]>("/api/v1/operations/timetable", { params }).then((r) => r.data),
@@ -380,15 +415,19 @@ export const operationsApi = {
   }) => api.post<TimetableSlot>("/api/v1/operations/timetable", payload).then((r) => r.data),
   deleteTimetableSlot: (id: string) => api.delete(`/api/v1/operations/timetable/${id}`).then((r) => r.data),
 
-  listHolidays: () => api.get<Holiday[]>("/api/v1/operations/holidays").then((r) => r.data),
-  createHoliday: (payload: { name: string; start_date: string; end_date: string }) =>
+  listHolidays: (params?: { category?: string; class_id?: string; date_from?: string; date_to?: string }) =>
+    api.get<Holiday[]>("/api/v1/operations/holidays", { params }).then((r) => r.data),
+  createHoliday: (payload: { name: string; category?: string; start_date: string; end_date: string; class_ids?: string[] }) =>
     api.post<Holiday>("/api/v1/operations/holidays", payload).then((r) => r.data),
-  updateHoliday: (id: string, payload: { name: string; start_date: string; end_date: string }) =>
+  updateHoliday: (id: string, payload: { name: string; category?: string; start_date: string; end_date: string; class_ids?: string[] }) =>
     api.put<Holiday>(`/api/v1/operations/holidays/${id}`, payload).then((r) => r.data),
   deleteHoliday: (id: string) => api.delete(`/api/v1/operations/holidays/${id}`).then((r) => r.data),
 
-  listLeave: (userId?: string) =>
-    api.get<Leave[]>("/api/v1/operations/leave", { params: { user_id: userId } }).then((r) => r.data),
+  listLeave: (params?: {
+    user_id?: string; person_type?: "teacher" | "student"; status?: string;
+    class_id?: string; date_from?: string; date_to?: string; q?: string;
+  }) =>
+    api.get<Leave[]>("/api/v1/operations/leave", { params }).then((r) => r.data),
   createLeave: (payload: { user_id?: string; start_date: string; end_date: string; reason?: string }) =>
     api.post<Leave>("/api/v1/operations/leave", payload).then((r) => r.data),
   setLeaveStatus: (id: string, status: string) =>
@@ -414,7 +453,8 @@ export const operationsApi = {
   listFormResponses: (formId: string) =>
     api.get<FormResponse[]>(`/api/v1/operations/forms/${formId}/responses`).then((r) => r.data),
 
-  listAnnouncements: () => api.get<Announcement[]>("/api/v1/operations/announcements").then((r) => r.data),
+  listAnnouncements: (params?: { audience?: "teachers" | "students" | "all"; q?: string; date_from?: string; date_to?: string }) =>
+    api.get<Announcement[]>("/api/v1/operations/announcements", { params }).then((r) => r.data),
   createAnnouncement: (payload: {
     title: string; body: string; attachment_link?: string; audience_scope?: Scope; publish_at?: string; expires_at?: string;
   }) => api.post<Announcement>("/api/v1/operations/announcements", payload).then((r) => r.data),
@@ -441,6 +481,7 @@ export const operationsApi = {
     api.post<ContactEnquiry>(`/api/v1/operations/enquiries/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
 
   listSettings: () => api.get<MadrasaSetting[]>("/api/v1/operations/settings").then((r) => r.data),
+  settingsCatalog: () => api.get<TypedSetting[]>("/api/v1/operations/settings/catalog").then((r) => r.data),
   upsertSetting: (key: string, value: string) =>
     api.put<MadrasaSetting>("/api/v1/operations/settings", { key, value }).then((r) => r.data),
 };
