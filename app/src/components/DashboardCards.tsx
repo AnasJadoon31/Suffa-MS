@@ -21,6 +21,7 @@ import {
 import { cachedFetch } from "../lib/offlineCache";
 import { setPendingClassNav } from "../lib/pendingNav";
 import { Input } from "./ui/Field";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 
 export type DashboardCardsProps = Readonly<{ onNavigate?: (view: ViewId) => void }>;
@@ -57,6 +58,7 @@ function QuickLinks({ onNavigate }: Readonly<{ onNavigate?: (view: ViewId) => vo
 
 export function DashboardCards({ onNavigate }: DashboardCardsProps) {
   const { t } = useTranslation();
+  const readOnly = useSessionReadOnly();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -77,9 +79,9 @@ export function DashboardCards({ onNavigate }: DashboardCardsProps) {
     <>
       <QuickLinks onNavigate={onNavigate} />
       {data.role === "teacher" ? (
-        <TeacherDashboardCards data={data} onNavigate={onNavigate} />
+        <TeacherDashboardCards data={data} onNavigate={onNavigate} readOnly={readOnly} />
       ) : data.role === "student" ? (
-        <StudentDashboardCards data={data} />
+        <StudentDashboardCards data={data} readOnly={readOnly} />
       ) : (
         <PrincipalDashboardCards data={data} />
       )}
@@ -154,7 +156,7 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
   );
 }
 
-function TeacherDashboardCards({ data, onNavigate }: Readonly<{ data: TeacherDashboard; onNavigate?: (view: ViewId) => void }>) {
+function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: TeacherDashboard; onNavigate?: (view: ViewId) => void; readOnly: boolean }>) {
   const { t } = useTranslation();
   const [attendance, setAttendance] = useState(data.today_attendance);
   const [logs, setLogs] = useState<TeacherAttendanceLogEntry[]>([]);
@@ -249,10 +251,10 @@ function TeacherDashboardCards({ data, onNavigate }: Readonly<{ data: TeacherDas
       <section className="modulePanel">
         <div className="moduleHeader"><h2>Time in / time out</h2></div>
         <div className="formActions">
-          <button className="primaryAction" type="button" disabled={!!attendance?.check_in} onClick={() => void checkIn()}>
+          <button className="primaryAction" type="button" disabled={readOnly || !!attendance?.check_in} onClick={() => void checkIn()}>
             <LogIn size={16} /> Time in
           </button>
-          <button className="secondaryAction" type="button" disabled={!attendance?.check_in || !!attendance?.check_out} onClick={() => void checkOut()}>
+          <button className="secondaryAction" type="button" disabled={readOnly || !attendance?.check_in || !!attendance?.check_out} onClick={() => void checkOut()}>
             <LogOut size={16} /> Time out
           </button>
         </div>
@@ -286,7 +288,7 @@ function TeacherDashboardCards({ data, onNavigate }: Readonly<{ data: TeacherDas
   );
 }
 
-function DueAssignmentRow({ assignment, onSubmitted }: Readonly<{ assignment: StudentDashboard["due_assignments"][number]; onSubmitted: () => void }>) {
+function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assignment: StudentDashboard["due_assignments"][number]; onSubmitted: () => void; readOnly: boolean }>) {
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
@@ -315,8 +317,8 @@ function DueAssignmentRow({ assignment, onSubmitted }: Readonly<{ assignment: St
         <span> — {t("submittedLabel")}</span>
       ) : (
         <>
-          <Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <button className="tableAction" type="button" disabled={!file} onClick={() => void submit()}>
+          <Input type="file" disabled={readOnly} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <button className="tableAction" type="button" disabled={readOnly || !file} onClick={() => void submit()}>
             {t("submitBtn")}
           </button>
         </>
@@ -326,7 +328,7 @@ function DueAssignmentRow({ assignment, onSubmitted }: Readonly<{ assignment: St
   );
 }
 
-function StudentDashboardCards({ data }: Readonly<{ data: StudentDashboard }>) {
+function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashboard; readOnly: boolean }>) {
   const { t } = useTranslation();
   const [month, setMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(toDateKey(new Date()));
@@ -396,7 +398,7 @@ function StudentDashboardCards({ data }: Readonly<{ data: StudentDashboard }>) {
             {data.due_assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
             <ul>
               {data.due_assignments.map((a) => (
-                <DueAssignmentRow key={a.id} assignment={a} onSubmitted={() => { /* refreshes next load */ }} />
+                <DueAssignmentRow key={a.id} assignment={a} readOnly={readOnly} onSubmitted={() => { /* refreshes next load */ }} />
               ))}
             </ul>
           </section>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { BookOpen, ClipboardList, FileDown, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -18,21 +18,26 @@ import {
   type SectionResultMatrix,
   type Student,
   type Submission,
+  type Teacher,
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { consumePendingClassNav } from "../lib/pendingNav";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 type Tab = "assignments" | "grading" | "results";
 
 export function AssessmentsView() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
+  const readOnly = useSessionReadOnly();
   const [tab, setTab] = useState<Tab>("assignments");
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -50,6 +55,13 @@ export function AssessmentsView() {
           setStudents(await peopleApi.listStudents());
         } catch {
           setStudents([]); // teachers without students.view still get the rest
+        }
+        if (hasPermission("assignments.manage_all")) {
+          try {
+            setTeachers(await peopleApi.listTeachers());
+          } catch {
+            setTeachers([]);
+          }
         }
       } catch (err: any) {
         setLoadError(err.response?.data?.detail ?? t("failedLoadAssessments"));
@@ -84,18 +96,19 @@ export function AssessmentsView() {
           classes={classes}
           courses={courses}
           students={students}
-          canCreate={hasPermission("assignments.create")}
+          teachers={teachers}
+          canCreate={!readOnly && hasPermission("assignments.create")}
           canPublishAll={hasPermission("assignments.manage_all")}
         />
       )}
       {!isLoading && !loadError && tab === "grading" && (
-        <GradingTab classes={classes} courses={courses} canManage={hasPermission("assessments.exam_types.manage")} />
+        <GradingTab classes={classes} courses={courses} canManage={!readOnly && hasPermission("assessments.exam_types.manage")} />
       )}
       {!isLoading && !loadError && tab === "results" && (
         <ResultsTab
           classes={classes}
-          canPublish={hasPermission("assessments.results.publish")}
-          canMessage={hasPermission("messaging.send")}
+          canPublish={!readOnly && hasPermission("assessments.results.publish")}
+          canMessage={!readOnly && hasPermission("messaging.send")}
         />
       )}
     </section>
@@ -108,9 +121,10 @@ function AssignmentsTab({
   classes,
   courses,
   students,
+  teachers,
   canCreate,
   canPublishAll,
-}: Readonly<{ classes: AcademicClass[]; courses: Course[]; students: Student[]; canCreate: boolean; canPublishAll: boolean }>) {
+}: Readonly<{ classes: AcademicClass[]; courses: Course[]; students: Student[]; teachers: Teacher[]; canCreate: boolean; canPublishAll: boolean }>) {
   const { t } = useTranslation();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filters, setFilters] = useState(() => {
@@ -121,6 +135,7 @@ function AssignmentsTab({
       section_id: pending?.sectionId ?? "",
       course_id: pending?.courseId ?? "",
       category: "",
+      created_by_id: "",
       sort: "due_date",
     };
   });
@@ -130,19 +145,29 @@ function AssignmentsTab({
   const [selected, setSelected] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [error, setError] = useState("");
+  const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
+  const [total, setTotal] = useState(0);
+  const updateFilters = (next: typeof filters) => {
+    setFilters(next);
+    setPagination((current) => current.page === 0 ? current : { ...current, page: 0 });
+  };
 
   const load = async () => {
-    const params: Record<string, string> = { sort: filters.sort };
+    const params: Parameters<typeof assessmentsApi.listAssignmentsPage>[0] = { sort: filters.sort, ...pageParams(pagination) };
     if (filters.class_id) params.class_id = filters.class_id;
     if (filters.section_id) params.section_id = filters.section_id;
     if (filters.course_id) params.course_id = filters.course_id;
     if (filters.category) params.category = filters.category;
-    setAssignments(await assessmentsApi.listAssignments(params));
+    if (filters.created_by_id) params.created_by_id = filters.created_by_id;
+    const result = await assessmentsApi.listAssignmentsPage(params);
+    if (recoverEmptyPage(result, pagination, setPagination)) return;
+    setAssignments(result.items);
+    setTotal(result.total);
   };
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [filters, pagination]);
 
   useEffect(() => {
     if (!filters.class_id) {
@@ -165,26 +190,33 @@ function AssignmentsTab({
   return (
     <>
       <div className="filterBar">
-        <Select value={filters.class_id} onChange={(e) => setFilters({ ...filters, class_id: e.target.value, section_id: "" })}>
+        <Select value={filters.class_id} onChange={(e) => updateFilters({ ...filters, class_id: e.target.value, section_id: "" })}>
           <option value="">{t("allClasses")}</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
-        <Select value={filters.section_id} onChange={(e) => setFilters({ ...filters, section_id: e.target.value })} disabled={!filters.class_id}>
+        <Select value={filters.section_id} onChange={(e) => updateFilters({ ...filters, section_id: e.target.value })} disabled={!filters.class_id}>
           <option value="">{t("allSections")}</option>
           {filterSections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </Select>
-        <Select value={filters.course_id} onChange={(e) => setFilters({ ...filters, course_id: e.target.value })}>
+        <Select value={filters.course_id} onChange={(e) => updateFilters({ ...filters, course_id: e.target.value })}>
           <option value="">{t("allCourses")}</option>
           {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
-        <Select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
+        <Select value={filters.category} onChange={(e) => updateFilters({ ...filters, category: e.target.value })}>
           <option value="">{t("allCategories")}</option>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
         </Select>
-        <Select value={filters.sort} onChange={(e) => setFilters({ ...filters, sort: e.target.value })}>
+        {canPublishAll && (
+          <Select value={filters.created_by_id} onChange={(e) => updateFilters({ ...filters, created_by_id: e.target.value })}>
+            <option value="">{t("allTeachers")}</option>
+            {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
+          </Select>
+        )}
+        <Select value={filters.sort} onChange={(e) => updateFilters({ ...filters, sort: e.target.value })}>
           <option value="due_date">{t("sortByDueDate")}</option>
           <option value="created_at">{t("sortByNewest")}</option>
           <option value="title">{t("sortByTitle")}</option>
+          {canPublishAll && <option value="teacher">{t("sortByTeacher")}</option>}
         </Select>
         {canCreate && (
           <button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
@@ -217,8 +249,12 @@ function AssignmentsTab({
           <span></span>
         </div>
         {assignments.length === 0 && <p className="emptyState">{t("noAssignmentsYet")}</p>}
-        {assignments.map((a) => (
-          <div className="dataRow" key={a.id}>
+        {assignments.map((a, index) => (
+          <Fragment key={a.id}>
+          {filters.sort === "teacher" && (index === 0 || assignments[index - 1].teacher_name !== a.teacher_name) && (
+            <div className="dataRow sectionRow"><strong>{a.teacher_name ?? t("unassignedLabel")}</strong></div>
+          )}
+          <div className="dataRow">
             <span>{a.title}</span>
             <span>{a.category ?? "—"}</span>
             <span>{a.class_name ?? "—"}{a.section_name ? ` / ${a.section_name}` : ""}</span>
@@ -265,8 +301,10 @@ function AssignmentsTab({
               )}
             </span>
           </div>
+          </Fragment>
         ))}
       </div>
+      <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {editing && (
         <AssignmentEditForm

@@ -17,13 +17,15 @@ import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 const emptyForm = { category_id: "", title: "", description: "", video_url: "" };
 
 export function ResourcesView() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
-  const canManage = hasPermission("resources.manage");
+  const readOnly = useSessionReadOnly();
+  const canManage = !readOnly && hasPermission("resources.manage");
   const canManageAll = hasPermission("resources.manage_all");
   const [categories, setCategories] = useState<ResourceCategory[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);

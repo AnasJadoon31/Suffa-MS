@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.core.security import hash_password, verify_password
 from app.modules.auth.models import User, UserRole
+from app.modules.finance.models import PaymentCategory
 from app.modules.operations.models import Holiday, Leave, TimetableSlot
 from app.modules.people.models import Guardian
 
@@ -331,6 +332,9 @@ async def test_rollover_copies_timetable_and_shifted_holidays(client, seed, db_s
                 start_date=date(2024, 6, 17), end_date=date(2024, 6, 19),
             )
         )
+        # Tenant-wide catalogue rows are deliberately evergreen: rollover
+        # must leave one shared row rather than creating a session copy.
+        db.add(PaymentCategory(madrasa_id=seed.madrasa.id, name="Tuition"))
         await db.commit()
 
     response = await client.post(
@@ -360,6 +364,9 @@ async def test_rollover_copies_timetable_and_shifted_holidays(client, seed, db_s
         assert len(holidays) == 2
         # 2024-04-01 → 2025-04-01 = 365 days; Eid copy lands one year later.
         assert holidays[1].start_date == date(2025, 6, 17)
+
+        categories = (await db.execute(select(PaymentCategory))).scalars().all()
+        assert [category.name for category in categories] == ["Tuition"]
 
 
 # ---------------------------------------------------------------- security

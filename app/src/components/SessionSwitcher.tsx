@@ -4,6 +4,11 @@ import { academicsApi, type AcademicSession } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Select } from "./ui/Field";
 
+export function useSessionReadOnly(): boolean {
+  const { user } = useAuth();
+  return Boolean(user?.selected_session_id);
+}
+
 export function SessionSwitcher() {
   const { t } = useTranslation();
   const { user, updateSelectedSession } = useAuth();

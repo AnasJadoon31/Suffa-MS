@@ -7,13 +7,15 @@ import { AudiencePicker } from "./AudiencePicker";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 const FIELD_TYPES = ["text", "textarea", "radio", "checkbox_group", "dropdown", "label"];
 
 export function FormsView() {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
-  const canCreate = hasPermission("forms.create");
+  const readOnly = useSessionReadOnly();
+  const canCreate = !readOnly && hasPermission("forms.create");
   const canManageAll = hasPermission("forms.manage_all");
   const canViewResponses = hasPermission("forms.responses.view");
   const [forms, setForms] = useState<FormDef[]>([]);
@@ -68,7 +70,7 @@ export function FormsView() {
     if (canViewResponses) setResponses(await operationsApi.listFormResponses(form.id));
   };
 
-  const canEditForm = (form: FormDef) => canManageAll || form.created_by_id === user?.id;
+  const canEditForm = (form: FormDef) => !readOnly && (canManageAll || form.created_by_id === user?.id);
 
   return (
     <section className="modulePanel">
@@ -231,6 +233,7 @@ export function FormsView() {
                 {f.label}
                 <Input
                   required={f.required}
+                  disabled={readOnly}
                   value={answers[f.key] ?? ""}
                   onChange={(e) => setAnswers({ ...answers, [f.key]: e.target.value })}
                   placeholder={f.options.length > 0 ? f.options.join(" / ") : undefined}
@@ -238,7 +241,7 @@ export function FormsView() {
               </label>
             ))}
             <div className="formActions">
-              <button className="primaryAction" type="submit"><Send size={16} /> {t("submitResponseBtn")}</button>
+              <button className="primaryAction" type="submit" disabled={readOnly}><Send size={16} /> {t("submitResponseBtn")}</button>
             </div>
           </form>
 

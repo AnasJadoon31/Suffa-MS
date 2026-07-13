@@ -7,6 +7,7 @@ import { useAuth } from "../lib/AuthContext";
 import { RichTextEditor } from "./RichTextEditor";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 
 function toScope(audience: string): Scope {
@@ -26,7 +27,8 @@ const audienceLabelKey: Record<string, string> = { all: "audienceEveryone", teac
 export function AnnouncementsView() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
-  const canPost = hasPermission("announcements.post");
+  const readOnly = useSessionReadOnly();
+  const canPost = !readOnly && hasPermission("announcements.post");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [form, setForm] = useState({ title: "", body: "", category: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
   const [error, setError] = useState("");

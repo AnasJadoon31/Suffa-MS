@@ -70,7 +70,7 @@ async def test_enroll_into_archived_session_is_rejected(client, seed, archived_s
     }
     response = await client.post("/api/v1/academics/students/enroll", json=payload)
     assert response.status_code == 403
-    assert "view-only" in response.json()["detail"]
+    assert response.json()["detail"] == "session_view_only"
 
 
 async def test_enroll_into_active_session_still_works(client, seed):
@@ -84,3 +84,20 @@ async def test_enroll_into_active_session_still_works(client, seed):
     response = await client.post("/api/v1/academics/students/enroll", json=payload)
     assert response.status_code == 200
     assert response.json()["status"] == "success"
+
+
+async def test_permission_protected_writes_are_blocked_in_archived_context(
+    client, seed, archived_session, db_sessionmaker
+):
+    """The shared permission dependency is the safety net for management
+    writes, including endpoints whose models are not directly session-keyed."""
+    async with db_sessionmaker() as db:
+        principal = await db.get(User, seed.principal.id)
+        principal.selected_session_id = archived_session.id
+        await db.commit()
+    response = await client.post(
+        "/api/v1/operations/holidays",
+        json={"name": "Archived edit", "start_date": "2023-08-01", "end_date": "2023-08-01"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "session_view_only"

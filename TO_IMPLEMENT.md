@@ -24,11 +24,11 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       quick-links grid, checkbox/touch sizing fixed.
 - [x] **[P3] Checkbox size.** Global CSS fix in `app/src/styles.css` — checkboxes
       normalized to 1rem everywhere (Forms view especially).
-- [x] **[P2] Personal settings (backend).** `PATCH /auth/me` +
-      `POST /auth/change-password` done. Remaining: settings page UI.
-- [x] **[P1] Super-admin tier (backend).** `super_admin` role, `madrasa_features`
-      flags, `/platform` onboarding + feature endpoints, router gating, nav
-      filtering. Remaining: super-admin UI (route tree in the SPA).
+- [x] **[P2] Personal settings.** `PATCH /auth/me`,
+      `POST /auth/change-password`, and the shared `ProfileView.tsx` UI done.
+- [x] **[P1] Super-admin tier.** `super_admin` role, `madrasa_features` flags,
+      `/platform` onboarding + feature endpoints, router gating, nav filtering,
+      and the SPA `PlatformView.tsx` console done.
 - [x] **[P1] OWASP pass.** Full sweep done: **critical fix** —
       `get_current_madrasa` trusted the client-supplied `X-Madrasa` header
       independently of the authenticated user, letting any principal spoof
@@ -54,10 +54,10 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
 - [x] **[P1] Per-role/per-login session selection.** Now a server-side per-user
       preference (`users.selected_session_id`) + in-memory header; shared
       localStorage key removed.
-- [x] **[P1] Non-active sessions read-only (core).** `require_active_session` /
-      `ensure_writable_session` guards + archived-session banner. Remaining:
-      apply the guard to every mutating route as screens are reworked, and
-      disable mutating controls per-view.
+- [x] **[P1] Non-active sessions read-only.** `require_active_session` /
+      `ensure_writable_session` guards plus a central authenticated-write guard;
+      the archived-session banner remains browseable while per-view mutation
+      controls are hidden/disabled and the session switcher remains available.
 
 ## B. Admin portal
 
@@ -68,43 +68,41 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       `hasPermission` nav/route gating.
 
 ### B2. Attendance
-- [x] **[P2]** Admin override of *teacher* attendance — backend already
-      supported (`/attendance/override` handles teacher subjects + check-in/
-      out). Remaining: admin screen control.
+- [x] **[P2]** Admin override of *teacher* attendance —
+      `/attendance/override` handles teacher subjects + check-in/out and the
+      attendance board exposes the override control with a required reason.
 
 ### B3. Timetable
 - [x] **[P3]** Weekly Grid tab first, List second. — verified already correct
       (stale checkbox): `TimetableView.tsx` defaults `viewMode` to `"grid"` and
       renders the Grid button before the List button.
 - [x] **[P2]** Bulk upload of slots — backend `POST /operations/timetable/import`
-      (dry-run, per-row errors, conflicts). Remaining: upload UI.
+      plus CSV paste/import UI (dry-run, per-row errors, conflicts).
 - [x] **[P2]** List sorting + filters: by class, course, teacher, day —
-      backend done (name-enriched, session-scoped); UI hookup pending.
+      name-enriched/session-scoped backend and UI controls done.
 - [x] **[P2]** Auto-derive periods + conflict detection (teacher/section
       overlap → 409) — backend done.
 - [x] **[P2]** Timetable is now the source of truth for teacher assignments
-      (backend: `core/teaching_scope.py`, wired into assessments, attendance,
-      dashboards). Remaining: UI grouping "who teaches what where" and
-      removing the Teacher Assignment tab (B7-j).
+      (`core/teaching_scope.py`, wired into assessments, attendance,
+      dashboards); `ByTeacherView` groups “who teaches what where”, and the
+      legacy Teacher Assignment tab is gone.
 
 ### B4. Holidays
-- [x] **[P3]** Filters (date range, category, class) — backend done; UI pending.
+- [x] **[P3]** Filters (date range, category, class) — backend and UI done.
 - [x] **[P2]** Categories — backend done.
-- [x] **[P2]** Class-scoped holidays — backend done incl. attendance summary
-      scope; UI pending.
+- [x] **[P2]** Class-scoped holidays — backend, attendance summary scope, and
+      create/edit/filter UI done.
 
 ### B5. Leave
-- [x] **[P3/P2]** Backend done: `person_type` tabs, status/class/date filters,
-      name search. Remaining: tabbed UI.
+- [x] **[P3/P2]** `person_type` tabs, status/class/date filters, name search,
+      and the complete tabbed UI done.
 
 ### B6. Announcements
 - [x] **[P2]** Categories — free-text `category` field (same pattern as
       Assignment.category), filter dropdown + datalist autocomplete in
       `AnnouncementsView.tsx`.
-- [x] **[P3]** Search — backend `q` param done; UI pending.
-- [x] **[P2]** Three audience tabs + date filtering — backend
-      (`audience=teachers|students|all`, `date_from`/`date_to`) done; UI
-      tabs pending.
+- [x] **[P3]** Search — backend `q` parameter and UI done.
+- [x] **[P2]** Three audience tabs + date filtering — backend and UI done.
 
 ### B7. Academics
 - [x] **[P3]** (b) Classes: sort, filters, clearer UI — `AcademicsView.tsx`
@@ -124,7 +122,7 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       layout from item (e) is now also shipped.
 - [x] **[P1]** (g) Session switching leaks across roles/logins — fixed via
       per-user server-side preference (see A).
-- [~] **[P2]** (h) Rollover per-module options: timetable + holidays (with
+- [x] **[P2]** (h) Rollover per-module options: timetable + holidays (with
       date shift) done. Investigated announcements/resources/forms/grading/fee:
       none of those models carry a `session_id` in this schema (Resource, Form,
       Announcement, GradingScheme, ExamType, PaymentCategory are all tenant-wide,
@@ -132,8 +130,8 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       TeacherAssignment which are genuinely per-session) so they already show up
       in every session automatically; there is nothing to "copy" without adding
       session-tagging to those tables first, which would be a larger schema
-      change than this backlog item implies. Left undone rather than shipping
-      wizard checkboxes that duplicate rows with no way to tell old from new.
+      change than this backlog item implies. This is now the explicit product
+      rule: evergreen rows remain shared and are not duplicated during rollover.
 - [x] **[P1]** (i) Only active session actionable, others view-only — core
       guards + banner in (see A); per-route adoption continues with screens.
 - [x] **[P2]** (j) Remove Teacher Assignment tab — no such tab exists;
@@ -159,8 +157,8 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       on-screen spreadsheet UI with column show/hide — all in
       `AssessmentsView.tsx`.
 - [x] **[P2]** (i) Teacher assigned in timetable automatically gets assessments +
-      attendance roster access (derived scope — done, tested). Remaining:
-      admin view of all teachers' assessments organized/sorted.
+      attendance roster access (derived scope — done, tested). Admins can
+      filter the organized assignment list by teacher and sort it server-side.
 - [x] **[P2]** (j) Admin (and delegates) can publish an assignment to all classes —
       `all_classes: bool` flag on `POST /assessments/assignments` (gated on
       `assignments.manage_all`), resolves every class the course is mapped to
@@ -171,7 +169,7 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       pickers. 3 new backend tests in `test_assessments_redesign.py`.
 - [x] **[P2]** Teacher teaching same course in multiple sections can publish one
       assignment to several sections at once (`section_ids[]` + `batch_id`,
-      batch-wide edit/delete) — backend done; teacher-portal UI pending.
+      batch-wide edit/delete) — backend and shared teacher-portal UI done.
 - [x] **[P2]** Teachers create assignments for own sections (slot-derived
       scope); admin overrides via `assignments.create_any`/`manage_all` —
       backend done.
@@ -226,14 +224,11 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       fee — done in `PeopleView.tsx` detail panels.
 
 ### B12. Admissions
-- [~] **[P2]** Split into two: "Students in Person" (manual add; lives with People
-      flow) and "Forms". — Implemented differently: single `AdmissionsView`
-      with 3 internal tabs (Registrations/Public forms/Enquiries) rather than
-      moving in-person admits into the People screen. Functionally covers the
-      same ground; revisit only if the People-screen placement specifically
-      matters to the workflow.
-- [x] **[P2]** Public admission forms per program — backend done (admin CRUD +
-      tokenized public form + submissions land as registrations). UI pending.
+- [x] **[P2]** Split admissions into the requested workflow: “Students in
+      person” opens the Admissions tab inside People, while “Public forms” is a
+      separate navigation destination (with contact enquiries below it).
+- [x] **[P2]** Public admission forms per program — admin CRUD, tokenized public
+      form, submissions-to-registrations flow, and management UI done.
 - [x] **[P2]** Contact form public-key endpoint — done
       (`POST /api/v1/public/contact/{public_key}`, honeypot + rate limit).
 
@@ -390,10 +385,11 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
 - [x] **[P2]** Pagination — `limit`/`offset` query params + `X-Total-Count`
       header added across all list endpoints (academics, assessments,
       attendance, finance, messaging, operations, people, platform); response
-      body shape unchanged. **Remaining:** frontend doesn't consume the new
-      params yet (still fetches unbounded) — low risk until a madrasa's
-      lists actually grow past a page, but worth wiring into the shared list
-      hooks when touching those views next.
+      body shape unchanged. Shared frontend page helpers and accessible controls
+      now consume those headers in the highest-growth management lists: teachers,
+      students, guardians, assignments, registrations, public admission forms,
+      and enquiries. Every remaining array-list client uses bounded automatic
+      page traversal, so no view silently loses records beyond the first page.
 - [x] **[P3]** Toast/confirm patterns for destructive actions (delete assessment,
       delete slot…). — audited every `api.delete*`/`*Api.delete*` call site
       (8 files). Genuine gaps fixed: `TimetableView.tsx` slot delete had *no*

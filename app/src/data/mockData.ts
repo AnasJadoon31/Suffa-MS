@@ -39,6 +39,7 @@ export type ViewId =
   | "salary"
   | "blog"
   | "admissions"
+  | "admission_forms"
   | "settings"
   | "profile"
   | "reports";
@@ -49,6 +50,7 @@ export type NavItem = Readonly<{
   descKey: string;
   icon: typeof ClipboardCheck;
   permission?: string;
+  permissionsAny?: readonly string[];
   /** Per-madrasa feature flag key (super-admin controlled); unset = always on. */
   feature?: string;
   /** Roles allowed to see this item; unset = every role. */
@@ -88,7 +90,8 @@ export const navGroups: readonly NavGroup[] = [
     labelKey: "groupPeople",
     items: [
       { id: "people", labelKey: "people", descKey: "descPeople", icon: UsersRound, permission: "students.view" },
-      { id: "admissions", labelKey: "admissions", descKey: "descAdmissions", icon: ClipboardCheck, feature: "admissions", roles: ["principal", "teacher"] }
+      { id: "admissions", labelKey: "walkInAdmissions", descKey: "walkInAdmissionsDesc", icon: ClipboardCheck, permission: "admissions.manage", feature: "admissions", roles: ["principal", "teacher"] },
+      { id: "admission_forms", labelKey: "admissionFormsTab", descKey: "admissionFormsHint", icon: FileText, permissionsAny: ["admissions.manage", "contact.enquiries.view"], feature: "admissions", roles: ["principal", "teacher"] }
     ]
   },
   {

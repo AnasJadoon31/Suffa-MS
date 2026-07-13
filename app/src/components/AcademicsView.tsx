@@ -15,10 +15,12 @@ import { peopleApi, type Teacher } from "../lib/endpoints";
 import { RolloverWizard } from "./RolloverWizard";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 
 export function AcademicsView() {
   const { t } = useTranslation();
+  const readOnly = useSessionReadOnly();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [sections, setSections] = useState<Record<string, Section[]>>({});
@@ -140,7 +142,7 @@ export function AcademicsView() {
   }, []);
 
   return (
-    <section className="modulePanel">
+    <section className={readOnly ? "modulePanel readOnlyView" : "modulePanel"}>
       <div className="moduleHeader">
         <h2>{t("academicStructureTitle")}</h2>
         <p className="notice">{t("academicStructureSubtitle")}</p>

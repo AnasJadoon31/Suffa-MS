@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.features import FEATURES
+from app.core.error_codes import ErrorCode
 from app.core.security import ALGORITHM
 from app.core.permissions import registry
 from app.db.session import get_session
@@ -18,6 +19,36 @@ from app.modules.platform.models import MadrasaFeature
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="api/auth/token", auto_error=False)
+
+
+async def ensure_request_context_writable(
+    request: Request, user: User, session: AsyncSession
+) -> None:
+    """Reject authenticated writes while a non-active session is selected.
+
+    Profile/password endpoints stay available so a user can recover their
+    account or clear the selected session. Explicit route-level guards remain
+    useful for payloads that target a session other than the user's context.
+    """
+    if (
+        request.method in {"GET", "HEAD", "OPTIONS"}
+        or user.selected_session_id is None
+        or request.url.path in {"/api/v1/auth/me", "/api/v1/auth/change-password"}
+    ):
+        return
+    selected_session = (
+        await session.execute(
+            select(AcademicSession).where(
+                AcademicSession.id == user.selected_session_id,
+                AcademicSession.madrasa_id == user.madrasa_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if selected_session is None or not selected_session.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail=ErrorCode.SESSION_VIEW_ONLY,
+        )
 
 
 async def get_optional_user(
@@ -40,6 +71,7 @@ async def get_optional_user(
 
 
 async def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     session: AsyncSession = Depends(get_session)
 ) -> User:
@@ -62,6 +94,7 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
+    await ensure_request_context_writable(request, user, session)
     return user
 
 
@@ -159,7 +192,7 @@ async def require_active_session(
     if not context_session.is_active:
         raise HTTPException(
             status_code=403,
-            detail="This academic session is view-only. Switch to the active session to make changes.",
+            detail=ErrorCode.SESSION_VIEW_ONLY,
         )
     return context_session
 
@@ -219,7 +252,7 @@ async def ensure_writable_session(
     if not academic_session.is_active:
         raise HTTPException(
             status_code=403,
-            detail="This academic session is view-only. Switch to the active session to make changes.",
+            detail=ErrorCode.SESSION_VIEW_ONLY,
         )
     return academic_session
 

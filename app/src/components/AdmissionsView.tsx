@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, ClipboardList, Copy, FileText, MessageCircle, Plus, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardList, Copy, Plus, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -14,15 +14,17 @@ import { useAuth } from "../lib/AuthContext";
 import { API_BASE } from "../lib/config";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
-export function AdmissionsView() {
+export function AdmissionsView({ section = "registrations" }: Readonly<{ section?: Tab }>) {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
+  const canMutate = !useSessionReadOnly();
   const canReview = hasPermission("admissions.manage");
   const canViewEnquiries = hasPermission("contact.enquiries.view");
-  const [tab, setTab] = useState<Tab>("registrations");
   const [programs, setPrograms] = useState<Program[]>([]);
 
   useEffect(() => {
@@ -36,32 +38,22 @@ export function AdmissionsView() {
         <p className="notice">{t("descAdmissions")}</p>
       </div>
 
-      <div className="formActions" style={{ marginBottom: 16 }}>
-        <button className={tab === "registrations" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("registrations")}>
-          <ClipboardList size={16} /> {t("registrationsTab")}
-        </button>
-        {canReview && (
-          <button className={tab === "forms" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("forms")}>
-            <FileText size={16} /> {t("admissionFormsTab")}
-          </button>
-        )}
-        {canViewEnquiries && (
-          <button className={tab === "enquiries" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("enquiries")}>
-            <MessageCircle size={16} /> {t("enquiriesTab")}
-          </button>
-        )}
-      </div>
-
-      {tab === "registrations" && <RegistrationsTab programs={programs} canReview={canReview} />}
-      {tab === "forms" && canReview && <AdmissionFormsTab programs={programs} />}
-      {tab === "enquiries" && canViewEnquiries && <EnquiriesTab />}
+      {section === "registrations" && <RegistrationsTab programs={programs} canReview={canReview} canMutate={canMutate} />}
+      {section === "forms" && canReview && <AdmissionFormsTab programs={programs} canMutate={canMutate} />}
+      {section === "forms" && canViewEnquiries && (
+        <div style={{ marginTop: 24 }}>
+          <h3>{t("enquiriesTab")}</h3>
+          <p className="notice">{t("enquiriesDesc")}</p>
+          <EnquiriesTab canMutate={canMutate} />
+        </div>
+      )}
     </section>
   );
 }
 
 // ------------------------------------------------------------- Registrations
 
-function RegistrationsTab({ programs, canReview }: Readonly<{ programs: Program[]; canReview: boolean }>) {
+function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ programs: Program[]; canReview: boolean; canMutate: boolean }>) {
   const { t } = useTranslation();
   const [applications, setApplications] = useState<AdmissionApplication[]>([]);
   const [form, setForm] = useState({ applicant_name: "", guardian_contact: "", program_id: "", date_of_birth: "", notes: "" });
@@ -69,6 +61,8 @@ function RegistrationsTab({ programs, canReview }: Readonly<{ programs: Program[
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
+  const [total, setTotal] = useState(0);
 
   const load = async () => {
     if (!canReview) {
@@ -77,7 +71,10 @@ function RegistrationsTab({ programs, canReview }: Readonly<{ programs: Program[
     }
     setIsLoading(true);
     try {
-      setApplications(await operationsApi.listAdmissions());
+      const result = await operationsApi.listAdmissionsPage(pageParams(pagination));
+      if (recoverEmptyPage(result, pagination, setPagination)) return;
+      setApplications(result.items);
+      setTotal(result.total);
       setLoadError("");
     } catch (err: any) {
       setLoadError(err.response?.data?.detail ?? t("failedLoadApplications"));
@@ -88,11 +85,11 @@ function RegistrationsTab({ programs, canReview }: Readonly<{ programs: Program[
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pagination]);
 
   return (
     <>
-      <form
+      {canMutate && <form
         className="inlineForm"
         onSubmit={async (e) => {
           e.preventDefault();
@@ -126,7 +123,7 @@ function RegistrationsTab({ programs, canReview }: Readonly<{ programs: Program[
         <label>{t("dobLabel")}<Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
         <label>{t("notesLabel")}<Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("submitApplicationBtn")}</button></div>
-      </form>
+      </form>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 
@@ -151,7 +148,7 @@ function RegistrationsTab({ programs, canReview }: Readonly<{ programs: Program[
               <span>{a.form_id ? t("sourcePublicForm") : t("sourceWalkIn")}</span>
               <span>{a.status}</span>
               <span>
-                {a.status === "pending" && (
+                {canMutate && a.status === "pending" && (
                   <>
                     <button className="tableAction" type="button" onClick={async () => { await operationsApi.setAdmissionStatus(a.id, "accepted"); await load(); }}>
                       <CheckCircle2 size={14} />
@@ -166,13 +163,14 @@ function RegistrationsTab({ programs, canReview }: Readonly<{ programs: Program[
           ))}
         </div>
       )}
+      {canReview && <PaginationControls state={pagination} total={total} onChange={setPagination} />}
     </>
   );
 }
 
 // ---------------------------------------------------- Public admission forms
 
-function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
+function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program[]; canMutate: boolean }>) {
   const { t } = useTranslation();
   const [forms, setForms] = useState<AdmissionForm[]>([]);
   const [form, setForm] = useState({ program_id: "", title: "", description: "" });
@@ -180,11 +178,16 @@ function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
+  const [total, setTotal] = useState(0);
 
   const load = async () => {
     setIsLoading(true);
     try {
-      setForms(await operationsApi.listAdmissionForms());
+      const result = await operationsApi.listAdmissionFormsPage(pageParams(pagination));
+      if (recoverEmptyPage(result, pagination, setPagination)) return;
+      setForms(result.items);
+      setTotal(result.total);
       setLoadError("");
     } catch (err: any) {
       setLoadError(err.response?.data?.detail ?? t("failedLoadAdmissionForms"));
@@ -195,7 +198,7 @@ function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pagination]);
 
   const publicUrl = (token: string) => `${API_BASE}/api/v1/public/admission-forms/${token}`;
 
@@ -208,7 +211,7 @@ function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
   return (
     <>
       <p className="notice">{t("admissionFormsHint")}</p>
-      <form
+      {canMutate && <form
         className="inlineForm"
         onSubmit={async (e) => {
           e.preventDefault();
@@ -236,7 +239,7 @@ function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
         <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
         <label>{t("descriptionLabel")}<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("createAdmissionFormBtn")}</button></div>
-      </form>
+      </form>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
       <div className="dataTable">
@@ -258,7 +261,7 @@ function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
               <button className="tableAction" type="button" onClick={() => void copyLink(adm)}>
                 <Copy size={14} /> {copiedId === adm.id ? t("linkCopied") : t("copyPublicLinkBtn")}
               </button>
-              <button
+              {canMutate && <button
                 className="tableAction"
                 type="button"
                 onClick={async () => {
@@ -267,27 +270,33 @@ function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
                 }}
               >
                 {adm.is_open ? t("closeFormBtn") : t("reopenFormBtn")}
-              </button>
+              </button>}
             </span>
           </div>
         ))}
       </div>
+      <PaginationControls state={pagination} total={total} onChange={setPagination} />
     </>
   );
 }
 
 // ------------------------------------------------------------------ Enquiries
 
-function EnquiriesTab() {
+function EnquiriesTab({ canMutate }: Readonly<{ canMutate: boolean }>) {
   const { t } = useTranslation();
   const [enquiries, setEnquiries] = useState<ContactEnquiry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
+  const [total, setTotal] = useState(0);
 
   const load = async () => {
     setIsLoading(true);
     try {
-      setEnquiries(await operationsApi.listEnquiries());
+      const result = await operationsApi.listEnquiriesPage(pageParams(pagination));
+      if (recoverEmptyPage(result, pagination, setPagination)) return;
+      setEnquiries(result.items);
+      setTotal(result.total);
       setLoadError("");
     } catch (err: any) {
       setLoadError(err.response?.data?.detail ?? t("failedLoadEnquiries"));
@@ -298,9 +307,10 @@ function EnquiriesTab() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pagination]);
 
   return (
+    <>
     <div className="dataTable">
       <div className="dataRow header">
         <span>{t("nameLabel")}</span>
@@ -319,7 +329,7 @@ function EnquiriesTab() {
           <span>{e.message}</span>
           <span>{e.status}</span>
           <span>
-            {e.status === "new" && (
+            {canMutate && e.status === "new" && (
               <button className="tableAction" type="button" onClick={async () => { await operationsApi.setEnquiryStatus(e.id, "reviewed"); await load(); }}>
                 <CheckCircle2 size={14} />
               </button>
@@ -328,5 +338,7 @@ function EnquiriesTab() {
         </div>
       ))}
     </div>
+    <PaginationControls state={pagination} total={total} onChange={setPagination} />
+    </>
   );
 }

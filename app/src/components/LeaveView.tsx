@@ -8,6 +8,7 @@ import { cachedFetch } from "../lib/offlineCache";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 
 function resolvePerson(record: Leave, personByUserId: Map<string, { name: string; role: string }>, unknownPerson: string) {
@@ -30,6 +31,7 @@ type PersonOption = {
 export function LeaveView() {
   const { t } = useTranslation();
   const { hasPermission, user } = useAuth();
+  const canWrite = !useSessionReadOnly();
   const canManage = hasPermission("leave.manage");
   const [leave, setLeave] = useState<Leave[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -153,7 +155,7 @@ export function LeaveView() {
         <p className="notice">{canManage ? t("leaveManageSubtitle") : t("leaveSelfSubtitle")}</p>
       </div>
 
-      <form
+      {canWrite && <form
         className="inlineForm"
         onSubmit={async (e) => {
           e.preventDefault();
@@ -252,7 +254,7 @@ export function LeaveView() {
         <div className="formActions">
           <button className="primaryAction" type="submit"><Plus size={16} /> {t("requestLeaveBtn")}</button>
         </div>
-      </form>
+      </form>}
 
       {!isLoading && error && <ErrorState message={error} />}
 
@@ -333,7 +335,7 @@ export function LeaveView() {
               <span>{record.end_date}</span>
               <span>{record.reason || "-"}</span>
               <span>
-                {canManage ? (
+                {canManage && canWrite ? (
                   <Select
                     value={record.status}
                     onChange={async (event) => {

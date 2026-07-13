@@ -20,6 +20,9 @@ import {
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { LoadingState } from "./ui/AsyncState";
+import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
+import { AdmissionsView } from "./AdmissionsView";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 function SendCredentialsButton({
   subjectType,
@@ -27,6 +30,7 @@ function SendCredentialsButton({
   setPasswordUrl,
 }: Readonly<{ subjectType: "student" | "teacher"; subjectId: string; setPasswordUrl: string }>) {
   const { t } = useTranslation();
+  const readOnly = useSessionReadOnly();
   const [error, setError] = useState("");
 
   const send = async () => {
@@ -45,7 +49,7 @@ function SendCredentialsButton({
 
   return (
     <>
-      <button className="secondaryAction" type="button" onClick={() => void send()}>
+      <button className="secondaryAction" type="button" disabled={readOnly} onClick={() => void send()}>
         {t("sendCredentialsBtn")}
       </button>
       {error && <span className="notice" style={{ color: "var(--rose)" }}>{error}</span>}
@@ -58,6 +62,7 @@ function ReissueCredentialsButton({
   subjectId,
 }: Readonly<{ subjectType: "student" | "teacher"; subjectId: string }>) {
   const { t } = useTranslation();
+  const readOnly = useSessionReadOnly();
   const [state, setState] = useState<"idle" | "copied" | "error">("idle");
 
   const reissue = async () => {
@@ -87,20 +92,21 @@ function ReissueCredentialsButton({
   };
 
   return (
-    <button className="tableAction" type="button" title={t("loginLinkTitle")} onClick={() => void reissue()}>
+    <button className="tableAction" type="button" disabled={readOnly} title={t("loginLinkTitle")} onClick={() => void reissue()}>
       <KeyRound size={14} /> {state === "copied" ? t("linkCopied") : state === "error" ? t("failedLabel") : t("loginLinkBtn")}
     </button>
   );
 }
 
-type Tab = "teachers" | "students" | "guardians" | "donators";
+type Tab = "teachers" | "students" | "guardians" | "donators" | "admissions";
 
-export function PeopleView() {
+export function PeopleView({ initialTab = "teachers" }: Readonly<{ initialTab?: Tab }>) {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
-  const [tab, setTab] = useState<Tab>("teachers");
-  const canFinance = hasPermission("finance.manage");
-  const canSalary = hasPermission("teachers.salary.manage");
+  const readOnly = useSessionReadOnly();
+  const [tab, setTab] = useState<Tab>(initialTab);
+  const canFinance = !readOnly && hasPermission("finance.manage");
+  const canSalary = !readOnly && hasPermission("teachers.salary.manage");
 
   return (
     <section className="modulePanel">
@@ -118,16 +124,22 @@ export function PeopleView() {
         <button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("guardians")}>
           <UsersRound size={16} /> {t("guardians")}
         </button>
+        {hasPermission("admissions.manage") && (
+          <button className={tab === "admissions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("admissions")}>
+            <GraduationCap size={16} /> {t("walkInAdmissions")}
+          </button>
+        )}
         {canFinance && (
           <button className={tab === "donators" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("donators")}>
             <HandCoins size={16} /> {t("donatorsTab")}
           </button>
         )}
       </div>
-      {tab === "teachers" && <TeachersTab canCreate={hasPermission("teachers.add")} canSalary={canSalary} />}
-      {tab === "students" && <StudentsTab canCreate={hasPermission("students.add")} canFinance={canFinance} />}
-      {tab === "guardians" && <GuardiansTab canCreate={hasPermission("students.add")} canSendCredentials={hasPermission("students.send_credentials")} />}
+      {tab === "teachers" && <TeachersTab canCreate={!readOnly && hasPermission("teachers.add")} canSalary={canSalary} />}
+      {tab === "students" && <StudentsTab canCreate={!readOnly && hasPermission("students.add")} canFinance={canFinance} />}
+      {tab === "guardians" && <GuardiansTab canCreate={!readOnly && hasPermission("students.add")} canSendCredentials={!readOnly && hasPermission("students.send_credentials")} />}
       {tab === "donators" && canFinance && <DonatorsTab />}
+      {tab === "admissions" && hasPermission("admissions.manage") && <AdmissionsView section="registrations" />}
     </section>
   );
 }
@@ -148,11 +160,16 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
   const [justCreated, setJustCreated] = useState<Teacher | null>(null);
   const [detail, setDetail] = useState<Teacher | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
+  const [total, setTotal] = useState(0);
 
-  const load = async (query?: string) => {
+  const load = async (query = search) => {
     setIsLoading(true);
     try {
-      setTeachers(await peopleApi.listTeachers(query || undefined));
+      const result = await peopleApi.listTeachersPage({ search: query || undefined, ...pageParams(pagination) });
+      if (recoverEmptyPage(result, pagination, setPagination)) return;
+      setTeachers(result.items);
+      setTotal(result.total);
       setError("");
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedLoadTeachers"));
@@ -163,7 +180,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pagination]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,7 +221,8 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           getDescription={(teacher) => `${teacher.employee_code} · ${teacher.status}`}
           onQueryChange={(query) => {
             setSearch(query);
-            void load(query);
+            if (pagination.page === 0) void load(query);
+            else setPagination((current) => ({ ...current, page: 0 }));
           }}
           onSelect={(teacher) => {
             setSearch(`${teacher.name} (${teacher.employee_code})`);
@@ -214,7 +232,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
         />
         <div className="formActions">
           {search && (
-            <button className="secondaryAction" type="button" onClick={() => { setSearch(""); void load(); }}>
+            <button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
               {t("cancelBtn")}
             </button>
           )}
@@ -272,6 +290,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           </div>
         ))}
       </div>
+      <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {detail && <TeacherDetail teacher={detail} canSalary={canSalary} onClose={() => setDetail(null)} />}
     </>
@@ -377,11 +396,16 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [justCreated, setJustCreated] = useState<Student | null>(null);
   const [detail, setDetail] = useState<Student | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
+  const [total, setTotal] = useState(0);
 
-  const load = async (query?: string) => {
+  const load = async (query = search) => {
     setIsLoading(true);
     try {
-      setStudents(await peopleApi.listStudents(query || undefined));
+      const result = await peopleApi.listStudentsPage({ search: query || undefined, ...pageParams(pagination) });
+      if (recoverEmptyPage(result, pagination, setPagination)) return;
+      setStudents(result.items);
+      setTotal(result.total);
       setError("");
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedLoadStudents"));
@@ -395,7 +419,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
       setClassOptions(rows.map((row) => ({ id: row.id ?? row.class_id, name: row.name ?? row.class_name })));
     }).catch(() => setClassOptions([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pagination]);
 
   useEffect(() => {
     if (!classFilter) {
@@ -445,7 +469,8 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           getDescription={(student) => `${student.admission_number} · ${student.status}`}
           onQueryChange={(query) => {
             setSearch(query);
-            void load(query);
+            if (pagination.page === 0) void load(query);
+            else setPagination((current) => ({ ...current, page: 0 }));
           }}
           onSelect={(student) => {
             setSearch(`${student.name} (${student.admission_number})`);
@@ -459,7 +484,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
             {classOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
           {search && (
-            <button className="secondaryAction" type="button" onClick={() => { setSearch(""); void load(); }}>
+            <button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
               {t("cancelBtn")}
             </button>
           )}
@@ -516,6 +541,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           </div>
         ))}
       </div>
+      <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {detail && <StudentDetail student={detail} canFinance={canFinance} onClose={() => setDetail(null)} />}
     </>
@@ -634,11 +660,16 @@ function GuardiansTab({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
+  const [total, setTotal] = useState(0);
 
   const load = async () => {
     setIsLoading(true);
     try {
-      setGuardians(await peopleApi.listGuardians());
+      const result = await peopleApi.listGuardiansPage(pageParams(pagination));
+      if (recoverEmptyPage(result, pagination, setPagination)) return;
+      setGuardians(result.items);
+      setTotal(result.total);
       setError("");
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedLoadGuardians"));
@@ -649,7 +680,7 @@ function GuardiansTab({
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pagination]);
 
   const provisionLogin = async (guardian: Guardian) => {
     setError("");
@@ -729,6 +760,7 @@ function GuardiansTab({
           </div>
         ))}
       </div>
+      <PaginationControls state={pagination} total={total} onChange={setPagination} />
     </>
   );
 }

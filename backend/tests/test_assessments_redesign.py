@@ -54,6 +54,20 @@ async def test_multi_section_publish_shares_batch(client, seed):
     assert {row["section_name"] for row in rows} == {"Alif", "Bay"}
 
 
+async def test_admin_can_sort_assignment_page_by_teacher(client, seed):
+    await client.post(
+        "/api/v1/assessments/assignments",
+        json=_assignment_payload(seed, title="Teacher-organized", section_ids=[str(seed.sections.a1.id)]),
+    )
+    response = await client.get(
+        "/api/v1/assessments/assignments",
+        params={"sort": "teacher", "limit": 25, "offset": 0},
+    )
+    assert response.status_code == 200
+    assert response.headers["x-total-count"] == "1"
+    assert response.json()[0]["title"] == "Teacher-organized"
+
+
 async def test_batch_edit_fans_out_and_delete_whole_batch(client, seed, db_sessionmaker):
     created = (
         await client.post(

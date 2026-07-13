@@ -7,6 +7,7 @@ import { useAuth } from "../lib/AuthContext";
 import { HijriTag } from "./HijriTag";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 type HolidayForm = {
   name: string;
@@ -21,7 +22,8 @@ const EMPTY_FORM: HolidayForm = { name: "", category: "", start_date: "", end_da
 export function HolidaysView() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
-  const canManage = hasPermission("holidays.manage");
+  const readOnly = useSessionReadOnly();
+  const canManage = !readOnly && hasPermission("holidays.manage");
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [filters, setFilters] = useState({ category: "", class_id: "", date_from: "", date_to: "" });

@@ -1918,6 +1918,25 @@ input[type="radio"] {
   font-size: 0.9rem;
 }
 
+.pagination {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.pagination > span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.readOnlyView .inlineForm,
+.readOnlyView .tableAction,
+.readOnlyView .iconBtn {
+  display: none;
+}
+
 /* ------------------------------------------------------ Student dashboard */
 
 .dashboardColumns {

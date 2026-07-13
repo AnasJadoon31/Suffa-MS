@@ -6,11 +6,13 @@ import { operationsApi, type TypedSetting } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 export function SettingsView() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
-  const canManage = hasPermission("settings.manage");
+  const readOnly = useSessionReadOnly();
+  const canManage = !readOnly && hasPermission("settings.manage");
   const [settings, setSettings] = useState<TypedSetting[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savedKey, setSavedKey] = useState("");

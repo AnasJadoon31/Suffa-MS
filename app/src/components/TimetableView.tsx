@@ -17,6 +17,7 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 const DAY_KEYS = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
 
@@ -25,7 +26,8 @@ type ViewMode = "grid" | "list" | "teachers" | "import";
 export function TimetableView() {
   const { t } = useTranslation();
   const { hasPermission, user } = useAuth();
-  const canManage = hasPermission("timetable.manage");
+  const readOnly = useSessionReadOnly();
+  const canManage = !readOnly && hasPermission("timetable.manage");
   const isTeacher = user?.role === "teacher";
 
   const [slots, setSlots] = useState<TimetableSlot[]>([]);

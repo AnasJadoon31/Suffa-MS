@@ -31,6 +31,7 @@ import { cachedFetch } from "../lib/offlineCache";
 import { consumePendingClassNav } from "../lib/pendingNav";
 import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
+import { useSessionReadOnly } from "./SessionSwitcher";
 import { Input } from "./ui/Field";
 
 
@@ -250,7 +251,8 @@ function AttendanceHistoryTable({
 export function AttendanceBoard({}: AttendanceBoardProps) {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
-  const canManageTeacherAttendance = hasPermission("teachers.attendance.manage");
+  const readOnly = useSessionReadOnly();
+  const canManageTeacherAttendance = !readOnly && hasPermission("teachers.attendance.manage");
   const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>("students");
   const [marked, setMarked] = useState<Record<string, AttendanceStatus>>({});
   const [classes, setClasses] = useState<AttendanceClassOption[]>([]);
@@ -266,7 +268,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const { entries, lockedKeys, isSyncing, queueAttendanceBatch, sync, overrideEntry } = useAttendanceOutbox(sessionId);
-  const canOverride = hasPermission("attendance.edit_locked");
+  const canOverride = !readOnly && hasPermission("attendance.edit_locked");
   const lockedEntries = entries.filter((entry) => lockedKeys.includes(entry.idempotency_key));
   const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
 
@@ -674,7 +676,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                             className={status === option ? `statusButton active ${option}` : "statusButton"}
                             key={option}
                             type="button"
-                            disabled={!sessionId || isApprovedLeaveLocked}
+                            disabled={readOnly || !sessionId || isApprovedLeaveLocked}
                             onClick={() => mark(student.id, option)}
                           >
                             {t(option)}
@@ -696,7 +698,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                     className="primaryAction"
                     type="button"
                     onClick={() => void saveAttendance()}
-                    disabled={!sessionId || !hasUnsavedMarks || markedCount === 0 || isSavingAttendance}
+                    disabled={readOnly || !sessionId || !hasUnsavedMarks || markedCount === 0 || isSavingAttendance}
                   >
                     <Save size={18} />
                     {t("saveAttendance")}
@@ -705,7 +707,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                     className="secondaryAction"
                     type="button"
                     onClick={() => void sync()}
-                    disabled={isSyncing || entries.length === 0}
+                    disabled={readOnly || isSyncing || entries.length === 0}
                   >
                     <CloudUpload size={18} />
                     {t("syncNow")}

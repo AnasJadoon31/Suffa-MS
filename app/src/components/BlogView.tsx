@@ -7,6 +7,7 @@ import { useAuth } from "../lib/AuthContext";
 import { RichTextEditor } from "./RichTextEditor";
 import { Input } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -15,7 +16,8 @@ function stripHtml(html: string): string {
 export function BlogView() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
-  const canManage = hasPermission("blog.manage");
+  const readOnly = useSessionReadOnly();
+  const canManage = !readOnly && hasPermission("blog.manage");
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [form, setForm] = useState({ title: "", body: "" });
   const [editing, setEditing] = useState<BlogPost | null>(null);

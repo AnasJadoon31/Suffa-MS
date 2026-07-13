@@ -46,6 +46,7 @@ const VIEW_MODULES: Partial<Record<ViewId, string[]>> = {
   forms: ["forms"],
   people: ["people", "auth"],
   admissions: ["admissions"],
+  admission_forms: ["admissions"],
   finance: ["finance"],
   salary: ["finance"],
   blog: ["web"],
@@ -118,7 +119,9 @@ function Workspace() {
       case "blog":
         return <BlogView />;
       case "admissions":
-        return <AdmissionsView />;
+        return <PeopleView initialTab="admissions" />;
+      case "admission_forms":
+        return <AdmissionsView section="forms" />;
       case "settings":
         return <SettingsView />;
       case "profile":
@@ -162,7 +165,7 @@ function Workspace() {
             <h1>{activeItem ? t(activeItem.labelKey) : t("appName")}</h1>
             <p className="viewDescription">{activeItem ? t(activeItem.descKey) : ""}</p>
           </div>
-          {VIEW_MODULES[activeView] && <DelegateButton modules={VIEW_MODULES[activeView]!} />}
+          {!user?.selected_session_id && VIEW_MODULES[activeView] && <DelegateButton modules={VIEW_MODULES[activeView]!} />}
           <div className="topbar-actions">
             {today && (
               <span className="dateChip" title={t("todayLabel")}>

@@ -276,7 +276,7 @@ async def list_assignments(
     course_id: UUID | None = None,
     category: str | None = None,
     created_by_id: UUID | None = None,
-    sort: str = "due_date",  # due_date | created_at | title
+    sort: str = "due_date",  # due_date | created_at | title | teacher
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[AssignmentRead]:
@@ -315,9 +315,12 @@ async def list_assignments(
         else:
             stmt = stmt.where(Assignment.section_id.is_(None))
 
+    if sort == "teacher":
+        stmt = stmt.outerjoin(TeacherProfile, Assignment.created_by_id == TeacherProfile.id)
     order_column = {
         "created_at": Assignment.created_at.desc(),
         "title": Assignment.title,
+        "teacher": TeacherProfile.name,
     }.get(sort, Assignment.due_date)
     rows = await paginate_scalars(session, stmt.order_by(order_column), limit=limit, offset=offset, response=response)
 

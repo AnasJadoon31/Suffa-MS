@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { api, getAllPages, getPage } from "./api";
 
 // ---------------------------------------------------------------- Academics
 
@@ -14,12 +14,12 @@ export interface TeacherAssignment { id: string; teacher_id: string; session_id:
 export const academicsApi = {
   today: (date?: string) =>
     api.get<{ gregorian: string; hijri: string }>("/api/v1/academics/today", { params: date ? { date } : {} }).then((r) => r.data),
-  listPrograms: () => api.get<Program[]>("/api/v1/academics/programs").then((r) => r.data),
+  listPrograms: () => getAllPages<Program>("/api/v1/academics/programs"),
   createProgram: (name: string) => api.post<Program>("/api/v1/academics/programs", { name }).then((r) => r.data),
   updateProgram: (id: string, payload: { name: string }) => api.put<Program>(`/api/v1/academics/programs/${id}`, payload).then((r) => r.data),
   deleteProgram: (id: string) => api.delete(`/api/v1/academics/programs/${id}`).then((r) => r.data),
 
-  listClasses: () => api.get<AcademicClass[]>("/api/v1/academics/classes").then((r) => r.data),
+  listClasses: () => getAllPages<AcademicClass>("/api/v1/academics/classes"),
   createClass: (program_id: string, name: string, default_portal_enabled = true) =>
     api.post<AcademicClass>("/api/v1/academics/classes", { program_id, name, default_portal_enabled }).then((r) => r.data),
   updateClass: (id: string, payload: { program_id?: string; name?: string; default_portal_enabled?: boolean }) =>
@@ -27,7 +27,7 @@ export const academicsApi = {
   deleteClass: (id: string) => api.delete(`/api/v1/academics/classes/${id}`).then((r) => r.data),
 
   listSections: (classId: string) =>
-    api.get<Section[]>(`/api/v1/academics/classes/${classId}/sections`).then((r) => r.data),
+    getAllPages<Section>(`/api/v1/academics/classes/${classId}/sections`),
   createSection: (classId: string, name: string) =>
     api.post<Section>(`/api/v1/academics/classes/${classId}/sections`, { name }).then((r) => r.data),
   updateSection: (classId: string, id: string, payload: { name: string }) =>
@@ -36,9 +36,9 @@ export const academicsApi = {
     api.delete(`/api/v1/academics/classes/${classId}/sections/${id}`).then((r) => r.data),
 
   listAllCourses: () =>
-    api.get<Course[]>("/api/v1/academics/courses").then((r) => r.data),
+    getAllPages<Course>("/api/v1/academics/courses"),
   listCourses: (classId: string) =>
-    api.get<Course[]>(`/api/v1/academics/classes/${classId}/courses`).then((r) => r.data),
+    getAllPages<Course>(`/api/v1/academics/classes/${classId}/courses`),
   createCourse: (name: string) =>
     api.post<Course>("/api/v1/academics/courses", { name }).then((r) => r.data),
   updateCourse: (id: string, payload: { name: string }) =>
@@ -50,7 +50,7 @@ export const academicsApi = {
     api.post(`/api/v1/academics/classes/${classId}/courses/assign`, { course_id: courseId }).then((r) => r.data),
   unassignCourseFromClass: (classId: string, courseId: string) =>
     api.delete(`/api/v1/academics/classes/${classId}/courses/${courseId}`).then((r) => r.data),
-  listSessions: () => api.get<AcademicSession[]>("/api/v1/academics/sessions").then((r) => r.data),
+  listSessions: () => getAllPages<AcademicSession>("/api/v1/academics/sessions"),
   createSession: (payload: {
     name: string; gregorian_start: string; gregorian_end: string; hijri_span: string; is_active?: boolean;
   }) => api.post<AcademicSession>("/api/v1/academics/sessions", payload).then((r) => r.data),
@@ -66,7 +66,7 @@ export const academicsApi = {
   activateSession: (id: string) =>
     api.post<AcademicSession>(`/api/v1/academics/sessions/${id}/activate`).then((r) => r.data),
   listTeacherAssignments: () =>
-    api.get<TeacherAssignment[]>("/api/v1/academics/teacher-assignments").then((r) => r.data),
+    getAllPages<TeacherAssignment>("/api/v1/academics/teacher-assignments"),
   createTeacherAssignment: (payload: { teacher_id: string; session_id: string; class_id: string; course_id: string }) =>
     api.post<TeacherAssignment>("/api/v1/academics/teacher-assignments", payload).then((r) => r.data),
   enrollStudent: (payload: {
@@ -99,7 +99,7 @@ export interface PlatformMadrasa { id: string; slug: string; name: string; conte
 export interface FeatureFlag { key: string; label: string; enabled: boolean }
 
 export const platformApi = {
-  listMadaris: () => api.get<PlatformMadrasa[]>("/api/v1/platform/madaris").then((r) => r.data),
+  listMadaris: () => getAllPages<PlatformMadrasa>("/api/v1/platform/madaris"),
   createMadrasa: (payload: {
     name: string; slug: string; content_language?: string; principal_username: string; disabled_features?: string[];
   }) =>
@@ -107,15 +107,15 @@ export const platformApi = {
       "/api/v1/platform/madaris", payload
     ).then((r) => r.data),
   getFeatures: (madrasaId: string) =>
-    api.get<FeatureFlag[]>(`/api/v1/platform/madaris/${madrasaId}/features`).then((r) => r.data),
+    getAllPages<FeatureFlag>(`/api/v1/platform/madaris/${madrasaId}/features`),
   setFeatures: (madrasaId: string, features: Record<string, boolean>) =>
     api.put<FeatureFlag[]>(`/api/v1/platform/madaris/${madrasaId}/features`, { features }).then((r) => r.data),
 };
 
 export const authApi = {
-  permissionCatalog: () => api.get<PermissionDef[]>("/api/v1/auth/permissions").then((r) => r.data),
+  permissionCatalog: () => getAllPages<PermissionDef>("/api/v1/auth/permissions"),
   userPermissions: (userId: string) =>
-    api.get<PermissionGrant[]>(`/api/v1/auth/users/${userId}/permissions`).then((r) => r.data),
+    getAllPages<PermissionGrant>(`/api/v1/auth/users/${userId}/permissions`),
   setGrants: (userId: string, grants: { code: string; scope_type?: "class" | "section"; scope_id?: string }[]) =>
     api.put("/api/v1/auth/permissions/grants", { user_id: userId, grants }).then((r) => r.data),
   changePassword: (payload: { current_password: string; new_password: string }) =>
@@ -124,7 +124,8 @@ export const authApi = {
 
 export const peopleApi = {
   listTeachers: (search?: string) =>
-    api.get<Teacher[]>("/api/v1/people/teachers", { params: { search } }).then((r) => r.data),
+    getAllPages<Teacher>("/api/v1/people/teachers", { search }),
+  listTeachersPage: (params: { search?: string; limit: number; offset: number }) => getPage<Teacher>("/api/v1/people/teachers", params),
   createTeacher: (payload: {
     username: string; name: string; whatsapp_number?: string; qualifications?: string; join_date?: string;
     cnic?: string; address?: string; emergency_contact?: string;
@@ -133,7 +134,8 @@ export const peopleApi = {
   deactivateTeacher: (id: string) => api.post(`/api/v1/people/teachers/${id}/deactivate`).then((r) => r.data),
 
   listStudents: (search?: string) =>
-    api.get<Student[]>("/api/v1/people/students", { params: { search } }).then((r) => r.data),
+    getAllPages<Student>("/api/v1/people/students", { search }),
+  listStudentsPage: (params: { search?: string; limit: number; offset: number }) => getPage<Student>("/api/v1/people/students", params),
   createStudent: (payload: {
     username: string; name: string; date_of_birth: string; guardian_ids?: string[];
     b_form_number?: string; address?: string;
@@ -142,7 +144,8 @@ export const peopleApi = {
   deactivateStudent: (id: string) => api.post(`/api/v1/people/students/${id}/deactivate`).then((r) => r.data),
 
   listGuardians: (search?: string) =>
-    api.get<Guardian[]>("/api/v1/people/guardians", { params: { search } }).then((r) => r.data),
+    getAllPages<Guardian>("/api/v1/people/guardians", { search }),
+  listGuardiansPage: (params: { search?: string; limit: number; offset: number }) => getPage<Guardian>("/api/v1/people/guardians", params),
   createGuardian: (payload: {
     name: string; relationship: string; phone_numbers: string; student_ids?: string[]; cnic?: string; address?: string;
   }) =>
@@ -152,7 +155,7 @@ export const peopleApi = {
       `/api/v1/people/guardians/${guardianId}/credentials-link`, { username }
     ).then((r) => r.data),
   studentGuardians: (studentId: string) =>
-    api.get<Guardian[]>(`/api/v1/people/students/${studentId}/guardians`).then((r) => r.data),
+    getAllPages<Guardian>(`/api/v1/people/students/${studentId}/guardians`),
 
   reissueTeacherCredentials: (teacherId: string) =>
     api.post<{ username: string; set_password_url: string }>(`/api/v1/people/teachers/${teacherId}/credentials-link`).then((r) => r.data),
@@ -255,7 +258,7 @@ export interface TeacherAttendanceToday {
 }
 
 export const attendanceApi = {
-  listClasses: () => api.get<AttendanceClassOption[]>("/api/v1/attendance/classes").then((r) => r.data),
+  listClasses: () => getAllPages<AttendanceClassOption>("/api/v1/attendance/classes"),
   classRoster: (classId: string) =>
     api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`).then((r) => r.data),
   classHistory: (classId: string, range?: AttendanceDateRange) =>
@@ -275,7 +278,7 @@ export const attendanceApi = {
   teacherCheckOut: () =>
     api.post<TeacherAttendanceToday>("/api/v1/attendance/teachers/me/check-out").then((r) => r.data),
   teacherHistory: (params?: AttendanceDateRange & { teacher_id?: string }) =>
-    api.get<TeacherAttendanceLogEntry[]>("/api/v1/attendance/teachers/history", { params }).then((r) => r.data),
+    getAllPages<TeacherAttendanceLogEntry>("/api/v1/attendance/teachers/history", params),
 };
 
 // --------------------------------------------------------------- Assessments
@@ -317,8 +320,13 @@ export interface SessionResult {
 export const assessmentsApi = {
   listAssignments: (params?: {
     class_id?: string; section_id?: string; course_id?: string; category?: string; created_by_id?: string; sort?: string;
+    limit?: number; offset?: number;
   }) =>
-    api.get<Assignment[]>("/api/v1/assessments/assignments", { params }).then((r) => r.data),
+    getAllPages<Assignment>("/api/v1/assessments/assignments", params),
+  listAssignmentsPage: (params?: {
+    class_id?: string; section_id?: string; course_id?: string; category?: string; created_by_id?: string; sort?: string;
+    limit?: number; offset?: number;
+  }) => getPage<Assignment>("/api/v1/assessments/assignments", params),
   createAssignment: (payload: {
     class_id?: string; course_id: string; section_ids?: string[]; all_classes?: boolean; title: string; category?: string;
     instructions: string; due_date: string; attachment_key?: string;
@@ -333,18 +341,18 @@ export const assessmentsApi = {
   exportResults: (params: { section_id?: string; class_id?: string }, format: "csv" | "pdf") =>
     downloadReport("/api/v1/assessments/results/export", params as Record<string, string>, format),
   listSubmissions: (assignmentId: string) =>
-    api.get<Submission[]>(`/api/v1/assessments/assignments/${assignmentId}/submissions`).then((r) => r.data),
+    getAllPages<Submission>(`/api/v1/assessments/assignments/${assignmentId}/submissions`),
   submitAssignment: (assignmentId: string, fileKey: string) =>
     api.post<Submission>(`/api/v1/assessments/assignments/${assignmentId}/submissions`, { file_key: fileKey }).then((r) => r.data),
   gradeSubmission: (submissionId: string, payload: { mark?: number; feedback?: string }) =>
     api.put<Submission>(`/api/v1/assessments/submissions/${submissionId}/grade`, payload).then((r) => r.data),
 
-  listGradingSchemes: () => api.get<GradingScheme[]>("/api/v1/assessments/grading-schemes").then((r) => r.data),
+  listGradingSchemes: () => getAllPages<GradingScheme>("/api/v1/assessments/grading-schemes"),
   createGradingScheme: (payload: { name: string; bands: GradingScheme["bands"] }) =>
     api.post<GradingScheme>("/api/v1/assessments/grading-schemes", payload).then((r) => r.data),
 
   listExamTypes: (courseId?: string) =>
-    api.get<ExamType[]>("/api/v1/assessments/exam-types", { params: { course_id: courseId } }).then((r) => r.data),
+    getAllPages<ExamType>("/api/v1/assessments/exam-types", { course_id: courseId }),
   createExamType: (payload: { course_id: string; name: string; weightage: number; grading_scheme_id: string }) =>
     api.post<ExamType>("/api/v1/assessments/exam-types", payload).then((r) => r.data),
 
@@ -487,7 +495,7 @@ export const operationsApi = {
   listTimetable: (params?: {
     class_id?: string; section_id?: string; teacher_id?: string; course_id?: string; day_of_week?: number;
   }) =>
-    api.get<TimetableSlot[]>("/api/v1/operations/timetable", { params }).then((r) => r.data),
+    getAllPages<TimetableSlot>("/api/v1/operations/timetable", params),
   createTimetableSlot: (payload: {
     class_id: string; section_id: string; course_id: string; teacher_id: string;
     day_of_week: number; period?: number; start_time: string; end_time: string;
@@ -499,7 +507,7 @@ export const operationsApi = {
   deleteTimetableSlot: (id: string) => api.delete(`/api/v1/operations/timetable/${id}`).then((r) => r.data),
 
   listHolidays: (params?: { category?: string; class_id?: string; date_from?: string; date_to?: string }) =>
-    api.get<Holiday[]>("/api/v1/operations/holidays", { params }).then((r) => r.data),
+    getAllPages<Holiday>("/api/v1/operations/holidays", params),
   createHoliday: (payload: { name: string; category?: string; start_date: string; end_date: string; class_ids?: string[] }) =>
     api.post<Holiday>("/api/v1/operations/holidays", payload).then((r) => r.data),
   updateHoliday: (id: string, payload: { name: string; category?: string; start_date: string; end_date: string; class_ids?: string[] }) =>
@@ -510,18 +518,18 @@ export const operationsApi = {
     user_id?: string; person_type?: "teacher" | "student"; status?: string;
     class_id?: string; date_from?: string; date_to?: string; q?: string;
   }) =>
-    api.get<Leave[]>("/api/v1/operations/leave", { params }).then((r) => r.data),
+    getAllPages<Leave>("/api/v1/operations/leave", params),
   createLeave: (payload: { user_id?: string; start_date: string; end_date: string; reason?: string }) =>
     api.post<Leave>("/api/v1/operations/leave", payload).then((r) => r.data),
   setLeaveStatus: (id: string, status: string) =>
     api.post<Leave>(`/api/v1/operations/leave/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
 
-  listResourceCategories: () => api.get<ResourceCategory[]>("/api/v1/operations/resource-categories").then((r) => r.data),
+  listResourceCategories: () => getAllPages<ResourceCategory>("/api/v1/operations/resource-categories"),
   createResourceCategory: (name: string, isGlobal = true) =>
     api.post<ResourceCategory>("/api/v1/operations/resource-categories", { name, is_global: isGlobal }).then((r) => r.data),
   deleteResourceCategory: (id: string) => api.delete(`/api/v1/operations/resource-categories/${id}`).then((r) => r.data),
   listResources: (params?: { category_id?: string; class_id?: string; section_id?: string; mine_only?: boolean }) =>
-    api.get<ResourceItem[]>("/api/v1/operations/resources", { params }).then((r) => r.data),
+    getAllPages<ResourceItem>("/api/v1/operations/resources", params),
   createResource: (payload: {
     category_id: string; title: string; description?: string; file_key?: string; video_url?: string; visibility_scope?: Scope;
   }) => api.post<ResourceItem>("/api/v1/operations/resources", payload).then((r) => r.data),
@@ -531,7 +539,7 @@ export const operationsApi = {
   deleteResource: (id: string) => api.delete(`/api/v1/operations/resources/${id}`).then((r) => r.data),
 
   listForms: (params?: { category?: string; mine_only?: boolean }) =>
-    api.get<FormDef[]>("/api/v1/operations/forms", { params }).then((r) => r.data),
+    getAllPages<FormDef>("/api/v1/operations/forms", params),
   getForm: (id: string) => api.get<FormDef>(`/api/v1/operations/forms/${id}`).then((r) => r.data),
   createForm: (payload: {
     title: string; description?: string; category?: string; fields: FormFieldDefinition[]; visibility_scope?: Scope;
@@ -545,10 +553,10 @@ export const operationsApi = {
   submitFormResponse: (formId: string, responseData: Record<string, unknown>) =>
     api.post<FormResponse>(`/api/v1/operations/forms/${formId}/responses`, { response_data: responseData }).then((r) => r.data),
   listFormResponses: (formId: string) =>
-    api.get<FormResponse[]>(`/api/v1/operations/forms/${formId}/responses`).then((r) => r.data),
+    getAllPages<FormResponse>(`/api/v1/operations/forms/${formId}/responses`),
 
   listAnnouncements: (params?: { audience?: "teachers" | "students" | "all"; category?: string; q?: string; date_from?: string; date_to?: string }) =>
-    api.get<Announcement[]>("/api/v1/operations/announcements", { params }).then((r) => r.data),
+    getAllPages<Announcement>("/api/v1/operations/announcements", params),
   createAnnouncement: (payload: {
     title: string; body: string; category?: string; attachment_link?: string; audience_scope?: Scope; publish_at?: string; expires_at?: string;
   }) => api.post<Announcement>("/api/v1/operations/announcements", payload).then((r) => r.data),
@@ -558,7 +566,7 @@ export const operationsApi = {
   deleteAnnouncement: (id: string) => api.delete(`/api/v1/operations/announcements/${id}`).then((r) => r.data),
 
   listBlogPosts: (publishedOnly?: boolean) =>
-    api.get<BlogPost[]>("/api/v1/operations/blog", { params: { published_only: publishedOnly } }).then((r) => r.data),
+    getAllPages<BlogPost>("/api/v1/operations/blog", { published_only: publishedOnly }),
   createBlogPost: (payload: { title: string; body: string; published?: boolean; publish_at?: string }) =>
     api.post<BlogPost>("/api/v1/operations/blog", payload).then((r) => r.data),
   updateBlogPost: (id: string, payload: { title?: string; body?: string }) =>
@@ -566,8 +574,10 @@ export const operationsApi = {
   deleteBlogPost: (id: string) => api.delete(`/api/v1/operations/blog/${id}`).then((r) => r.data),
   publishBlogPost: (id: string) => api.post<BlogPost>(`/api/v1/operations/blog/${id}/publish`).then((r) => r.data),
 
-  listAdmissions: () => api.get<AdmissionApplication[]>("/api/v1/operations/admissions").then((r) => r.data),
-  listAdmissionForms: () => api.get<AdmissionForm[]>("/api/v1/operations/admission-forms").then((r) => r.data),
+  listAdmissions: () => getAllPages<AdmissionApplication>("/api/v1/operations/admissions"),
+  listAdmissionsPage: (params: { limit: number; offset: number }) => getPage<AdmissionApplication>("/api/v1/operations/admissions", params),
+  listAdmissionForms: () => getAllPages<AdmissionForm>("/api/v1/operations/admission-forms"),
+  listAdmissionFormsPage: (params: { limit: number; offset: number }) => getPage<AdmissionForm>("/api/v1/operations/admission-forms", params),
   createAdmissionForm: (payload: { program_id: string; title: string; description?: string }) =>
     api.post<AdmissionForm>("/api/v1/operations/admission-forms", payload).then((r) => r.data),
   updateAdmissionForm: (id: string, payload: { title?: string; description?: string; is_open?: boolean }) =>
@@ -578,12 +588,13 @@ export const operationsApi = {
   setAdmissionStatus: (id: string, status: string) =>
     api.post<AdmissionApplication>(`/api/v1/operations/admissions/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
 
-  listEnquiries: () => api.get<ContactEnquiry[]>("/api/v1/operations/enquiries").then((r) => r.data),
+  listEnquiries: () => getAllPages<ContactEnquiry>("/api/v1/operations/enquiries"),
+  listEnquiriesPage: (params: { limit: number; offset: number }) => getPage<ContactEnquiry>("/api/v1/operations/enquiries", params),
   setEnquiryStatus: (id: string, status: string) =>
     api.post<ContactEnquiry>(`/api/v1/operations/enquiries/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
 
-  listSettings: () => api.get<MadrasaSetting[]>("/api/v1/operations/settings").then((r) => r.data),
-  settingsCatalog: () => api.get<TypedSetting[]>("/api/v1/operations/settings/catalog").then((r) => r.data),
+  listSettings: () => getAllPages<MadrasaSetting>("/api/v1/operations/settings"),
+  settingsCatalog: () => getAllPages<TypedSetting>("/api/v1/operations/settings/catalog"),
   upsertSetting: (key: string, value: string) =>
     api.put<MadrasaSetting>("/api/v1/operations/settings", { key, value }).then((r) => r.data),
 };
@@ -632,19 +643,19 @@ export interface SalaryPayment {
 export interface MySalary { record: SalaryRecord | null; payments: SalaryPayment[] }
 
 export const financeApi = {
-  listCategories: () => api.get<PaymentCategory[]>("/api/v1/finance/categories").then((r) => r.data),
+  listCategories: () => getAllPages<PaymentCategory>("/api/v1/finance/categories"),
   createCategory: (name: string) => api.post<PaymentCategory>("/api/v1/finance/categories", { name }).then((r) => r.data),
 
   listPayments: (params?: { student_id?: string; class_id?: string; category_id?: string; date_from?: string; date_to?: string }) =>
-    api.get<Payment[]>("/api/v1/finance/payments", { params }).then((r) => r.data),
+    getAllPages<Payment>("/api/v1/finance/payments", params),
   createPayment: (payload: {
     student_id: string; category_id: string; amount: number; currency?: string; payment_date: string; note?: string;
   }) => api.post<Payment>("/api/v1/finance/payments", payload).then((r) => r.data),
 
-  listDonors: () => api.get<Donor[]>("/api/v1/finance/donors").then((r) => r.data),
+  listDonors: () => getAllPages<Donor>("/api/v1/finance/donors"),
   createDonor: (payload: { name: string; contact: string }) => api.post<Donor>("/api/v1/finance/donors", payload).then((r) => r.data),
   listDonations: (donorId?: string) =>
-    api.get<Donation[]>("/api/v1/finance/donations", { params: { donor_id: donorId } }).then((r) => r.data),
+    getAllPages<Donation>("/api/v1/finance/donations", { donor_id: donorId }),
   createDonation: (payload: {
     donor_id: string; category_id: string; amount: number; currency?: string; donation_date: string; note?: string;
   }) => api.post<Donation>("/api/v1/finance/donations", payload).then((r) => r.data),
@@ -665,7 +676,7 @@ export const financeApi = {
   setSalary: (teacherId: string, payload: { amount: number; currency?: string; effective_from: string }) =>
     api.put<SalaryRecord>(`/api/v1/finance/salary/${teacherId}`, payload).then((r) => r.data),
   listSalaryPayments: (teacherId: string) =>
-    api.get<SalaryPayment[]>(`/api/v1/finance/salary/${teacherId}/payments`).then((r) => r.data),
+    getAllPages<SalaryPayment>(`/api/v1/finance/salary/${teacherId}/payments`),
   recordSalaryPayment: (teacherId: string, payload: {
     amount: number; currency?: string; payment_date: string; period_covered: string; method: string; note?: string;
   }) => api.post<SalaryPayment>(`/api/v1/finance/salary/${teacherId}/payments`, payload).then((r) => r.data),

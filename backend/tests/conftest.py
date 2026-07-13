@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import ensure_request_context_writable, get_current_user
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app as fastapi_app
@@ -181,7 +181,9 @@ def _make_client(db_sessionmaker, seed, acting_user):
     async def override_get_current_user(request: Request):
         user_id = UUID(request.headers["x-test-user-id"])
         async with db_sessionmaker() as session:
-            return (await session.execute(select(User).where(User.id == user_id))).scalar_one()
+            user = (await session.execute(select(User).where(User.id == user_id))).scalar_one()
+            await ensure_request_context_writable(request, user, session)
+            return user
 
     fastapi_app.dependency_overrides[get_session] = override_get_session
     fastapi_app.dependency_overrides[get_current_user] = override_get_current_user

@@ -9,6 +9,7 @@ import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 /** Read-only self-view for teachers without teachers.salary.manage — own
  * salary record + payment history only, no ability to browse other teachers. */
@@ -63,7 +64,7 @@ function MySalaryView() {
   );
 }
 
-function AdminSalaryView() {
+function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const { t } = useTranslation();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [teacherId, setTeacherId] = useState("");
@@ -162,7 +163,7 @@ function AdminSalaryView() {
 
       {teacherId && (
         <>
-          <form
+          {canWrite && <form
             className="inlineForm"
             onSubmit={async (e) => {
               e.preventDefault();
@@ -181,14 +182,14 @@ function AdminSalaryView() {
             <label>{t("monthlyAmountLabel")}<Input required type="number" min={0} value={salaryForm.amount} onChange={(e) => setSalaryForm({ ...salaryForm, amount: e.target.value })} placeholder={record ? String(record.amount) : ""} /></label>
             <label>{t("effectiveFromLabel")}<Input required type="date" value={salaryForm.effective_from} onChange={(e) => setSalaryForm({ ...salaryForm, effective_from: e.target.value })} /></label>
             <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("saveSalaryBtn")}</button></div>
-          </form>
+          </form>}
           {record && (
             <p className="notice">{t("currentSalaryLine", { currency: record.currency, amount: record.amount, date: record.effective_from })}</p>
           )}
           {notice && <p className="notice">{notice}</p>}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
-          <form
+          {canWrite && <form
             className="inlineForm"
             style={{ marginTop: 16 }}
             onSubmit={async (e) => {
@@ -220,7 +221,7 @@ function AdminSalaryView() {
             </label>
             <label>{t("notesLabel")}<Input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} /></label>
             <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordSalaryBtn")}</button></div>
-          </form>
+          </form>}
 
           <div className="dataTable">
             <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span></div>
@@ -243,8 +244,9 @@ function AdminSalaryView() {
 
 export function SalaryView() {
   const { hasPermission } = useAuth();
+  const canWrite = !useSessionReadOnly();
   // Admins (and delegated teachers.salary.manage grantees) get the full
   // lookup-any-teacher screen; every other teacher gets their own read-only
   // record (§C — salary self-view).
-  return hasPermission("teachers.salary.manage") ? <AdminSalaryView /> : <MySalaryView />;
+  return hasPermission("teachers.salary.manage") ? <AdminSalaryView canWrite={canWrite} /> : <MySalaryView />;
 }

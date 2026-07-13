@@ -3,6 +3,28 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-13 — Final portal-audit backlog closure
+
+- Archived sessions are now centrally read-only: authenticated unsafe HTTP
+  methods are rejected when the user selected a non-active session, permission-
+  protected session lookups are tenant-scoped, and the SPA hides/disables
+  mutation controls while keeping browsing, filters, and the session switcher
+  available. Added a regression test for the shared backend guard.
+- Added reusable `getPage`, `PaginationControls`, and page-state helpers. Wired
+  server-backed pages and `X-Total-Count` into teachers, students, guardians,
+  assignments, registrations, admission forms, and enquiries; all other array
+  list clients now traverse bounded server pages automatically rather than
+  silently truncating at the backend's first-page limit.
+- The assignment centre now lets admins filter assignments by teacher or use a
+  server-sorted, teacher-grouped view in addition to existing filters.
+- Split Admissions into the requested People → Students in person flow and a
+  separate Public forms destination, preserving enquiries and all gates.
+- Confirmed the timetable's existing `ByTeacherView` already provides the
+  requested “who teaches what where” organization. Formalized rollover's data
+  rule: timetable/date-shifted holidays are copied; tenant-wide evergreen
+  resources/forms/announcements/grading/fee categories remain shared and must
+  not be duplicated.
+
 ## 2026-07-13 — Course-mapping layout (B7-e) + loading/error rollout (§E)
 
 ### Leave view i18n follow-up

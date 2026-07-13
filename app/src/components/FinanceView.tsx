@@ -9,6 +9,7 @@ import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { useSessionReadOnly } from "./SessionSwitcher";
 
 
 type Tab = "contributions" | "donations" | "summary";
@@ -16,8 +17,9 @@ type Tab = "contributions" | "donations" | "summary";
 export function FinanceView() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
+  const readOnly = useSessionReadOnly();
   const [tab, setTab] = useState<Tab>("contributions");
-  const canManage = hasPermission("finance.manage");
+  const canManage = !readOnly && hasPermission("finance.manage");
   const [categories, setCategories] = useState<PaymentCategory[]>([]);
   const [categoryName, setCategoryName] = useState("");
   const [error, setError] = useState("");

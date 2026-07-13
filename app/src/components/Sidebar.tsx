@@ -41,6 +41,7 @@ export function Sidebar({ activeView, onViewChange, mobileOpen = false }: Sideba
           const visible = group.items.filter(
             (item) =>
               (!item.permission || hasPermission(item.permission)) &&
+              (!item.permissionsAny || item.permissionsAny.some(hasPermission)) &&
               (!item.feature || hasFeature(item.feature)) &&
               (!item.roles || (user && item.roles.includes(user.role)))
           );
