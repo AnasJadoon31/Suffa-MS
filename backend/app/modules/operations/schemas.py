@@ -203,6 +203,7 @@ class FormResponseRead(BaseModel):
     id: UUID
     form_id: UUID
     student_id: UUID
+    student_name: str | None = None
     submitted_by_id: UUID
     response_data: dict
     created_at: datetime

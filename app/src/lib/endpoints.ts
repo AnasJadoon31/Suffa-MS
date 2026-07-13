@@ -117,6 +117,8 @@ export const authApi = {
     api.get<PermissionGrant[]>(`/api/v1/auth/users/${userId}/permissions`).then((r) => r.data),
   setGrants: (userId: string, grants: { code: string; scope_type?: "class" | "section"; scope_id?: string }[]) =>
     api.put("/api/v1/auth/permissions/grants", { user_id: userId, grants }).then((r) => r.data),
+  changePassword: (payload: { current_password: string; new_password: string }) =>
+    api.post("/api/v1/auth/change-password", payload).then((r) => r.data),
 };
 
 export const peopleApi = {
@@ -463,7 +465,7 @@ export interface FormDef {
   visibility_scope: Scope; open_from: string | null; open_until: string | null; allow_multiple: boolean; created_at: string;
 }
 export interface FormResponse {
-  id: string; form_id: string; student_id: string; submitted_by_id: string; response_data: Record<string, unknown>; created_at: string;
+  id: string; form_id: string; student_id: string; student_name: string | null; submitted_by_id: string; response_data: Record<string, unknown>; created_at: string;
 }
 export interface Announcement {
   id: string; title: string; body: string; attachment_link: string | null; audience_scope: Scope;
@@ -613,6 +615,7 @@ export interface SalaryPayment {
   id: string; teacher_id: string; amount: number; currency: string; payment_date: string;
   period_covered: string; method: string; note: string; recorded_by_id: string; created_at: string;
 }
+export interface MySalary { record: SalaryRecord | null; payments: SalaryPayment[] }
 
 export const financeApi = {
   listCategories: () => api.get<PaymentCategory[]>("/api/v1/finance/categories").then((r) => r.data),
@@ -652,4 +655,5 @@ export const financeApi = {
   recordSalaryPayment: (teacherId: string, payload: {
     amount: number; currency?: string; payment_date: string; period_covered: string; method: string; note?: string;
   }) => api.post<SalaryPayment>(`/api/v1/finance/salary/${teacherId}/payments`, payload).then((r) => r.data),
+  getMySalary: () => api.get<MySalary>("/api/v1/finance/salary/me").then((r) => r.data),
 };

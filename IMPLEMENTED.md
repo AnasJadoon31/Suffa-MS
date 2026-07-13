@@ -3,6 +3,50 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-12 — Teacher & student portal closeout (TO_IMPLEMENT.md §C/§D)
+
+Most of §C/§D turned out to already be backend-correct or frontend-built from
+prior passes (teacher dashboard `my_classes`, student attendance
+calendar/scores/timetable/announcements/resources, role-based nav filtering,
+timetable teacher scoping). This pass closed the remaining genuine gaps:
+
+- **Deep-linked "open class list"**: `app/src/lib/pendingNav.ts` — a one-shot
+  signal the teacher dashboard sets before navigating, consumed on mount by
+  `AttendanceBoard` (auto-selects the class/roster) and `AssessmentsView`'s
+  Assignments tab (pre-fills class/section/course filters). Previously the
+  buttons just switched screens and made the teacher pick the class again.
+- **Personal settings page (missing entirely for teacher + student)**: new
+  `app/src/components/ProfileView.tsx` — username/role display, preferred
+  language (via existing `PATCH /auth/me`, now also exposed through a new
+  `updateProfile()` on `AuthContext`), and change password (existing
+  `POST /auth/change-password`, new `authApi.changePassword`). New `profile`
+  nav item, `roles: ["teacher", "student"]`, in a new `groupAccount` nav
+  group. No new backend needed here — both endpoints already existed.
+- **Teacher salary self-view**: `SalaryView.tsx` now branches on
+  `hasPermission("teachers.salary.manage")` — admins/delegates keep the
+  existing lookup-any-teacher screen (`AdminSalaryView`); every other teacher
+  gets a new read-only `MySalaryView` (own record + payment history only).
+  Required one minimal backend addition: `GET /api/v1/finance/salary/me`
+  (`backend/app/modules/finance/routes.py`, registered *before*
+  `GET /salary/{teacher_id}` to avoid "me" being swallowed as a UUID path
+  param), `MySalaryRead` schema, 403 for non-teacher accounts. The `salary`
+  nav item's `permission` gate was removed (kept `roles` + `feature`) so every
+  teacher sees it. 4 new tests in `backend/tests/test_self_service.py`.
+- **Verification pass** (no code changes, confirmed already correct): teacher
+  timetable grid-only/own-sections (`TimetableView.tsx` `isTeacher`),
+  attendance/assessments backend scoping via `core/teaching_scope.py`
+  (`taught_pairs`), student self-scoping on dashboard/results/timetable, and
+  student nav exclusion of Admissions/Finance/Salary/Reports/Blog (all
+  already `roles: ["principal", "teacher"]`-gated in `mockData.ts`).
+
+Left undone (out of this pass's file-ownership scope — `AnnouncementsView`,
+`ResourcesView`, `FormsView`, `AudiencePicker`, `AcademicsView` explicitly
+excluded): teacher-scoped Holidays/Announcements/Resources/Forms filtering
+(§C rows still unchecked in TO_IMPLEMENT.md).
+
+Suite: 87 backend tests green (83 + 4 new); frontend `tsc --noEmit` and
+`vite build` both clean.
+
 ## 2026-07-12 — Frontend phase 4 / finish (PWA, i18n sweep, exports)
 
 - **Timetable PDF export**: `GET /operations/timetable/export` — whole-madrasa

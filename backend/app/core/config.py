@@ -24,6 +24,25 @@ class Settings(BaseSettings):
     s3_secret_key: str = ""
     s3_bucket: str = "mms-files"
     s3_public_url: str = ""
+    # OWASP A04/A08 file-upload guardrails: comma-separated MIME allowlist and
+    # a max declared size (bytes) enforced at presign time. Overridable per
+    # deployment via .env.
+    upload_allowed_content_types: Annotated[list[str], NoDecode] = [
+        "image/jpeg", "image/png", "image/webp", "image/gif",
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ]
+    upload_max_size_bytes: int = 20 * 1024 * 1024  # 20MB
+
+    @field_validator("upload_allowed_content_types", mode="before")
+    @classmethod
+    def _split_content_types(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
     @field_validator("cors_origins", mode="before")
     @classmethod

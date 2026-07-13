@@ -28,6 +28,7 @@ import {
   peopleApi,
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
+import { consumePendingClassNav } from "../lib/pendingNav";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input } from "./ui/Field";
 
@@ -322,12 +323,19 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       try {
         const { data } = await cachedFetch("attendance-classes", attendanceApi.listClasses);
         setClasses(data);
+        // Deep link from the dashboard's "open class list" button (§C):
+        // jump straight into the roster instead of making the teacher pick again.
+        const pending = consumePendingClassNav();
+        if (pending && data.some((c) => c.id === pending.classId)) {
+          selectClass(pending.classId);
+        }
       } catch (err: any) {
         setError(err.response?.data?.detail ?? t("failedLoadAttendanceClasses"));
       } finally {
         setIsLoadingClasses(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t]);
 
   useEffect(() => {

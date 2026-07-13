@@ -3,13 +3,14 @@ from collections import defaultdict
 from datetime import UTC, date, datetime, time
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.core.audit import record_audit
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.core.teaching_scope import taught_class_ids, taught_pairs
 from app.db.session import get_session
 from app.modules.auth.models import User, UserRole
@@ -518,47 +519,6 @@ async def _student_has_approved_leave(
     ).scalar_one_or_none() is not None
 
 
-def _teacher_history_entry_from_row(row) -> TeacherAttendanceLogEntry:
-    (
-        attendance_id,
-        teacher_id,
-        teacher_name,
-        employee_code,
-        attendance_date,
-        status,
-        check_in,
-        check_out,
-        marked_at,
-        created_at,
-        updated_at,
-        marker_id,
-        marker_username,
-        marker_role,
-        marker_display_name,
-        overridden,
-    ) = row
-    synced_at = updated_at or created_at
-    return TeacherAttendanceLogEntry(
-        id=attendance_id,
-        teacher_id=teacher_id,
-        teacher_name=teacher_name,
-        employee_code=employee_code,
-        attendance_date=attendance_date,
-        status=status,
-        check_in=check_in,
-        check_out=check_out,
-        marked_at=marked_at,
-        synced_at=synced_at,
-        marked_by=AttendanceMarkerRead(
-            id=marker_id,
-            username=marker_username,
-            display_name=marker_display_name or marker_username,
-            role=str(marker_role.value if hasattr(marker_role, "value") else marker_role),
-        ),
-        overridden=overridden,
-    )
-
-
 async def _teacher_history_entries(
     session: AsyncSession,
     *,
@@ -567,31 +527,17 @@ async def _teacher_history_entries(
     teacher_id: UUID | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
+    limit: int,
+    offset: int,
+    response: Response,
 ) -> list[TeacherAttendanceLogEntry]:
-    marker_teacher = TeacherProfile.__table__.alias("marker_teacher")
+    # Paginate on the bare TeacherAttendance entity (joined only for ordering,
+    # not for output columns) so `paginate_scalars`'s `.scalars()` returns
+    # real ORM rows; display fields (teacher/marker names) are then resolved
+    # in bulk for just this page, not the whole matching set.
     stmt = (
-        select(
-            TeacherAttendance.id,
-            TeacherProfile.id,
-            TeacherProfile.name,
-            TeacherProfile.employee_code,
-            TeacherAttendance.attendance_date,
-            TeacherAttendance.status,
-            TeacherAttendance.check_in,
-            TeacherAttendance.check_out,
-            TeacherAttendance.marked_at,
-            TeacherAttendance.created_at,
-            TeacherAttendance.updated_at,
-            User.id,
-            User.username,
-            User.role,
-            marker_teacher.c.name,
-            TeacherAttendance.overridden,
-        )
-        .select_from(TeacherAttendance)
+        select(TeacherAttendance)
         .join(TeacherProfile, TeacherProfile.id == TeacherAttendance.teacher_id)
-        .join(User, User.id == TeacherAttendance.marked_by_id)
-        .outerjoin(marker_teacher, marker_teacher.c.user_id == User.id)
         .where(
             TeacherAttendance.madrasa_id == madrasa_id,
             TeacherAttendance.session_id == session_id,
@@ -603,12 +549,67 @@ async def _teacher_history_entries(
         stmt = stmt.where(TeacherAttendance.attendance_date >= start_date)
     if end_date is not None:
         stmt = stmt.where(TeacherAttendance.attendance_date <= end_date)
-    rows = (
+
+    records = await paginate_scalars(
+        session,
+        stmt.order_by(TeacherAttendance.attendance_date.desc(), TeacherProfile.name),
+        limit=limit,
+        offset=offset,
+        response=response,
+    )
+    if not records:
+        return []
+
+    teacher_ids = {record.teacher_id for record in records}
+    marker_user_ids = {record.marked_by_id for record in records}
+
+    teacher_rows = (
         await session.execute(
-            stmt.order_by(TeacherAttendance.attendance_date.desc(), TeacherProfile.name)
+            select(TeacherProfile.id, TeacherProfile.name, TeacherProfile.employee_code).where(
+                TeacherProfile.id.in_(teacher_ids)
+            )
         )
     ).all()
-    return [_teacher_history_entry_from_row(row) for row in rows]
+    teacher_map = {row[0]: (row[1], row[2]) for row in teacher_rows}
+
+    marker_teacher = TeacherProfile.__table__.alias("marker_teacher")
+    marker_rows = (
+        await session.execute(
+            select(User.id, User.username, User.role, marker_teacher.c.name)
+            .select_from(User)
+            .outerjoin(marker_teacher, marker_teacher.c.user_id == User.id)
+            .where(User.id.in_(marker_user_ids))
+        )
+    ).all()
+    marker_map = {row[0]: (row[1], row[2], row[3]) for row in marker_rows}
+
+    entries: list[TeacherAttendanceLogEntry] = []
+    for record in records:
+        teacher_name, employee_code = teacher_map[record.teacher_id]
+        marker_username, marker_role, marker_display_name = marker_map[record.marked_by_id]
+        synced_at = record.updated_at or record.created_at
+        entries.append(
+            TeacherAttendanceLogEntry(
+                id=record.id,
+                teacher_id=record.teacher_id,
+                teacher_name=teacher_name,
+                employee_code=employee_code,
+                attendance_date=record.attendance_date,
+                status=record.status,
+                check_in=record.check_in,
+                check_out=record.check_out,
+                marked_at=record.marked_at,
+                synced_at=synced_at,
+                marked_by=AttendanceMarkerRead(
+                    id=record.marked_by_id,
+                    username=marker_username,
+                    display_name=marker_display_name or marker_username,
+                    role=str(marker_role.value if hasattr(marker_role, "value") else marker_role),
+                ),
+                overridden=record.overridden,
+            )
+        )
+    return entries
 
 
 async def _class_history_entries(
@@ -979,9 +980,12 @@ async def teacher_check_out(
 
 @router.get("/teachers/history", response_model=list[TeacherAttendanceLogEntry])
 async def teacher_attendance_history(
+    response: Response,
     teacher_id: UUID | None = Query(default=None),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -1006,6 +1010,9 @@ async def teacher_attendance_history(
         teacher_id=teacher_id,
         start_date=start_date,
         end_date=end_date,
+        limit=limit,
+        offset=offset,
+        response=response,
     )
 
 

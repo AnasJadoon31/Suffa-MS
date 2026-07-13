@@ -2,13 +2,59 @@ import { useEffect, useMemo, useState } from "react";
 import { Banknote, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { financeApi, type SalaryPayment, type SalaryRecord } from "../lib/endpoints";
+import { useAuth } from "../lib/AuthContext";
+import { financeApi, type MySalary, type SalaryPayment, type SalaryRecord } from "../lib/endpoints";
 import { peopleApi, type Teacher } from "../lib/endpoints";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 
+/** Read-only self-view for teachers without teachers.salary.manage — own
+ * salary record + payment history only, no ability to browse other teachers. */
+function MySalaryView() {
+  const { t } = useTranslation();
+  const [data, setData] = useState<MySalary | null>(null);
+  const [error, setError] = useState("");
 
-export function SalaryView() {
+  useEffect(() => {
+    void (async () => {
+      try {
+        setData(await financeApi.getMySalary());
+      } catch (err: any) {
+        setError(err.response?.data?.detail ?? t("failedLoadSalary"));
+      }
+    })();
+  }, [t]);
+
+  return (
+    <section className="modulePanel">
+      <div className="moduleHeader">
+        <h2><Banknote size={18} /> {t("salary")}</h2>
+        <p className="notice">{t("descMySalary")}</p>
+      </div>
+      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {data?.record ? (
+        <p className="notice">{t("currentSalaryLine", { currency: data.record.currency, amount: data.record.amount, date: data.record.effective_from })}</p>
+      ) : (
+        data && <p className="emptyState">{t("noSalarySetYet")}</p>
+      )}
+      <div className="dataTable">
+        <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span></div>
+        {data && data.payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
+        {data?.payments.map((p) => (
+          <div className="dataRow" key={p.id}>
+            <span>{p.payment_date}</span>
+            <span>{p.period_covered}</span>
+            <span>{p.currency} {p.amount}</span>
+            <span>{p.method}</span>
+            <span>{p.note || "—"}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AdminSalaryView() {
   const { t } = useTranslation();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [teacherId, setTeacherId] = useState("");
@@ -168,4 +214,12 @@ export function SalaryView() {
       )}
     </section>
   );
+}
+
+export function SalaryView() {
+  const { hasPermission } = useAuth();
+  // Admins (and delegated teachers.salary.manage grantees) get the full
+  // lookup-any-teacher screen; every other teacher gets their own read-only
+  // record (§C — salary self-view).
+  return hasPermission("teachers.salary.manage") ? <AdminSalaryView /> : <MySalaryView />;
 }

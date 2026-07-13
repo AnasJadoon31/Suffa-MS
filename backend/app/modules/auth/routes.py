@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.permissions import registry
 from app.core.rate_limit import LOGIN_LOCKOUT_SECONDS, LOGIN_MAX_ATTEMPTS, assert_not_locked_out, clear_failures, record_failure
 from app.core.security import ALGORITHM, hash_password, verify_password, issue_token
+from app.core.settings_catalog import CATALOG_BY_KEY
 from app.core.tenancy import TenantContext, get_tenant
 from app.core.dependencies import (
     get_current_user,
@@ -21,6 +22,7 @@ from app.db.session import get_session
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
 from app.modules.auth.service import UsernameTakenError, provision_login
 from app.modules.academics.models import AcademicSession, Madrasa
+from app.modules.operations.models import MadrasaSetting
 from app.modules.auth.schemas import (
     ChangePasswordRequest,
     LoginRequest,
@@ -39,6 +41,35 @@ from app.modules.auth.schemas import (
 )
 
 router = APIRouter()
+
+_DEFAULT_TOKEN_MINUTES = 30
+
+
+async def _session_lifetime_minutes(session: AsyncSession, user: User) -> int:
+    """Per-role idle-timeout setting (security.idle_timeout_minutes_<role> in
+    the settings catalogue) becomes the access token's fixed lifetime — the
+    simplest correct approximation of an idle timeout for a stateless JWT
+    without adding refresh-token/session-tracking infra. Falls back to the
+    catalogue default, then a hard 30-minute default for roles the catalogue
+    doesn't define one for (parent, super_admin)."""
+    key = f"security.idle_timeout_minutes_{user.role}"
+    definition = CATALOG_BY_KEY.get(key)
+    fallback = int(definition.default) if definition else _DEFAULT_TOKEN_MINUTES
+    if user.madrasa_id is None:
+        return fallback
+    row = (
+        await session.execute(
+            select(MadrasaSetting).where(
+                MadrasaSetting.madrasa_id == user.madrasa_id, MadrasaSetting.key == key
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return fallback
+    try:
+        return int(row.value)
+    except ValueError:
+        return fallback
 
 
 @router.post("/token", response_model=TokenResponse)
@@ -63,7 +94,8 @@ async def login(
         )
 
     await clear_failures(lockout_key)
-    token = issue_token(str(user.id), extra={"tenant": tenant.slug, "role": str(user.role)})
+    minutes = await _session_lifetime_minutes(session, user)
+    token = issue_token(str(user.id), minutes=minutes, extra={"tenant": tenant.slug, "role": str(user.role)})
     return TokenResponse(access_token=token)
 
 

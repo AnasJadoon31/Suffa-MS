@@ -18,6 +18,7 @@ import {
   reportingApi,
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
+import { setPendingClassNav } from "../lib/pendingNav";
 import { Input } from "./ui/Field";
 
 
@@ -210,10 +211,24 @@ function TeacherDashboardCards({ data, onNavigate }: Readonly<{ data: TeacherDas
               <span>{entry.class_name}{entry.section_name ? ` / ${entry.section_name}` : ""}</span>
               <span>{entry.course_name}</span>
               <span>
-                <button className="tableAction" type="button" onClick={() => onNavigate?.("attendance")}>
+                <button
+                  className="tableAction"
+                  type="button"
+                  onClick={() => {
+                    setPendingClassNav({ classId: entry.class_id, sectionId: entry.section_id, courseId: entry.course_id });
+                    onNavigate?.("attendance");
+                  }}
+                >
                   <ExternalLink size={14} /> {t("openClassListBtn")}
                 </button>
-                <button className="tableAction" type="button" onClick={() => onNavigate?.("assessments")}>
+                <button
+                  className="tableAction"
+                  type="button"
+                  onClick={() => {
+                    setPendingClassNav({ classId: entry.class_id, sectionId: entry.section_id, courseId: entry.course_id });
+                    onNavigate?.("assessments");
+                  }}
+                >
                   <ExternalLink size={14} /> {t("assessments")}
                 </button>
               </span>

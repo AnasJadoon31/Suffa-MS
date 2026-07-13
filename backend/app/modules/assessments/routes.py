@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,7 @@ from app.core.dependencies import (
     user_has_permission,
 )
 from app.core.hijri import to_hijri_string
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.core.pdf import render_result_card_pdf
 from app.core.teaching_scope import teacher_teaches
 from app.db.session import get_session
@@ -224,6 +225,7 @@ async def _assignment_reads(session: AsyncSession, madrasa_id: UUID, rows: list[
 
 @router.get("/assignments", response_model=list[AssignmentRead])
 async def list_assignments(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -233,6 +235,8 @@ async def list_assignments(
     category: str | None = None,
     created_by_id: UUID | None = None,
     sort: str = "due_date",  # due_date | created_at | title
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[AssignmentRead]:
     stmt = select(Assignment).where(Assignment.madrasa_id == madrasa.id)
     if class_id:
@@ -245,17 +249,12 @@ async def list_assignments(
         stmt = stmt.where(Assignment.category == category)
     if created_by_id:
         stmt = stmt.where(Assignment.created_by_id == created_by_id)
-    order_column = {
-        "created_at": Assignment.created_at.desc(),
-        "title": Assignment.title,
-    }.get(sort, Assignment.due_date)
-    rows = (await session.execute(stmt.order_by(order_column))).scalars().all()
 
     student = await _student_profile(session, current_user)
+    enrollment = None
     if student is not None:
-        # Students: only their section's rows (or class-wide) and, when the
-        # assignment targets specific students, only if they're targeted.
-        enrollment = None
+        # Students: only their section's rows (or class-wide), pushed into
+        # the SQL filter itself so it's applied before pagination/limit.
         active_session_id = await _active_session_id(session, madrasa.id)
         if active_session_id is not None:
             enrollment = (
@@ -266,19 +265,27 @@ async def list_assignments(
                     )
                 )
             ).scalar_one_or_none()
+        if enrollment is not None:
+            stmt = stmt.where(
+                (Assignment.section_id.is_(None)) | (Assignment.section_id == enrollment.section_id)
+            )
+            stmt = stmt.where(Assignment.class_id == enrollment.class_id)
+        else:
+            stmt = stmt.where(Assignment.section_id.is_(None))
 
-        def _visible(row: Assignment) -> bool:
-            if row.section_id is not None and (enrollment is None or enrollment.section_id != row.section_id):
-                return False
-            if enrollment is not None and row.class_id != enrollment.class_id:
-                return False
-            if not row.target_student_ids:
-                return True
-            return str(student.id) in row.target_student_ids
+    order_column = {
+        "created_at": Assignment.created_at.desc(),
+        "title": Assignment.title,
+    }.get(sort, Assignment.due_date)
+    rows = await paginate_scalars(session, stmt.order_by(order_column), limit=limit, offset=offset, response=response)
 
-        rows = [row for row in rows if _visible(row)]
+    if student is not None:
+        # target_student_ids is a JSON column; per-row containment can't be
+        # pushed into a portable SQL WHERE (sqlite in tests vs Postgres
+        # JSONB), so it's applied to the already-paginated page.
+        rows = [row for row in rows if not row.target_student_ids or str(student.id) in row.target_student_ids]
 
-    return await _assignment_reads(session, madrasa.id, rows)
+    return await _assignment_reads(session, madrasa.id, list(rows))
 
 
 @router.get("/assignments/{assignment_id}", response_model=AssignmentRead)
@@ -578,15 +585,20 @@ async def enter_mark(
 
 @router.get("/marks", response_model=list[MarkRead])
 async def list_marks(
+    response: Response,
     current_user: User = Depends(require_permission("assessments.marks.enter")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     exam_type_id: UUID | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[MarkRead]:
     stmt = select(Mark)
     if exam_type_id:
         stmt = stmt.where(Mark.exam_type_id == exam_type_id)
-    rows = (await session.execute(stmt)).scalars().all()
+    rows = await paginate_scalars(
+        session, stmt.order_by(Mark.created_at, Mark.id), limit=limit, offset=offset, response=response
+    )
     return [MarkRead.model_validate(row) for row in rows]
 
 

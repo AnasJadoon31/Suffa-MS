@@ -1,14 +1,15 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
-from app.core.dependencies import get_current_madrasa, require_permission
+from app.core.dependencies import get_current_madrasa, get_current_user, require_permission
 from app.core.hijri import to_hijri_string
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.core.pdf import render_receipt_pdf
 from app.db.session import get_session
 from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
@@ -24,6 +25,7 @@ from app.modules.finance.schemas import (
     PaymentCategoryRead,
     PaymentCreate,
     PaymentRead,
+    MySalaryRead,
     SalaryPaymentCreate,
     SalaryPaymentRead,
     SalaryRecordRead,
@@ -126,6 +128,7 @@ async def create_payment(
 
 @router.get("/payments", response_model=list[PaymentRead])
 async def list_payments(
+    response: Response,
     current_user: User = Depends(require_permission("finance.reports.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -134,6 +137,8 @@ async def list_payments(
     category_id: UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[PaymentRead]:
     stmt = select(Payment).where(Payment.madrasa_id == madrasa.id)
     if student_id:
@@ -149,6 +154,7 @@ async def list_payments(
             )
         ).scalars().all()
         if not class_student_ids:
+            response.headers["X-Total-Count"] = "0"
             return []
         stmt = stmt.where(Payment.student_id.in_(class_student_ids))
     if category_id:
@@ -157,7 +163,9 @@ async def list_payments(
         stmt = stmt.where(Payment.payment_date >= date_from)
     if date_to:
         stmt = stmt.where(Payment.payment_date <= date_to)
-    rows = (await session.execute(stmt.order_by(Payment.payment_date.desc()))).scalars().all()
+    rows = await paginate_scalars(
+        session, stmt.order_by(Payment.payment_date.desc()), limit=limit, offset=offset, response=response
+    )
     return [PaymentRead.model_validate(row) for row in rows]
 
 
@@ -231,11 +239,15 @@ async def create_donor(
 
 @router.get("/donors", response_model=list[DonorRead])
 async def list_donors(
+    response: Response,
     current_user: User = Depends(require_permission("finance.reports.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[DonorRead]:
-    rows = (await session.execute(select(Donor).where(Donor.madrasa_id == madrasa.id))).scalars().all()
+    stmt = select(Donor).where(Donor.madrasa_id == madrasa.id)
+    rows = await paginate_scalars(session, stmt.order_by(Donor.name), limit=limit, offset=offset, response=response)
     return [DonorRead.model_validate(row) for row in rows]
 
 
@@ -274,6 +286,7 @@ async def create_donation(
 
 @router.get("/donations", response_model=list[DonationRead])
 async def list_donations(
+    response: Response,
     current_user: User = Depends(require_permission("finance.reports.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -281,6 +294,8 @@ async def list_donations(
     category_id: UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[DonationRead]:
     stmt = select(Donation).where(Donation.madrasa_id == madrasa.id)
     if donor_id:
@@ -291,7 +306,9 @@ async def list_donations(
         stmt = stmt.where(Donation.donation_date >= date_from)
     if date_to:
         stmt = stmt.where(Donation.donation_date <= date_to)
-    rows = (await session.execute(stmt.order_by(Donation.donation_date.desc()))).scalars().all()
+    rows = await paginate_scalars(
+        session, stmt.order_by(Donation.donation_date.desc()), limit=limit, offset=offset, response=response
+    )
     return [DonationRead.model_validate(row) for row in rows]
 
 
@@ -429,12 +446,50 @@ async def set_salary(
     return SalaryRecordRead.model_validate(record)
 
 
+@router.get("/salary/me", response_model=MySalaryRead)
+async def get_my_salary(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> MySalaryRead:
+    """Self-scoped read for a teacher's own salary record + payment history.
+    Registered before the `/salary/{teacher_id}` GET route so "me" is never
+    swallowed as a UUID path parameter."""
+    teacher = (
+        await session.execute(select(TeacherProfile).where(TeacherProfile.user_id == current_user.id))
+    ).scalar_one_or_none()
+    if teacher is None:
+        raise HTTPException(status_code=403, detail="Only teacher accounts have salary records")
+
+    record = (
+        await session.execute(select(SalaryRecord).where(SalaryRecord.teacher_id == teacher.id))
+    ).scalar_one_or_none()
+    payments = (
+        await session.execute(
+            select(SalaryPayment)
+            .where(SalaryPayment.teacher_id == teacher.id)
+            .order_by(SalaryPayment.payment_date.desc())
+        )
+    ).scalars().all()
+    return MySalaryRead(
+        record=SalaryRecordRead.model_validate(record) if record else None,
+        payments=[SalaryPaymentRead.model_validate(p) for p in payments],
+    )
+
+
 @router.get("/salary/{teacher_id}", response_model=SalaryRecordRead)
 async def get_salary(
     teacher_id: UUID,
     current_user: User = Depends(require_permission("teachers.salary.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> SalaryRecordRead:
+    # IDOR fix: this route previously had no tenant scoping at all — a
+    # caller holding teachers.salary.manage (a role/permission check with no
+    # tenant scope of its own) could read another madrasa's salary record
+    # just by guessing/knowing its teacher_id.
+    teacher = await session.get(TeacherProfile, teacher_id)
+    if teacher is None or teacher.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Teacher not found")
     record = (
         await session.execute(select(SalaryRecord).where(SalaryRecord.teacher_id == teacher_id))
     ).scalar_one_or_none()
@@ -482,10 +537,19 @@ async def record_salary_payment(
 @router.get("/salary/{teacher_id}/payments", response_model=list[SalaryPaymentRead])
 async def list_salary_payments(
     teacher_id: UUID,
+    response: Response,
     current_user: User = Depends(require_permission("teachers.salary.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[SalaryPaymentRead]:
-    rows = (
-        await session.execute(select(SalaryPayment).where(SalaryPayment.teacher_id == teacher_id))
-    ).scalars().all()
+    # IDOR fix: same gap as GET /salary/{teacher_id} — no tenant check at all.
+    teacher = await session.get(TeacherProfile, teacher_id)
+    if teacher is None or teacher.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+    stmt = select(SalaryPayment).where(SalaryPayment.teacher_id == teacher_id)
+    rows = await paginate_scalars(
+        session, stmt.order_by(SalaryPayment.payment_date.desc()), limit=limit, offset=offset, response=response
+    )
     return [SalaryPaymentRead.model_validate(row) for row in rows]

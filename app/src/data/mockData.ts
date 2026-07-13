@@ -17,6 +17,7 @@ import {
   Megaphone,
   Newspaper,
   Settings,
+  User,
   UserRoundCog,
   UsersRound
 } from "lucide-react";
@@ -39,6 +40,7 @@ export type ViewId =
   | "blog"
   | "admissions"
   | "settings"
+  | "profile"
   | "reports";
 
 export type NavItem = Readonly<{
@@ -92,9 +94,11 @@ export const navGroups: readonly NavGroup[] = [
   {
     labelKey: "groupFinance",
     items: [
-      { id: "finance", labelKey: "finance", descKey: "descFinance", icon: Landmark, permission: "finance.reports.view", feature: "finance" },
-      { id: "salary", labelKey: "salary", descKey: "descSalary", icon: Banknote, permission: "teachers.salary.manage", feature: "salary" },
-      { id: "reports", labelKey: "reports", descKey: "descReports", icon: FileDown, permission: "attendance.take", feature: "reports" }
+      { id: "finance", labelKey: "finance", descKey: "descFinance", icon: Landmark, permission: "finance.reports.view", feature: "finance", roles: ["principal", "teacher"] },
+      // No permission gate: every teacher gets a read-only self-view here even
+      // without teachers.salary.manage (SalaryView branches on that permission).
+      { id: "salary", labelKey: "salary", descKey: "descSalary", icon: Banknote, feature: "salary", roles: ["principal", "teacher"] },
+      { id: "reports", labelKey: "reports", descKey: "descReports", icon: FileDown, permission: "attendance.take", feature: "reports", roles: ["principal", "teacher"] }
     ]
   },
   {
@@ -102,6 +106,15 @@ export const navGroups: readonly NavGroup[] = [
     items: [
       { id: "blog", labelKey: "blog", descKey: "descBlog", icon: Newspaper, feature: "blog", roles: ["principal", "teacher"] },
       { id: "settings", labelKey: "settings", descKey: "descSettings", icon: Settings, permission: "academics.manage" }
+    ]
+  },
+  {
+    labelKey: "groupAccount",
+    items: [
+      // Personal settings (§C/§D) — every teacher/student gets their own
+      // profile + change-password page; principals already have the full
+      // madrasa Settings screen above.
+      { id: "profile", labelKey: "myProfile", descKey: "descProfile", icon: User, roles: ["teacher", "student"] }
     ]
   }
 ];

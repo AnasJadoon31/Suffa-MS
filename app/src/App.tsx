@@ -17,6 +17,7 @@ import { LeaveView } from "./components/LeaveView";
 import { LoginScreen } from "./components/LoginScreen";
 import { PeopleView } from "./components/PeopleView";
 import { PlatformView } from "./components/PlatformView";
+import { ProfileView } from "./components/ProfileView";
 import { ReportsView } from "./components/ReportsView";
 import { ResourcesView } from "./components/ResourcesView";
 import { SalaryView } from "./components/SalaryView";
@@ -120,6 +121,8 @@ function Workspace() {
         return <AdmissionsView />;
       case "settings":
         return <SettingsView />;
+      case "profile":
+        return <ProfileView />;
       case "reports":
         return <ReportsView />;
       default:

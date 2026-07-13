@@ -1,6 +1,6 @@
 from datetime import date
 
-from hijri_converter import Gregorian
+from hijridate import Gregorian
 
 
 def to_hijri_string(gregorian_date: date) -> str:

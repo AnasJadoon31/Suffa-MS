@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,7 @@ from app.core.dependencies import (
     require_permission,
     user_has_permission,
 )
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.academics.models import (
     AcademicClass,
@@ -467,6 +468,7 @@ def _enriched_slot(row) -> TimetableSlotRead:
 
 @router.get("/timetable", response_model=list[TimetableSlotRead])
 async def list_timetable(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     context_session: AcademicSession = Depends(get_context_session),
@@ -476,9 +478,15 @@ async def list_timetable(
     teacher_id: UUID | None = None,
     course_id: UUID | None = None,
     day_of_week: int | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[TimetableSlotRead]:
+    # Select only the TimetableSlot entity so paginate_scalars' `.scalars()`
+    # keeps working; the joins stay in the FROM clause purely to support the
+    # Section.name secondary sort below. Enrichment columns (class/section/
+    # course/teacher names) are batch-fetched afterwards, for the page only.
     stmt = (
-        select(TimetableSlot, AcademicClass.name, Section.name, Course.name, TeacherProfile.name)
+        select(TimetableSlot)
         .join(AcademicClass, AcademicClass.id == TimetableSlot.class_id)
         .join(Section, Section.id == TimetableSlot.section_id)
         .join(Course, Course.id == TimetableSlot.course_id)
@@ -499,17 +507,62 @@ async def list_timetable(
         stmt = stmt.where(TimetableSlot.course_id == course_id)
     if day_of_week is not None:
         stmt = stmt.where(TimetableSlot.day_of_week == day_of_week)
-    result = await session.execute(
-        stmt.order_by(TimetableSlot.day_of_week, TimetableSlot.start_time, Section.name)
+
+    slots = await paginate_scalars(
+        session,
+        stmt.order_by(TimetableSlot.day_of_week, TimetableSlot.start_time, Section.name),
+        limit=limit,
+        offset=offset,
+        response=response,
     )
-    return [_enriched_slot(row) for row in result.all()]
+
+    class_ids = {slot.class_id for slot in slots}
+    section_ids = {slot.section_id for slot in slots}
+    course_ids = {slot.course_id for slot in slots}
+    teacher_ids = {slot.teacher_id for slot in slots}
+    class_names: dict[UUID, str] = {}
+    section_names: dict[UUID, str] = {}
+    course_names: dict[UUID, str] = {}
+    teacher_names: dict[UUID, str] = {}
+    if class_ids:
+        class_names = dict(
+            (await session.execute(select(AcademicClass.id, AcademicClass.name).where(AcademicClass.id.in_(class_ids)))).all()
+        )
+    if section_ids:
+        section_names = dict(
+            (await session.execute(select(Section.id, Section.name).where(Section.id.in_(section_ids)))).all()
+        )
+    if course_ids:
+        course_names = dict(
+            (await session.execute(select(Course.id, Course.name).where(Course.id.in_(course_ids)))).all()
+        )
+    if teacher_ids:
+        teacher_names = dict(
+            (await session.execute(select(TeacherProfile.id, TeacherProfile.name).where(TeacherProfile.id.in_(teacher_ids)))).all()
+        )
+
+    return [
+        _enriched_slot(
+            (
+                slot,
+                class_names.get(slot.class_id),
+                section_names.get(slot.section_id),
+                course_names.get(slot.course_id),
+                teacher_names.get(slot.teacher_id),
+            )
+        )
+        for slot in slots
+    ]
 
 
 @router.get("/timetable/me", response_model=list[TimetableSlotRead])
 async def my_timetable(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[TimetableSlotRead]:
     active_session_id = await _active_session_id(session, madrasa.id)
     if active_session_id is None:
@@ -546,8 +599,10 @@ async def my_timetable(
     else:
         return []
 
-    result = await session.execute(stmt.order_by(TimetableSlot.day_of_week, TimetableSlot.period))
-    return [TimetableSlotRead.model_validate(row) for row in result.scalars().all()]
+    rows = await paginate_scalars(
+        session, stmt.order_by(TimetableSlot.day_of_week, TimetableSlot.period), limit=limit, offset=offset, response=response
+    )
+    return [TimetableSlotRead.model_validate(row) for row in rows]
 
 
 @router.post("/holidays", response_model=HolidayRead)
@@ -584,6 +639,7 @@ async def _validated_class_ids(
 
 @router.get("/holidays", response_model=list[HolidayRead])
 async def list_holidays(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -591,6 +647,8 @@ async def list_holidays(
     class_id: UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[HolidayRead]:
     stmt = select(Holiday).where(Holiday.madrasa_id == madrasa.id)
     if category:
@@ -599,10 +657,18 @@ async def list_holidays(
         stmt = stmt.where(Holiday.end_date >= date_from)
     if date_to:
         stmt = stmt.where(Holiday.start_date <= date_to)
-    rows = (await session.execute(stmt.order_by(Holiday.start_date))).scalars().all()
+    stmt = stmt.order_by(Holiday.start_date)
+
     if class_id is not None:
-        # Madrasa-wide holidays + those scoped to the class.
-        rows = [row for row in rows if not row.class_ids or str(class_id) in row.class_ids]
+        # class_ids is a JSON array; containment can't be filtered portably
+        # in SQL, so filter in Python first, then paginate the filtered set.
+        all_rows = (await session.execute(stmt)).scalars().all()
+        filtered = [row for row in all_rows if not row.class_ids or str(class_id) in row.class_ids]
+        response.headers["X-Total-Count"] = str(len(filtered))
+        page = filtered[offset : offset + limit]
+        return [HolidayRead.model_validate(row) for row in page]
+
+    rows = await paginate_scalars(session, stmt, limit=limit, offset=offset, response=response)
     return [HolidayRead.model_validate(row) for row in rows]
 
 
@@ -675,6 +741,7 @@ async def create_leave(
 
 @router.get("/leave", response_model=list[LeaveRead])
 async def list_leave(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -685,6 +752,8 @@ async def list_leave(
     date_from: date | None = None,
     date_to: date | None = None,
     q: str | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[LeaveRead]:
     can_manage_leave = await user_has_permission(current_user, "leave.manage", session)
     stmt = select(Leave).where(Leave.madrasa_id == madrasa.id)
@@ -721,12 +790,20 @@ async def list_leave(
             return []
         stmt = stmt.where(Leave.user_id.in_(student_user_ids))
 
-    result = await session.execute(stmt.order_by(Leave.start_date))
-    reads = await _leave_reads(session, list(result.scalars().all()), madrasa.id)
+    stmt = stmt.order_by(Leave.start_date)
+
     if q:
+        # person_name is derived (joined) per row, so the text search can
+        # only run after enrichment; filter first, then paginate the result.
+        all_rows = (await session.execute(stmt)).scalars().all()
+        reads = await _leave_reads(session, list(all_rows), madrasa.id)
         needle = q.lower()
         reads = [r for r in reads if r.person_name and needle in r.person_name.lower()]
-    return reads
+        response.headers["X-Total-Count"] = str(len(reads))
+        return reads[offset : offset + limit]
+
+    rows = await paginate_scalars(session, stmt, limit=limit, offset=offset, response=response)
+    return await _leave_reads(session, list(rows), madrasa.id)
 
 
 @router.post("/leave/{leave_id}/status", response_model=LeaveRead)
@@ -801,10 +878,13 @@ async def create_resource(
 
 @router.get("/resources", response_model=list[ResourceRead])
 async def list_resources(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     category_id: UUID | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[ResourceRead]:
     stmt = select(Resource).where(Resource.madrasa_id == madrasa.id)
     if category_id:
@@ -812,7 +892,11 @@ async def list_resources(
     result = await session.execute(stmt.order_by(Resource.title))
     rows = result.scalars().all()
     ctx = await get_viewer_context(session, current_user, madrasa.id)
-    return [ResourceRead.model_validate(row) for row in rows if scope_allows(row.visibility_scope, ctx)]
+    # scope_allows is a Python-side visibility check, so filter before paging.
+    visible = [row for row in rows if scope_allows(row.visibility_scope, ctx)]
+    response.headers["X-Total-Count"] = str(len(visible))
+    page = visible[offset : offset + limit]
+    return [ResourceRead.model_validate(row) for row in page]
 
 
 # ------------------------------------------------------------------ Forms
@@ -843,14 +927,21 @@ async def create_form(
 
 @router.get("/forms", response_model=list[FormRead])
 async def list_forms(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[FormRead]:
     result = await session.execute(select(Form).where(Form.madrasa_id == madrasa.id).order_by(Form.title))
     rows = result.scalars().all()
     ctx = await get_viewer_context(session, current_user, madrasa.id)
-    return [FormRead.model_validate(row) for row in rows if scope_allows(row.visibility_scope, ctx)]
+    # scope_allows is a Python-side visibility check, so filter before paging.
+    visible = [row for row in rows if scope_allows(row.visibility_scope, ctx)]
+    response.headers["X-Total-Count"] = str(len(visible))
+    page = visible[offset : offset + limit]
+    return [FormRead.model_validate(row) for row in page]
 
 
 @router.get("/forms/{form_id}", response_model=FormRead)
@@ -915,7 +1006,18 @@ async def list_form_responses(
 ) -> list[FormResponseRead]:
     await _get_form_or_404(session, form_id, madrasa.id)
     result = await session.execute(select(FormResponse).where(FormResponse.form_id == form_id))
-    return [FormResponseRead.model_validate(row) for row in result.scalars().all()]
+    responses = result.scalars().all()
+    student_ids = {r.student_id for r in responses}
+    names: dict[UUID, str] = {}
+    if student_ids:
+        rows = await session.execute(
+            select(StudentProfile.id, StudentProfile.name).where(StudentProfile.id.in_(student_ids))
+        )
+        names = dict(rows.all())
+    return [
+        FormResponseRead(**FormResponseRead.model_validate(row).model_dump(exclude={"student_name"}), student_name=names.get(row.student_id))
+        for row in responses
+    ]
 
 
 async def _get_form_or_404(session: AsyncSession, form_id: UUID, madrasa_id: UUID) -> Form:
@@ -952,6 +1054,7 @@ async def create_announcement(
 
 @router.get("/announcements", response_model=list[AnnouncementRead])
 async def list_announcements(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -959,6 +1062,8 @@ async def list_announcements(
     q: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[AnnouncementRead]:
     now = datetime.now(UTC)
     stmt = select(Announcement).where(Announcement.madrasa_id == madrasa.id)
@@ -988,7 +1093,12 @@ async def list_announcements(
             return False
         return scope_allows(row.audience_scope, ctx) and _audience_tab(row)
 
-    return [AnnouncementRead.model_validate(row) for row in rows if _live(row)]
+    # _live combines time-window and Python-side visibility checks, so
+    # filter first, then paginate the filtered set.
+    live = [row for row in rows if _live(row)]
+    response.headers["X-Total-Count"] = str(len(live))
+    page = live[offset : offset + limit]
+    return [AnnouncementRead.model_validate(row) for row in page]
 
 
 @router.put("/announcements/{announcement_id}", response_model=AnnouncementRead)
@@ -1055,17 +1165,22 @@ async def create_blog_post(
 
 @router.get("/blog", response_model=list[BlogPostRead])
 async def list_blog_posts(
+    response: Response,
     current_user: Optional[User] = Depends(get_optional_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     published_only: bool = False,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[BlogPostRead]:
     # Anonymous visitors (the public marketing site) only ever see published posts.
     stmt = select(BlogPost).where(BlogPost.madrasa_id == madrasa.id)
     if published_only or current_user is None:
         stmt = stmt.where(BlogPost.published.is_(True))
-    result = await session.execute(stmt.order_by(BlogPost.created_at.desc()))
-    return [BlogPostRead.model_validate(row) for row in result.scalars().all()]
+    rows = await paginate_scalars(
+        session, stmt.order_by(BlogPost.created_at.desc()), limit=limit, offset=offset, response=response
+    )
+    return [BlogPostRead.model_validate(row) for row in rows]
 
 
 @router.post("/blog/{post_id}/publish", response_model=BlogPostRead)
@@ -1158,15 +1273,15 @@ async def create_admission_form(
 
 @router.get("/admission-forms", response_model=list[AdmissionFormRead])
 async def list_admission_forms(
+    response: Response,
     current_user: User = Depends(require_permission("admissions.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[AdmissionFormRead]:
-    rows = (
-        await session.execute(
-            select(AdmissionForm).where(AdmissionForm.madrasa_id == madrasa.id).order_by(AdmissionForm.created_at.desc())
-        )
-    ).scalars().all()
+    stmt = select(AdmissionForm).where(AdmissionForm.madrasa_id == madrasa.id).order_by(AdmissionForm.created_at.desc())
+    rows = await paginate_scalars(session, stmt, limit=limit, offset=offset, response=response)
     return [await _admission_form_read(session, row) for row in rows]
 
 
@@ -1207,14 +1322,20 @@ async def create_admission_application(
 
 @router.get("/admissions", response_model=list[AdmissionApplicationRead])
 async def list_admission_applications(
+    response: Response,
     current_user: User = Depends(require_permission("admissions.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[AdmissionApplicationRead]:
-    result = await session.execute(
-        select(AdmissionApplication).where(AdmissionApplication.madrasa_id == madrasa.id).order_by(AdmissionApplication.created_at.desc())
+    stmt = (
+        select(AdmissionApplication)
+        .where(AdmissionApplication.madrasa_id == madrasa.id)
+        .order_by(AdmissionApplication.created_at.desc())
     )
-    return [AdmissionApplicationRead.model_validate(row) for row in result.scalars().all()]
+    rows = await paginate_scalars(session, stmt, limit=limit, offset=offset, response=response)
+    return [AdmissionApplicationRead.model_validate(row) for row in rows]
 
 
 @router.post("/admissions/{application_id}/status", response_model=AdmissionApplicationRead)
@@ -1253,14 +1374,16 @@ async def create_contact_enquiry(
 
 @router.get("/enquiries", response_model=list[ContactEnquiryRead])
 async def list_contact_enquiries(
+    response: Response,
     current_user: User = Depends(require_permission("contact.enquiries.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[ContactEnquiryRead]:
-    result = await session.execute(
-        select(ContactEnquiry).where(ContactEnquiry.madrasa_id == madrasa.id).order_by(ContactEnquiry.created_at.desc())
-    )
-    return [ContactEnquiryRead.model_validate(row) for row in result.scalars().all()]
+    stmt = select(ContactEnquiry).where(ContactEnquiry.madrasa_id == madrasa.id).order_by(ContactEnquiry.created_at.desc())
+    rows = await paginate_scalars(session, stmt, limit=limit, offset=offset, response=response)
+    return [ContactEnquiryRead.model_validate(row) for row in rows]
 
 
 @router.post("/enquiries/{enquiry_id}/status", response_model=ContactEnquiryRead)

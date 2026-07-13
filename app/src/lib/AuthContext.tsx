@@ -27,6 +27,7 @@ interface AuthContextType {
   login: (token: string, tenant: string) => Promise<void>;
   logout: () => void;
   updateSelectedSession: (sessionId: string | null) => Promise<void>;
+  updateProfile: (payload: { preferred_language?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -99,13 +100,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAcademicSessionId(res.data.user?.selected_session_id ?? null);
   };
 
+  const updateProfile = async (payload: { preferred_language?: string }) => {
+    const res = await api.patch("/api/v1/auth/me", payload);
+    setUser(res.data.user);
+    setAcademicSessionId(res.data.user?.selected_session_id ?? null);
+  };
+
   const hasPermission = (code: string) => user?.role === "principal" || permissions.includes(code);
   // Missing key = enabled: flags are subtractive, set only by the super admin.
   const hasFeature = (key: string) => features[key] !== false;
 
   return (
     <AuthContext.Provider
-      value={{ user, madrasa, permissions, isAuthenticated: !!user, isLoading, hasPermission, hasFeature, login, logout, updateSelectedSession }}
+      value={{ user, madrasa, permissions, isAuthenticated: !!user, isLoading, hasPermission, hasFeature, login, logout, updateSelectedSession, updateProfile }}
     >
       {children}
     </AuthContext.Provider>

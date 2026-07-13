@@ -2,11 +2,12 @@ from datetime import UTC, datetime
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, require_permission
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.academics.models import AcademicClass, AcademicSession, Course, Enrollment, Madrasa
 from app.modules.assessments.models import ExamType, Mark, ResultPublication
@@ -247,13 +248,18 @@ async def send_credentials(
 
 @router.get("/templates", response_model=list[MessageTemplateRead])
 async def list_templates(
+    response: Response,
     current_user: User = Depends(require_permission("messaging.templates.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
-) -> list[MessageTemplate]:
-    return (
-        await session.execute(select(MessageTemplate).where(MessageTemplate.madrasa_id == madrasa.id))
-    ).scalars().all()
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> list[MessageTemplateRead]:
+    stmt = select(MessageTemplate).where(MessageTemplate.madrasa_id == madrasa.id)
+    rows = await paginate_scalars(
+        session, stmt.order_by(MessageTemplate.name), limit=limit, offset=offset, response=response
+    )
+    return [MessageTemplateRead.model_validate(row) for row in rows]
 
 
 @router.post("/templates", response_model=MessageTemplateRead)

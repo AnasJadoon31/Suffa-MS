@@ -6,13 +6,14 @@ admin's onboarding decisions cannot be overridden from inside a tenant.
 """
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
 from app.core.dependencies import get_enabled_features, require_super_admin
 from app.core.features import FEATURES, FEATURE_KEYS
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.academics.models import Madrasa
 from app.modules.auth.models import User, UserRole
@@ -38,11 +39,17 @@ async def _get_madrasa_or_404(session: AsyncSession, madrasa_id: UUID) -> Madras
 
 @router.get("/madaris", response_model=list[PlatformMadrasaRead])
 async def list_madaris(
+    response: Response,
     current_user: User = Depends(require_super_admin),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[PlatformMadrasaRead]:
-    result = await session.execute(select(Madrasa).order_by(Madrasa.created_at))
-    return [PlatformMadrasaRead.model_validate(row) for row in result.scalars().all()]
+    stmt = select(Madrasa)
+    rows = await paginate_scalars(
+        session, stmt.order_by(Madrasa.created_at), limit=limit, offset=offset, response=response
+    )
+    return [PlatformMadrasaRead.model_validate(row) for row in rows]
 
 
 @router.post("/madaris", response_model=MadrasaCreateResponse)

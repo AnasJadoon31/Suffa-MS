@@ -16,6 +16,7 @@ void i18next.use(initReactI18next).init({
         groupPeople: "People",
         groupFinance: "Finance & reports",
         groupSite: "Madrasa site",
+        groupAccount: "Account",
 
         rolePrincipal: "Principal",
         roleTeacher: "Teacher",
@@ -325,6 +326,8 @@ void i18next.use(initReactI18next).init({
         descReports: "Attendance, results, and finance exports (CSV / PDF).",
         descBlog: "Public posts for the marketing site.",
         descSettings: "Madrasa-wide configuration.",
+        descProfile: "Your account details, language, and password.",
+        descMySalary: "Your salary record and payment history.",
 
         dashboard: "Dashboard",
         attendance: "Attendance",
@@ -523,7 +526,21 @@ void i18next.use(initReactI18next).init({
         downloadBtn: "Download",
         submitBtn: "Submit",
         failedSubmitAssignment: "Failed to submit assignment",
-        submittedLabel: "Submitted"
+        submittedLabel: "Submitted",
+
+        myProfile: "My profile",
+        roleLabel: "Role",
+        preferredLanguageLabel: "Preferred language",
+        profileLanguageSaved: "Language preference saved.",
+        profileLanguageFailed: "Could not save language preference",
+        changePasswordHeading: "Change password",
+        currentPasswordLabel: "Current password",
+        changePasswordBtn: "Change password",
+        profilePasswordMismatch: "New password and confirmation do not match.",
+        profilePasswordChanged: "Password changed.",
+        profilePasswordFailed: "Could not change password",
+        failedLoadSalary: "Could not load salary",
+        noSalarySetYet: "No salary has been set yet."
       }
     },
     ur: {
@@ -536,6 +553,7 @@ void i18next.use(initReactI18next).init({
         groupPeople: "افراد",
         groupFinance: "مالیات و رپورٹس",
         groupSite: "مدرسہ ویب سائٹ",
+        groupAccount: "اکاؤنٹ",
 
         rolePrincipal: "مہتمم",
         roleTeacher: "استاد",
@@ -845,6 +863,8 @@ void i18next.use(initReactI18next).init({
         descReports: "حاضری، نتائج اور مالیات کی رپورٹس (CSV / PDF)۔",
         descBlog: "مارکیٹنگ سائٹ کے لیے عوامی تحریریں۔",
         descSettings: "مدرسے کی مجموعی ترتیبات۔",
+        descProfile: "آپ کے اکاؤنٹ کی تفصیلات، زبان اور پاس ورڈ۔",
+        descMySalary: "آپ کی تنخواہ کا ریکارڈ اور ادائیگیوں کی تاریخ۔",
 
         dashboard: "ڈیش بورڈ",
         attendance: "حاضری",
@@ -1043,7 +1063,21 @@ void i18next.use(initReactI18next).init({
         downloadBtn: "ڈاؤن لوڈ کریں",
         submitBtn: "جمع کروائیں",
         failedSubmitAssignment: "اسائنمنٹ جمع کروانے میں ناکامی",
-        submittedLabel: "جمع کر دیا گیا"
+        submittedLabel: "جمع کر دیا گیا",
+
+        myProfile: "میری پروفائل",
+        roleLabel: "کردار",
+        preferredLanguageLabel: "پسندیدہ زبان",
+        profileLanguageSaved: "زبان کی ترجیح محفوظ کر لی گئی۔",
+        profileLanguageFailed: "زبان کی ترجیح محفوظ نہیں ہو سکی",
+        changePasswordHeading: "پاس ورڈ تبدیل کریں",
+        currentPasswordLabel: "موجودہ پاس ورڈ",
+        changePasswordBtn: "پاس ورڈ تبدیل کریں",
+        profilePasswordMismatch: "نیا پاس ورڈ اور اس کی تصدیق مماثل نہیں ہیں۔",
+        profilePasswordChanged: "پاس ورڈ تبدیل کر دیا گیا۔",
+        profilePasswordFailed: "پاس ورڈ تبدیل نہیں ہو سکا",
+        failedLoadSalary: "تنخواہ لوڈ نہیں ہو سکی",
+        noSalarySetYet: "ابھی تک کوئی تنخواہ مقرر نہیں کی گئی۔"
       }
     }
   }

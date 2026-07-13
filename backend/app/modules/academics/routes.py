@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,7 @@ from app.core.dependencies import (
     require_permission,
 )
 from app.core.hijri import to_hijri_string
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.auth.models import User
 from app.modules.academics.models import (
@@ -77,13 +78,16 @@ async def create_program(
 
 @router.get("/programs", response_model=list[ProgramRead])
 async def list_programs(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[ProgramRead]:
     stmt = select(Program).where(Program.madrasa_id == madrasa.id)
-    result = await session.execute(stmt)
-    return [ProgramRead.model_validate(p) for p in result.scalars().all()]
+    rows = await paginate_scalars(session, stmt.order_by(Program.name), limit=limit, offset=offset, response=response)
+    return [ProgramRead.model_validate(p) for p in rows]
 
 
 @router.put("/programs/{program_id}", response_model=ProgramRead)
@@ -149,13 +153,18 @@ async def create_class(
 
 @router.get("/classes", response_model=list[AcademicClassRead])
 async def list_classes(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[AcademicClassRead]:
     stmt = select(AcademicClass).where(AcademicClass.madrasa_id == madrasa.id)
-    result = await session.execute(stmt)
-    return [AcademicClassRead.model_validate(c) for c in result.scalars().all()]
+    rows = await paginate_scalars(
+        session, stmt.order_by(AcademicClass.name), limit=limit, offset=offset, response=response
+    )
+    return [AcademicClassRead.model_validate(c) for c in rows]
 
 
 @router.put("/classes/{class_id}", response_model=AcademicClassRead)
@@ -323,13 +332,16 @@ async def create_course(
 
 @router.get("/courses", response_model=list[CourseRead])
 async def list_all_courses(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[CourseRead]:
     stmt = select(Course).where(Course.madrasa_id == madrasa.id)
-    result = await session.execute(stmt)
-    return [CourseRead.model_validate(c) for c in result.scalars().all()]
+    rows = await paginate_scalars(session, stmt.order_by(Course.name), limit=limit, offset=offset, response=response)
+    return [CourseRead.model_validate(c) for c in rows]
 
 
 @router.put("/courses/{course_id}", response_model=CourseRead)
@@ -478,12 +490,16 @@ async def create_session_record(
 
 @router.get("/sessions", response_model=list[AcademicSessionRead])
 async def list_sessions(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[AcademicSessionRead]:
-    result = await session.execute(select(AcademicSession).where(AcademicSession.madrasa_id == madrasa.id))
-    return [AcademicSessionRead.model_validate(row) for row in result.scalars().all()]
+    stmt = select(AcademicSession).where(AcademicSession.madrasa_id == madrasa.id)
+    rows = await paginate_scalars(session, stmt.order_by(AcademicSession.name), limit=limit, offset=offset, response=response)
+    return [AcademicSessionRead.model_validate(row) for row in rows]
 
 
 @router.put("/sessions/{session_id}", response_model=AcademicSessionRead)
@@ -609,6 +625,7 @@ async def create_teacher_assignment(
 
 @router.get("/teacher-assignments", response_model=list[TeacherAssignmentRead])
 async def list_teacher_assignments(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -616,6 +633,8 @@ async def list_teacher_assignments(
     class_id: UUID | None = None,
     course_id: UUID | None = None,
     session_id: UUID | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[TeacherAssignmentRead]:
     stmt = select(TeacherAssignment).where(TeacherAssignment.madrasa_id == madrasa.id)
     if teacher_id:
@@ -626,8 +645,10 @@ async def list_teacher_assignments(
         stmt = stmt.where(TeacherAssignment.course_id == course_id)
     if session_id:
         stmt = stmt.where(TeacherAssignment.session_id == session_id)
-    result = await session.execute(stmt)
-    return [TeacherAssignmentRead.model_validate(row) for row in result.scalars().all()]
+    rows = await paginate_scalars(
+        session, stmt.order_by(TeacherAssignment.created_at), limit=limit, offset=offset, response=response
+    )
+    return [TeacherAssignmentRead.model_validate(row) for row in rows]
 
 
 # ------------------------------------------------------------------ Enrollment

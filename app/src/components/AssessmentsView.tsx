@@ -20,6 +20,7 @@ import {
   type Submission,
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { consumePendingClassNav } from "../lib/pendingNav";
 import { Input, Select } from "./ui/Field";
 
 type Tab = "assignments" | "grading" | "results";
@@ -91,7 +92,17 @@ function AssignmentsTab({
 }: Readonly<{ classes: AcademicClass[]; courses: Course[]; students: Student[]; canCreate: boolean }>) {
   const { t } = useTranslation();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [filters, setFilters] = useState({ class_id: "", section_id: "", course_id: "", category: "", sort: "due_date" });
+  const [filters, setFilters] = useState(() => {
+    // Deep link from the dashboard's "open class list" button (§C).
+    const pending = consumePendingClassNav();
+    return {
+      class_id: pending?.classId ?? "",
+      section_id: pending?.sectionId ?? "",
+      course_id: pending?.courseId ?? "",
+      category: "",
+      sort: "due_date",
+    };
+  });
   const [filterSections, setFilterSections] = useState<Section[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Assignment | null>(null);

@@ -111,3 +111,9 @@ class SalaryPaymentRead(BaseModel):
     note: str
     recorded_by_id: UUID
     created_at: datetime
+
+
+class MySalaryRead(BaseModel):
+    """Self-scoped view for a teacher: own salary record + payment history."""
+    record: SalaryRecordRead | None = None
+    payments: list[SalaryPaymentRead] = []

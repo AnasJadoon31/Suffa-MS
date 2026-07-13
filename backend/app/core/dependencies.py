@@ -68,18 +68,40 @@ async def get_current_user(
 async def get_current_madrasa(
     request: Request,
     x_madrasa: Optional[str] = Header(None),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ) -> Madrasa:
-    slug = x_madrasa or settings.default_tenant
-    if not slug:
-        raise HTTPException(status_code=400, detail="Madrasa tenant not specified")
+    """Resolves the tenant every scoped route filters by.
 
-    stmt = select(Madrasa).where(Madrasa.slug == slug)
-    result = await session.execute(stmt)
-    madrasa = result.scalar_one_or_none()
+    OWASP A01 (broken access control): the `X-Madrasa` header is
+    client-supplied and MUST NOT decide which tenant's rows an authenticated
+    request can read/write — permission checks (`user_has_permission`) carry
+    no tenant scope of their own (a Principal is an implicit superuser for
+    *whichever* madrasa this function returns), so trusting the header would
+    let any authenticated user — e.g. any Principal of any tenant — read or
+    mutate a completely different tenant's data just by sending a different
+    header value, regardless of role/permission grants. Non-super-admin
+    users are therefore pinned to their own `madrasa_id`; the header is
+    ignored for them. Only `super_admin` (platform scope, no `madrasa_id` of
+    its own) uses the header to pick which tenant it's currently acting on.
+    """
+    if current_user.role == UserRole.super_admin:
+        slug = x_madrasa or settings.default_tenant
+        if not slug:
+            raise HTTPException(status_code=400, detail="Madrasa tenant not specified")
+        stmt = select(Madrasa).where(Madrasa.slug == slug)
+        result = await session.execute(stmt)
+        madrasa = result.scalar_one_or_none()
+        if madrasa is None:
+            raise HTTPException(status_code=404, detail="Madrasa not found")
+        return madrasa
+
+    if current_user.madrasa_id is None:
+        raise HTTPException(status_code=403, detail="User is not attached to any tenant")
+
+    madrasa = await session.get(Madrasa, current_user.madrasa_id)
     if madrasa is None:
         raise HTTPException(status_code=404, detail="Madrasa not found")
-
     return madrasa
 
 

@@ -1,10 +1,11 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, require_permission
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.academics.models import Madrasa
 from app.modules.auth.models import User, UserRole
@@ -94,11 +95,14 @@ async def create_teacher(
 
 @router.get("/teachers", response_model=list[TeacherRead])
 async def list_teachers(
+    response: Response,
     current_user: User = Depends(require_permission("teachers.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     search: str | None = Query(default=None, description="Match against name or employee code"),
     status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[TeacherRead]:
     stmt = select(TeacherProfile).where(TeacherProfile.madrasa_id == madrasa.id)
     if search:
@@ -106,8 +110,10 @@ async def list_teachers(
         stmt = stmt.where((TeacherProfile.name.ilike(like)) | (TeacherProfile.employee_code.ilike(like)))
     if status_filter:
         stmt = stmt.where(TeacherProfile.status == status_filter)
-    result = await session.execute(stmt.order_by(TeacherProfile.name))
-    return [TeacherRead.model_validate(row) for row in result.scalars().all()]
+    rows = await paginate_scalars(
+        session, stmt.order_by(TeacherProfile.name), limit=limit, offset=offset, response=response
+    )
+    return [TeacherRead.model_validate(row) for row in rows]
 
 
 @router.get("/teachers/{teacher_id}", response_model=TeacherRead)
@@ -232,11 +238,14 @@ async def create_student(
 
 @router.get("/students", response_model=list[StudentRead])
 async def list_students(
+    response: Response,
     current_user: User = Depends(require_permission("students.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     search: str | None = Query(default=None, description="Match against name or admission number"),
     status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[StudentRead]:
     stmt = select(StudentProfile).where(StudentProfile.madrasa_id == madrasa.id)
     if search:
@@ -244,8 +253,10 @@ async def list_students(
         stmt = stmt.where((StudentProfile.name.ilike(like)) | (StudentProfile.admission_number.ilike(like)))
     if status_filter:
         stmt = stmt.where(StudentProfile.status == status_filter)
-    result = await session.execute(stmt.order_by(StudentProfile.name))
-    return [StudentRead.model_validate(row) for row in result.scalars().all()]
+    rows = await paginate_scalars(
+        session, stmt.order_by(StudentProfile.name), limit=limit, offset=offset, response=response
+    )
+    return [StudentRead.model_validate(row) for row in rows]
 
 
 @router.get("/students/{student_id}", response_model=StudentRead)
@@ -303,25 +314,6 @@ async def reissue_student_credentials(
     url = reissue_set_password_link(session, madrasa_id=madrasa.id, actor_id=current_user.id, user=user)
     await session.commit()
     return {"username": user.username, "set_password_url": url}
-
-
-@router.get("/students/{student_id}/guardians", response_model=list[GuardianRead])
-async def list_student_guardians(
-    student_id: UUID,
-    current_user: User = Depends(require_permission("students.view")),
-    madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session),
-) -> list[GuardianRead]:
-    await _get_or_404(session, StudentProfile, student_id, madrasa.id)
-    rows = (
-        await session.execute(
-            select(Guardian)
-            .join(StudentGuardian, StudentGuardian.guardian_id == Guardian.id)
-            .where(StudentGuardian.student_id == student_id)
-            .order_by(Guardian.name)
-        )
-    ).scalars().all()
-    return [GuardianRead.model_validate(row) for row in rows]
 
 
 # ---------------------------------------------------------------- Guardians
@@ -396,16 +388,21 @@ async def guardian_credentials_link(
 
 @router.get("/guardians", response_model=list[GuardianRead])
 async def list_guardians(
+    response: Response,
     current_user: User = Depends(require_permission("students.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     search: str | None = Query(default=None, description="Match against guardian name"),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[GuardianRead]:
     stmt = select(Guardian).where(Guardian.madrasa_id == madrasa.id)
     if search:
         stmt = stmt.where(Guardian.name.ilike(f"%{search}%"))
-    result = await session.execute(stmt.order_by(Guardian.name))
-    return [GuardianRead.model_validate(row) for row in result.scalars().all()]
+    rows = await paginate_scalars(
+        session, stmt.order_by(Guardian.name), limit=limit, offset=offset, response=response
+    )
+    return [GuardianRead.model_validate(row) for row in rows]
 
 
 @router.get("/students/{student_id}/guardians", response_model=list[GuardianRead])

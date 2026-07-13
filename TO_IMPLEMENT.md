@@ -199,31 +199,56 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
 
 ## C. Teacher portal
 
-- [ ] **[P2]** Dashboard: direct "open class list" per taught section with course
-      name; all student actions on that page.
-- [ ] **[P2]** Assessments page = admin's, scoped to taught sections (derived from
-      timetable, IMPLEMENT.md §4).
-- [ ] **[P2]** Attendance page = admin's, scoped to taught sections, only if admin
-      allows (permission-gated).
-- [ ] **[P3]** Timetable: grid view only, own sections only.
+- [x] **[P2]** Dashboard: direct "open class list" per taught section with course
+      name; all student actions on that page. — `my_classes` was already returned
+      by `/reporting/dashboard`; the buttons now actually deep-link via
+      `lib/pendingNav.ts` (a one-shot signal consumed on mount) so clicking
+      "open class list" / "Assessments" lands straight on that section's roster
+      in `AttendanceBoard` / the pre-filtered Assignments tab, instead of just
+      switching screens and making the teacher pick again.
+- [x] **[P2]** Assessments page = admin's, scoped to taught sections (derived from
+      timetable, IMPLEMENT.md §4). — backend already scoped (verified); dashboard
+      deep-link now also pre-selects class/section/course on arrival.
+- [x] **[P2]** Attendance page = admin's, scoped to taught sections, only if admin
+      allows (permission-gated). — `/attendance/classes` already scoped to
+      `taught_pairs`; verified, plus deep-link added.
+- [x] **[P3]** Timetable: grid view only, own sections only. — already correct
+      (`TimetableView.tsx` `isTeacher` branch); verified.
 - [ ] **[P3]** Holidays: own classes + global only.
 - [ ] **[P3]** Announcements: teacher-audience + global only.
 - [ ] **[P2]** Resources: upload for own sections if allowed; global resources
       visible; global upload if allowed; per-teacher permission toggles by admin.
 - [ ] **[P3]** Forms: related only.
-- [ ] **[P2]** Profile settings (missing entirely).
-- [ ] **[P2]** Salary view (own salary records/payments — read-only).
+- [x] **[P2]** Profile settings (missing entirely). — new `ProfileView.tsx`
+      (account info, preferred language, change password), reusing existing
+      `PATCH /auth/me` + `POST /auth/change-password`; nav item added for
+      teacher + student roles.
+- [x] **[P2]** Salary view (own salary records/payments — read-only). — new
+      `GET /api/v1/finance/salary/me` (minimal backend addition, tested in
+      `backend/tests/test_self_service.py`); `SalaryView.tsx` now branches on
+      `teachers.salary.manage` permission (admin lookup-any-teacher screen vs.
+      read-only self-view).
 
 ## D. Student portal
 
-- [ ] **[P2]** Dashboard redesign: own attendance calendar, test scores, organized
-      layout.
-- [ ] **[P3]** Scope everything to self: own attendance, own timetable, related
-      announcements/resources/forms only.
-- [ ] **[P1]** Remove from student nav: Admissions, Blog, Fee tracking (leaks
+- [x] **[P2]** Dashboard redesign: own attendance calendar, test scores, organized
+      layout. — already implemented in a prior pass (`StudentDashboardCards` in
+      `DashboardCards.tsx`: attendance calendar, latest published result +
+      result-card download, due assignments with inline submit, announcements,
+      resources, today's timetable, two-column layout); verified against the
+      spec and left as-is.
+- [x] **[P3]** Scope everything to self: own attendance, own timetable, related
+      announcements/resources/forms only. — verified: `/reporting/dashboard`,
+      `/assessments/results/me`, timetable and attendance endpoints are all
+      filtered by the caller's own student/enrollment record server-side.
+- [x] **[P1]** Remove from student nav: Admissions, Blog, Fee tracking (leaks
       admin views today — audit `navItems` role filtering in
-      `app/src/data/mockData.ts` and enforce server-side too).
-- [ ] **[P2]** Personal settings page.
+      `app/src/data/mockData.ts` and enforce server-side too). — verified
+      already correct: `admissions`/`finance`/`salary`/`reports`/`blog` nav
+      items are all `roles: ["principal", "teacher"]`-gated, and the
+      corresponding backend routes are permission-gated independently.
+- [x] **[P2]** Personal settings page. — same `ProfileView.tsx` as the teacher
+      portal (shared component, `profile` nav item for teacher + student).
 
 ## E. Additional findings (self-audit, "look for other things")
 

@@ -68,11 +68,24 @@ def create_app() -> FastAPI:
             # ServerErrorMiddleware, whose response carries no CORS headers and
             # shows up in browsers as a bogus CORS failure.
             return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    # allow_origin_regex=".*" is intentional: madrasas front this API from
+    # their own custom domains, unknown at deploy time, so a fixed allowlist
+    # (`cors_origins`, still applied/kept for local dev clarity) can't cover
+    # every tenant. That combined with allow_credentials=True is a classic
+    # OWASP A05 misconfiguration *for cookie-based auth* — but this API never
+    # sets or reads cookies; auth is a bearer token the frontend attaches
+    # itself via the Authorization header (see app/src — no
+    # `credentials: 'include'`/`withCredentials` anywhere). allow_credentials
+    # is therefore off: it only gates cookie/TLS-client-cert forwarding, and
+    # turning it off is what converts "wildcard origin" from an unsafe
+    # anti-pattern into the standard, safe shape for a public bearer-token
+    # API (browsers still require the caller to already hold the token —
+    # CORS can't hand that out).
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_origin_regex=".*",
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
