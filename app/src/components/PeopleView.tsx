@@ -98,15 +98,25 @@ function ReissueCredentialsButton({
   );
 }
 
-type Tab = "teachers" | "students" | "guardians" | "donators" | "admissions";
+export type PeopleTab = "teachers" | "students" | "guardians" | "donators" | "admissions";
 
-export function PeopleView({ initialTab = "teachers" }: Readonly<{ initialTab?: Tab }>) {
+export function PeopleView({
+  initialTab = "teachers",
+  onTabChange,
+  showTabs = true,
+}: Readonly<{ initialTab?: PeopleTab; onTabChange?: (tab: PeopleTab) => void; showTabs?: boolean }>) {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const readOnly = useSessionReadOnly();
-  const [tab, setTab] = useState<Tab>(initialTab);
-  const canFinance = !readOnly && hasPermission("finance.manage");
+  const [tab, setTab] = useState<PeopleTab>(initialTab);
+  const canViewFinance = hasPermission("finance.manage");
+  const canFinance = !readOnly && canViewFinance;
   const canSalary = !readOnly && hasPermission("teachers.salary.manage");
+  useEffect(() => setTab(initialTab), [initialTab]);
+  const changeTab = (next: PeopleTab) => {
+    setTab(next);
+    onTabChange?.(next);
+  };
 
   return (
     <section className="modulePanel">
@@ -114,31 +124,31 @@ export function PeopleView({ initialTab = "teachers" }: Readonly<{ initialTab?: 
         <h2>{t("peopleTitle")}</h2>
         <p className="notice">{t("peopleSubtitle")}</p>
       </div>
-      <div className="formActions" style={{ marginBottom: 16 }}>
-        <button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teachers")}>
+      {showTabs && <div className="formActions" style={{ marginBottom: 16 }}>
+        {hasPermission("teachers.view") && <button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("teachers")}>
           <UserRoundCog size={16} /> {t("teachers")}
-        </button>
-        <button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("students")}>
+        </button>}
+        {hasPermission("students.view") && <button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("students")}>
           <GraduationCap size={16} /> {t("students")}
-        </button>
-        <button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("guardians")}>
+        </button>}
+        {hasPermission("students.view") && <button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("guardians")}>
           <UsersRound size={16} /> {t("guardians")}
-        </button>
+        </button>}
         {hasPermission("admissions.manage") && (
-          <button className={tab === "admissions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("admissions")}>
+          <button className={tab === "admissions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("admissions")}>
             <GraduationCap size={16} /> {t("walkInAdmissions")}
           </button>
         )}
-        {canFinance && (
-          <button className={tab === "donators" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("donators")}>
+        {canViewFinance && (
+          <button className={tab === "donators" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("donators")}>
             <HandCoins size={16} /> {t("donatorsTab")}
           </button>
         )}
-      </div>
+      </div>}
       {tab === "teachers" && <TeachersTab canCreate={!readOnly && hasPermission("teachers.add")} canSalary={canSalary} />}
       {tab === "students" && <StudentsTab canCreate={!readOnly && hasPermission("students.add")} canFinance={canFinance} />}
       {tab === "guardians" && <GuardiansTab canCreate={!readOnly && hasPermission("students.add")} canSendCredentials={!readOnly && hasPermission("students.send_credentials")} />}
-      {tab === "donators" && canFinance && <DonatorsTab />}
+      {tab === "donators" && canViewFinance && <DonatorsTab canWrite={canFinance} />}
       {tab === "admissions" && hasPermission("admissions.manage") && <AdmissionsView section="registrations" />}
     </section>
   );
@@ -767,7 +777,7 @@ function GuardiansTab({
 
 // ------------------------------------------------------------------ Donators
 
-function DonatorsTab() {
+function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const { t } = useTranslation();
   const [donors, setDonors] = useState<Donor[]>([]);
   const [selected, setSelected] = useState<Donor | null>(null);
@@ -831,7 +841,7 @@ function DonatorsTab() {
               </div>
             ))}
           </div>
-          <form
+          {canWrite && <form
             className="inlineForm"
             onSubmit={async (e) => {
               e.preventDefault();
@@ -860,7 +870,7 @@ function DonatorsTab() {
             <label>{t("amountCol")}<Input required type="number" value={donationForm.amount} onChange={(e) => setDonationForm({ ...donationForm, amount: e.target.value })} /></label>
             <label>{t("dateCol")}<Input required type="date" value={donationForm.donation_date} onChange={(e) => setDonationForm({ ...donationForm, donation_date: e.target.value })} /></label>
             <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addDonationBtn")}</button></div>
-          </form>
+          </form>}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
         </div>
       )}

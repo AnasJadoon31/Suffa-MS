@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.modules.assessments.models import Assignment, ExamType, GradingScheme, Mark
 from app.modules.auth.models import User
 from app.modules.operations.models import TimetableSlot
+from app.modules.academics.models import Enrollment
 
 from tests.conftest import _make_client
 from app.main import app as fastapi_app
@@ -114,6 +115,43 @@ async def test_student_sees_only_own_section_assignments(client, student_client,
     response = await student_client.get("/api/v1/assessments/assignments")
     titles = {row["title"] for row in response.json()}
     assert titles == {"a1 only", "class wide"}
+
+
+async def test_student_cannot_read_or_submit_assignment_outside_enrollment(client, student_client, seed):
+    created = await client.post(
+        "/api/v1/assessments/assignments",
+        json=_assignment_payload(seed, class_id=str(seed.class_b.id), title="Other class"),
+    )
+    assert created.status_code == 200, created.text
+    assignment_id = created.json()[0]["id"]
+
+    detail = await student_client.get(f"/api/v1/assessments/assignments/{assignment_id}")
+    assert detail.status_code == 403
+    submission = await student_client.post(
+        f"/api/v1/assessments/assignments/{assignment_id}/submissions",
+        json={"file_key": "submissions/not-mine.pdf"},
+    )
+    assert submission.status_code == 403
+
+
+async def test_student_without_active_enrollment_sees_no_class_wide_assignments(
+    client, student_client, db_sessionmaker, seed,
+):
+    created = await client.post(
+        "/api/v1/assessments/assignments",
+        json=_assignment_payload(seed, title="Class-wide assignment"),
+    )
+    assert created.status_code == 200, created.text
+    async with db_sessionmaker() as db:
+        enrollment = (
+            await db.execute(select(Enrollment).where(Enrollment.student_id == seed.students[0].id))
+        ).scalar_one()
+        await db.delete(enrollment)
+        await db.commit()
+
+    response = await student_client.get("/api/v1/assessments/assignments")
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 async def test_publish_all_classes_creates_one_row_per_mapped_class(client, seed):

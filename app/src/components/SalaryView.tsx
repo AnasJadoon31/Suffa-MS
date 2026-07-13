@@ -242,11 +242,13 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
   );
 }
 
-export function SalaryView() {
+export function SalaryView({ mode = "manage" }: Readonly<{ mode?: "manage" | "self" }>) {
   const { hasPermission } = useAuth();
   const canWrite = !useSessionReadOnly();
   // Admins (and delegated teachers.salary.manage grantees) get the full
   // lookup-any-teacher screen; every other teacher gets their own read-only
   // record (§C — salary self-view).
-  return hasPermission("teachers.salary.manage") ? <AdminSalaryView canWrite={canWrite} /> : <MySalaryView />;
+  return mode === "manage" && hasPermission("teachers.salary.manage")
+    ? <AdminSalaryView canWrite={canWrite} />
+    : <MySalaryView />;
 }

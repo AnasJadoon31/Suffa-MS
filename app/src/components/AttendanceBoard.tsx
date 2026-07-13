@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 
 import type { AttendanceStatus } from "../data/mockData";
 import { AttendanceCalendar, monthRange, toDateKey, type ClassDayStats, type HolidayMarkers, type StudentDayStatus } from "./AttendanceCalendar";
@@ -252,12 +253,13 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const readOnly = useSessionReadOnly();
+  const [searchParams, setSearchParams] = useSearchParams();
   const canManageTeacherAttendance = !readOnly && hasPermission("teachers.attendance.manage");
-  const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>("students");
+  const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>(() => searchParams.get("mode") === "teachers" ? "teachers" : "students");
   const [marked, setMarked] = useState<Record<string, AttendanceStatus>>({});
   const [classes, setClasses] = useState<AttendanceClassOption[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<AttendanceTab>("calendar");
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(() => searchParams.get("class"));
+  const [activeTab, setActiveTab] = useState<AttendanceTab>(() => searchParams.get("view") === "history" ? "studentHistory" : "calendar");
   const [roster, setRoster] = useState<AttendanceRoster | null>(null);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [isLoadingRoster, setIsLoadingRoster] = useState(false);
@@ -283,9 +285,16 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [studentMonth, setStudentMonth] = useState(() => new Date());
   const [studentSelectedDate, setStudentSelectedDate] = useState<string | null>(null);
   const [studentSearch, setStudentSearch] = useState("");
-  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState(() => searchParams.get("student") ?? "");
   const [studentHistory, setStudentHistory] = useState<StudentAttendanceHistory | null>(null);
   const [isLoadingStudentHistory, setIsLoadingStudentHistory] = useState(false);
+
+  useEffect(() => {
+    setAttendanceMode(searchParams.get("mode") === "teachers" ? "teachers" : "students");
+    setSelectedClassId(searchParams.get("class"));
+    setActiveTab(searchParams.get("view") === "history" ? "studentHistory" : "calendar");
+    setSelectedStudentId(searchParams.get("student") ?? "");
+  }, [searchParams]);
 
   async function handleOverride(entry: (typeof lockedEntries)[number]): Promise<void> {
     const reason = window.prompt(t("overrideReasonPrompt") ?? "Reason for overriding locked attendance day:");
@@ -307,6 +316,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setHasUnsavedMarks(false);
     setSaveMessage("");
     setMarked({});
+    setSearchParams({ class: classId, view: "calendar" });
   }
 
   function returnToClasses(): void {
@@ -317,6 +327,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setSelectedStudentId("");
     setHasUnsavedMarks(false);
     setSaveMessage("");
+    setSearchParams({});
   }
 
   useEffect(() => {
@@ -402,8 +413,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   useEffect(() => {
     if (activeTab === "studentHistory" && !selectedStudentId && roster?.students.length) {
       setSelectedStudentId(roster.students[0].id);
+      setSearchParams({ class: selectedClassId ?? "", view: "history", student: roster.students[0].id });
     }
-  }, [activeTab, roster, selectedStudentId]);
+  }, [activeTab, roster, selectedClassId, selectedStudentId, setSearchParams]);
 
   useEffect(() => {
     if (!selectedClassId || activeTab !== "studentHistory" || !selectedStudentId) return;
@@ -572,7 +584,10 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           <button
             className={attendanceMode === "students" ? "primaryAction" : "secondaryAction"}
             type="button"
-            onClick={() => setAttendanceMode("students")}
+            onClick={() => {
+              setAttendanceMode("students");
+              setSearchParams({});
+            }}
           >
             Student attendance
           </button>
@@ -582,6 +597,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             onClick={() => {
               setAttendanceMode("teachers");
               returnToClasses();
+              setSearchParams({ mode: "teachers" });
             }}
           >
             Teacher attendance
@@ -617,14 +633,20 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           <button
             className={activeTab === "calendar" ? "primaryAction" : "secondaryAction"}
             type="button"
-            onClick={() => setActiveTab("calendar")}
+            onClick={() => {
+              setActiveTab("calendar");
+              setSearchParams({ class: selectedClassId, view: "calendar" });
+            }}
           >
             {t("calendarTab")}
           </button>
           <button
             className={activeTab === "studentHistory" ? "primaryAction" : "secondaryAction"}
             type="button"
-            onClick={() => setActiveTab("studentHistory")}
+            onClick={() => {
+              setActiveTab("studentHistory");
+              setSearchParams({ class: selectedClassId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
+            }}
           >
             {t("studentAttendanceHistory")}
           </button>
@@ -749,6 +771,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 onClick={() => {
                   setSelectedStudentId(student.id);
                   setStudentSelectedDate(null);
+                  setSearchParams({ class: selectedClassId, view: "history", student: student.id });
                 }}
               >
                 <strong>{student.name}</strong>

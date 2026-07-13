@@ -21,21 +21,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // App shell precached; API reads network-first with cache fallback so
-        // dashboards/timetables stay viewable offline. Writes are never
-        // cached — the attendance outbox handles offline writes itself.
+        // App shell only. API responses must never enter Cache Storage because
+        // its cache key does not include the authenticated account. Selected
+        // offline reads use the account-scoped IndexedDB cache instead.
         navigateFallbackDenylist: [/^\/api\//],
-        runtimeCaching: [
-          {
-            urlPattern: ({ url, request }) => request.method === "GET" && url.pathname.startsWith("/api/v1/"),
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-reads",
-              networkTimeoutSeconds: 4,
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
-            },
-          },
-        ],
       },
     }),
   ],

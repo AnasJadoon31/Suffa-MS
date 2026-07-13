@@ -663,3 +663,12 @@ Suite: 60 backend tests green.
   `typing.Union.__getitem__` TypeError at mapper configuration).
 
 Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
+# 2026-07-13 — Route-based portal isolation
+
+- Replaced persisted in-app view state with real React Router URLs for every portal page.
+- Added centralized role, permission, and feature checks that render a 404 when an account opens an unauthorized route.
+- Split management and self-service destinations: `/attendance` vs `/my-attendance`, `/timetable` vs `/my-timetable`, `/assessments` vs `/my-assessments`, `/leave` vs `/my-leave`, and `/salary` vs `/my-salary`.
+- Promoted page-level tabs to URLs, including `/people/*`, `/academics/*`, `/assessments/*`, `/timetable/*`, `/finance/*`, `/admission-forms`, and `/enquiries`; attendance class/history selection is encoded in the URL query.
+- Added student-only attendance history and role-scoped timetable endpoints; the general timetable endpoint now requires management permission.
+- Forced self-service attendance and leave queries to remain self-scoped even when the user also holds management permissions, and enforced enrollment/section scope on assignment detail and submission APIs.
+- Scoped offline reference data and attendance outbox rows by madrasa and user, and removed the shared service-worker API response cache to prevent cross-login data exposure.

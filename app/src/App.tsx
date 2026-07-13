@@ -1,7 +1,7 @@
 import { CalendarDays, Languages, Menu } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { AcademicsView } from "./components/AcademicsView";
 import { AdmissionsView } from "./components/AdmissionsView";
@@ -27,11 +27,21 @@ import { SessionReadOnlyBanner, SessionSwitcher } from "./components/SessionSwit
 import { SetPasswordPage } from "./components/SetPasswordPage";
 import { initialsOf, RoleBadge, Sidebar } from "./components/Sidebar";
 import { TimetableView } from "./components/TimetableView";
+import { MyAssessmentsView } from "./components/MyAssessmentsView";
+import { MyAttendanceView } from "./components/MyAttendanceView";
+import { MyTimetableView } from "./components/MyTimetableView";
+import { NotFoundView } from "./components/NotFoundView";
 import { useAuth } from "./lib/AuthContext";
 import { academicsApi } from "./lib/endpoints";
-import { navItems, type ViewId } from "./data/mockData";
-
-const VIEW_STORAGE_KEY = "mms_active_view";
+import {
+  isNavItemAccessible,
+  isPortalRouteAccessible,
+  navItems,
+  portalRoutes,
+  resolveNavItemPath,
+  type PortalRoute,
+  type ViewId,
+} from "./data/mockData";
 
 // Screen → permission modules, for the per-screen "Delegate…" control (§3).
 const VIEW_MODULES: Partial<Record<ViewId, string[]>> = {
@@ -47,29 +57,27 @@ const VIEW_MODULES: Partial<Record<ViewId, string[]>> = {
   people: ["people", "auth"],
   admissions: ["admissions"],
   admission_forms: ["admissions"],
+  enquiries: ["admissions"],
   finance: ["finance"],
   salary: ["finance"],
   blog: ["web"],
   settings: ["settings"],
 };
 
-function loadInitialView(): ViewId {
-  const stored = localStorage.getItem(VIEW_STORAGE_KEY);
-  return navItems.some((item) => item.id === stored) ? (stored as ViewId) : "dashboard";
-}
-
 function Workspace() {
   const { t, i18n } = useTranslation();
-  const { isAuthenticated, isLoading, user, madrasa } = useAuth();
-  const [activeView, setActiveViewState] = useState<ViewId>(loadInitialView);
+  const { isAuthenticated, isLoading, user, madrasa, hasPermission, hasFeature } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   const [today, setToday] = useState<{ gregorian: string; hijri: string } | null>(null);
   const isUrdu = i18n.language === "ur";
 
-  const setActiveView = (view: ViewId) => {
-    setActiveViewState(view);
+  const navigateToView = (view: ViewId) => {
+    const item = navItems.find((candidate) => candidate.id === view);
+    if (!item || !isNavItemAccessible(item, user?.role, hasPermission, hasFeature)) return;
     setNavOpen(false);
-    localStorage.setItem(VIEW_STORAGE_KEY, view);
+    navigate(resolveNavItemPath(item, user?.role, hasPermission, hasFeature));
   };
 
   useEffect(() => {
@@ -84,28 +92,77 @@ function Workspace() {
     document.documentElement.lang = isUrdu ? "en" : "ur";
   }
 
-  function renderActiveView() {
-    switch (activeView) {
+  function renderRoute(route: PortalRoute) {
+    switch (route.key) {
+      case "academicPrograms":
+        return <AcademicsView tab="programs" onTabChange={(tab) => navigate(`/academics/${tab}`)} />;
+      case "academicClasses":
+        return <AcademicsView tab="classes" onTabChange={(tab) => navigate(`/academics/${tab}`)} />;
+      case "academicCourses":
+        return <AcademicsView tab="courses" onTabChange={(tab) => navigate(`/academics/${tab}`)} />;
+      case "academicSessions":
+        return <AcademicsView tab="sessions" onTabChange={(tab) => navigate(`/academics/${tab}`)} />;
+      case "timetableGrid":
+        return <TimetableView mode="grid" onModeChange={(mode) => navigate(`/timetable/${mode}`)} />;
+      case "timetableList":
+        return <TimetableView mode="list" onModeChange={(mode) => navigate(`/timetable/${mode}`)} />;
+      case "timetableTeachers":
+        return <TimetableView mode="teachers" onModeChange={(mode) => navigate(`/timetable/${mode}`)} />;
+      case "timetableImport":
+        return <TimetableView mode="import" onModeChange={(mode) => navigate(`/timetable/${mode}`)} />;
+      case "assessmentAssignments":
+        return <AssessmentsView tab="assignments" onTabChange={(tab) => navigate(`/assessments/${tab}`)} />;
+      case "assessmentGrading":
+        return <AssessmentsView tab="grading" onTabChange={(tab) => navigate(`/assessments/${tab}`)} />;
+      case "assessmentSetup":
+        return <AssessmentsView tab="setup" onTabChange={(tab) => navigate(`/assessments/${tab}`)} />;
+      case "assessmentResults":
+        return <AssessmentsView tab="results" onTabChange={(tab) => navigate(`/assessments/${tab}`)} />;
+      case "peopleStudents":
+        return <PeopleView initialTab="students" onTabChange={(tab) => navigate(tab === "admissions" ? "/admissions" : `/people/${tab}`)} />;
+      case "peopleTeachers":
+        return <PeopleView initialTab="teachers" onTabChange={(tab) => navigate(tab === "admissions" ? "/admissions" : `/people/${tab}`)} />;
+      case "peopleGuardians":
+        return <PeopleView initialTab="guardians" onTabChange={(tab) => navigate(tab === "admissions" ? "/admissions" : `/people/${tab}`)} />;
+      case "peopleDonators":
+        return <PeopleView initialTab="donators" onTabChange={(tab) => navigate(tab === "admissions" ? "/admissions" : `/people/${tab}`)} />;
+      case "financeContributions":
+        return <FinanceView tab="contributions" onTabChange={(tab) => navigate(`/finance/${tab}`)} />;
+      case "financeDonations":
+        return <FinanceView tab="donations" onTabChange={(tab) => navigate(`/finance/${tab}`)} />;
+      case "financeSummary":
+        return <FinanceView tab="summary" onTabChange={(tab) => navigate(`/finance/${tab}`)} />;
+    }
+
+    switch (route.view) {
       case "dashboard":
         return (
           <>
-            <DashboardCards onNavigate={setActiveView} />
+            <DashboardCards onNavigate={navigateToView} />
           </>
         );
       case "attendance":
         return <AttendanceBoard />;
+      case "my_attendance":
+        return <MyAttendanceView />;
       case "academics":
         return <AcademicsView />;
       case "people":
         return <PeopleView />;
       case "assessments":
         return <AssessmentsView />;
+      case "my_assessments":
+        return <MyAssessmentsView />;
       case "timetable":
         return <TimetableView />;
+      case "my_timetable":
+        return <MyTimetableView />;
       case "holidays":
         return <HolidaysView />;
       case "leave":
-        return <LeaveView />;
+        return <LeaveView mode="manage" />;
+      case "my_leave":
+        return <LeaveView mode="self" />;
       case "resources":
         return <ResourcesView />;
       case "forms":
@@ -115,13 +172,17 @@ function Workspace() {
       case "finance":
         return <FinanceView />;
       case "salary":
-        return <SalaryView />;
+        return <SalaryView mode="manage" />;
+      case "my_salary":
+        return <SalaryView mode="self" />;
       case "blog":
         return <BlogView />;
       case "admissions":
-        return <PeopleView initialTab="admissions" />;
+        return <PeopleView initialTab="admissions" showTabs={false} />;
       case "admission_forms":
         return <AdmissionsView section="forms" />;
+      case "enquiries":
+        return <AdmissionsView section="enquiries" />;
       case "settings":
         return <SettingsView />;
       case "profile":
@@ -142,14 +203,22 @@ function Workspace() {
   }
 
   if (user?.role === "super_admin") {
-    return <PlatformView />;
+    return (
+      <Routes>
+        <Route path="/" element={<Navigate to="/platform" replace />} />
+        <Route path="/platform" element={<PlatformView />} />
+        <Route path="*" element={<NotFoundView homePath="/platform" />} />
+      </Routes>
+    );
   }
 
+  const activeRoute = portalRoutes.find((route) => route.path === location.pathname);
+  const activeView = activeRoute?.view;
   const activeItem = navItems.find((item) => item.id === activeView);
 
   return (
     <main className="appShell">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} mobileOpen={navOpen} />
+      <Sidebar onNavigate={() => setNavOpen(false)} mobileOpen={navOpen} />
       {navOpen && <div className="navOverlay" onClick={() => setNavOpen(false)} />}
       <section className="workspace">
         <header className="topbar">
@@ -165,7 +234,7 @@ function Workspace() {
             <h1>{activeItem ? t(activeItem.labelKey) : t("appName")}</h1>
             <p className="viewDescription">{activeItem ? t(activeItem.descKey) : ""}</p>
           </div>
-          {!user?.selected_session_id && VIEW_MODULES[activeView] && <DelegateButton modules={VIEW_MODULES[activeView]!} />}
+          {!user?.selected_session_id && activeView && VIEW_MODULES[activeView] && <DelegateButton modules={VIEW_MODULES[activeView]!} />}
           <div className="topbar-actions">
             {today && (
               <span className="dateChip" title={t("todayLabel")}>
@@ -193,7 +262,17 @@ function Workspace() {
           </div>
         </header>
         <SessionReadOnlyBanner />
-        {renderActiveView()}
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {portalRoutes.map((route) => (
+            <Route
+              key={route.key}
+              path={route.path}
+              element={isPortalRouteAccessible(route, user?.role, hasPermission, hasFeature) ? renderRoute(route) : <NotFoundView />}
+            />
+          ))}
+          <Route path="*" element={<NotFoundView />} />
+        </Routes>
       </section>
     </main>
   );

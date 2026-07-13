@@ -12,13 +12,12 @@ import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 
 
-type Tab = "contributions" | "donations" | "summary";
+export type FinanceTab = "contributions" | "donations" | "summary";
 
-export function FinanceView() {
+export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ tab?: FinanceTab; onTabChange?: (tab: FinanceTab) => void }>) {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const readOnly = useSessionReadOnly();
-  const [tab, setTab] = useState<Tab>("contributions");
   const canManage = !readOnly && hasPermission("finance.manage");
   const [categories, setCategories] = useState<PaymentCategory[]>([]);
   const [categoryName, setCategoryName] = useState("");
@@ -49,9 +48,9 @@ export function FinanceView() {
         <p className="notice">{t("descFinance")}</p>
       </div>
       <div className="formActions" style={{ marginBottom: 16 }}>
-        <button className={tab === "contributions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("contributions")}>{t("contributionsTab")}</button>
-        <button className={tab === "donations" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("donations")}>{t("donationsTab")}</button>
-        <button className={tab === "summary" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("summary")}>{t("summaryTab")}</button>
+        <button className={tab === "contributions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("contributions")}>{t("contributionsTab")}</button>
+        <button className={tab === "donations" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("donations")}>{t("donationsTab")}</button>
+        <button className={tab === "summary" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("summary")}>{t("summaryTab")}</button>
       </div>
 
       {canManage && (

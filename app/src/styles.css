@@ -188,6 +188,7 @@ h3 { font-size: 1rem; }
   cursor: pointer;
   font-weight: 600;
   font-size: 0.92rem;
+  text-decoration: none;
   position: relative;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -2054,4 +2055,23 @@ input[type="radio"] {
   background: var(--surface, #fff);
   font-size: 0.78rem;
   cursor: pointer;
+}
+
+.notFoundView {
+  max-width: 680px;
+  margin: 48px auto;
+  text-align: center;
+}
+
+.notFoundCode {
+  display: block;
+  color: var(--teal, #0f766e);
+  font-size: clamp(4rem, 12vw, 8rem);
+  line-height: 1;
+}
+
+.notFoundView .primaryAction {
+  display: inline-flex;
+  margin-top: 16px;
+  text-decoration: none;
 }

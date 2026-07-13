@@ -1,12 +1,12 @@
 import { LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { NavLink, useLocation } from "react-router-dom";
 
-import { navGroups, type ViewId } from "../data/mockData";
+import { isNavItemAccessible, navGroups, portalRoutes, resolveNavItemPath } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
 
 export type SidebarProps = Readonly<{
-  activeView: ViewId;
-  onViewChange: (view: ViewId) => void;
+  onNavigate?: () => void;
   mobileOpen?: boolean;
 }>;
 
@@ -22,8 +22,10 @@ export function RoleBadge({ role }: Readonly<{ role: string }>) {
   return <span className={`roleBadge role-${role}`}>{t(labelKey)}</span>;
 }
 
-export function Sidebar({ activeView, onViewChange, mobileOpen = false }: SidebarProps) {
+export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
   const { t } = useTranslation();
+  const location = useLocation();
+  const activeView = portalRoutes.find((route) => route.path === location.pathname)?.view;
   const { hasPermission, hasFeature, user, madrasa, logout } = useAuth();
 
   return (
@@ -39,11 +41,7 @@ export function Sidebar({ activeView, onViewChange, mobileOpen = false }: Sideba
       <nav className="navScroll" aria-label="Primary">
         {navGroups.map((group) => {
           const visible = group.items.filter(
-            (item) =>
-              (!item.permission || hasPermission(item.permission)) &&
-              (!item.permissionsAny || item.permissionsAny.some(hasPermission)) &&
-              (!item.feature || hasFeature(item.feature)) &&
-              (!item.roles || (user && item.roles.includes(user.role)))
+            (item) => isNavItemAccessible(item, user?.role, hasPermission, hasFeature),
           );
           if (visible.length === 0) return null;
           return (
@@ -52,18 +50,18 @@ export function Sidebar({ activeView, onViewChange, mobileOpen = false }: Sideba
               <div className="navList">
                 {visible.map((item) => {
                   const Icon = item.icon;
-                  const isActive = activeView === item.id;
                   return (
-                    <button
-                      aria-current={isActive ? "page" : undefined}
-                      className={isActive ? "navItem active" : "navItem"}
+                    <NavLink
+                      className={({ isActive }) => {
+                        return isActive || activeView === item.id ? "navItem active" : "navItem";
+                      }}
                       key={item.id}
-                      type="button"
-                      onClick={() => onViewChange(item.id)}
+                      onClick={onNavigate}
+                      to={resolveNavItemPath(item, user?.role, hasPermission, hasFeature)}
                     >
                       <Icon size={17} />
                       <span>{t(item.labelKey)}</span>
-                    </button>
+                    </NavLink>
                   );
                 })}
               </div>

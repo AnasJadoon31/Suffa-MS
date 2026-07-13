@@ -15,6 +15,7 @@ from app.core.dependencies import (
     require_permission,
     user_has_permission,
 )
+from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.core.teaching_scope import taught_class_ids, teacher_teaches
 from app.db.session import get_session
@@ -470,10 +471,53 @@ def _enriched_slot(row) -> TimetableSlotRead:
     return TimetableSlotRead(**data)
 
 
+async def _enriched_timetable_slots(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    slots: list[TimetableSlot],
+) -> list[TimetableSlotRead]:
+    if not slots:
+        return []
+    class_names = dict((await session.execute(
+        select(AcademicClass.id, AcademicClass.name).where(
+            AcademicClass.madrasa_id == madrasa_id,
+            AcademicClass.id.in_({slot.class_id for slot in slots}),
+        )
+    )).all())
+    section_names = dict((await session.execute(
+        select(Section.id, Section.name).where(
+            Section.madrasa_id == madrasa_id,
+            Section.id.in_({slot.section_id for slot in slots}),
+        )
+    )).all())
+    course_names = dict((await session.execute(
+        select(Course.id, Course.name).where(
+            Course.madrasa_id == madrasa_id,
+            Course.id.in_({slot.course_id for slot in slots}),
+        )
+    )).all())
+    teacher_names = dict((await session.execute(
+        select(TeacherProfile.id, TeacherProfile.name).where(
+            TeacherProfile.madrasa_id == madrasa_id,
+            TeacherProfile.id.in_({slot.teacher_id for slot in slots}),
+        )
+    )).all())
+    return [
+        _enriched_slot((
+            slot,
+            class_names.get(slot.class_id),
+            section_names.get(slot.section_id),
+            course_names.get(slot.course_id),
+            teacher_names.get(slot.teacher_id),
+        ))
+        for slot in slots
+    ]
+
+
 @router.get("/timetable", response_model=list[TimetableSlotRead])
 async def list_timetable(
     response: Response,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("timetable.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     context_session: AcademicSession = Depends(get_context_session),
     session: AsyncSession = Depends(get_session),
@@ -520,43 +564,7 @@ async def list_timetable(
         response=response,
     )
 
-    class_ids = {slot.class_id for slot in slots}
-    section_ids = {slot.section_id for slot in slots}
-    course_ids = {slot.course_id for slot in slots}
-    teacher_ids = {slot.teacher_id for slot in slots}
-    class_names: dict[UUID, str] = {}
-    section_names: dict[UUID, str] = {}
-    course_names: dict[UUID, str] = {}
-    teacher_names: dict[UUID, str] = {}
-    if class_ids:
-        class_names = dict(
-            (await session.execute(select(AcademicClass.id, AcademicClass.name).where(AcademicClass.id.in_(class_ids)))).all()
-        )
-    if section_ids:
-        section_names = dict(
-            (await session.execute(select(Section.id, Section.name).where(Section.id.in_(section_ids)))).all()
-        )
-    if course_ids:
-        course_names = dict(
-            (await session.execute(select(Course.id, Course.name).where(Course.id.in_(course_ids)))).all()
-        )
-    if teacher_ids:
-        teacher_names = dict(
-            (await session.execute(select(TeacherProfile.id, TeacherProfile.name).where(TeacherProfile.id.in_(teacher_ids)))).all()
-        )
-
-    return [
-        _enriched_slot(
-            (
-                slot,
-                class_names.get(slot.class_id),
-                section_names.get(slot.section_id),
-                course_names.get(slot.course_id),
-                teacher_names.get(slot.teacher_id),
-            )
-        )
-        for slot in slots
-    ]
+    return await _enriched_timetable_slots(session, madrasa.id, list(slots))
 
 
 @router.get("/timetable/me", response_model=list[TimetableSlotRead])
@@ -564,49 +572,58 @@ async def my_timetable(
     response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
+    context_session: AcademicSession = Depends(get_context_session),
     session: AsyncSession = Depends(get_session),
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[TimetableSlotRead]:
-    active_session_id = await _active_session_id(session, madrasa.id)
-    if active_session_id is None:
-        return []
-
     if current_user.role == UserRole.student:
         profile = (
-            await session.execute(select(StudentProfile).where(StudentProfile.user_id == current_user.id))
+            await session.execute(select(StudentProfile).where(
+                StudentProfile.user_id == current_user.id,
+                StudentProfile.madrasa_id == madrasa.id,
+            ))
         ).scalar_one_or_none()
         if profile is None:
             return []
         enrollment = (
             await session.execute(
-                select(Enrollment).where(Enrollment.student_id == profile.id, Enrollment.session_id == active_session_id)
+                select(Enrollment).where(
+                    Enrollment.madrasa_id == madrasa.id,
+                    Enrollment.student_id == profile.id,
+                    Enrollment.session_id == context_session.id,
+                )
             )
         ).scalar_one_or_none()
         if enrollment is None:
             return []
         stmt = select(TimetableSlot).where(
             TimetableSlot.madrasa_id == madrasa.id,
+            (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
             TimetableSlot.class_id == enrollment.class_id,
             TimetableSlot.section_id == enrollment.section_id,
         )
     elif current_user.role == UserRole.teacher:
         profile = (
-            await session.execute(select(TeacherProfile).where(TeacherProfile.user_id == current_user.id))
+            await session.execute(select(TeacherProfile).where(
+                TeacherProfile.user_id == current_user.id,
+                TeacherProfile.madrasa_id == madrasa.id,
+            ))
         ).scalar_one_or_none()
         if profile is None:
             return []
         stmt = select(TimetableSlot).where(
             TimetableSlot.madrasa_id == madrasa.id,
+            (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
             TimetableSlot.teacher_id == profile.id,
         )
     else:
-        return []
+        raise HTTPException(status_code=403, detail=ErrorCode.TIMETABLE_SELF_SERVICE_ONLY)
 
-    rows = await paginate_scalars(
+    rows = list(await paginate_scalars(
         session, stmt.order_by(TimetableSlot.day_of_week, TimetableSlot.period), limit=limit, offset=offset, response=response
-    )
-    return [TimetableSlotRead.model_validate(row) for row in rows]
+    ))
+    return await _enriched_timetable_slots(session, madrasa.id, rows)
 
 
 @router.post("/holidays", response_model=HolidayRead)
@@ -737,7 +754,7 @@ async def create_leave(
 ) -> LeaveRead:
     _ensure_valid_date_range(payload.start_date, payload.end_date)
 
-    can_manage_leave = await user_has_permission(current_user, "timetable.manage", session)
+    can_manage_leave = await user_has_permission(current_user, "leave.manage", session)
     target_user_id = payload.user_id or current_user.id
     if target_user_id != current_user.id and not can_manage_leave:
         raise HTTPException(status_code=403, detail="You can only request leave for your own account")
@@ -771,12 +788,15 @@ async def list_leave(
     date_from: date | None = None,
     date_to: date | None = None,
     q: str | None = None,
+    self_only: bool = False,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[LeaveRead]:
     can_manage_leave = await user_has_permission(current_user, "leave.manage", session)
     stmt = select(Leave).where(Leave.madrasa_id == madrasa.id)
-    if user_id:
+    if self_only:
+        stmt = stmt.where(Leave.user_id == current_user.id)
+    elif user_id:
         if user_id != current_user.id and not can_manage_leave:
             raise HTTPException(status_code=403, detail="You can only view your own leave records")
         stmt = stmt.where(Leave.user_id == user_id)

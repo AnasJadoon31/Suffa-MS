@@ -14,6 +14,7 @@ from app.core.dependencies import (
     require_permission,
     user_has_permission,
 )
+from app.core.error_codes import ErrorCode
 from app.core.hijri import to_hijri_string
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.core.pdf import render_result_card_pdf
@@ -59,10 +60,42 @@ async def _teacher_profile(session: AsyncSession, current_user: User) -> Teacher
     ).scalar_one_or_none()
 
 
-async def _student_profile(session: AsyncSession, current_user: User) -> StudentProfile | None:
+async def _student_profile(session: AsyncSession, current_user: User, madrasa_id: UUID) -> StudentProfile | None:
     return (
-        await session.execute(select(StudentProfile).where(StudentProfile.user_id == current_user.id))
+        await session.execute(select(StudentProfile).where(
+            StudentProfile.user_id == current_user.id,
+            StudentProfile.madrasa_id == madrasa_id,
+        ))
     ).scalar_one_or_none()
+
+
+async def _require_student_assignment_access(
+    session: AsyncSession,
+    current_user: User,
+    madrasa_id: UUID,
+    assignment: Assignment,
+) -> StudentProfile:
+    student = await _student_profile(session, current_user, madrasa_id)
+    if student is None:
+        raise HTTPException(status_code=403, detail=ErrorCode.ASSIGNMENT_NOT_ASSIGNED)
+    active_session_id = await _active_session_id(session, madrasa_id)
+    enrollment = (
+        await session.execute(
+            select(Enrollment).where(
+                Enrollment.madrasa_id == madrasa_id,
+                Enrollment.session_id == active_session_id,
+                Enrollment.student_id == student.id,
+                Enrollment.class_id == assignment.class_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if (
+        enrollment is None
+        or (assignment.section_id is not None and assignment.section_id != enrollment.section_id)
+        or (assignment.target_student_ids and str(student.id) not in assignment.target_student_ids)
+    ):
+        raise HTTPException(status_code=403, detail=ErrorCode.ASSIGNMENT_NOT_ASSIGNED)
+    return student
 
 
 async def _active_session_id(session: AsyncSession, madrasa_id: UUID):
@@ -292,7 +325,7 @@ async def list_assignments(
     if created_by_id:
         stmt = stmt.where(Assignment.created_by_id == created_by_id)
 
-    student = await _student_profile(session, current_user)
+    student = await _student_profile(session, current_user, madrasa.id)
     enrollment = None
     if student is not None:
         # Students: only their section's rows (or class-wide), pushed into
@@ -313,7 +346,8 @@ async def list_assignments(
             )
             stmt = stmt.where(Assignment.class_id == enrollment.class_id)
         else:
-            stmt = stmt.where(Assignment.section_id.is_(None))
+            response.headers["X-Total-Count"] = "0"
+            return []
 
     if sort == "teacher":
         stmt = stmt.outerjoin(TeacherProfile, Assignment.created_by_id == TeacherProfile.id)
@@ -341,6 +375,16 @@ async def get_assignment(
     session: AsyncSession = Depends(get_session),
 ) -> AssignmentRead:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
+    student = await _student_profile(session, current_user, madrasa.id)
+    if student is not None:
+        await _require_student_assignment_access(session, current_user, madrasa.id, assignment)
+    else:
+        if current_user.role != UserRole.principal and not await user_has_permission(current_user, "assignments.create", session):
+            raise HTTPException(status_code=403, detail=ErrorCode.ASSIGNMENT_NOT_ASSIGNED)
+        await _require_class_course_scope(
+            session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
+            bypass_permission="assignments.manage_all",
+        )
     return AssignmentRead.model_validate(assignment)
 
 
@@ -420,11 +464,7 @@ async def submit_assignment(
     session: AsyncSession = Depends(get_session),
 ) -> SubmissionRead:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
-    student = await _student_profile(session, current_user)
-    if student is None:
-        raise HTTPException(status_code=403, detail="Only portal students can submit assignments")
-    if assignment.target_student_ids and str(student.id) not in assignment.target_student_ids:
-        raise HTTPException(status_code=403, detail="This assignment is not addressed to you")
+    student = await _require_student_assignment_access(session, current_user, madrasa.id, assignment)
 
     now = datetime.now(UTC)
     due_date = _aware(assignment.due_date)
@@ -717,7 +757,7 @@ async def get_my_result(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> SessionResult:
-    student = await _student_profile(session, current_user)
+    student = await _student_profile(session, current_user, madrasa.id)
     if student is None:
         raise HTTPException(status_code=403, detail="Only portal students can view their own results")
     published = (
@@ -847,7 +887,7 @@ async def get_my_result_card(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    student = await _student_profile(session, current_user)
+    student = await _student_profile(session, current_user, madrasa.id)
     if student is None:
         raise HTTPException(status_code=403, detail="Only portal students can view their own result card")
     published = (

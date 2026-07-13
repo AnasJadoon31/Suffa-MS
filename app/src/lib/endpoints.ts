@@ -271,6 +271,8 @@ export const attendanceApi = {
         params: range,
       })
       .then((r) => r.data),
+  myStudentHistory: (range?: AttendanceDateRange) =>
+    api.get<StudentAttendanceHistory>("/api/v1/attendance/students/me/history", { params: range }).then((r) => r.data),
   myTeacherAttendanceToday: () =>
     api.get<TeacherAttendanceToday>("/api/v1/attendance/teachers/me/today").then((r) => r.data),
   teacherCheckIn: () =>
@@ -279,6 +281,8 @@ export const attendanceApi = {
     api.post<TeacherAttendanceToday>("/api/v1/attendance/teachers/me/check-out").then((r) => r.data),
   teacherHistory: (params?: AttendanceDateRange & { teacher_id?: string }) =>
     getAllPages<TeacherAttendanceLogEntry>("/api/v1/attendance/teachers/history", params),
+  myTeacherHistory: (params?: AttendanceDateRange) =>
+    getAllPages<TeacherAttendanceLogEntry>("/api/v1/attendance/teachers/me/history", params),
 };
 
 // --------------------------------------------------------------- Assessments
@@ -373,6 +377,8 @@ export const assessmentsApi = {
     downloadReport("/api/v1/assessments/results/card", { student_id: studentId, session_id: sessionId }, "pdf"),
   downloadMyResultCard: (sessionId: string) =>
     downloadReport("/api/v1/assessments/results/card/me", { session_id: sessionId }, "pdf"),
+  myResult: (sessionId: string) =>
+    api.get<SessionResult>("/api/v1/assessments/results/me", { params: { session_id: sessionId } }).then((r) => r.data),
 };
 
 // ---------------------------------------------------------------- Reporting
@@ -496,6 +502,7 @@ export const operationsApi = {
     class_id?: string; section_id?: string; teacher_id?: string; course_id?: string; day_of_week?: number;
   }) =>
     getAllPages<TimetableSlot>("/api/v1/operations/timetable", params),
+  listMyTimetable: () => getAllPages<TimetableSlot>("/api/v1/operations/timetable/me"),
   createTimetableSlot: (payload: {
     class_id: string; section_id: string; course_id: string; teacher_id: string;
     day_of_week: number; period?: number; start_time: string; end_time: string;
@@ -519,6 +526,7 @@ export const operationsApi = {
     class_id?: string; date_from?: string; date_to?: string; q?: string;
   }) =>
     getAllPages<Leave>("/api/v1/operations/leave", params),
+  listMyLeave: () => getAllPages<Leave>("/api/v1/operations/leave", { self_only: true }),
   createLeave: (payload: { user_id?: string; start_date: string; end_date: string; reason?: string }) =>
     api.post<Leave>("/api/v1/operations/leave", payload).then((r) => r.data),
   setLeaveStatus: (id: string, status: string) =>

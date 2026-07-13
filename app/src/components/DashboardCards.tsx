@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { AttendanceCalendar, toDateKey, type StudentDayStatus } from "./AttendanceCalendar";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
-import { navItems, type ViewId } from "../data/mockData";
+import { isNavItemAccessible, navItems, type ViewId } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
 
 import {
@@ -35,11 +35,7 @@ function QuickLinks({ onNavigate }: Readonly<{ onNavigate?: (view: ViewId) => vo
   const { hasPermission, hasFeature, user } = useAuth();
   if (!onNavigate) return null;
   const visible = navItems.filter(
-    (item) =>
-      item.id !== "dashboard" &&
-      (!item.permission || hasPermission(item.permission)) &&
-      (!item.feature || hasFeature(item.feature)) &&
-      (!item.roles || (user && item.roles.includes(user.role)))
+    (item) => item.id !== "dashboard" && isNavItemAccessible(item, user?.role, hasPermission, hasFeature),
   );
   return (
     <nav className="quickLinks" aria-label={t("quickLinksLabel")}>
@@ -164,7 +160,7 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
 
   const loadLogs = async () => {
     try {
-      setLogs(await attendanceApi.teacherHistory());
+      setLogs(await attendanceApi.myTeacherHistory());
     } catch {
       setLogs([]);
     }

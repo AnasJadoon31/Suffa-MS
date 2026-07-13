@@ -27,13 +27,12 @@ import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
 
-type Tab = "assignments" | "grading" | "results";
+export type AssessmentTab = "assignments" | "grading" | "results" | "setup";
 
-export function AssessmentsView() {
+export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{ tab?: AssessmentTab; onTabChange?: (tab: AssessmentTab) => void }>) {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const readOnly = useSessionReadOnly();
-  const [tab, setTab] = useState<Tab>("assignments");
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -79,15 +78,18 @@ export function AssessmentsView() {
         <p className="notice">{t("assessmentsSubtitle")}</p>
       </div>
       <div className="formActions" style={{ marginBottom: 16 }}>
-        <button className={tab === "assignments" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("assignments")}>
+        {hasPermission("assignments.create") && <button className={tab === "assignments" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("assignments")}>
           <ClipboardList size={16} /> {t("assignmentsTab")}
-        </button>
-        <button className={tab === "grading" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("grading")}>
+        </button>}
+        {hasPermission("assessments.marks.enter") && <button className={tab === "grading" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("grading")}>
           <BookOpen size={16} /> {t("gradingTab")}
-        </button>
-        <button className={tab === "results" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("results")}>
+        </button>}
+        {(hasPermission("grading.schemes.manage") || hasPermission("assessments.exam_types.manage")) && <button className={tab === "setup" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("setup")}>
+          <BookOpen size={16} /> {t("gradingSetupBtn")}
+        </button>}
+        {hasPermission("assessments.marks.enter") && <button className={tab === "results" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("results")}>
           <Send size={16} /> {t("resultsTab")}
-        </button>
+        </button>}
       </div>
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
@@ -102,7 +104,14 @@ export function AssessmentsView() {
         />
       )}
       {!isLoading && !loadError && tab === "grading" && (
-        <GradingTab classes={classes} courses={courses} canManage={!readOnly && hasPermission("assessments.exam_types.manage")} />
+        <GradingTab classes={classes} />
+      )}
+      {!isLoading && !loadError && tab === "setup" && (
+        <GradingSetup
+          courses={courses}
+          canCreateScheme={!readOnly && hasPermission("grading.schemes.manage")}
+          canCreateExamType={!readOnly && hasPermission("assessments.exam_types.manage")}
+        />
       )}
       {!isLoading && !loadError && tab === "results" && (
         <ResultsTab
@@ -570,15 +579,12 @@ function SubmissionRow({
 
 function GradingTab({
   classes,
-  courses,
-  canManage,
-}: Readonly<{ classes: AcademicClass[]; courses: Course[]; canManage: boolean }>) {
+}: Readonly<{ classes: AcademicClass[] }>) {
   const { t } = useTranslation();
   const [classId, setClassId] = useState("");
   const [matrix, setMatrix] = useState<ResultsMatrixResponse | null>(null);
   const [courseId, setCourseId] = useState("");
   const [sectionId, setSectionId] = useState("");
-  const [showSetup, setShowSetup] = useState(false);
   const [error, setError] = useState("");
 
   const load = async (targetClassId: string) => {
@@ -620,14 +626,7 @@ function GradingTab({
             {section.courses.map((c) => <option key={c.course_id} value={c.course_id}>{c.course_name}</option>)}
           </Select>
         )}
-        {canManage && (
-          <button className="secondaryAction" type="button" onClick={() => setShowSetup((v) => !v)}>
-            {showSetup ? t("hideSetupBtn") : t("gradingSetupBtn")}
-          </button>
-        )}
       </div>
-
-      {showSetup && canManage && <GradingSetup courses={courses} />}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
       {matrix && (
@@ -738,7 +737,11 @@ function MarkCell({
   );
 }
 
-function GradingSetup({ courses }: Readonly<{ courses: Course[] }>) {
+function GradingSetup({
+  courses,
+  canCreateScheme,
+  canCreateExamType,
+}: Readonly<{ courses: Course[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
   const { t } = useTranslation();
   const [schemes, setSchemes] = useState<GradingScheme[]>([]);
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
@@ -763,7 +766,7 @@ function GradingSetup({ courses }: Readonly<{ courses: Course[] }>) {
 
   return (
     <div className="modulePanel" style={{ marginBottom: 16 }}>
-      <form
+      {canCreateScheme && <form
         className="inlineForm"
         onSubmit={async (e) => {
           e.preventDefault();
@@ -783,7 +786,7 @@ function GradingSetup({ courses }: Readonly<{ courses: Course[] }>) {
           <Input required value={schemeForm.bandsText} onChange={(e) => setSchemeForm({ ...schemeForm, bandsText: e.target.value })} />
         </label>
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addSchemeBtn")}</button></div>
-      </form>
+      </form>}
       <div className="dataTable">
         <div className="dataRow header"><span>{t("schemeCol")}</span><span>{t("bandsCol")}</span></div>
         {schemes.map((s) => (
@@ -794,7 +797,7 @@ function GradingSetup({ courses }: Readonly<{ courses: Course[] }>) {
         ))}
       </div>
 
-      <form
+      {canCreateExamType && <form
         className="inlineForm"
         style={{ marginTop: 16 }}
         onSubmit={async (e) => {
@@ -831,7 +834,7 @@ function GradingSetup({ courses }: Readonly<{ courses: Course[] }>) {
           </Select>
         </label>
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addExamTypeBtn")}</button></div>
-      </form>
+      </form>}
       <div className="dataTable">
         <div className="dataRow header"><span>{t("courseCol")}</span><span>{t("examCol")}</span><span>{t("weightageCol")}</span></div>
         {examTypes.map((et) => (

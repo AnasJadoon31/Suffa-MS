@@ -26,6 +26,7 @@ PRIVILEGED_ROUTES = [
     ("get", "/api/v1/finance/payments", None),
     ("get", "/api/v1/finance/donors", None),
     ("get", "/api/v1/operations/admissions", None),
+    ("get", "/api/v1/operations/timetable", None),
     ("get", "/api/v1/platform/madaris", None),
     ("post", "/api/v1/academics/programs", {"name": "Sneaky Program"}),
     ("post", "/api/v1/operations/holidays", {"name": "Fake Holiday", "start_date": "2024-06-17", "end_date": "2024-06-18"}),
@@ -62,6 +63,11 @@ async def test_permission_grant_endpoint_rejects_non_principal(teacher_client, s
         "/api/v1/auth/permissions/grants",
         json={"user_id": str(seed.teacher_user.id), "permission_codes": ["holidays.manage"]},
     )
+    assert response.status_code == 403
+
+
+async def test_student_cannot_open_attendance_management_api(student_client):
+    response = await student_client.get("/api/v1/attendance/classes")
     assert response.status_code == 403
 
 

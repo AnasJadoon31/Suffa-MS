@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.core.audit import record_audit
-from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.dependencies import get_context_session, get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.core.teaching_scope import taught_class_ids, taught_pairs
 from app.db.session import get_session
@@ -804,6 +805,75 @@ async def attendance_student_history(
     )
 
 
+@router.get("/students/me/history", response_model=StudentAttendanceHistoryResponse)
+async def my_student_attendance_history(
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    context_session: AcademicSession = Depends(get_context_session),
+    session: AsyncSession = Depends(get_session),
+) -> StudentAttendanceHistoryResponse:
+    """Return only the authenticated student's attendance for the selected session."""
+    student = (
+        await session.execute(
+            select(StudentProfile).where(
+                StudentProfile.user_id == current_user.id,
+                StudentProfile.madrasa_id == madrasa.id,
+                StudentProfile.status == "active",
+            )
+        )
+    ).scalar_one_or_none()
+    if student is None:
+        raise HTTPException(status_code=403, detail=ErrorCode.STUDENT_SELF_ATTENDANCE_ONLY)
+
+    enrollment = (
+        await session.execute(
+            select(Enrollment).where(
+                Enrollment.madrasa_id == madrasa.id,
+                Enrollment.session_id == context_session.id,
+                Enrollment.student_id == student.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if enrollment is None:
+        raise HTTPException(status_code=404, detail=ErrorCode.STUDENT_NOT_ENROLLED)
+
+    academic_class = await session.get(AcademicClass, enrollment.class_id)
+    if academic_class is None or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail=ErrorCode.CLASS_NOT_FOUND)
+    section = None
+    if enrollment.section_id:
+        section = (
+            await session.execute(
+                select(Section).where(Section.id == enrollment.section_id, Section.madrasa_id == madrasa.id)
+            )
+        ).scalar_one_or_none()
+    entries = await _class_history_entries(
+        session,
+        madrasa_id=madrasa.id,
+        session_id=context_session.id,
+        class_id=enrollment.class_id,
+        student_id=student.id,
+        start_date=start_date or context_session.gregorian_start,
+        end_date=end_date or context_session.gregorian_end,
+    )
+    return StudentAttendanceHistoryResponse(
+        session_id=context_session.id,
+        session_name=context_session.name,
+        class_id=academic_class.id,
+        class_name=academic_class.name,
+        student=AttendanceRosterStudent(
+            id=student.id,
+            admission_number=student.admission_number,
+            name=student.name,
+            section_id=section.id if section else None,
+            section_name=section.name if section else None,
+        ),
+        entries=entries,
+    )
+
+
 async def _teacher_today_response(
     session: AsyncSession,
     *,
@@ -988,12 +1058,9 @@ async def teacher_attendance_history(
     offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
+    context_session: AcademicSession = Depends(get_context_session),
     session: AsyncSession = Depends(get_session),
 ) -> list[TeacherAttendanceLogEntry]:
-    active_session = await _active_session(session, madrasa.id)
-    if active_session is None:
-        return []
-
     can_manage = await user_has_permission(current_user, "teachers.attendance.manage", session)
     if not can_manage:
         own_teacher_id = await _current_teacher_id(current_user, session, madrasa.id)
@@ -1006,7 +1073,35 @@ async def teacher_attendance_history(
     return await _teacher_history_entries(
         session,
         madrasa_id=madrasa.id,
-        session_id=active_session.id,
+        session_id=context_session.id,
+        teacher_id=teacher_id,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+        response=response,
+    )
+
+
+@router.get("/teachers/me/history", response_model=list[TeacherAttendanceLogEntry])
+async def my_teacher_attendance_history(
+    response: Response,
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    context_session: AcademicSession = Depends(get_context_session),
+    session: AsyncSession = Depends(get_session),
+) -> list[TeacherAttendanceLogEntry]:
+    teacher_id = await _current_teacher_id(current_user, session, madrasa.id)
+    if teacher_id is None:
+        raise HTTPException(status_code=403, detail=ErrorCode.TEACHER_SELF_ATTENDANCE_ONLY)
+    return await _teacher_history_entries(
+        session,
+        madrasa_id=madrasa.id,
+        session_id=context_session.id,
         teacher_id=teacher_id,
         start_date=start_date,
         end_date=end_date,

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { api, setAcademicSessionId } from "./api";
+import { clearLegacyApiCache, setOfflineAccountKey } from "./offlineCache";
 
 export interface User {
   id: string;
@@ -41,7 +42,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async () => {
     try {
+      await clearLegacyApiCache();
       const res = await api.get("/api/v1/auth/me");
+      setOfflineAccountKey(res.data.madrasa?.id ?? null, res.data.user?.id ?? null);
       setUser(res.data.user);
       setMadrasa(res.data.madrasa);
       setPermissions(res.data.permissions ?? []);
@@ -53,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPermissions([]);
       setFeatures({});
       setAcademicSessionId(null);
+      setOfflineAccountKey(null, null);
       localStorage.removeItem("mms_token");
     } finally {
       setIsLoading(false);
@@ -71,6 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setMadrasa(null);
       setPermissions([]);
+      setAcademicSessionId(null);
+      setOfflineAccountKey(null, null);
     };
 
     window.addEventListener("unauthorized", handleUnauthorized);
@@ -85,10 +91,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("mms_token");
+    localStorage.removeItem("mms_tenant");
     setUser(null);
     setMadrasa(null);
     setPermissions([]);
     setAcademicSessionId(null);
+    setOfflineAccountKey(null, null);
+    void clearLegacyApiCache();
   };
 
   const updateSelectedSession = async (sessionId: string | null) => {

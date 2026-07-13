@@ -28,11 +28,11 @@ type PersonOption = {
   code: string;
 };
 
-export function LeaveView() {
+export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "self" }>) {
   const { t } = useTranslation();
   const { hasPermission, user } = useAuth();
   const canWrite = !useSessionReadOnly();
-  const canManage = hasPermission("leave.manage");
+  const canManage = mode === "manage" && hasPermission("leave.manage");
   const [leave, setLeave] = useState<Leave[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -68,7 +68,7 @@ export function LeaveView() {
         setLeave(await operationsApi.listLeave(params));
       } else {
         const cacheKey = canManage ? "leave:all" : `leave:${user?.id ?? "me"}`;
-        const { data } = await cachedFetch(cacheKey, () => operationsApi.listLeave());
+        const { data } = await cachedFetch(cacheKey, () => canManage ? operationsApi.listLeave() : operationsApi.listMyLeave());
         setLeave(data);
       }
       setError("");

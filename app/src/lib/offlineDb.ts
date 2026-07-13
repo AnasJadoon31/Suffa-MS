@@ -4,6 +4,7 @@ import type { AttendanceStatus } from "../data/mockData";
 
 export type OutboxEntry = Readonly<{
   id?: number;
+  account_key: string;
   subject_type: "student" | "teacher";
   subject_id: string;
   session_id: string;
@@ -34,6 +35,12 @@ class MmsOfflineDb extends Dexie {
     // screens survive a fully offline day (§3.4, FR-TT-02).
     this.version(2).stores({
       outbox: "++id, subject_type, subject_id, attendance_date, idempotency_key",
+      refCache: "key"
+    });
+    // v3: every offline write belongs to one authenticated account. Legacy
+    // rows have no account_key and are intentionally ignored.
+    this.version(3).stores({
+      outbox: "++id, account_key, [account_key+idempotency_key], subject_type, subject_id, attendance_date, idempotency_key",
       refCache: "key"
     });
   }

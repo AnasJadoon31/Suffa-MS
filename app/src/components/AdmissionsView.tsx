@@ -40,13 +40,7 @@ export function AdmissionsView({ section = "registrations" }: Readonly<{ section
 
       {section === "registrations" && <RegistrationsTab programs={programs} canReview={canReview} canMutate={canMutate} />}
       {section === "forms" && canReview && <AdmissionFormsTab programs={programs} canMutate={canMutate} />}
-      {section === "forms" && canViewEnquiries && (
-        <div style={{ marginTop: 24 }}>
-          <h3>{t("enquiriesTab")}</h3>
-          <p className="notice">{t("enquiriesDesc")}</p>
-          <EnquiriesTab canMutate={canMutate} />
-        </div>
-      )}
+      {section === "enquiries" && canViewEnquiries && <EnquiriesTab canMutate={canMutate} />}
     </section>
   );
 }

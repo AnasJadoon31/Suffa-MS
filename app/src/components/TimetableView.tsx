@@ -21,9 +21,9 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 
 const DAY_KEYS = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
 
-type ViewMode = "grid" | "list" | "teachers" | "import";
+export type TimetableMode = "grid" | "list" | "teachers" | "import";
 
-export function TimetableView() {
+export function TimetableView({ mode = "grid", onModeChange }: Readonly<{ mode?: TimetableMode; onModeChange?: (mode: TimetableMode) => void }>) {
   const { t } = useTranslation();
   const { hasPermission, user } = useAuth();
   const readOnly = useSessionReadOnly();
@@ -36,7 +36,7 @@ export function TimetableView() {
   const [courses, setCourses] = useState<Record<string, Course[]>>({});
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   // Teachers get the grid of their own sections only (audit: Teacher-4).
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const viewMode = mode;
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -86,21 +86,21 @@ export function TimetableView() {
       </div>
 
       <div className="formActions" style={{ marginBottom: 16 }}>
-        <button className={viewMode === "grid" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setViewMode("grid")}>
+        <button className={viewMode === "grid" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("grid")}>
           <LayoutGrid size={16} /> {t("weeklyGridTab")}
         </button>
         {!isTeacher && (
-          <button className={viewMode === "list" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setViewMode("list")}>
+          <button className={viewMode === "list" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("list")}>
             <List size={16} /> {t("listTab")}
           </button>
         )}
         {!isTeacher && (
-          <button className={viewMode === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setViewMode("teachers")}>
+          <button className={viewMode === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("teachers")}>
             <Users size={16} /> {t("byTeacherTab")}
           </button>
         )}
         {canManage && (
-          <button className={viewMode === "import" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setViewMode("import")}>
+          <button className={viewMode === "import" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("import")}>
             <Upload size={16} /> {t("importTab")}
           </button>
         )}

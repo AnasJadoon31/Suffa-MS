@@ -18,7 +18,9 @@ import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 
 
-export function AcademicsView() {
+export type AcademicTab = "programs" | "classes" | "courses" | "sessions";
+
+export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?: AcademicTab; onTabChange?: (tab: AcademicTab) => void }>) {
   const { t } = useTranslation();
   const readOnly = useSessionReadOnly();
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -40,7 +42,7 @@ export function AcademicsView() {
   const [sessionForm, setSessionForm] = useState({ name: "", gregorian_start: "", gregorian_end: "", hijri_span: "" });
   const [rolloverSourceSession, setRolloverSourceSession] = useState<AcademicSession | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"programs" | "classes" | "courses" | "sessions">("programs");
+  const activeTab = tab;
 
   // B7-b: classes tab sort/filter.
   const [classSearch, setClassSearch] = useState("");
@@ -153,28 +155,28 @@ export function AcademicsView() {
           <button
             type="button"
             className={`tabButton ${activeTab === "programs" ? "active" : ""}`}
-            onClick={() => setActiveTab("programs")}
+            onClick={() => onTabChange?.("programs")}
           >
             {t("programsHeading")}
           </button>
           <button
             type="button"
             className={`tabButton ${activeTab === "classes" ? "active" : ""}`}
-            onClick={() => setActiveTab("classes")}
+            onClick={() => onTabChange?.("classes")}
           >
             {t("classesHeading")}
           </button>
           <button
             type="button"
             className={`tabButton ${activeTab === "courses" ? "active" : ""}`}
-            onClick={() => setActiveTab("courses")}
+            onClick={() => onTabChange?.("courses")}
           >
             Courses
           </button>
           <button
             type="button"
             className={`tabButton ${activeTab === "sessions" ? "active" : ""}`}
-            onClick={() => setActiveTab("sessions")}
+            onClick={() => onTabChange?.("sessions")}
           >
             {t("sessionsHeading")}
           </button>

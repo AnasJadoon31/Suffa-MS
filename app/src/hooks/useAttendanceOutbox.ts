@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AttendanceStatus } from "../data/mockData";
 import { api } from "../lib/api";
 import { db, type OutboxEntry } from "../lib/offlineDb";
+import { getOfflineAccountKey } from "../lib/offlineCache";
 
 type AttendanceOutboxState = Readonly<{
   entries: OutboxEntry[];
@@ -23,6 +24,7 @@ function createAttendanceEntry(
   const attendanceDate = capturedAt.slice(0, 10);
 
   return {
+    account_key: getOfflineAccountKey(),
     subject_type: "student",
     subject_id: studentId,
     session_id: sessionId,
@@ -37,16 +39,17 @@ function createAttendanceEntry(
 }
 
 export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxState {
+  const accountKey = getOfflineAccountKey();
   const [entries, setEntries] = useState<OutboxEntry[]>([]);
   const [lockedKeys, setLockedKeys] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const refresh = useCallback(async (): Promise<void> => {
-    setEntries(await db.outbox.toArray());
-  }, []);
+    setEntries(await db.outbox.where("account_key").equals(accountKey).toArray());
+  }, [accountKey]);
 
   const sync = useCallback(async (): Promise<void> => {
-    const pending = await db.outbox.toArray();
+    const pending = await db.outbox.where("account_key").equals(accountKey).toArray();
     if (pending.length === 0) return;
 
     setIsSyncing(true);
@@ -54,7 +57,9 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
       const response = await api.post("/api/v1/attendance/sync", { entries: pending });
 
       const payload = response.data;
-      await db.outbox.where("idempotency_key").anyOf(payload.idempotency_keys).delete();
+      await db.outbox.where("[account_key+idempotency_key]").anyOf(
+        payload.idempotency_keys.map((key: string) => [accountKey, key]),
+      ).delete();
       setLockedKeys(payload.locked ?? []);
       await refresh();
     } catch (error) {
@@ -62,16 +67,16 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
     } finally {
       setIsSyncing(false);
     }
-  }, [refresh]);
+  }, [accountKey, refresh]);
 
   const overrideEntry = useCallback(
     async (entry: OutboxEntry, reason: string): Promise<void> => {
       await api.post("/api/v1/attendance/override", { entry, reason });
-      await db.outbox.where("idempotency_key").equals(entry.idempotency_key).delete();
+      await db.outbox.where("[account_key+idempotency_key]").equals([accountKey, entry.idempotency_key]).delete();
       setLockedKeys((current) => current.filter((key) => key !== entry.idempotency_key));
       await refresh();
     },
-    [refresh],
+    [accountKey, refresh],
   );
 
   useEffect(() => {
@@ -87,14 +92,14 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
       if (!sessionId) return;
       const entry = createAttendanceEntry(studentId, status, sessionId);
       // Upsert: re-marking a student the same day replaces the queued entry.
-      await db.outbox.where("idempotency_key").equals(entry.idempotency_key).delete();
+      await db.outbox.where("[account_key+idempotency_key]").equals([accountKey, entry.idempotency_key]).delete();
       await db.outbox.add(entry);
       await refresh();
       if (navigator.onLine) {
         sync();
       }
     },
-    [refresh, sync, sessionId],
+    [accountKey, refresh, sync, sessionId],
   );
 
   const queueAttendanceBatch = useCallback(
@@ -107,7 +112,7 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
       if (batch.length === 0) return;
 
       for (const entry of batch) {
-        await db.outbox.where("idempotency_key").equals(entry.idempotency_key).delete();
+        await db.outbox.where("[account_key+idempotency_key]").equals([accountKey, entry.idempotency_key]).delete();
         await db.outbox.add(entry);
       }
 
@@ -116,7 +121,7 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
         sync();
       }
     },
-    [refresh, sync, sessionId],
+    [accountKey, refresh, sync, sessionId],
   );
 
   return { entries, lockedKeys, isSyncing, queueAttendance, queueAttendanceBatch, sync, overrideEntry };

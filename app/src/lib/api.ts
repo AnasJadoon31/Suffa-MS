@@ -68,7 +68,18 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.data && typeof error.response.data === "object" && "detail" in error.response.data) {
       const body = error.response.data as { detail?: unknown };
-      if (body.detail === "session_view_only") body.detail = i18next.t("sessionViewOnlyError");
+      const localizedErrors: Record<string, string> = {
+        session_view_only: "sessionViewOnlyError",
+        student_self_attendance_only: "studentSelfAttendanceOnlyError",
+        student_not_enrolled: "studentNotEnrolledError",
+        class_not_found: "classNotFoundError",
+        timetable_self_service_only: "timetableSelfServiceOnlyError",
+        assignment_not_assigned: "assignmentNotAssignedError",
+        teachers_self_attendance_only: "teachersSelfAttendanceOnlyError",
+      };
+      if (typeof body.detail === "string" && localizedErrors[body.detail]) {
+        body.detail = i18next.t(localizedErrors[body.detail]);
+      }
     }
     if (error.response?.status === 401) {
       // Clear local storage and redirect to login
