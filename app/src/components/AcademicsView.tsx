@@ -651,7 +651,7 @@ function CourseMappingModal({
               {available.map((co) => (
                 <div className="courseMapItem" key={co.id}>
                   <span>{co.name}</span>
-                  <button className="iconBtn" title={t("assignBtn")} type="button" onClick={() => void onAssign(co.id)}>
+                  <button className="iconBtn" title={t("assignCourseBtn")} type="button" onClick={() => void onAssign(co.id)}>
                     <Plus size={14} />
                   </button>
                 </div>
