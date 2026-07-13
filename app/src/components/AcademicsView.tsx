@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Plus, Edit2, Trash2 } from "lucide-react";
+import { CheckCircle2, Plus, Edit2, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 
@@ -32,9 +32,8 @@ export function AcademicsView() {
   const [classPortalEnabled, setClassPortalEnabled] = useState(true);
   const [sectionClassId, setSectionClassId] = useState("");
   const [sectionName, setSectionName] = useState("");
-  const [courseClassId, setCourseClassId] = useState("");
   const [courseName, setCourseName] = useState("");
-  const [assignCourseId, setAssignCourseId] = useState("");
+  const [courseMapModalClassId, setCourseMapModalClassId] = useState<string | null>(null);
   const [sessionForm, setSessionForm] = useState({ name: "", gregorian_start: "", gregorian_end: "", hijri_span: "" });
   const [rolloverSourceSession, setRolloverSourceSession] = useState<AcademicSession | null>(null);
 
@@ -410,34 +409,6 @@ export function AcademicsView() {
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSectionBtn")}</button>
                 </div>
               </form>
-              <form
-                className="inlineForm"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!courseClassId || !assignCourseId) return;
-                  await academicsApi.assignCourseToClass(courseClassId, assignCourseId);
-                  setAssignCourseId("");
-                  await refreshAll();
-                }}
-              >
-                <label>
-                  {t("classLabel")}
-                  <Select required value={courseClassId} onChange={(e) => setCourseClassId(e.target.value)}>
-                    <option value="">{t("selectEllipsis")}</option>
-                    {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </Select>
-                </label>
-                <label>
-                  Course
-                  <Select required value={assignCourseId} onChange={(e) => setAssignCourseId(e.target.value)}>
-                    <option value="">{t("selectEllipsis")}</option>
-                    {allCourses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </Select>
-                </label>
-                <div className="formActions">
-                  <button className="primaryAction" type="submit"><Plus size={16} /> Assign</button>
-                </div>
-              </form>
               <div className="moduleToolbar">
                 <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={courseMapSearch} onChange={(e) => setCourseMapSearch(e.target.value)} />
                 <Select value={courseMapFilterClass} onChange={(e) => setCourseMapFilterClass(e.target.value)}>
@@ -480,16 +451,20 @@ export function AcademicsView() {
                       ))}
                       {!(sections[c.id]?.length > 0) && "—"}
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      {(courses[c.id] ?? []).map((co) => (
-                        <div key={co.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span>{co.name}</span>
-                          <span className="actions" style={{ marginLeft: "auto" }}>
-                            <button className="iconBtn" title="Unassign" onClick={() => handleDelete(() => academicsApi.unassignCourseFromClass(c.id, co.id))}><Trash2 size={14} /></button>
-                          </span>
-                        </div>
-                      ))}
-                      {!(courses[c.id]?.length > 0) && "—"}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
+                      <span
+                        className="badge"
+                        style={{ background: "var(--surface-2, #f1f5f9)", color: "var(--muted, #475569)" }}
+                      >
+                        {t("coursesCountLabel", { count: (courses[c.id] ?? []).length })}
+                      </span>
+                      <button
+                        className="tableAction"
+                        type="button"
+                        onClick={() => setCourseMapModalClassId(c.id)}
+                      >
+                        {t("manageCoursesBtn")}
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -592,6 +567,99 @@ export function AcademicsView() {
           }}
         />
       )}
+
+      {courseMapModalClassId && (() => {
+        const cls = classes.find((c) => c.id === courseMapModalClassId);
+        if (!cls) return null;
+        return (
+          <CourseMappingModal
+            cls={cls}
+            assignedCourses={courses[cls.id] ?? []}
+            allCourses={allCourses}
+            onAssign={async (courseId) => {
+              try {
+                await academicsApi.assignCourseToClass(cls.id, courseId);
+                await refreshAll();
+              } catch (err) { handleError(err); }
+            }}
+            onUnassign={async (courseId) => {
+              if (!window.confirm(t("deleteRecordConfirm"))) return;
+              try {
+                await academicsApi.unassignCourseFromClass(cls.id, courseId);
+                await refreshAll();
+              } catch (err) { handleError(err); }
+            }}
+            onClose={() => setCourseMapModalClassId(null)}
+          />
+        );
+      })()}
     </section>
+  );
+}
+
+/**
+ * B7(e): dedicated course↔class mapping layout — a two-column assigned/
+ * available picker in a modal (same `modalOverlay`/`modalCard` idiom as
+ * `DelegateButton.tsx`), replacing the cramped inline courses column.
+ * Same `assignCourseToClass`/`unassignCourseFromClass` calls as before.
+ */
+function CourseMappingModal({
+  cls,
+  assignedCourses,
+  allCourses,
+  onAssign,
+  onUnassign,
+  onClose,
+}: Readonly<{
+  cls: AcademicClass;
+  assignedCourses: Course[];
+  allCourses: Course[];
+  onAssign: (courseId: string) => Promise<void>;
+  onUnassign: (courseId: string) => Promise<void>;
+  onClose: () => void;
+}>) {
+  const { t } = useTranslation();
+  const assignedIds = new Set(assignedCourses.map((co) => co.id));
+  const available = allCourses.filter((co) => !assignedIds.has(co.id));
+
+  return (
+    <div className="modalOverlay" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="modalCard" style={{ width: "min(680px, 92vw)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3>{t("manageCoursesTitle", { class: cls.name })}</h3>
+          <button className="tableAction" type="button" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="courseMapColumns">
+          <div>
+            <h4>{t("assignedCoursesLabel")}</h4>
+            <div className="courseMapList">
+              {assignedCourses.length === 0 && <p className="emptyState">{t("noCoursesAssignedYet")}</p>}
+              {assignedCourses.map((co) => (
+                <div className="courseMapItem" key={co.id}>
+                  <span>{co.name}</span>
+                  <button className="iconBtn" title={t("unassignBtn")} type="button" onClick={() => void onUnassign(co.id)}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h4>{t("availableCoursesLabel")}</h4>
+            <div className="courseMapList">
+              {available.length === 0 && <p className="emptyState">{t("noCoursesAvailableLabel")}</p>}
+              {available.map((co) => (
+                <div className="courseMapItem" key={co.id}>
+                  <span>{co.name}</span>
+                  <button className="iconBtn" title={t("assignBtn")} type="button" onClick={() => void onAssign(co.id)}>
+                    <Plus size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

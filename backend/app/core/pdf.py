@@ -53,28 +53,65 @@ def bilingual_line(urdu_label: str, value: str, *, bold: bool = False) -> str:
 
 
 def render_table_pdf(title: str, subtitle: str, headers: list[str], rows: list[list[str]]) -> bytes:
+    """Wide grids (timetables, result matrices) were overflowing the page:
+    a plain reportlab Table auto-sizes columns to fit its content, and with
+    many columns of unwrapped multi-line text (course + teacher names) the
+    table simply grew wider than the page, clipping whatever fell outside
+    the frame. Fixed by wrapping every cell in a Paragraph (so text wraps
+    within its column instead of forcing the table wider) and computing
+    explicit colWidths that always sum to the printable width, with
+    landscape orientation once there are enough columns that portrait would
+    squeeze them unreadably thin."""
+    from reportlab.lib.pagesizes import landscape as landscape_pagesize
+
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, title=title)
+    page_size = landscape_pagesize(A4) if len(headers) > 5 else A4
+    doc = SimpleDocTemplate(buffer, pagesize=page_size, title=title, topMargin=36, bottomMargin=36, leftMargin=36, rightMargin=36)
     styles = getSampleStyleSheet()
+    cell_style = ParagraphStyle("cell", fontName="Helvetica", fontSize=8, leading=10)
+    header_style = ParagraphStyle("cellHeader", parent=cell_style, textColor=colors.white, fontName="Helvetica-Bold")
+    section_style = ParagraphStyle("cellSection", parent=cell_style, fontName="Helvetica-Bold")
 
     elements = [
-        Paragraph(title, styles["Title"]),
-        Paragraph(subtitle, styles["Normal"]),
+        Paragraph(escape(title), styles["Title"]),
+        Paragraph(escape(subtitle), styles["Normal"]),
         Spacer(1, 16),
     ]
 
-    table = Table([headers, *rows], repeatRows=1)
-    table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f3f4f6")]),
-            ]
-        )
-    )
+    # Rows produced by callers use a "— label —" marker in the first cell for
+    # group/section separators (one weekly grid per section, one block per
+    # class in a results export, etc) — span those across the full row width
+    # instead of rendering them as a mostly-empty data row.
+    section_row_indices = {i for i, row in enumerate(rows) if row and str(row[0]).startswith("— ")}
+
+    def _cell(value: object, *, is_header: bool = False, is_section: bool = False) -> Paragraph:
+        style = header_style if is_header else (section_style if is_section else cell_style)
+        text = escape(str(value)).replace("\n", "<br/>")
+        return Paragraph(text, style)
+
+    table_data = [[_cell(h, is_header=True) for h in headers]]
+    for i, row in enumerate(rows):
+        is_section = i in section_row_indices
+        table_data.append([_cell(v, is_section=is_section) for v in row])
+
+    usable_width = page_size[0] - doc.leftMargin - doc.rightMargin
+    first_col_width = max(usable_width * 0.16, 60)
+    other_col_width = (usable_width - first_col_width) / max(len(headers) - 1, 1)
+    col_widths = [first_col_width] + [other_col_width] * (len(headers) - 1)
+
+    style_commands = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f3f4f6")]),
+    ]
+    for row_index in section_row_indices:
+        table_row = row_index + 1  # +1 for the header row
+        style_commands.append(("SPAN", (0, table_row), (-1, table_row)))
+        style_commands.append(("BACKGROUND", (0, table_row), (-1, table_row), colors.HexColor("#e5e7eb")))
+
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    table.setStyle(TableStyle(style_commands))
     elements.append(table)
     doc.build(elements)
     return buffer.getvalue()

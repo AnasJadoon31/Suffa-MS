@@ -1876,6 +1876,48 @@ input[type="radio"] {
   margin-bottom: 12px;
 }
 
+/* --------------------------------------------------- Course mapping modal (B7-e) */
+
+.courseMapColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .courseMapColumns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.courseMapColumns h4 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: var(--muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.courseMapList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.courseMapItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
 /* ------------------------------------------------------ Student dashboard */
 
 .dashboardColumns {

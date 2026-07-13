@@ -3,6 +3,34 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-13 — Timetable PDF export was clipped (bug report)
+
+`GET /operations/timetable/export` (and the two other `render_table_pdf`
+callers — reporting exports, assessments results export) overflowed the
+page: a plain reportlab `Table` auto-sizes columns to fit unwrapped content,
+so an 8-column grid (Time + 7 days) with multi-line "Course / Teacher" cell
+text grew wider than portrait A4 and got clipped at the frame edge instead
+of wrapping.
+
+Fixed in `backend/app/core/pdf.py::render_table_pdf` (shared by all three
+callers, no call-site changes needed):
+- Every cell now renders as a `Paragraph` so long text wraps within its
+  column instead of forcing the table wider than the page.
+- Explicit `colWidths` always sum to the printable width (first column 16%,
+  remaining columns split the rest evenly).
+- Auto-switches to landscape A4 once a table has more than 5 columns
+  (timetable's 8 columns always qualifies).
+- Group/section-separator rows (both timetable and the results export
+  already prefixed these `"— Class / Section —"`) now actually `SPAN`
+  across the full row width with a shaded background, instead of rendering
+  as a mostly-empty data row.
+
+Confirms the existing behavior was already correct on the *data* side —
+one weekly grid per section, stacked for every class in the madrasa (or
+filtered to one via `class_id`) — the bug was purely rendering/layout.
+Regression test in `test_backend_sweep.py` asserts the exported PDF's
+`/MediaBox` is actually landscape. Suite: 106/106 green.
+
 ## 2026-07-13 — B8-j publish-to-all-classes, §C teacher-portal closeout, §E polish
 
 Scope: `TO_IMPLEMENT.md` §B8(j), §C (Holidays/Announcements/Resources/Forms),

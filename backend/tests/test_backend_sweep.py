@@ -1,6 +1,7 @@
 """Backend completion sweep: auth extras, holidays scope, leave filters,
 public endpoints, timetable import, settings catalogue, reports, rollover
 copy options, security headers."""
+import re
 from datetime import date
 
 from sqlalchemy import select
@@ -384,6 +385,14 @@ async def test_timetable_export_pdf(client, seed, db_sessionmaker):
     response = await client.get("/api/v1/operations/timetable/export", params={"format": "pdf"})
     assert response.status_code == 200
     assert response.content[:4] == b"%PDF"
+    # Regression: an 8-column grid (Time + 7 days) in portrait A4 with
+    # unwrapped cell text overflowed the page and got silently clipped.
+    # render_table_pdf now switches to landscape once there are enough
+    # columns — assert the page is actually wider than it is tall.
+    media_box = re.search(rb"/MediaBox\s*\[\s*[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)\s*\]", response.content)
+    assert media_box is not None, "no /MediaBox found in exported PDF"
+    page_width, page_height = float(media_box.group(1)), float(media_box.group(2))
+    assert page_width > page_height, f"expected landscape page, got {page_width}x{page_height}"
 
     empty = await client.get(
         "/api/v1/operations/timetable/export", params={"class_id": str(seed.class_b.id)}
