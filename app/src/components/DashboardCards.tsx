@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AttendanceCalendar, toDateKey, type StudentDayStatus } from "./AttendanceCalendar";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { navItems, type ViewId } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
 
@@ -55,13 +56,22 @@ function QuickLinks({ onNavigate }: Readonly<{ onNavigate?: (view: ViewId) => vo
 }
 
 export function DashboardCards({ onNavigate }: DashboardCardsProps) {
+  const { t } = useTranslation();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     // Cached so today's timetable / dashboard stays viewable offline (FR-TT-02).
-    void cachedFetch("dashboard", () => reportingApi.dashboard()).then(({ data: payload }) => setData(payload));
+    void cachedFetch("dashboard", () => reportingApi.dashboard())
+      .then(({ data: payload }) => setData(payload))
+      .catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDashboard")))
+      .finally(() => setIsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState message={error} />;
   if (!data) return null;
   return (
     <>

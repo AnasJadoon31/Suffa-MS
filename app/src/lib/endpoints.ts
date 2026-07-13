@@ -12,15 +12,16 @@ export interface AcademicSession {
 export interface TeacherAssignment { id: string; teacher_id: string; session_id: string; class_id: string; course_id: string }
 
 export const academicsApi = {
-  today: () => api.get<{ gregorian: string; hijri: string }>("/api/v1/academics/today").then((r) => r.data),
+  today: (date?: string) =>
+    api.get<{ gregorian: string; hijri: string }>("/api/v1/academics/today", { params: date ? { date } : {} }).then((r) => r.data),
   listPrograms: () => api.get<Program[]>("/api/v1/academics/programs").then((r) => r.data),
   createProgram: (name: string) => api.post<Program>("/api/v1/academics/programs", { name }).then((r) => r.data),
   updateProgram: (id: string, payload: { name: string }) => api.put<Program>(`/api/v1/academics/programs/${id}`, payload).then((r) => r.data),
   deleteProgram: (id: string) => api.delete(`/api/v1/academics/programs/${id}`).then((r) => r.data),
 
   listClasses: () => api.get<AcademicClass[]>("/api/v1/academics/classes").then((r) => r.data),
-  createClass: (program_id: string, name: string) =>
-    api.post<AcademicClass>("/api/v1/academics/classes", { program_id, name }).then((r) => r.data),
+  createClass: (program_id: string, name: string, default_portal_enabled = true) =>
+    api.post<AcademicClass>("/api/v1/academics/classes", { program_id, name, default_portal_enabled }).then((r) => r.data),
   updateClass: (id: string, payload: { program_id?: string; name?: string; default_portal_enabled?: boolean }) =>
     api.put<AcademicClass>(`/api/v1/academics/classes/${id}`, payload).then((r) => r.data),
   deleteClass: (id: string) => api.delete(`/api/v1/academics/classes/${id}`).then((r) => r.data),
@@ -319,7 +320,7 @@ export const assessmentsApi = {
   }) =>
     api.get<Assignment[]>("/api/v1/assessments/assignments", { params }).then((r) => r.data),
   createAssignment: (payload: {
-    class_id: string; course_id: string; section_ids?: string[]; title: string; category?: string;
+    class_id?: string; course_id: string; section_ids?: string[]; all_classes?: boolean; title: string; category?: string;
     instructions: string; due_date: string; attachment_key?: string;
   }) => api.post<Assignment[]>("/api/v1/assessments/assignments", payload).then((r) => r.data),
   updateAssignment: (id: string, payload: {
@@ -454,21 +455,23 @@ export interface Leave {
   id: string; user_id: string; person_name: string | null; person_type: string | null;
   start_date: string; end_date: string; reason: string | null; status: string;
 }
-export interface ResourceCategory { id: string; name: string }
+export interface ResourceCategory { id: string; name: string; owner_id: string | null; is_mine: boolean }
 export interface ResourceItem {
   id: string; category_id: string; title: string; description: string | null;
-  file_key: string | null; video_url: string | null; visibility_scope: Scope; created_at: string;
+  file_key: string | null; video_url: string | null; visibility_scope: Scope;
+  created_by_id: string; owner_name: string | null; created_at: string;
 }
 export interface FormFieldDefinition { key: string; label: string; type: string; required: boolean; options: string[] }
 export interface FormDef {
-  id: string; title: string; description: string; fields_definition: FormFieldDefinition[];
-  visibility_scope: Scope; open_from: string | null; open_until: string | null; allow_multiple: boolean; created_at: string;
+  id: string; title: string; description: string; category: string | null; fields_definition: FormFieldDefinition[];
+  visibility_scope: Scope; open_from: string | null; open_until: string | null; allow_multiple: boolean;
+  created_by_id: string; created_at: string;
 }
 export interface FormResponse {
   id: string; form_id: string; student_id: string; student_name: string | null; submitted_by_id: string; response_data: Record<string, unknown>; created_at: string;
 }
 export interface Announcement {
-  id: string; title: string; body: string; attachment_link: string | null; audience_scope: Scope;
+  id: string; title: string; body: string; category: string | null; attachment_link: string | null; audience_scope: Scope;
   publish_at: string | null; expires_at: string | null; created_at: string;
 }
 
@@ -514,32 +517,43 @@ export const operationsApi = {
     api.post<Leave>(`/api/v1/operations/leave/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
 
   listResourceCategories: () => api.get<ResourceCategory[]>("/api/v1/operations/resource-categories").then((r) => r.data),
-  createResourceCategory: (name: string) =>
-    api.post<ResourceCategory>("/api/v1/operations/resource-categories", { name }).then((r) => r.data),
-  listResources: (categoryId?: string) =>
-    api.get<ResourceItem[]>("/api/v1/operations/resources", { params: { category_id: categoryId } }).then((r) => r.data),
+  createResourceCategory: (name: string, isGlobal = true) =>
+    api.post<ResourceCategory>("/api/v1/operations/resource-categories", { name, is_global: isGlobal }).then((r) => r.data),
+  deleteResourceCategory: (id: string) => api.delete(`/api/v1/operations/resource-categories/${id}`).then((r) => r.data),
+  listResources: (params?: { category_id?: string; class_id?: string; section_id?: string; mine_only?: boolean }) =>
+    api.get<ResourceItem[]>("/api/v1/operations/resources", { params }).then((r) => r.data),
   createResource: (payload: {
     category_id: string; title: string; description?: string; file_key?: string; video_url?: string; visibility_scope?: Scope;
   }) => api.post<ResourceItem>("/api/v1/operations/resources", payload).then((r) => r.data),
+  updateResource: (id: string, payload: {
+    category_id?: string; title?: string; description?: string; file_key?: string; video_url?: string; visibility_scope?: Scope;
+  }) => api.put<ResourceItem>(`/api/v1/operations/resources/${id}`, payload).then((r) => r.data),
+  deleteResource: (id: string) => api.delete(`/api/v1/operations/resources/${id}`).then((r) => r.data),
 
-  listForms: () => api.get<FormDef[]>("/api/v1/operations/forms").then((r) => r.data),
+  listForms: (params?: { category?: string; mine_only?: boolean }) =>
+    api.get<FormDef[]>("/api/v1/operations/forms", { params }).then((r) => r.data),
   getForm: (id: string) => api.get<FormDef>(`/api/v1/operations/forms/${id}`).then((r) => r.data),
   createForm: (payload: {
-    title: string; description?: string; fields: FormFieldDefinition[]; visibility_scope?: Scope;
+    title: string; description?: string; category?: string; fields: FormFieldDefinition[]; visibility_scope?: Scope;
     open_from?: string; open_until?: string; allow_multiple?: boolean;
   }) => api.post<FormDef>("/api/v1/operations/forms", payload).then((r) => r.data),
+  updateForm: (id: string, payload: {
+    title?: string; description?: string; category?: string; fields?: FormFieldDefinition[]; visibility_scope?: Scope;
+    open_from?: string; open_until?: string; allow_multiple?: boolean;
+  }) => api.put<FormDef>(`/api/v1/operations/forms/${id}`, payload).then((r) => r.data),
+  deleteForm: (id: string) => api.delete(`/api/v1/operations/forms/${id}`).then((r) => r.data),
   submitFormResponse: (formId: string, responseData: Record<string, unknown>) =>
     api.post<FormResponse>(`/api/v1/operations/forms/${formId}/responses`, { response_data: responseData }).then((r) => r.data),
   listFormResponses: (formId: string) =>
     api.get<FormResponse[]>(`/api/v1/operations/forms/${formId}/responses`).then((r) => r.data),
 
-  listAnnouncements: (params?: { audience?: "teachers" | "students" | "all"; q?: string; date_from?: string; date_to?: string }) =>
+  listAnnouncements: (params?: { audience?: "teachers" | "students" | "all"; category?: string; q?: string; date_from?: string; date_to?: string }) =>
     api.get<Announcement[]>("/api/v1/operations/announcements", { params }).then((r) => r.data),
   createAnnouncement: (payload: {
-    title: string; body: string; attachment_link?: string; audience_scope?: Scope; publish_at?: string; expires_at?: string;
+    title: string; body: string; category?: string; attachment_link?: string; audience_scope?: Scope; publish_at?: string; expires_at?: string;
   }) => api.post<Announcement>("/api/v1/operations/announcements", payload).then((r) => r.data),
   updateAnnouncement: (id: string, payload: {
-    title?: string; body?: string; attachment_link?: string; audience_scope?: Scope; publish_at?: string; expires_at?: string;
+    title?: string; body?: string; category?: string; attachment_link?: string; audience_scope?: Scope; publish_at?: string; expires_at?: string;
   }) => api.put<Announcement>(`/api/v1/operations/announcements/${id}`, payload).then((r) => r.data),
   deleteAnnouncement: (id: string) => api.delete(`/api/v1/operations/announcements/${id}`).then((r) => r.data),
 

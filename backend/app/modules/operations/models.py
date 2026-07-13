@@ -55,6 +55,10 @@ class ResourceCategory(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "resource_categories"
 
     name: Mapped[str] = mapped_column(String(80))
+    # Null = global/shared category (visible to everyone); set = private to
+    # that teacher (B9 — per-teacher categories). Admins/resources.manage_all
+    # see every category, global or not.
+    owner_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
 
 class Resource(Base, IdMixin, TenantMixin, TimestampMixin):
@@ -74,6 +78,9 @@ class Form(Base, IdMixin, TenantMixin, TimestampMixin):
 
     title: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text)
+    # Free-form label (B10), same pattern as Assignment.category — filterable,
+    # not a managed table.
+    category: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     fields_definition: Mapped[list] = mapped_column(PortableJSONB) # Array of field definitions
     visibility_scope: Mapped[dict] = mapped_column(PortableJSONB)
     open_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -96,6 +103,9 @@ class Announcement(Base, IdMixin, TenantMixin, TimestampMixin):
 
     title: Mapped[str] = mapped_column(String(160))
     body: Mapped[str] = mapped_column(Text)
+    # Free-form label (B6), same pattern as Assignment.category — filterable,
+    # not a managed table.
+    category: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     attachment_link: Mapped[str] = mapped_column(String(500), nullable=True)
     audience_scope: Mapped[dict] = mapped_column(PortableJSONB) # e.g. {"all": true} or {"classes": [id1, id2]}
     publish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)

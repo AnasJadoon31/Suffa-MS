@@ -19,6 +19,7 @@ import {
 } from "../lib/endpoints";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
+import { LoadingState } from "./ui/AsyncState";
 
 function SendCredentialsButton({
   subjectType,
@@ -146,10 +147,22 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
   const [error, setError] = useState("");
   const [justCreated, setJustCreated] = useState<Teacher | null>(null);
   const [detail, setDetail] = useState<Teacher | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const load = async (query?: string) => setTeachers(await peopleApi.listTeachers(query || undefined));
+  const load = async (query?: string) => {
+    setIsLoading(true);
+    try {
+      setTeachers(await peopleApi.listTeachers(query || undefined));
+      setError("");
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedLoadTeachers"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -242,7 +255,8 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           <span>{t("statusCol")}</span>
           <span></span>
         </div>
-        {teachers.length === 0 && <p className="emptyState">{t("noTeachersYet")}</p>}
+        {isLoading && <LoadingState />}
+        {!isLoading && teachers.length === 0 && <p className="emptyState">{t("noTeachersYet")}</p>}
         {teachers.map((teacher) => (
           <div className="dataRow" key={teacher.id}>
             <span>{teacher.employee_code}</span>
@@ -362,13 +376,25 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [error, setError] = useState("");
   const [justCreated, setJustCreated] = useState<Student | null>(null);
   const [detail, setDetail] = useState<Student | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const load = async (query?: string) => setStudents(await peopleApi.listStudents(query || undefined));
+  const load = async (query?: string) => {
+    setIsLoading(true);
+    try {
+      setStudents(await peopleApi.listStudents(query || undefined));
+      setError("");
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedLoadStudents"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
   useEffect(() => {
     void load();
     void attendanceApi.listClasses().then((rows: any[]) => {
       setClassOptions(rows.map((row) => ({ id: row.id ?? row.class_id, name: row.name ?? row.class_name })));
     }).catch(() => setClassOptions([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -472,7 +498,8 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           <span>{t("statusCol")}</span>
           <span></span>
         </div>
-        {visible.length === 0 && <p className="emptyState">{t("noStudentsYet")}</p>}
+        {isLoading && <LoadingState />}
+        {!isLoading && visible.length === 0 && <p className="emptyState">{t("noStudentsYet")}</p>}
         {visible.map((s) => (
           <div className="dataRow" key={s.id}>
             <span>{s.admission_number}</span>
@@ -606,10 +633,22 @@ function GuardiansTab({
   const [form, setForm] = useState({ name: "", relationship: "", phone_numbers: "", cnic: "", address: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const load = async () => setGuardians(await peopleApi.listGuardians());
+  const load = async () => {
+    setIsLoading(true);
+    try {
+      setGuardians(await peopleApi.listGuardians());
+      setError("");
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedLoadGuardians"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const provisionLogin = async (guardian: Guardian) => {
@@ -672,7 +711,8 @@ function GuardiansTab({
           <span>{t("portalCol")}</span>
           <span></span>
         </div>
-        {guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
+        {isLoading && <LoadingState />}
+        {!isLoading && guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
         {guardians.map((g) => (
           <div className="dataRow" key={g.id}>
             <span>{g.name}</span>
@@ -703,10 +743,17 @@ function DonatorsTab() {
   const [categories, setCategories] = useState<PaymentCategory[]>([]);
   const [donationForm, setDonationForm] = useState({ category_id: "", amount: "", donation_date: "" });
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    void financeApi.listDonors().then(setDonors).catch(() => setDonors([]));
-    void financeApi.listCategories().then(setCategories).catch(() => setCategories([]));
+    void Promise.all([
+      financeApi.listDonors().then(setDonors).catch((err: any) => {
+        setDonors([]);
+        setError(err.response?.data?.detail ?? t("failedLoadDonors"));
+      }),
+      financeApi.listCategories().then(setCategories).catch(() => setCategories([])),
+    ]).finally(() => setIsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const openDonor = async (donor: Donor) => {
@@ -716,9 +763,11 @@ function DonatorsTab() {
 
   return (
     <>
+      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <div className="dataTable">
         <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("contactCol")}</span><span></span></div>
-        {donors.length === 0 && <p className="emptyState">{t("noDonorsYet")}</p>}
+        {isLoading && <LoadingState />}
+        {!isLoading && donors.length === 0 && <p className="emptyState">{t("noDonorsYet")}</p>}
         {donors.map((d) => (
           <div className="dataRow" key={d.id}>
             <span>{d.name}</span>

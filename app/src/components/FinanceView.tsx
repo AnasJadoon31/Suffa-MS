@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { academicsApi, financeApi, type AcademicClass, type Donation, type Donor, type Payment, type PaymentCategory, type FinanceSummary } from "../lib/endpoints";
 import { peopleApi, type Student } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 
@@ -174,7 +175,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
             <span>{students.find((s) => s.id === p.student_id)?.name ?? p.student_id}</span>
             <span>{categories.find((c) => c.id === p.category_id)?.name ?? "—"}</span>
             <span>{p.currency} {p.amount}</span>
-            <span>{p.payment_date}</span>
+            <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
             <span>{p.note ?? "—"}</span>
             <span>
               <button className="tableAction" type="button" onClick={() => void financeApi.downloadPaymentReceipt(p.id)}>
@@ -312,7 +313,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
             <span>{donors.find((x) => x.id === d.donor_id)?.name ?? d.donor_id}</span>
             <span>{categories.find((c) => c.id === d.category_id)?.name ?? "—"}</span>
             <span>{d.currency} {d.amount}</span>
-            <span>{d.donation_date}</span>
+            <span>{d.donation_date}<HijriTag date={d.donation_date} /></span>
             <span>{d.note ?? "—"}</span>
             <span>
               <button className="tableAction" type="button" onClick={() => void financeApi.downloadDonationReceipt(d.id)}>

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../lib/AuthContext";
 import { financeApi, type MySalary, type SalaryPayment, type SalaryRecord } from "../lib/endpoints";
 import { peopleApi, type Teacher } from "../lib/endpoints";
+import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 
@@ -42,7 +43,7 @@ function MySalaryView() {
         {data && data.payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
         {data?.payments.map((p) => (
           <div className="dataRow" key={p.id}>
-            <span>{p.payment_date}</span>
+            <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
             <span>{p.period_covered}</span>
             <span>{p.currency} {p.amount}</span>
             <span>{p.method}</span>
@@ -202,7 +203,7 @@ function AdminSalaryView() {
             {payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
             {payments.map((p) => (
               <div className="dataRow" key={p.id}>
-                <span>{p.payment_date}</span>
+                <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
                 <span>{p.period_covered}</span>
                 <span>{p.currency} {p.amount}</span>
                 <span>{p.method}</span>

@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import select
 
 from app.main import app as fastapi_app
-from app.modules.academics.models import Madrasa
+from app.modules.academics.models import AcademicClass, Madrasa, Program, Section
 from app.modules.auth.models import User, UserRole, UserStatus
 from app.modules.people.models import StudentProfile, TeacherProfile
 
@@ -159,3 +159,109 @@ async def test_salary_routes_reject_cross_tenant_teacher_id(client, db_sessionma
 
     payments_response = await client.get(f"/api/v1/finance/salary/{other_teacher_id}/payments")
     assert payments_response.status_code == 404
+
+
+async def test_attendance_summary_404s_for_unknown_subject(client, seed):
+    """Regression: GET /attendance/summary/{subject_type}/{subject_id} used to
+    silently return a zeroed-out summary for a bad/cross-tenant subject_id
+    instead of 404, masking the difference between "no attendance recorded"
+    and "this student/teacher doesn't exist here"."""
+    import uuid
+
+    response = await client.get(
+        f"/api/v1/attendance/summary/student/{uuid.uuid4()}",
+        params={"start_date": "2024-01-01", "end_date": "2024-01-31"},
+    )
+    assert response.status_code == 404
+
+
+async def test_academics_section_create_rejects_cross_tenant_class(client, db_sessionmaker):
+    """Regression: POST /academics/classes/{class_id}/sections never checked
+    that class_id belonged to the caller's tenant before creating the section
+    under it, letting a principal attach a section to another madrasa's class."""
+    async with db_sessionmaker() as db:
+        other = Madrasa(name="Other Madrasa", slug="other-section-tenant")
+        db.add(other)
+        await db.flush()
+        other_program = Program(madrasa_id=other.id, name="Other Program")
+        db.add(other_program)
+        await db.flush()
+        other_class = AcademicClass(madrasa_id=other.id, program_id=other_program.id, name="Other Class")
+        db.add(other_class)
+        await db.commit()
+        other_class_id = other_class.id
+
+    response = await client.post(
+        f"/api/v1/academics/classes/{other_class_id}/sections", json={"name": "Sneaky Section"}
+    )
+    assert response.status_code == 404
+
+
+async def test_academics_course_assign_rejects_cross_tenant_class(client, seed, db_sessionmaker):
+    """Regression: POST /academics/classes/{class_id}/courses/assign checked
+    the course's tenant but not the class's, letting a principal assign their
+    own course onto another madrasa's class."""
+    async with db_sessionmaker() as db:
+        other = Madrasa(name="Other Madrasa", slug="other-assign-tenant")
+        db.add(other)
+        await db.flush()
+        other_program = Program(madrasa_id=other.id, name="Other Program")
+        db.add(other_program)
+        await db.flush()
+        other_class = AcademicClass(madrasa_id=other.id, program_id=other_program.id, name="Other Class")
+        db.add(other_class)
+        await db.commit()
+        other_class_id = other_class.id
+
+    response = await client.post(
+        f"/api/v1/academics/classes/{other_class_id}/courses/assign",
+        json={"course_id": str(seed.course.id)},
+    )
+    assert response.status_code == 404
+
+
+async def test_enroll_student_rejects_cross_tenant_class_and_section(client, seed, db_sessionmaker):
+    """Regression: POST /academics/students/enroll wrote program_id/class_id/
+    section_id from the request body straight onto the Enrollment row with no
+    tenant check, letting a principal enroll their own student into another
+    madrasa's class/section."""
+    async with db_sessionmaker() as db:
+        other = Madrasa(name="Other Madrasa", slug="other-enroll-tenant")
+        db.add(other)
+        await db.flush()
+        other_program = Program(madrasa_id=other.id, name="Other Program")
+        db.add(other_program)
+        await db.flush()
+        other_class = AcademicClass(madrasa_id=other.id, program_id=other_program.id, name="Other Class")
+        db.add(other_class)
+        await db.flush()
+        other_section = Section(madrasa_id=other.id, class_id=other_class.id, name="Other Section")
+        db.add(other_section)
+        await db.commit()
+        other_class_id, other_section_id = other_class.id, other_section.id
+
+    response = await client.post(
+        "/api/v1/academics/students/enroll",
+        json={
+            "student_id": str(seed.students[0].id),
+            "session_id": str(seed.old_session.id),
+            "program_id": str(seed.program.id),
+            "class_id": str(other_class_id),
+            "section_id": str(other_section_id),
+        },
+    )
+    assert response.status_code == 404
+
+
+async def test_course_result_requires_marks_permission(student_client):
+    """Regression: GET /assessments/results/course only required an
+    authenticated user (any role), letting a student query any other
+    student's per-course result by guessing ids. Must now require
+    assessments.marks.enter like its sibling result endpoints."""
+    import uuid
+
+    response = await student_client.get(
+        "/api/v1/assessments/results/course",
+        params={"student_id": str(uuid.uuid4()), "course_id": str(uuid.uuid4())},
+    )
+    assert response.status_code == 403

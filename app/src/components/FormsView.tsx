@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Plus, Send, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Edit2, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { operationsApi, type FormDef, type FormFieldDefinition, type FormResponse, type Scope } from "../lib/endpoints";
@@ -12,10 +12,12 @@ const FIELD_TYPES = ["text", "textarea", "radio", "checkbox_group", "dropdown", 
 
 export function FormsView() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const canCreate = hasPermission("forms.create");
+  const canManageAll = hasPermission("forms.manage_all");
   const canViewResponses = hasPermission("forms.responses.view");
   const [forms, setForms] = useState<FormDef[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [selected, setSelected] = useState<FormDef | null>(null);
   const [responses, setResponses] = useState<FormResponse[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -24,16 +26,27 @@ export function FormsView() {
 
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formCategory, setFormCategory] = useState("");
   const [allowMultiple, setAllowMultiple] = useState(false);
   const [audience, setAudience] = useState<Scope>({ all: true });
   const [fields, setFields] = useState<FormFieldDefinition[]>([
     { key: "", label: "", type: "text", required: true, options: [] },
   ]);
 
-  const load = async () => setForms(await operationsApi.listForms());
+  const [editing, setEditing] = useState<FormDef | null>(null);
+  const [editAudience, setEditAudience] = useState<Scope>({ all: true });
+  const [editError, setEditError] = useState("");
+
+  const knownCategories = useMemo(
+    () => [...new Set(forms.map((f) => f.category).filter(Boolean))] as string[],
+    [forms]
+  );
+
+  const load = async () => setForms(await operationsApi.listForms({ category: categoryFilter || undefined }));
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryFilter]);
 
   const openForm = async (form: FormDef) => {
     setSelected(form);
@@ -42,6 +55,8 @@ export function FormsView() {
     setError("");
     if (canViewResponses) setResponses(await operationsApi.listFormResponses(form.id));
   };
+
+  const canEditForm = (form: FormDef) => canManageAll || form.created_by_id === user?.id;
 
   return (
     <section className="modulePanel">
@@ -62,9 +77,13 @@ export function FormsView() {
               .map((f) => ({ ...f, options: f.type === "label" || f.type === "text" || f.type === "textarea" ? [] : f.options }));
             if (!formTitle || cleanFields.length === 0) return;
             try {
-              await operationsApi.createForm({ title: formTitle, description: formDescription, fields: cleanFields, allow_multiple: allowMultiple, visibility_scope: audience });
+              await operationsApi.createForm({
+                title: formTitle, description: formDescription, category: formCategory || undefined,
+                fields: cleanFields, allow_multiple: allowMultiple, visibility_scope: audience,
+              });
               setFormTitle("");
               setFormDescription("");
+              setFormCategory("");
               setAllowMultiple(false);
               setFields([{ key: "", label: "", type: "text", required: true, options: [] }]);
               await load();
@@ -76,6 +95,7 @@ export function FormsView() {
           <div className="inlineForm" style={{ margin: 0, padding: 0, border: "none", background: "none" }}>
             <label>{t("titleLabel")}<Input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></label>
             <label>{t("descriptionLabel")}<Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} /></label>
+            <label>{t("formCategoryLabel")}<Input value={formCategory} onChange={(e) => setFormCategory(e.target.value)} placeholder={t("formCategoryPlaceholder") ?? ""} list="form-categories" /></label>
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} /> {t("allowMultipleLabel")}
             </label>
@@ -119,16 +139,57 @@ export function FormsView() {
         </form>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      <datalist id="form-categories">
+        {knownCategories.map((c) => <option key={c} value={c} />)}
+      </datalist>
+
+      <div className="moduleToolbar">
+        <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+          <option value="">{t("allCategories")}</option>
+          {knownCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+        </Select>
+      </div>
 
       <div className="dataTable">
-        <div className="dataRow header"><span>{t("titleCol")}</span><span>{t("descriptionLabel")}</span><span>{t("fieldsCol")}</span><span></span></div>
+        <div className="dataRow header"><span>{t("titleCol")}</span><span>{t("categoryFilterLabel")}</span><span>{t("fieldsCol")}</span><span></span></div>
         {forms.length === 0 && <p className="emptyState">{t("noFormsYet")}</p>}
         {forms.map((f) => (
           <div className="dataRow" key={f.id}>
             <span>{f.title}</span>
-            <span>{f.description || "—"}</span>
+            <span>{f.category ?? "—"}</span>
             <span>{f.fields_definition.length}</span>
-            <span><button className="tableAction" type="button" onClick={() => void openForm(f)}>{t("openBtn")}</button></span>
+            <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="tableAction" type="button" onClick={() => void openForm(f)}>{t("openBtn")}</button>
+              {canEditForm(f) && (
+                <>
+                  <button
+                    className="iconBtn" type="button" title={t("editBtn") ?? ""}
+                    onClick={() => {
+                      setEditing(f);
+                      setEditAudience(f.visibility_scope);
+                      setEditError("");
+                    }}
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button
+                    className="iconBtn" type="button" title={t("deleteBtn") ?? ""}
+                    onClick={async () => {
+                      if (!confirm(t("deleteFormConfirm") ?? "")) return;
+                      try {
+                        await operationsApi.deleteForm(f.id);
+                        if (selected?.id === f.id) setSelected(null);
+                        await load();
+                      } catch (err: any) {
+                        alert(err.response?.data?.detail ?? t("failedDeleteForm"));
+                      }
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </>
+              )}
+            </span>
           </div>
         ))}
       </div>
@@ -180,6 +241,55 @@ export function FormsView() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {editing && (
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+          }}
+          onClick={() => setEditing(null)}
+        >
+          <div
+            style={{
+              backgroundColor: "var(--surface)", padding: "2rem", borderRadius: "8px", width: "100%",
+              maxWidth: "600px", maxHeight: "90vh", overflowY: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0 }}>{t("editFormHeading")}</h3>
+            <form
+              className="inlineForm"
+              style={{ gridTemplateColumns: "1fr", border: "none", padding: 0 }}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!editing) return;
+                setEditError("");
+                try {
+                  await operationsApi.updateForm(editing.id, {
+                    title: editing.title, description: editing.description, category: editing.category ?? undefined,
+                    allow_multiple: editing.allow_multiple, visibility_scope: editAudience,
+                  });
+                  setEditing(null);
+                  await load();
+                } catch (err: any) {
+                  setEditError(err.response?.data?.detail ?? t("failedUpdateForm"));
+                }
+              }}
+            >
+              <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
+              <label>{t("descriptionLabel")}<Input value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
+              <label>{t("formCategoryLabel")}<Input value={editing.category ?? ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })} list="form-categories" /></label>
+              <AudiencePicker value={editAudience} onChange={setEditAudience} />
+              {editError && <p className="notice" style={{ color: "var(--rose)" }}>{editError}</p>}
+              <div className="formActions" style={{ justifyContent: "flex-end" }}>
+                <button type="button" onClick={() => setEditing(null)}>{t("cancelBtn")}</button>
+                <button className="primaryAction" type="submit">{t("editBtn")}</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </section>

@@ -132,12 +132,17 @@ class LeaveRead(BaseModel):
 
 class ResourceCategoryCreate(BaseModel):
     name: str
+    # Only meaningful for admins/resources.manage_all holders — plain
+    # teachers always get a private category regardless of this flag.
+    is_global: bool = True
 
 
 class ResourceCategoryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
+    owner_id: UUID | None = None
+    is_mine: bool = False
 
 
 class ResourceCreate(BaseModel):
@@ -149,6 +154,15 @@ class ResourceCreate(BaseModel):
     visibility_scope: Scope = Scope(all=True)
 
 
+class ResourceUpdate(BaseModel):
+    category_id: UUID | None = None
+    title: str | None = None
+    description: str | None = None
+    file_key: str | None = None
+    video_url: str | None = None
+    visibility_scope: Scope | None = None
+
+
 class ResourceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
@@ -158,7 +172,9 @@ class ResourceRead(BaseModel):
     file_key: str | None
     video_url: str | None
     visibility_scope: dict
+    created_by_id: UUID
     created_at: datetime
+    owner_name: str | None = None
 
 
 # ------------------------------------------------------------------ Forms
@@ -174,6 +190,7 @@ class FormFieldDefinition(BaseModel):
 class FormCreate(BaseModel):
     title: str
     description: str = ""
+    category: str | None = None
     fields: list[FormFieldDefinition]
     visibility_scope: Scope = Scope(all=True)
     open_from: datetime | None = None
@@ -181,16 +198,29 @@ class FormCreate(BaseModel):
     allow_multiple: bool = False
 
 
+class FormUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    category: str | None = None
+    fields: list[FormFieldDefinition] | None = None
+    visibility_scope: Scope | None = None
+    open_from: datetime | None = None
+    open_until: datetime | None = None
+    allow_multiple: bool | None = None
+
+
 class FormRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     title: str
     description: str
+    category: str | None = None
     fields_definition: list
     visibility_scope: dict
     open_from: datetime | None
     open_until: datetime | None
     allow_multiple: bool
+    created_by_id: UUID
     created_at: datetime
 
 
@@ -214,6 +244,7 @@ class FormResponseRead(BaseModel):
 class AnnouncementCreate(BaseModel):
     title: str
     body: str
+    category: str | None = None
     attachment_link: str | None = None
     audience_scope: Scope = Scope(all=True)
     publish_at: datetime | None = None
@@ -223,6 +254,7 @@ class AnnouncementCreate(BaseModel):
 class AnnouncementUpdate(BaseModel):
     title: str | None = None
     body: str | None = None
+    category: str | None = None
     attachment_link: str | None = None
     audience_scope: Scope | None = None
     publish_at: datetime | None = None
@@ -234,6 +266,7 @@ class AnnouncementRead(BaseModel):
     id: UUID
     title: str
     body: str
+    category: str | None = None
     attachment_link: str | None
     audience_scope: dict
     publish_at: datetime | None

@@ -22,6 +22,7 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { consumePendingClassNav } from "../lib/pendingNav";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 type Tab = "assignments" | "grading" | "results";
 
@@ -32,20 +33,31 @@ export function AssessmentsView() {
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     void (async () => {
-      const c = await academicsApi.listClasses();
-      setClasses(c);
-      const allCourses = (await Promise.all(c.map((cls) => academicsApi.listCourses(cls.id)))).flat();
-      const unique = new Map(allCourses.map((course) => [course.id, course]));
-      setCourses([...unique.values()]);
+      setIsLoading(true);
+      setLoadError("");
       try {
-        setStudents(await peopleApi.listStudents());
-      } catch {
-        setStudents([]); // teachers without students.view still get the rest
+        const c = await academicsApi.listClasses();
+        setClasses(c);
+        const allCourses = (await Promise.all(c.map((cls) => academicsApi.listCourses(cls.id)))).flat();
+        const unique = new Map(allCourses.map((course) => [course.id, course]));
+        setCourses([...unique.values()]);
+        try {
+          setStudents(await peopleApi.listStudents());
+        } catch {
+          setStudents([]); // teachers without students.view still get the rest
+        }
+      } catch (err: any) {
+        setLoadError(err.response?.data?.detail ?? t("failedLoadAssessments"));
+      } finally {
+        setIsLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -65,13 +77,21 @@ export function AssessmentsView() {
           <Send size={16} /> {t("resultsTab")}
         </button>
       </div>
-      {tab === "assignments" && (
-        <AssignmentsTab classes={classes} courses={courses} students={students} canCreate={hasPermission("assignments.create")} />
+      {isLoading && <LoadingState />}
+      {!isLoading && loadError && <ErrorState message={loadError} />}
+      {!isLoading && !loadError && tab === "assignments" && (
+        <AssignmentsTab
+          classes={classes}
+          courses={courses}
+          students={students}
+          canCreate={hasPermission("assignments.create")}
+          canPublishAll={hasPermission("assignments.manage_all")}
+        />
       )}
-      {tab === "grading" && (
+      {!isLoading && !loadError && tab === "grading" && (
         <GradingTab classes={classes} courses={courses} canManage={hasPermission("assessments.exam_types.manage")} />
       )}
-      {tab === "results" && (
+      {!isLoading && !loadError && tab === "results" && (
         <ResultsTab
           classes={classes}
           canPublish={hasPermission("assessments.results.publish")}
@@ -89,7 +109,8 @@ function AssignmentsTab({
   courses,
   students,
   canCreate,
-}: Readonly<{ classes: AcademicClass[]; courses: Course[]; students: Student[]; canCreate: boolean }>) {
+  canPublishAll,
+}: Readonly<{ classes: AcademicClass[]; courses: Course[]; students: Student[]; canCreate: boolean; canPublishAll: boolean }>) {
   const { t } = useTranslation();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filters, setFilters] = useState(() => {
@@ -176,6 +197,7 @@ function AssignmentsTab({
         <AssignmentCreateForm
           classes={classes}
           courses={courses}
+          canPublishAll={canPublishAll}
           onCreated={() => {
             setShowCreate(false);
             void load();
@@ -281,12 +303,14 @@ function AssignmentsTab({
 function AssignmentCreateForm({
   classes,
   courses,
+  canPublishAll,
   onCreated,
-}: Readonly<{ classes: AcademicClass[]; courses: Course[]; onCreated: () => void }>) {
+}: Readonly<{ classes: AcademicClass[]; courses: Course[]; canPublishAll: boolean; onCreated: () => void }>) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ class_id: "", course_id: "", title: "", category: "", instructions: "", due_date: "" });
   const [sections, setSections] = useState<Section[]>([]);
   const [sectionIds, setSectionIds] = useState<string[]>([]);
+  const [allClasses, setAllClasses] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [error, setError] = useState("");
 
@@ -318,9 +342,10 @@ function AssignmentCreateForm({
             attachment_key = object_key;
           }
           await assessmentsApi.createAssignment({
-            class_id: form.class_id,
+            class_id: allClasses ? undefined : form.class_id,
             course_id: form.course_id,
-            section_ids: sectionIds,
+            section_ids: allClasses ? undefined : sectionIds,
+            all_classes: allClasses || undefined,
             title: form.title,
             category: form.category || undefined,
             instructions: form.instructions,
@@ -333,13 +358,32 @@ function AssignmentCreateForm({
         }
       }}
     >
-      <label>
-        {t("classLabel")}
-        <Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })}>
-          <option value="">{t("selectEllipsis")}</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-      </label>
+      {canPublishAll && (
+        <label className="checkboxLabel">
+          <input
+            type="checkbox"
+            checked={allClasses}
+            onChange={(e) => {
+              setAllClasses(e.target.checked);
+              if (e.target.checked) {
+                setForm({ ...form, class_id: "" });
+                setSectionIds([]);
+              }
+            }}
+          />
+          {t("publishAllClassesLabel")}
+        </label>
+      )}
+      {allClasses && <small className="notice">{t("publishAllClassesHint")}</small>}
+      {!allClasses && (
+        <label>
+          {t("classLabel")}
+          <Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })}>
+            <option value="">{t("selectEllipsis")}</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </label>
+      )}
       <label>
         {t("courseLabel")}
         <Select required value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
@@ -347,7 +391,7 @@ function AssignmentCreateForm({
           {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
       </label>
-      {sections.length > 0 && (
+      {!allClasses && sections.length > 0 && (
         <fieldset className="sectionPicker">
           <legend>{t("sectionsLegend")}</legend>
           <small className="notice">{t("sectionsHint")}</small>

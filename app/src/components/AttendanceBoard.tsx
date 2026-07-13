@@ -29,6 +29,7 @@ import {
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
 import { consumePendingClassNav } from "../lib/pendingNav";
+import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input } from "./ui/Field";
 
@@ -647,6 +648,12 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           <section className="attendanceModeSection">
             {isLoadingClassHistory && <p className="emptyState">{t("loadingLabel")}</p>}
             {!isLoadingClassHistory && !selectedDate && <p className="emptyState">{t("selectDayPrompt")}</p>}
+            {!isLoadingClassHistory && selectedDate && (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                <strong>{selectedDate}</strong>
+                <HijriTag date={selectedDate} inline />
+              </div>
+            )}
 
             {!isLoadingClassHistory && selectedDate && showMarkForm && (
               <div className="roster">
@@ -766,7 +773,13 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               {isLoadingStudentHistory && <p className="emptyState">{t("loadingLabel")}</p>}
               {!isLoadingStudentHistory && !studentSelectedDate && <p className="emptyState">{t("selectDayPrompt")}</p>}
               {!isLoadingStudentHistory && studentSelectedDate && (
-                <AttendanceHistoryTable entries={studentDayEntries} includeStudent={false} />
+                <>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                    <strong>{studentSelectedDate}</strong>
+                    <HijriTag date={studentSelectedDate} inline />
+                  </div>
+                  <AttendanceHistoryTable entries={studentDayEntries} includeStudent={false} />
+                </>
               )}
             </section>
           </div>

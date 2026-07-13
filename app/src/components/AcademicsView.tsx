@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Plus, Edit2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
@@ -29,6 +29,7 @@ export function AcademicsView() {
   const [programName, setProgramName] = useState("");
   const [className, setClassName] = useState("");
   const [classProgramId, setClassProgramId] = useState("");
+  const [classPortalEnabled, setClassPortalEnabled] = useState(true);
   const [sectionClassId, setSectionClassId] = useState("");
   const [sectionName, setSectionName] = useState("");
   const [courseClassId, setCourseClassId] = useState("");
@@ -38,6 +39,38 @@ export function AcademicsView() {
   const [rolloverSourceSession, setRolloverSourceSession] = useState<AcademicSession | null>(null);
 
   const [activeTab, setActiveTab] = useState<"programs" | "classes" | "courses" | "sessions">("programs");
+
+  // B7-b: classes tab sort/filter.
+  const [classSearch, setClassSearch] = useState("");
+  const [classFilterProgram, setClassFilterProgram] = useState("");
+  const [classSortBy, setClassSortBy] = useState<"name" | "program">("name");
+  const classesToShow = useMemo(() => {
+    let list = classes;
+    if (classFilterProgram) list = list.filter((c) => c.program_id === classFilterProgram);
+    if (classSearch.trim()) {
+      const needle = classSearch.trim().toLowerCase();
+      list = list.filter((c) => c.name.toLowerCase().includes(needle));
+    }
+    const programName = (id: string) => programs.find((p) => p.id === id)?.name ?? "";
+    return [...list].sort((a, b) =>
+      classSortBy === "program"
+        ? programName(a.program_id).localeCompare(programName(b.program_id)) || a.name.localeCompare(b.name)
+        : a.name.localeCompare(b.name)
+    );
+  }, [classes, programs, classFilterProgram, classSearch, classSortBy]);
+
+  // B7-f: course-mapping (assign) tab sort/filter.
+  const [courseMapFilterClass, setCourseMapFilterClass] = useState("");
+  const [courseMapSearch, setCourseMapSearch] = useState("");
+  const classesForCourseMap = useMemo(() => {
+    let list = classes;
+    if (courseMapFilterClass) list = list.filter((c) => c.id === courseMapFilterClass);
+    if (courseMapSearch.trim()) {
+      const needle = courseMapSearch.trim().toLowerCase();
+      list = list.filter((c) => c.name.toLowerCase().includes(needle));
+    }
+    return [...list].sort((a, b) => a.name.localeCompare(b.name));
+  }, [classes, courseMapFilterClass, courseMapSearch]);
 
   const refreshAll = async () => {
     const [p, c, s, t_res, ac] = await Promise.all([
@@ -64,16 +97,16 @@ export function AcademicsView() {
 
   const handleError = (e: unknown) => {
     if (axios.isAxiosError(e) && e.response?.status === 409) {
-      alert(e.response.data.detail || "Cannot delete this record because it is in use.");
+      alert(e.response.data.detail || t("recordInUseError"));
     } else {
       console.error(e);
-      alert("An error occurred.");
+      alert(t("genericError"));
     }
   };
 
   // Generic delete handler
   const handleDelete = async (action: () => Promise<void>) => {
-    if (!window.confirm("Are you sure you want to delete this record?")) return;
+    if (!window.confirm(t("deleteRecordConfirm"))) return;
     try {
       await action();
       await refreshAll();
@@ -198,8 +231,9 @@ export function AcademicsView() {
                 onSubmit={async (e) => {
                   e.preventDefault();
                   if (!classProgramId) return;
-                  await academicsApi.createClass(classProgramId, className);
+                  await academicsApi.createClass(classProgramId, className, classPortalEnabled);
                   setClassName("");
+                  setClassPortalEnabled(true);
                   await refreshAll();
                 }}
               >
@@ -214,20 +248,39 @@ export function AcademicsView() {
                   {t("classNameLabel")}
                   <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Darja 1" />
                 </label>
+                <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }} title={t("classPortalEnabledHint") ?? ""}>
+                  <Input type="checkbox" checked={classPortalEnabled} onChange={(e) => setClassPortalEnabled(e.target.checked)} />
+                  {t("classPortalEnabledLabel")}
+                </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addClassBtn")}</button>
                 </div>
               </form>
+              <div className="moduleToolbar">
+                <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={classSearch} onChange={(e) => setClassSearch(e.target.value)} />
+                <Select value={classFilterProgram} onChange={(e) => setClassFilterProgram(e.target.value)}>
+                  <option value="">{t("allPrograms")}</option>
+                  {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
+                <Select value={classSortBy} onChange={(e) => setClassSortBy(e.target.value as "name" | "program")}>
+                  <option value="name">{t("sortByNameLabel")}</option>
+                  <option value="program">{t("sortByProgramLabel")}</option>
+                </Select>
+              </div>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span><span>Actions</span></div>
-                {classes.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
-                {classes.map((c) => (
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span><span>{t("portalCol")}</span><span>Actions</span></div>
+                {classesToShow.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
+                {classesToShow.map((c) => (
                   <div className="dataRow" key={c.id}>
                     {editingClass?.id === c.id ? (
                       <form style={{ display: "contents" }} onSubmit={async (e) => {
                         e.preventDefault();
                         try {
-                          await academicsApi.updateClass(c.id, { name: editingClass.name, program_id: editingClass.program_id });
+                          await academicsApi.updateClass(c.id, {
+                            name: editingClass.name,
+                            program_id: editingClass.program_id,
+                            default_portal_enabled: editingClass.default_portal_enabled,
+                          });
                           setEditingClass(null);
                           await refreshAll();
                         } catch (err) { handleError(err); }
@@ -240,6 +293,16 @@ export function AcademicsView() {
                             {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                           </Select>
                         </span>
+                        <span>
+                          <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }} title={t("classPortalEnabledHint") ?? ""}>
+                            <Input
+                              type="checkbox"
+                              checked={editingClass.default_portal_enabled}
+                              onChange={(e) => setEditingClass({ ...editingClass, default_portal_enabled: e.target.checked })}
+                            />
+                            {t("classPortalEnabledLabel")}
+                          </label>
+                        </span>
                         <span className="actions" style={{ gap: "8px" }}>
                           <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
                           <button className="tableAction" type="button" onClick={() => setEditingClass(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
@@ -249,6 +312,7 @@ export function AcademicsView() {
                       <>
                         <span>{c.name}</span>
                         <span>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
+                        <span>{c.default_portal_enabled ? t("yesLabel") : t("noLabel")}</span>
                         <span className="actions">
                           <button className="iconBtn" title="Edit" onClick={() => setEditingClass(c)}><Edit2 size={16} /></button>
                           <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteClass(c.id))}><Trash2 size={16} /></button>
@@ -374,9 +438,17 @@ export function AcademicsView() {
                   <button className="primaryAction" type="submit"><Plus size={16} /> Assign</button>
                 </div>
               </form>
+              <div className="moduleToolbar">
+                <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={courseMapSearch} onChange={(e) => setCourseMapSearch(e.target.value)} />
+                <Select value={courseMapFilterClass} onChange={(e) => setCourseMapFilterClass(e.target.value)}>
+                  <option value="">{t("filterByClassLabel")}</option>
+                  {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </div>
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("classLabel")}</span><span>{t("sectionsCol")}</span><span>{t("coursesCol")}</span></div>
-                {classes.map((c) => (
+                {classesForCourseMap.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
+                {classesForCourseMap.map((c) => (
                   <div className="dataRow" key={c.id} style={{ alignItems: "flex-start", gap: "1rem" }}>
                     <span><strong>{c.name}</strong></span>
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

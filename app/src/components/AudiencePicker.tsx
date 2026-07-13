@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { academicsApi, type AcademicClass, type Scope, type Section } from "../lib/endpoints";
+import { academicsApi, peopleApi, type AcademicClass, type Course, type Scope, type Section } from "../lib/endpoints";
 import { Select } from "./ui/Field";
+
+type Mode = "all" | "teachers" | "students" | "classes" | "sections" | "courses" | "users";
 
 /**
  * Shared "who sees this" control for resources/forms/announcements —
- * produces the §6 scope shape: {all} / {roles} / any-of {classes, sections}.
+ * produces the §6 scope shape: {all} / {roles} / any-of {classes, sections,
+ * courses, users}.
  */
 export function AudiencePicker({
   value,
@@ -15,11 +18,15 @@ export function AudiencePicker({
   const { t } = useTranslation();
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [sections, setSections] = useState<Record<string, Section[]>>({});
-  const [mode, setMode] = useState<"all" | "teachers" | "students" | "classes" | "sections">(
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [people, setPeople] = useState<{ id: string; user_id: string; name: string; role: "teacher" | "student" }[]>([]);
+  const [mode, setMode] = useState<Mode>(
     value.all ? "all"
       : value.roles?.includes("teacher") ? "teachers"
       : value.roles?.includes("student") ? "students"
       : value.sections && value.sections.length > 0 ? "sections"
+      : value.courses && value.courses.length > 0 ? "courses"
+      : value.users && value.users.length > 0 ? "users"
       : value.classes && value.classes.length > 0 ? "classes"
       : "all"
   );
@@ -31,11 +38,20 @@ export function AudiencePicker({
       for (const cls of list) byClass[cls.id] = await academicsApi.listSections(cls.id);
       setSections(byClass);
     }).catch(() => setClasses([]));
+    void academicsApi.listAllCourses().then(setCourses).catch(() => setCourses([]));
+    void Promise.all([peopleApi.listTeachers(), peopleApi.listStudents()])
+      .then(([teachers, students]) => {
+        setPeople([
+          ...teachers.map((t) => ({ id: t.id, user_id: t.user_id, name: t.name, role: "teacher" as const })),
+          ...students.map((s) => ({ id: s.id, user_id: s.user_id, name: s.name, role: "student" as const })),
+        ]);
+      })
+      .catch(() => setPeople([]));
   }, []);
 
   const emptyScope: Scope = { all: false, roles: [], classes: [], sections: [], courses: [], users: [] };
 
-  const setMode2 = (next: typeof mode) => {
+  const setMode2 = (next: Mode) => {
     setMode(next);
     if (next === "all") onChange({ ...emptyScope, all: true });
     else if (next === "teachers") onChange({ ...emptyScope, roles: ["teacher"] });
@@ -43,7 +59,7 @@ export function AudiencePicker({
     else onChange({ ...emptyScope });
   };
 
-  const toggleId = (key: "classes" | "sections", id: string) => {
+  const toggleId = (key: "classes" | "sections" | "courses" | "users", id: string) => {
     const current = value[key] ?? [];
     const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
     onChange({ ...emptyScope, [key]: next });
@@ -53,12 +69,14 @@ export function AudiencePicker({
     <div className="audiencePicker">
       <label>
         {t("audienceLabel")}
-        <Select value={mode} onChange={(e) => setMode2(e.target.value as typeof mode)}>
+        <Select value={mode} onChange={(e) => setMode2(e.target.value as Mode)}>
           <option value="all">{t("audienceEveryone")}</option>
           <option value="teachers">{t("teachers")}</option>
           <option value="students">{t("students")}</option>
           <option value="classes">{t("audienceClasses")}</option>
           <option value="sections">{t("audienceSections")}</option>
+          <option value="courses">{t("audienceCourses")}</option>
+          <option value="users">{t("audienceUsers")}</option>
         </Select>
       </label>
       {mode === "classes" && (
@@ -89,6 +107,36 @@ export function AudiencePicker({
               </label>
             ))
           )}
+        </div>
+      )}
+      {mode === "courses" && (
+        <div className="sectionPicker">
+          <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectCoursesHint")}</p>
+          {courses.map((co) => (
+            <label key={co.id} className="checkboxLabel">
+              <input
+                type="checkbox"
+                checked={(value.courses ?? []).includes(co.id)}
+                onChange={() => toggleId("courses", co.id)}
+              />
+              {co.name}
+            </label>
+          ))}
+        </div>
+      )}
+      {mode === "users" && (
+        <div className="sectionPicker">
+          <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectUsersHint")}</p>
+          {people.map((p) => (
+            <label key={p.user_id} className="checkboxLabel">
+              <input
+                type="checkbox"
+                checked={(value.users ?? []).includes(p.user_id)}
+                onChange={() => toggleId("users", p.user_id)}
+              />
+              {p.name} <small style={{ color: "var(--muted)" }}>({p.role === "teacher" ? t("teachers") : t("students")})</small>
+            </label>
+          ))}
         </div>
       )}
     </div>

@@ -3,6 +3,234 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-13 — B8-j publish-to-all-classes, §C teacher-portal closeout, §E polish
+
+Scope: `TO_IMPLEMENT.md` §B8(j), §C (Holidays/Announcements/Resources/Forms),
+§B3, §E (loading/error states, Hijri dual-date, confirm patterns).
+
+**B8-j — publish an assignment to all classes.** `AssignmentCreate` gains
+`all_classes: bool` (`class_id` now optional, required unless `all_classes`;
+`section_ids` rejected in combination — enforced by a pydantic
+`model_validator`). `POST /assessments/assignments`: when `all_classes` is
+set, requires `assignments.manage_all` (principal is an implicit superuser),
+resolves every class the course is mapped to via `ClassCourse`, and creates
+one whole-class row (`section_id=None`) per class sharing a `batch_id` — same
+batch machinery as multi-section publish, just at class granularity instead
+of section granularity. `AssessmentsView.tsx`'s create form gets a "Publish to
+all classes" checkbox (visible only with the permission) that hides the
+class/section pickers. 3 new backend tests (create/deny/reject-combo) in
+`test_assessments_redesign.py`.
+
+**§C teacher portal — Holidays, Announcements, Resources, Forms.** Of the 4
+items, only **Holidays** was a genuine gap: `GET /operations/holidays`
+returned every holiday to every role with no teacher scoping at all (the
+`class_id` filter only applied when a caller explicitly passed one). Fixed:
+for `UserRole.teacher`, the endpoint now resolves `taught_class_ids` (§4,
+`core/teaching_scope.py`) and filters to global holidays ∪ holidays scoped to
+a class they teach — even if a teacher explicitly queries another class's id,
+they only get the global rows back. Regression test in `test_backend_sweep.py`.
+The other three were already correct and just needed verification (stale
+TO_IMPLEMENT.md checkboxes): **Announcements** (`list_announcements` already
+runs every row through the §6 `scope_allows` resolver; the frontend only
+sends the admin `audience` tab filter when `canPost`, so a plain teacher's
+view is scope-filtered server-side with no tab restriction), **Forms**
+(`list_forms` uses the identical `visibility_scope` + `scope_allows` pattern
+as resources — admin/`forms.manage_all` ∪ own-created ∪ scope match), and
+**Resources** (the existing `DelegateButton` — already wired into every
+screen via `App.tsx`'s `VIEW_MODULES`, including `resources` — already lets a
+principal grant/revoke `resources.manage` per teacher, whole-madrasa or
+class-scoped; `create_resource` gates on that exact permission and
+`_require_teachable_scope` restricts a granted teacher to classes/sections/
+courses they actually teach). No rebuild needed for any of the three.
+
+**B3 — verified already correct** (stale checkbox): `TimetableView.tsx`
+already defaults to the grid view and renders the Grid button before List.
+
+**§E — loading/error state standardization (partial).** New shared
+`LoadingState`/`ErrorState`/`EmptyState` trio
+(`app/src/components/ui/AsyncState.tsx`, built on the `emptyState`/`notice`
+CSS classes already used ad hoc everywhere). Rolled out to the 4 prioritized
+views: `DashboardCards.tsx` (previously `if (!data) return null` — a failed
+fetch left the dashboard permanently blank with zero feedback),
+`AssessmentsView.tsx`'s top-level load, and all 4 `PeopleView.tsx` tabs
+(Teachers/Students/Guardians/Donators — none had a loading indicator or
+caught a load failure before this). `AttendanceBoard.tsx` and
+`RolloverWizard.tsx` already had a solid pattern, verified and left as-is.
+~24 other views still have no loading/error handling — not touched this pass,
+listed in `TO_IMPLEMENT.md` for the next one to pick up.
+
+**§E — Hijri dual-date surfacing.** `GET /academics/today` now accepts an
+optional `date` query param (previously hardcoded to "today"), reusing the
+same `to_hijri_string()` conversion for any Gregorian date. New frontend
+`useHijri(date)` hook (`app/src/lib/hijri.ts`, in-memory cached per date since
+the conversion is deterministic) + a shared `<HijriTag date=.../>` component
+(`app/src/components/HijriTag.tsx`). Wired into Holidays (start/end date),
+Attendance calendar (selected-day header, class + student history), Salary
+payments (both the admin lookup screen and the teacher self-view), and
+Finance contributions/donations. 1 new backend test.
+
+**§E — toast/confirm pattern standardization.** Audited every delete call
+site (8 files). Real gap: `TimetableView.tsx`'s slot delete fired the DELETE
+immediately with zero confirmation and zero error handling — now confirms via
+`window.confirm(t("deleteSlotConfirm"))` and reports failures through the
+existing `onError` callback. Two files had a confirm dialog but with a
+hardcoded English string (CLAUDE.md "no hardcoded copy" mandate):
+`AcademicsView.tsx`'s generic `handleDelete` and `AnnouncementsView.tsx`'s
+delete (which also used `alert()` for the failure instead of the file's own
+`setError` state) — both now route through i18next (en+ur). AssessmentsView,
+FormsView, ResourcesView, BlogView, HolidaysView already had a correct
+i18n-backed confirm — verified, left as-is.
+
+**Tests:** 5 new backend tests (3 B8-j + 1 holidays teacher-scoping + 1 hijri
+arbitrary-date). Backend suite: 106 passed (was 101). Frontend `tsc --noEmit`
+and `npm run build` both clean.
+
+## 2026-07-13 — B7-k portal/guardian provisioning, AudiencePicker fix, B6/B9/B10 categories & scoping
+
+Scope: `TO_IMPLEMENT.md` §B6, §B7 (b/f/h/k), §B9, §B10.
+
+**B7-k — per-class portal-access + guardian auto-provisioning.**
+`AcademicClass.default_portal_enabled` (already existed) now has a UI
+checkbox in `AcademicsView.tsx`'s class create/edit forms, plus a "Portal"
+column on the classes table. `POST /academics/students/enroll`
+(`backend/app/modules/academics/routes.py`) now checks the target class: if
+`default_portal_enabled` is false, the student's own `User.portal_enabled`
+and `StudentProfile.portal_enabled` are switched off, and every linked
+Guardian without a login yet gets one auto-provisioned (reusing
+`provision_login`, same flow the manual `guardians/{id}/credentials-link`
+endpoint already used) with a generated unique username
+(`generate_unique_username`, new in `auth/service.py` — slugifies the
+guardian's name, retries with a numeric suffix on collision, since there's no
+interactive username prompt at enrolment time). We deliberately never
+re-enable a student's portal automatically on a later move to a
+portal-enabled class — that flag could already be an explicit admin decision
+for other reasons. `enroll_student` now returns `guardian_logins_provisioned:
+[{guardian_id, username, set_password_url}]`. No new migration needed — every
+column already existed. Tested in `backend/tests/test_categories_scoping.py`.
+
+**AudiencePicker course/user targeting.** `app/src/components/AudiencePicker.tsx`
+only exposed all/roles/classes/sections even though the backend `Scope` type
+(`operations/audience.py`) already supported `courses` and `users`. Added
+both modes: course targeting lists all courses; user targeting lists
+teachers+students by name. Unblocks B9/B10 below.
+
+**B6 — Announcement categories.** Free-text `category` column (same pattern
+as `Assignment.category` — filterable, not a managed table), `category`
+filter param on `GET /operations/announcements`, filter dropdown + datalist
+autocomplete in `AnnouncementsView.tsx`.
+
+**B9 — Resources.** `resources.manage` is now a *scoped* permission
+(`core/permissions.py`): a teacher may create/manage resources for classes/
+sections/courses they actually teach (derived from `core/teaching_scope.py`,
+the same source of truth assessments/attendance already use), enforced by a
+new `_require_teachable_scope` helper in `operations/routes.py`; targeting
+"everyone", a whole role, or specific users needs the new
+`resources.manage_all` override permission (or Principal). `ResourceCategory`
+gained `owner_id` (nullable = global; set = private to that teacher) — a
+teacher's own categories are invisible to other teachers, admins/
+`resources.manage_all` see every category. `PUT`/`DELETE
+/operations/resources/{id}` added (didn't exist before) with
+`created_by_id` ownership checks, admin override. `GET /operations/resources`
+gained `class_id`/`section_id` (admin browse-by-class/section — every
+resource whose scope covers that class/section, or is global) and
+`mine_only`. `ResourcesView.tsx` rebuilt: category privacy indicator, browse-
+by-class/section toolbar (admin only), edit/delete on each row, "my uploads
+only" toggle. Migration `53c210d0f427` (`resource_categories.owner_id`).
+
+**B10 — Forms.** Same `_require_teachable_scope` enforcement as resources
+(`forms.manage_all` is the admin override — `forms.create` stays the scoped
+base ability, teachers are restricted to sections/classes/courses they
+teach). Free-text `Form.category` (same pattern as B6). `PUT`/`DELETE
+/operations/forms/{id}` added (didn't exist before) with `created_by_id`
+ownership checks. `FormsView.tsx`: category filter + datalist, edit/delete on
+each row gated by ownership. Migration `53c210d0f427` (`forms.category`).
+
+**B7-b/f — Classes & course-mapping polish.** `AcademicsView.tsx` classes tab
+gained a search box, program filter, and name/program sort; the course-
+mapping (sections+courses per class) block gained a search box and
+"filter by class" control. Not a full redesign (item B7-e explicitly still
+wants a dedicated layout) — this is the "sort, filters, clearer" ask, done.
+
+**B7-h — rollover copy options: investigated, not implemented.**
+Announcements/Resources/Forms/GradingScheme/ExamType/PaymentCategory all
+lack a `session_id` in this schema — unlike TimetableSlot/Holiday/
+Enrollment/TeacherAssignment, which are genuinely per-session, these are
+tenant-wide evergreen config/content and already show up in every session
+automatically. There's nothing to "copy" without first adding session-
+tagging to those tables, which is a materially bigger schema change than
+this backlog line implies. Left undone rather than shipping wizard
+checkboxes that would just duplicate rows with no way to tell old from new.
+
+**Tests:** `backend/tests/test_categories_scoping.py` (7 new tests) — B7-k
+enrolment provisioning (incl. no-op on re-enrolment), resource category
+privacy, teacher-can-only-target-taught-sections (both resources and forms),
+resource/form ownership on update/delete, announcement category filter.
+Backend suite: 101 passed (was 94). Frontend `tsc --noEmit` and `npm run
+build` both clean.
+
+## 2026-07-13 — Backend hardening: OWASP pass, pagination, hijri migration (TO_IMPLEMENT.md §A/§E)
+
+Full sweep across the backend, plus the last real UUID leak in the frontend.
+
+**Critical fix:** `get_current_madrasa` (`backend/app/core/dependencies.py`)
+trusted the client-supplied `X-Madrasa` header independently of the
+authenticated user — any principal could spoof another tenant's slug and get
+full cross-tenant read/write access, since role-based permission checks
+(principal = implicit superuser for its own permission codes) carry no tenant
+scope of their own. Now pinned to `current_user.madrasa_id` for
+non-super-admins. Regression: `test_x_madrasa_header_cannot_spoof_tenant`.
+
+**IDOR audit** — every `/{id}` route in attendance, assessments, operations,
+finance, messaging, platform, reporting, academics, and auth was read in full
+(via parallel sub-agents, findings consolidated and applied here). 7 real gaps
+found and fixed, all with regression tests in `backend/tests/test_authz_matrix.py`:
+- `finance/routes.py` `GET /salary/{teacher_id}` + `GET /salary/{teacher_id}/payments`
+  — zero tenant scoping at all (missing the `madrasa` dependency entirely).
+- `attendance/routes.py` `GET /summary/{subject_type}/{subject_id}` — silently
+  returned a zeroed-out summary for a bad/cross-tenant `subject_id` instead of
+  404.
+- `academics/routes.py` `POST /classes/{class_id}/sections` and
+  `POST /classes/{class_id}/courses/assign` — path `class_id` never
+  tenant-checked before writing the child row, letting a principal attach a
+  section or course-assignment to another madrasa's class.
+- `academics/routes.py` `POST /students/enroll` — body `class_id`/`section_id`/
+  `program_id` never tenant-checked before writing the `Enrollment` row.
+- `assessments/routes.py` `GET /results/course` — only required an
+  authenticated user (any role), letting a student query any other student's
+  per-course result by guessing ids; now requires `assessments.marks.enter`
+  like its sibling result endpoints, plus an explicit student-tenant check.
+
+Everything else across all 9 route modules audited clean (SQL-scoped list
+endpoints, correctly-ordered tenant checks on mutations).
+
+**Pagination:** `limit`/`offset` query params + `X-Total-Count` response
+header added to every list endpoint across academics, assessments,
+attendance, finance, messaging, operations, people, platform
+(`backend/app/core/pagination.py`). Response body shape unchanged — frontend
+doesn't consume the new params yet, flagged in TO_IMPLEMENT.md §E.
+
+**Other OWASP items:** rate limiting confirmed applied to auth + public
+endpoints; password policy; per-role idle-timeout settings now actually wired
+into JWT lifetime at login (previously stored but unused); file-upload
+content-type allowlist + size cap + path-safe object keys added to
+`core/storage.py`; CORS `allow_credentials` flipped to `False` (bearer-token
+app, no cookies — wildcard-origin-regex + credentials was a real OWASP
+misconfiguration); security headers verified already in place; public-form
+CSRF posture confirmed intentional (honeypot + rate limit, unauthenticated by
+design); `pip-audit` run — starlette CVEs need a coordinated FastAPI major
+version bump, flagged but not attempted.
+
+**Package fixes (CLAUDE.md mandate — fix deprecations on the go):**
+`hijri_converter` → `hijridate` migration (`backend/app/core/hijri.py`),
+clears the deprecation warning. `python-jose` 3.3.0 → 3.5.0 (clears 3 CVEs).
+
+**Frontend UUID leak:** `FormsView.tsx` response table rendered raw
+`student_id`; `FormResponseRead` now joins `student_name` server-side
+(`backend/app/modules/operations/routes.py` `list_form_responses`).
+
+Suite: 94 backend tests green (89 + 5 new regression tests); frontend
+`tsc --noEmit` clean.
+
 ## 2026-07-12 — Teacher & student portal closeout (TO_IMPLEMENT.md §C/§D)
 
 Most of §C/§D turned out to already be backend-correct or frontend-built from

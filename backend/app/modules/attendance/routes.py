@@ -1234,6 +1234,9 @@ async def compute_attendance_summary(
             )
         ).scalar_one_or_none()
 
+    if subject_user_id is None:
+        raise HTTPException(status_code=404, detail=f"{subject_type.capitalize()} not found")
+
     # Class-scoped holidays (B4-c) only count for students of those classes;
     # teachers and madrasa-wide holidays always count.
     subject_class_id = None

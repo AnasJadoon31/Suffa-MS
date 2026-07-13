@@ -11,6 +11,23 @@ from app.modules.operations.models import Holiday, Leave, TimetableSlot
 from app.modules.people.models import Guardian
 
 
+# ---------------------------------------------------------------- hijri
+
+async def test_today_endpoint_converts_arbitrary_date(client):
+    # No date param -> today's conversion (unchanged behaviour).
+    today = await client.get("/api/v1/academics/today")
+    assert today.status_code == 200
+    assert "gregorian" in today.json() and "hijri" in today.json()
+
+    # §E dual-date surfacing: any Gregorian date can be converted, not just
+    # "today" — reused by the Holidays/Attendance/Salary hijriOf() helper.
+    specific = await client.get("/api/v1/academics/today", params={"date": "2024-07-01"})
+    assert specific.status_code == 200
+    body = specific.json()
+    assert body["gregorian"] == "2024-07-01"
+    assert body["hijri"].endswith("AH")
+
+
 # ------------------------------------------------------------------ auth
 
 async def test_change_password_flow(client, seed, db_sessionmaker):
@@ -90,6 +107,32 @@ async def test_holiday_category_and_class_scope_filters(client, seed):
 
     class_a_view = await client.get("/api/v1/operations/holidays", params={"class_id": str(seed.class_a.id)})
     assert {h["name"] for h in class_a_view.json()} == {"Eid", "Class-1 exam break"}
+
+
+async def test_teacher_sees_only_own_class_and_global_holidays(client, teacher_client, seed):
+    # seed.teacher_user teaches class_a/course only (TeacherAssignment in conftest).
+    await client.post(
+        "/api/v1/operations/holidays",
+        json={"name": "Global break", "start_date": "2024-08-01", "end_date": "2024-08-02"},
+    )
+    await client.post(
+        "/api/v1/operations/holidays",
+        json={
+            "name": "Own class break", "start_date": "2024-08-05", "end_date": "2024-08-06",
+            "class_ids": [str(seed.class_a.id)],
+        },
+    )
+    await client.post(
+        "/api/v1/operations/holidays",
+        json={
+            "name": "Other class break", "start_date": "2024-08-10", "end_date": "2024-08-11",
+            "class_ids": [str(seed.class_b.id)],
+        },
+    )
+
+    response = await teacher_client.get("/api/v1/operations/holidays")
+    assert response.status_code == 200
+    assert {h["name"] for h in response.json()} == {"Global break", "Own class break"}
 
 
 # ----------------------------------------------------------------- leave

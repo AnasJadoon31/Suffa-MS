@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { academicsApi, operationsApi, type AcademicClass, type Holiday } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { HijriTag } from "./HijriTag";
 import { Input, Select } from "./ui/Field";
 
 type HolidayForm = {
@@ -195,12 +196,22 @@ export function HolidaysView() {
               <span>
                 {isEditing ? (
                   <Input required type="date" value={editForm.start_date} onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })} />
-                ) : holiday.start_date}
+                ) : (
+                  <>
+                    {holiday.start_date}
+                    <HijriTag date={holiday.start_date} />
+                  </>
+                )}
               </span>
               <span>
                 {isEditing ? (
                   <Input required type="date" value={editForm.end_date} onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })} />
-                ) : holiday.end_date}
+                ) : (
+                  <>
+                    {holiday.end_date}
+                    <HijriTag date={holiday.end_date} />
+                  </>
+                )}
               </span>
               <span>{classNames(holiday.class_ids)}</span>
               {canManage && (

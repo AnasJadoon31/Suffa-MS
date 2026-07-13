@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Megaphone, Pencil, Plus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { operationsApi, type Announcement, type Scope } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
@@ -20,23 +21,31 @@ function fromScope(scope: Scope): string {
 }
 
 export function AnnouncementsView() {
+  const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const canPost = hasPermission("announcements.post");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [form, setForm] = useState({ title: "", body: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
+  const [form, setForm] = useState({ title: "", body: "", category: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
   const [error, setError] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", body: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
+  const [editForm, setEditForm] = useState({ title: "", body: "", category: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
   const [editError, setEditError] = useState("");
   const [tab, setTab] = useState<"all" | "teachers" | "students">("all");
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [dates, setDates] = useState({ date_from: "", date_to: "" });
+
+  const knownCategories = useMemo(
+    () => [...new Set(announcements.map((a) => a.category).filter(Boolean))] as string[],
+    [announcements]
+  );
 
   const load = async () => {
     const params: Parameters<typeof operationsApi.listAnnouncements>[0] = {};
     if (canPost && tab !== "all") params.audience = tab;
     if (search) params.q = search;
+    if (categoryFilter) params.category = categoryFilter;
     if (dates.date_from) params.date_from = dates.date_from;
     if (dates.date_to) params.date_to = dates.date_to;
     setAnnouncements(await operationsApi.listAnnouncements(params));
@@ -44,7 +53,7 @@ export function AnnouncementsView() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, search, dates]);
+  }, [tab, search, categoryFilter, dates]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,12 +63,13 @@ export function AnnouncementsView() {
       await operationsApi.createAnnouncement({
         title: form.title,
         body: form.body,
+        category: form.category || undefined,
         attachment_link: form.attachment_link || undefined,
         audience_scope: toScope(form.audience),
         publish_at: form.publish_at ? new Date(form.publish_at).toISOString() : undefined,
         expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : undefined,
       });
-      setForm({ title: "", body: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
+      setForm({ title: "", body: "", category: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
       await load();
     } catch (err: any) {
       setError(err.response?.data?.detail ?? "Failed to post announcement");
@@ -74,6 +84,7 @@ export function AnnouncementsView() {
       await operationsApi.updateAnnouncement(editId, {
         title: editForm.title,
         body: editForm.body,
+        category: editForm.category || undefined,
         attachment_link: editForm.attachment_link || undefined,
         audience_scope: toScope(editForm.audience),
         publish_at: editForm.publish_at ? new Date(editForm.publish_at).toISOString() : undefined,
@@ -87,12 +98,13 @@ export function AnnouncementsView() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this announcement?")) return;
+    if (!window.confirm(t("deleteAnnouncementConfirm"))) return;
+    setError("");
     try {
       await operationsApi.deleteAnnouncement(id);
       await load();
     } catch (err: any) {
-      alert("Failed to delete: " + (err.response?.data?.detail ?? err.message));
+      setError(err.response?.data?.detail ?? t("failedDeleteAnnouncement"));
     }
   };
 
@@ -125,6 +137,7 @@ export function AnnouncementsView() {
               <option value="students">Students</option>
             </Select>
           </label>
+          <label>{t("announcementCategoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("announcementCategoryPlaceholder") ?? ""} list="announcement-categories" /></label>
           <label>Attachment link<Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder="optional" /></label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <label>Publish at<Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} /></label>
@@ -144,6 +157,9 @@ export function AnnouncementsView() {
         </form>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      <datalist id="announcement-categories">
+        {knownCategories.map((c) => <option key={c} value={c} />)}
+      </datalist>
 
       <div className="filterBar">
         {canPost && (
@@ -154,6 +170,10 @@ export function AnnouncementsView() {
           </>
         )}
         <Input placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+          <option value="">{t("allCategories")}</option>
+          {knownCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+        </Select>
         <Input type="date" value={dates.date_from} onChange={(e) => setDates({ ...dates, date_from: e.target.value })} />
         <Input type="date" value={dates.date_to} onChange={(e) => setDates({ ...dates, date_to: e.target.value })} />
       </div>
@@ -166,6 +186,7 @@ export function AnnouncementsView() {
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 {expandedId === a.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 <strong><Megaphone size={14} /> {a.title}</strong>
+                {a.category && <span className="badge">{a.category}</span>}
               </div>
               
               {expandedId === a.id ? (
@@ -199,6 +220,7 @@ export function AnnouncementsView() {
                       setEditForm({
                         title: a.title,
                         body: a.body,
+                        category: a.category || "",
                         attachment_link: a.attachment_link || "",
                         audience: fromScope(a.audience_scope),
                         publish_at: a.publish_at ? new Date(a.publish_at).toISOString().slice(0, 16) : "",
@@ -237,6 +259,7 @@ export function AnnouncementsView() {
                   <option value="students">Students</option>
                 </Select>
               </label>
+              <label>{t("announcementCategoryLabel")}<Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} list="announcement-categories" /></label>
               <label>Attachment link<Input value={editForm.attachment_link} onChange={(e) => setEditForm({ ...editForm, attachment_link: e.target.value })} /></label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <label>Publish at<Input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} /></label>

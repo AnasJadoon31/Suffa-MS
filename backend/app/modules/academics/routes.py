@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from datetime import date as DateType
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -14,7 +15,8 @@ from app.core.dependencies import (
 from app.core.hijri import to_hijri_string
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
-from app.modules.auth.models import User
+from app.modules.auth.models import User, UserRole
+from app.modules.auth.service import UsernameTakenError, generate_unique_username, provision_login
 from app.modules.academics.models import (
     AcademicClass,
     AcademicSession,
@@ -27,7 +29,7 @@ from app.modules.academics.models import (
     TeacherAssignment,
 )
 from app.modules.operations.models import TimetableSlot
-from app.modules.people.models import StudentProfile, TeacherProfile
+from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 from app.modules.academics.schemas import (
     AcademicClassCreate,
     AcademicClassRead,
@@ -55,9 +57,15 @@ router = APIRouter()
 
 
 @router.get("/today")
-async def today(current_user: User = Depends(get_current_user)) -> dict[str, str]:
-    today_date = datetime.now(UTC).date()
-    return {"gregorian": today_date.isoformat(), "hijri": to_hijri_string(today_date)}
+async def today(
+    current_user: User = Depends(get_current_user),
+    date: DateType | None = None,
+) -> dict[str, str]:
+    # `date` lets callers convert any Gregorian date (not just "today") to its
+    # Hijri equivalent — §E dual-date surfacing (Holidays/Attendance/Salary),
+    # reusing the same to_hijri_string() the topbar chip already uses.
+    target_date = date or datetime.now(UTC).date()
+    return {"gregorian": target_date.isoformat(), "hijri": to_hijri_string(target_date)}
 
 
 # ------------------------------------------------------------------ Programs
@@ -234,6 +242,9 @@ async def create_section(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> SectionRead:
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
     section = Section(madrasa_id=madrasa.id, class_id=class_id, name=payload.name)
     session.add(section)
     await session.commit()
@@ -403,7 +414,11 @@ async def assign_course_to_class(
     course = await session.get(Course, payload.course_id)
     if not course or course.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Course not found")
-        
+
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
     assignment = ClassCourse(madrasa_id=madrasa.id, class_id=class_id, course_id=payload.course_id)
     session.add(assignment)
     try:
@@ -659,12 +674,22 @@ async def enroll_student(
     current_user: User = Depends(require_permission("academics.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
-) -> dict[str, str]:
+) -> dict:
     stmt = select(StudentProfile).where(StudentProfile.id == payload.student_id, StudentProfile.madrasa_id == madrasa.id)
     result = await session.execute(stmt)
     student = result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+
+    program = await session.get(Program, payload.program_id)
+    if not program or program.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Program not found")
+    academic_class = await session.get(AcademicClass, payload.class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+    section = await session.get(Section, payload.section_id)
+    if not section or section.madrasa_id != madrasa.id or section.class_id != payload.class_id:
+        raise HTTPException(status_code=404, detail="Section not found")
 
     await ensure_writable_session(session, madrasa.id, payload.session_id)
 
@@ -692,5 +717,43 @@ async def enroll_student(
         enrollment.program_id = payload.program_id
         enrollment.class_id = payload.class_id
         enrollment.section_id = payload.section_id
+
+    # B7-k: a class with portal access switched off means its students don't
+    # get their own portal login — instead their guardians do. We never
+    # silently re-enable a student's portal on a later move (that could have
+    # been an explicit admin choice for other reasons); we only ever act when
+    # the target class says "no student portal".
+    guardian_logins: list[dict[str, str]] = []
+    if not academic_class.default_portal_enabled:
+        student_user = await session.get(User, student.user_id)
+        if student_user is not None:
+            student_user.portal_enabled = False
+        student.portal_enabled = False
+
+        guardians = (
+            await session.execute(
+                select(Guardian)
+                .join(StudentGuardian, StudentGuardian.guardian_id == Guardian.id)
+                .where(StudentGuardian.student_id == student.id, Guardian.madrasa_id == madrasa.id)
+            )
+        ).scalars().all()
+        for guardian in guardians:
+            if guardian.user_id is not None:
+                continue
+            username = await generate_unique_username(session, guardian.name or "guardian")
+            try:
+                guardian_user, set_password_url = await provision_login(
+                    session,
+                    madrasa_id=madrasa.id,
+                    actor_id=current_user.id,
+                    username=username,
+                    role=UserRole.parent,
+                    preferred_language=guardian.preferred_language,
+                )
+            except UsernameTakenError:
+                continue  # extremely unlikely race on the generated slug; skip rather than fail enrolment
+            guardian.user_id = guardian_user.id
+            guardian_logins.append({"guardian_id": str(guardian.id), "username": guardian_user.username, "set_password_url": set_password_url})
+
     await session.commit()
-    return {"status": "success", "enrollment_id": str(enrollment.id)}
+    return {"status": "success", "enrollment_id": str(enrollment.id), "guardian_logins_provisioned": guardian_logins}

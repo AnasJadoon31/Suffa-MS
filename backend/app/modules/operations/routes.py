@@ -16,6 +16,7 @@ from app.core.dependencies import (
     user_has_permission,
 )
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
+from app.core.teaching_scope import taught_class_ids, teacher_teaches
 from app.db.session import get_session
 from app.modules.academics.models import (
     AcademicClass,
@@ -60,6 +61,7 @@ from app.modules.operations.schemas import (
     FormRead,
     FormResponseCreate,
     FormResponseRead,
+    FormUpdate,
     HolidayCreate,
     HolidayRead,
     HolidayUpdate,
@@ -69,6 +71,8 @@ from app.modules.operations.schemas import (
     ResourceCategoryRead,
     ResourceCreate,
     ResourceRead,
+    ResourceUpdate,
+    Scope,
     SettingRead,
     SettingUpsert,
     TypedSettingRead,
@@ -659,11 +663,26 @@ async def list_holidays(
         stmt = stmt.where(Holiday.start_date <= date_to)
     stmt = stmt.order_by(Holiday.start_date)
 
-    if class_id is not None:
+    # Teachers only see global holidays + their own (taught) classes' scoped
+    # holidays — not every other class's entries (§C teacher portal scoping).
+    allowed_class_ids: set[str] | None = None
+    if current_user.role == UserRole.teacher:
+        teacher = (
+            await session.execute(select(TeacherProfile).where(TeacherProfile.user_id == current_user.id))
+        ).scalar_one_or_none()
+        if teacher is not None:
+            active_session_id = await _active_session_id(session, madrasa.id)
+            allowed_class_ids = {
+                str(cid) for cid in await taught_class_ids(session, madrasa_id=madrasa.id, teacher_id=teacher.id, session_id=active_session_id)
+            }
+
+    if class_id is not None or allowed_class_ids is not None:
         # class_ids is a JSON array; containment can't be filtered portably
         # in SQL, so filter in Python first, then paginate the filtered set.
         all_rows = (await session.execute(stmt)).scalars().all()
-        filtered = [row for row in all_rows if not row.class_ids or str(class_id) in row.class_ids]
+        filtered = [row for row in all_rows if not row.class_ids or str(class_id) in row.class_ids] if class_id is not None else all_rows
+        if allowed_class_ids is not None:
+            filtered = [row for row in filtered if not row.class_ids or any(cid in allowed_class_ids for cid in row.class_ids)]
         response.headers["X-Total-Count"] = str(len(filtered))
         page = filtered[offset : offset + limit]
         return [HolidayRead.model_validate(row) for row in page]
@@ -827,6 +846,73 @@ async def set_leave_status(
 
 # --------------------------------------------------------------- Resources
 
+async def _resource_admin(current_user: User, session: AsyncSession) -> bool:
+    return current_user.role == UserRole.principal or await user_has_permission(current_user, "resources.manage_all", session)
+
+
+async def _require_teachable_scope(
+    session: AsyncSession,
+    current_user: User,
+    madrasa_id: UUID,
+    scope: Scope,
+    bypass_permission: str,
+) -> None:
+    """Resources/Forms (B9/B10): a teacher may only target classes/sections/
+    courses they actually teach, unless they hold the module's admin-override
+    permission. Broadcasting to everyone/a whole role/specific people always
+    needs the override — only genuine teaching scope is self-service."""
+    if current_user.role == UserRole.principal:
+        return
+    if await user_has_permission(current_user, bypass_permission, session):
+        return
+    if current_user.role != UserRole.teacher:
+        raise HTTPException(status_code=403, detail="Not permitted to target this audience")
+
+    teacher = (
+        await session.execute(select(TeacherProfile).where(TeacherProfile.user_id == current_user.id))
+    ).scalar_one_or_none()
+    if teacher is None:
+        raise HTTPException(status_code=403, detail="Not permitted to target this audience")
+
+    if scope.all or scope.roles or scope.users:
+        raise HTTPException(status_code=403, detail="Only an admin can target everyone, a whole role, or specific people")
+    if not (scope.classes or scope.sections or scope.courses):
+        raise HTTPException(status_code=403, detail="Choose which of your own classes/sections/courses this applies to")
+
+    active_session_id = await _active_session_id(session, madrasa_id)
+    for class_id in scope.classes:
+        if not await teacher_teaches(session, madrasa_id=madrasa_id, teacher_id=teacher.id, session_id=active_session_id, class_id=class_id):
+            raise HTTPException(status_code=403, detail="You do not teach one of the targeted classes")
+    for section_id in scope.sections:
+        # A legacy (class-wide, section_id=None) TeacherAssignment matches any
+        # section of *its own* class — but teacher_teaches() only enforces
+        # that when class_id is also given, so resolve it here rather than
+        # letting an unscoped section_id-only check match every class.
+        section = await session.get(Section, section_id)
+        section_class_id = section.class_id if section is not None else None
+        if not await teacher_teaches(
+            session, madrasa_id=madrasa_id, teacher_id=teacher.id, session_id=active_session_id,
+            class_id=section_class_id, section_id=section_id,
+        ):
+            raise HTTPException(status_code=403, detail="You do not teach one of the targeted sections")
+    for course_id in scope.courses:
+        if not await teacher_teaches(session, madrasa_id=madrasa_id, teacher_id=teacher.id, session_id=active_session_id, course_id=course_id):
+            raise HTTPException(status_code=403, detail="You do not teach one of the targeted courses")
+
+
+async def _get_resource_category_or_404(session: AsyncSession, category_id: UUID, madrasa_id: UUID) -> ResourceCategory:
+    category = await session.get(ResourceCategory, category_id)
+    if category is None or category.madrasa_id != madrasa_id:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return category
+
+
+def _category_read(row: ResourceCategory, current_user_id: UUID) -> ResourceCategoryRead:
+    data = ResourceCategoryRead.model_validate(row).model_dump()
+    data["is_mine"] = row.owner_id == current_user_id
+    return ResourceCategoryRead(**data)
+
+
 @router.post("/resource-categories", response_model=ResourceCategoryRead)
 async def create_resource_category(
     payload: ResourceCategoryCreate,
@@ -834,11 +920,15 @@ async def create_resource_category(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> ResourceCategoryRead:
-    category = ResourceCategory(madrasa_id=madrasa.id, name=payload.name)
+    is_admin = await _resource_admin(current_user, session)
+    # Plain teachers always get a private category (B9); only an admin/
+    # resources.manage_all holder can make one global.
+    owner_id = None if (is_admin and payload.is_global) else current_user.id
+    category = ResourceCategory(madrasa_id=madrasa.id, name=payload.name, owner_id=owner_id)
     session.add(category)
     await session.commit()
     await session.refresh(category)
-    return ResourceCategoryRead.model_validate(category)
+    return _category_read(category, current_user.id)
 
 
 @router.get("/resource-categories", response_model=list[ResourceCategoryRead])
@@ -847,8 +937,53 @@ async def list_resource_categories(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> list[ResourceCategoryRead]:
-    result = await session.execute(select(ResourceCategory).where(ResourceCategory.madrasa_id == madrasa.id))
-    return [ResourceCategoryRead.model_validate(row) for row in result.scalars().all()]
+    # Admins see every category (global + every teacher's); everyone else
+    # sees only global categories plus their own private ones (B9).
+    is_admin = await _resource_admin(current_user, session)
+    stmt = select(ResourceCategory).where(ResourceCategory.madrasa_id == madrasa.id)
+    if not is_admin:
+        stmt = stmt.where((ResourceCategory.owner_id.is_(None)) | (ResourceCategory.owner_id == current_user.id))
+    rows = (await session.execute(stmt.order_by(ResourceCategory.name))).scalars().all()
+    return [_category_read(row, current_user.id) for row in rows]
+
+
+@router.delete("/resource-categories/{category_id}")
+async def delete_resource_category(
+    category_id: UUID,
+    current_user: User = Depends(require_permission("resources.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    category = await _get_resource_category_or_404(session, category_id, madrasa.id)
+    is_admin = await _resource_admin(current_user, session)
+    if category.owner_id != current_user.id and not is_admin:
+        raise HTTPException(status_code=403, detail="Not your category")
+    in_use = await session.scalar(select(Resource.id).where(Resource.category_id == category_id).limit(1))
+    if in_use:
+        raise HTTPException(status_code=409, detail="Cannot delete a category that still has resources in it.")
+    await session.delete(category)
+    await session.commit()
+    return {"status": "deleted"}
+
+
+async def _get_resource_or_404(session: AsyncSession, resource_id: UUID, madrasa_id: UUID) -> Resource:
+    resource = await session.get(Resource, resource_id)
+    if resource is None or resource.madrasa_id != madrasa_id:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    return resource
+
+
+async def _resource_read(session: AsyncSession, resource: Resource) -> ResourceRead:
+    owner = await session.get(User, resource.created_by_id)
+    owner_name = None
+    if owner is not None:
+        teacher = (
+            await session.execute(select(TeacherProfile).where(TeacherProfile.user_id == owner.id))
+        ).scalar_one_or_none()
+        owner_name = teacher.name if teacher else owner.username
+    data = ResourceRead.model_validate(resource).model_dump()
+    data["owner_name"] = owner_name
+    return ResourceRead(**data)
 
 
 @router.post("/resources", response_model=ResourceRead)
@@ -860,6 +995,11 @@ async def create_resource(
 ) -> ResourceRead:
     if not payload.file_key and not payload.video_url:
         raise HTTPException(status_code=400, detail="Provide file_key or video_url")
+    category = await _get_resource_category_or_404(session, payload.category_id, madrasa.id)
+    is_admin = await _resource_admin(current_user, session)
+    if category.owner_id not in (None, current_user.id) and not is_admin:
+        raise HTTPException(status_code=403, detail="Not your category")
+    await _require_teachable_scope(session, current_user, madrasa.id, payload.visibility_scope, "resources.manage_all")
     resource = Resource(
         madrasa_id=madrasa.id,
         category_id=payload.category_id,
@@ -873,7 +1013,56 @@ async def create_resource(
     session.add(resource)
     await session.commit()
     await session.refresh(resource)
-    return ResourceRead.model_validate(resource)
+    return await _resource_read(session, resource)
+
+
+@router.put("/resources/{resource_id}", response_model=ResourceRead)
+async def update_resource(
+    resource_id: UUID,
+    payload: ResourceUpdate,
+    current_user: User = Depends(require_permission("resources.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> ResourceRead:
+    resource = await _get_resource_or_404(session, resource_id, madrasa.id)
+    is_admin = await _resource_admin(current_user, session)
+    if resource.created_by_id != current_user.id and not is_admin:
+        raise HTTPException(status_code=403, detail="Not your resource")
+    if payload.category_id is not None:
+        category = await _get_resource_category_or_404(session, payload.category_id, madrasa.id)
+        if category.owner_id not in (None, current_user.id) and not is_admin:
+            raise HTTPException(status_code=403, detail="Not your category")
+        resource.category_id = payload.category_id
+    if payload.title is not None:
+        resource.title = payload.title
+    if payload.description is not None:
+        resource.description = payload.description
+    if payload.file_key is not None:
+        resource.file_key = payload.file_key
+    if payload.video_url is not None:
+        resource.video_url = payload.video_url
+    if payload.visibility_scope is not None:
+        await _require_teachable_scope(session, current_user, madrasa.id, payload.visibility_scope, "resources.manage_all")
+        resource.visibility_scope = _scope_dump(payload.visibility_scope)
+    await session.commit()
+    await session.refresh(resource)
+    return await _resource_read(session, resource)
+
+
+@router.delete("/resources/{resource_id}")
+async def delete_resource(
+    resource_id: UUID,
+    current_user: User = Depends(require_permission("resources.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    resource = await _get_resource_or_404(session, resource_id, madrasa.id)
+    is_admin = await _resource_admin(current_user, session)
+    if resource.created_by_id != current_user.id and not is_admin:
+        raise HTTPException(status_code=403, detail="Not your resource")
+    await session.delete(resource)
+    await session.commit()
+    return {"status": "deleted"}
 
 
 @router.get("/resources", response_model=list[ResourceRead])
@@ -883,23 +1072,51 @@ async def list_resources(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     category_id: UUID | None = None,
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
+    mine_only: bool = False,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[ResourceRead]:
+    """class_id/section_id = admin browse-by-class/section (B9): every
+    resource whose scope actually covers that class/section, or is global —
+    admin/resources.manage_all only. Everyone else always gets their own
+    personally-visible list (own uploads ∪ whatever scope_allows them)."""
+    is_admin = await _resource_admin(current_user, session)
     stmt = select(Resource).where(Resource.madrasa_id == madrasa.id)
     if category_id:
         stmt = stmt.where(Resource.category_id == category_id)
-    result = await session.execute(stmt.order_by(Resource.title))
-    rows = result.scalars().all()
-    ctx = await get_viewer_context(session, current_user, madrasa.id)
-    # scope_allows is a Python-side visibility check, so filter before paging.
-    visible = [row for row in rows if scope_allows(row.visibility_scope, ctx)]
+    if mine_only:
+        stmt = stmt.where(Resource.created_by_id == current_user.id)
+    rows = (await session.execute(stmt.order_by(Resource.title))).scalars().all()
+
+    if is_admin and (class_id or section_id):
+        def _covers(scope: dict) -> bool:
+            if scope.get("all"):
+                return True
+            if class_id and str(class_id) in {str(c) for c in scope.get("classes", [])}:
+                return True
+            if section_id and str(section_id) in {str(s) for s in scope.get("sections", [])}:
+                return True
+            return False
+        visible = [row for row in rows if _covers(row.visibility_scope or {})]
+    else:
+        ctx = await get_viewer_context(session, current_user, madrasa.id)
+        visible = [
+            row for row in rows
+            if is_admin or row.created_by_id == current_user.id or scope_allows(row.visibility_scope, ctx)
+        ]
+
     response.headers["X-Total-Count"] = str(len(visible))
     page = visible[offset : offset + limit]
-    return [ResourceRead.model_validate(row) for row in page]
+    return [await _resource_read(session, row) for row in page]
 
 
 # ------------------------------------------------------------------ Forms
+
+async def _form_admin(current_user: User, session: AsyncSession) -> bool:
+    return current_user.role == UserRole.principal or await user_has_permission(current_user, "forms.manage_all", session)
+
 
 @router.post("/forms", response_model=FormRead)
 async def create_form(
@@ -908,10 +1125,12 @@ async def create_form(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> FormRead:
+    await _require_teachable_scope(session, current_user, madrasa.id, payload.visibility_scope, "forms.manage_all")
     form = Form(
         madrasa_id=madrasa.id,
         title=payload.title,
         description=payload.description,
+        category=payload.category,
         fields_definition=[field.model_dump() for field in payload.fields],
         visibility_scope=_scope_dump(payload.visibility_scope),
         open_from=payload.open_from,
@@ -925,20 +1144,80 @@ async def create_form(
     return FormRead.model_validate(form)
 
 
+@router.put("/forms/{form_id}", response_model=FormRead)
+async def update_form(
+    form_id: UUID,
+    payload: FormUpdate,
+    current_user: User = Depends(require_permission("forms.create")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> FormRead:
+    form = await _get_form_or_404(session, form_id, madrasa.id)
+    is_admin = await _form_admin(current_user, session)
+    if form.created_by_id != current_user.id and not is_admin:
+        raise HTTPException(status_code=403, detail="Not your form")
+    if payload.title is not None:
+        form.title = payload.title
+    if payload.description is not None:
+        form.description = payload.description
+    if payload.category is not None:
+        form.category = payload.category
+    if payload.fields is not None:
+        form.fields_definition = [field.model_dump() for field in payload.fields]
+    if payload.open_from is not None:
+        form.open_from = payload.open_from
+    if payload.open_until is not None:
+        form.open_until = payload.open_until
+    if payload.allow_multiple is not None:
+        form.allow_multiple = payload.allow_multiple
+    if payload.visibility_scope is not None:
+        await _require_teachable_scope(session, current_user, madrasa.id, payload.visibility_scope, "forms.manage_all")
+        form.visibility_scope = _scope_dump(payload.visibility_scope)
+    await session.commit()
+    await session.refresh(form)
+    return FormRead.model_validate(form)
+
+
+@router.delete("/forms/{form_id}")
+async def delete_form(
+    form_id: UUID,
+    current_user: User = Depends(require_permission("forms.create")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    form = await _get_form_or_404(session, form_id, madrasa.id)
+    is_admin = await _form_admin(current_user, session)
+    if form.created_by_id != current_user.id and not is_admin:
+        raise HTTPException(status_code=403, detail="Not your form")
+    await session.delete(form)
+    await session.commit()
+    return {"status": "deleted"}
+
+
 @router.get("/forms", response_model=list[FormRead])
 async def list_forms(
     response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    category: str | None = None,
+    mine_only: bool = False,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[FormRead]:
-    result = await session.execute(select(Form).where(Form.madrasa_id == madrasa.id).order_by(Form.title))
-    rows = result.scalars().all()
+    stmt = select(Form).where(Form.madrasa_id == madrasa.id)
+    if category:
+        stmt = stmt.where(Form.category == category)
+    if mine_only:
+        stmt = stmt.where(Form.created_by_id == current_user.id)
+    rows = (await session.execute(stmt.order_by(Form.title))).scalars().all()
+    is_admin = await _form_admin(current_user, session)
     ctx = await get_viewer_context(session, current_user, madrasa.id)
     # scope_allows is a Python-side visibility check, so filter before paging.
-    visible = [row for row in rows if scope_allows(row.visibility_scope, ctx)]
+    visible = [
+        row for row in rows
+        if is_admin or row.created_by_id == current_user.id or scope_allows(row.visibility_scope, ctx)
+    ]
     response.headers["X-Total-Count"] = str(len(visible))
     page = visible[offset : offset + limit]
     return [FormRead.model_validate(row) for row in page]
@@ -1040,6 +1319,7 @@ async def create_announcement(
         madrasa_id=madrasa.id,
         title=payload.title,
         body=payload.body,
+        category=payload.category,
         attachment_link=payload.attachment_link,
         audience_scope=_scope_dump(payload.audience_scope),
         publish_at=payload.publish_at,
@@ -1059,6 +1339,7 @@ async def list_announcements(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     audience: str | None = None,  # teachers | students | all — the admin tabs
+    category: str | None = None,
     q: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -1067,6 +1348,8 @@ async def list_announcements(
 ) -> list[AnnouncementRead]:
     now = datetime.now(UTC)
     stmt = select(Announcement).where(Announcement.madrasa_id == madrasa.id)
+    if category:
+        stmt = stmt.where(Announcement.category == category)
     if q:
         pattern = f"%{q}%"
         stmt = stmt.where(Announcement.title.ilike(pattern) | Announcement.body.ilike(pattern))
@@ -1117,6 +1400,8 @@ async def update_announcement(
         announcement.title = payload.title
     if payload.body is not None:
         announcement.body = payload.body
+    if payload.category is not None:
+        announcement.category = payload.category
     if payload.attachment_link is not None:
         announcement.attachment_link = payload.attachment_link
     if payload.audience_scope is not None:

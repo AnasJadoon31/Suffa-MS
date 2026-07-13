@@ -102,6 +102,70 @@ async def test_student_sees_only_own_section_assignments(client, student_client,
     assert titles == {"a1 only", "class wide"}
 
 
+async def test_publish_all_classes_creates_one_row_per_mapped_class(client, seed):
+    response = await client.post(
+        "/api/v1/assessments/assignments",
+        json={
+            "course_id": str(seed.course.id),
+            "all_classes": True,
+            "title": "All-classes memo",
+            "instructions": "Read chapter 3",
+            "due_date": "2024-07-01T00:00:00Z",
+        },
+    )
+    assert response.status_code == 200
+    rows = response.json()
+    # course is mapped to class_a and class_b in the seed.
+    assert {row["class_name"] for row in rows} == {"Class 1", "Class 2"}
+    assert all(row["section_id"] is None for row in rows)
+    assert rows[0]["batch_id"] is not None
+    assert rows[0]["batch_id"] == rows[1]["batch_id"]
+
+
+async def test_publish_all_classes_denied_without_manage_all(teacher_client, seed, db_sessionmaker):
+    from app.modules.auth.models import UserPermission
+
+    # Give the teacher a plain (madrasa-wide) assignments.create grant, so
+    # the 403 below is specifically the all_classes/manage_all gate, not the
+    # base "can this user create assignments at all" check.
+    async with db_sessionmaker() as db:
+        db.add(
+            UserPermission(
+                user_id=seed.teacher_user.id,
+                permission_code="assignments.create",
+                granted_by_id=seed.principal.id,
+            )
+        )
+        await db.commit()
+
+    response = await teacher_client.post(
+        "/api/v1/assessments/assignments",
+        json={
+            "course_id": str(seed.course.id),
+            "all_classes": True,
+            "title": "Should fail",
+            "instructions": "n/a",
+            "due_date": "2024-07-01T00:00:00Z",
+        },
+    )
+    assert response.status_code == 403
+
+
+async def test_publish_all_classes_rejects_section_ids(client, seed):
+    response = await client.post(
+        "/api/v1/assessments/assignments",
+        json={
+            "course_id": str(seed.course.id),
+            "all_classes": True,
+            "section_ids": [str(seed.sections.a1.id)],
+            "title": "Bad combo",
+            "instructions": "n/a",
+            "due_date": "2024-07-01T00:00:00Z",
+        },
+    )
+    assert response.status_code == 422
+
+
 async def test_category_filter(client, seed):
     await client.post("/api/v1/assessments/assignments", json=_assignment_payload(seed, title="hw", category="homework"))
     await client.post("/api/v1/assessments/assignments", json=_assignment_payload(seed, title="test", category="test"))

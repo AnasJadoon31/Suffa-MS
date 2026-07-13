@@ -150,12 +150,54 @@ async def create_assignment(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> list[AssignmentRead]:
-    await _require_class_course_scope(
-        session, current_user, madrasa.id, payload.class_id, payload.course_id, bypass_permission="assignments.create_any"
-    )
     teacher = await _teacher_profile(session, current_user)
     if teacher is None and current_user.role != UserRole.principal:
         raise HTTPException(status_code=403, detail="Only teachers or the Principal can create assignments")
+
+    # B8-j: publish to every class the course is mapped to, in one action —
+    # reuses the same batch_id machinery as multi-section publish, just at
+    # class granularity (one whole-class row per class) instead of section
+    # granularity. Gated on assignments.manage_all (principal is an implicit
+    # superuser via user_has_permission).
+    if payload.all_classes:
+        if not await user_has_permission(current_user, "assignments.manage_all", session):
+            raise HTTPException(status_code=403, detail="Not permitted to publish to all classes")
+        class_ids = (
+            await session.execute(
+                select(ClassCourse.class_id).where(
+                    ClassCourse.madrasa_id == madrasa.id, ClassCourse.course_id == payload.course_id
+                )
+            )
+        ).scalars().all()
+        if not class_ids:
+            raise HTTPException(status_code=400, detail="No classes have this course mapped")
+        batch_id = uuid4() if len(class_ids) > 1 else None
+        created: list[Assignment] = []
+        for class_id in class_ids:
+            assignment = Assignment(
+                madrasa_id=madrasa.id,
+                class_id=class_id,
+                section_id=None,
+                course_id=payload.course_id,
+                title=payload.title,
+                category=payload.category,
+                instructions=payload.instructions,
+                attachment_key=payload.attachment_key,
+                due_date=payload.due_date,
+                target_student_ids=[str(sid) for sid in payload.target_student_ids] or None,
+                created_by_id=teacher.id if teacher else None,
+                batch_id=batch_id,
+            )
+            session.add(assignment)
+            created.append(assignment)
+        await session.commit()
+        for assignment in created:
+            await session.refresh(assignment)
+        return await _assignment_reads(session, madrasa.id, created)
+
+    await _require_class_course_scope(
+        session, current_user, madrasa.id, payload.class_id, payload.course_id, bypass_permission="assignments.create_any"
+    )
 
     section_ids: list[UUID | None] = list(dict.fromkeys(payload.section_ids)) or [None]
     for section_id in section_ids:
@@ -644,10 +686,13 @@ async def _compute_course_result(session: AsyncSession, madrasa_id: UUID, studen
 async def get_course_result(
     student_id: UUID,
     course_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("assessments.marks.enter")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> CourseResult:
+    student = await session.get(StudentProfile, student_id)
+    if student is None or student.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Student not found")
     return await _compute_course_result(session, madrasa.id, student_id, course_id)
 
 

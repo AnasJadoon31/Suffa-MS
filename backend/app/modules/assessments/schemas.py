@@ -1,21 +1,34 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AssignmentCreate(BaseModel):
-    class_id: UUID
+    # Required unless all_classes=True, in which case the target class list
+    # is resolved server-side (every class the course is mapped to, B8-j).
+    class_id: UUID | None = None
     course_id: UUID
     # Empty = whole class; one or more ids = one assignment row per section
     # (multi-section publish shares a batch_id, IMPLEMENT.md §5).
     section_ids: list[UUID] = []
+    # Publish to every class the course is mapped to (whole-class rows,
+    # sharing one batch_id) — requires assignments.manage_all. B8-j.
+    all_classes: bool = False
     title: str
     category: str | None = Field(default=None, max_length=60)
     instructions: str
     attachment_key: str | None = None
     due_date: datetime
     target_student_ids: list[UUID] = []
+
+    @model_validator(mode="after")
+    def _class_id_required_unless_all_classes(self) -> "AssignmentCreate":
+        if not self.all_classes and self.class_id is None:
+            raise ValueError("class_id is required unless all_classes is set")
+        if self.all_classes and self.section_ids:
+            raise ValueError("section_ids cannot be combined with all_classes")
+        return self
 
 
 class AssignmentUpdate(BaseModel):

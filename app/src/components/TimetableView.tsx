@@ -362,8 +362,14 @@ function ListView({
                   className="tableAction"
                   type="button"
                   onClick={async () => {
-                    await operationsApi.deleteTimetableSlot(s.id);
-                    onChanged();
+                    if (!window.confirm(t("deleteSlotConfirm"))) return;
+                    onError("");
+                    try {
+                      await operationsApi.deleteTimetableSlot(s.id);
+                      onChanged();
+                    } catch (err: any) {
+                      onError(err.response?.data?.detail ?? t("failedDeleteSlot"));
+                    }
                   }}
                 >
                   <Trash2 size={14} />

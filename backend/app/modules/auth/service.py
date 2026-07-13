@@ -1,3 +1,4 @@
+import re
 import secrets
 from uuid import UUID
 
@@ -12,6 +13,22 @@ from app.modules.auth.models import User, UserRole, UserStatus
 
 class UsernameTakenError(ValueError):
     pass
+
+
+async def generate_unique_username(session: AsyncSession, base: str) -> str:
+    """Derives a login username from a display name for flows with no
+    interactive username prompt (e.g. guardian auto-provisioning at
+    enrolment time, B7-k). Usernames are unique across the whole platform
+    (see provision_login), so this keeps trying numeric suffixes."""
+    slug = re.sub(r"[^a-z0-9]+", ".", base.strip().lower()).strip(".") or "guardian"
+    candidate = slug
+    suffix = 1
+    while True:
+        existing = await session.execute(select(User.id).where(User.username == candidate))
+        if existing.scalar_one_or_none() is None:
+            return candidate
+        suffix += 1
+        candidate = f"{slug}{suffix}"
 
 
 async def provision_login(
