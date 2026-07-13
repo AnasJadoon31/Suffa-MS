@@ -20,6 +20,8 @@ function fromScope(scope: Scope): string {
   return "all";
 }
 
+const audienceLabelKey: Record<string, string> = { all: "audienceEveryone", teachers: "teachers", students: "students" };
+
 export function AnnouncementsView() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
@@ -72,7 +74,7 @@ export function AnnouncementsView() {
       setForm({ title: "", body: "", category: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
       await load();
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? "Failed to post announcement");
+      setError(err.response?.data?.detail ?? t("failedPostAnnouncement"));
     }
   };
 
@@ -93,7 +95,7 @@ export function AnnouncementsView() {
       setEditId(null);
       await load();
     } catch (err: any) {
-      setEditError(err.response?.data?.detail ?? "Failed to update announcement");
+      setEditError(err.response?.data?.detail ?? t("failedUpdateAnnouncement"));
     }
   };
 
@@ -123,36 +125,36 @@ export function AnnouncementsView() {
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
-        <h2>Announcements</h2>
-        <p className="notice">Notices published to staff, students, or guardians.</p>
+        <h2>{t("announcementsHeading")}</h2>
+        <p className="notice">{t("announcementsSubtitle")}</p>
       </div>
 
       {canPost && (
         <form className="inlineForm" onSubmit={handleCreate}>
-          <label>Title<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-          <label>Target Audience
+          <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+          <label>{t("targetAudienceLabel")}
             <Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
-              <option value="all">All</option>
-              <option value="teachers">Teachers</option>
-              <option value="students">Students</option>
+              <option value="all">{t("audienceEveryone")}</option>
+              <option value="teachers">{t("teachers")}</option>
+              <option value="students">{t("students")}</option>
             </Select>
           </label>
           <label>{t("announcementCategoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("announcementCategoryPlaceholder") ?? ""} list="announcement-categories" /></label>
-          <label>Attachment link<Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder="optional" /></label>
+          <label>{t("attachmentLinkLabel")}<Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder={t("optionalPlaceholder")} /></label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <label>Publish at<Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} /></label>
-            <label>Expires at<Input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} /></label>
+            <label>{t("publishAtLabel")}<Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} /></label>
+            <label>{t("expiresAtLabel")}<Input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} /></label>
           </div>
           <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
-            <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>Body</span>
+            <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>{t("bodyLabel")}</span>
             <RichTextEditor
               value={form.body}
               onChange={(html) => setForm({ ...form, body: html })}
-              placeholder="Announcement content..."
+              placeholder={t("announcementContentPlaceholder")}
             />
           </div>
           <div className="formActions">
-            <button className="primaryAction" type="submit"><Plus size={16} /> Post announcement</button>
+            <button className="primaryAction" type="submit"><Plus size={16} /> {t("postAnnouncementBtn")}</button>
           </div>
         </form>
       )}
@@ -164,12 +166,12 @@ export function AnnouncementsView() {
       <div className="filterBar">
         {canPost && (
           <>
-            <button className={tab === "all" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("all")}>All</button>
-            <button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teachers")}>Teachers</button>
-            <button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("students")}>Students</button>
+            <button className={tab === "all" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("all")}>{t("audienceEveryone")}</button>
+            <button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teachers")}>{t("teachers")}</button>
+            <button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("students")}>{t("students")}</button>
           </>
         )}
-        <Input placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input placeholder={t("searchAnnouncementsPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} />
         <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
           <option value="">{t("allCategories")}</option>
           {knownCategories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -179,7 +181,7 @@ export function AnnouncementsView() {
       </div>
 
       <div className="roster">
-        {announcements.length === 0 && <p className="emptyState">No announcements yet.</p>}
+        {announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsListYet")}</p>}
         {announcements.map((a) => (
           <div className="rosterRow" key={a.id} style={{ alignItems: "flex-start", cursor: "pointer", transition: "background-color 0.15s ease" }} onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}>
             <div style={{ flex: 1, padding: "0.5rem 0" }}>
@@ -194,11 +196,11 @@ export function AnnouncementsView() {
                   <div dangerouslySetInnerHTML={{ __html: a.body }} className="richTextContent" />
                   {a.attachment_link && (
                     <div style={{ marginTop: "1rem" }}>
-                      <a href={a.attachment_link} target="_blank" rel="noreferrer" style={{ fontWeight: 500, color: "var(--brand)" }}>View Attachment</a>
+                      <a href={a.attachment_link} target="_blank" rel="noreferrer" style={{ fontWeight: 500, color: "var(--brand)" }}>{t("viewAttachmentLink")}</a>
                     </div>
                   )}
-                  <div style={{ marginTop: "1rem", color: "var(--slate-500)", fontSize: "0.85rem", textTransform: "capitalize" }}>
-                    Audience: {fromScope(a.audience_scope)}
+                  <div style={{ marginTop: "1rem", color: "var(--slate-500)", fontSize: "0.85rem" }}>
+                    {t("announcementAudienceLine", { audience: t(audienceLabelKey[fromScope(a.audience_scope)]) })}
                   </div>
                 </div>
               ) : (
@@ -227,7 +229,7 @@ export function AnnouncementsView() {
                         expires_at: a.expires_at ? new Date(a.expires_at).toISOString().slice(0, 16) : "",
                       });
                     }}
-                    title="Edit"
+                    title={t("editBtn")}
                   >
                     <Pencil size={14} />
                   </button>
@@ -235,7 +237,7 @@ export function AnnouncementsView() {
                     type="button"
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px 8px", cursor: "pointer", color: "var(--rose)" }}
                     onClick={() => handleDelete(a.id)}
-                    title="Delete"
+                    title={t("deleteBtn")}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -249,35 +251,35 @@ export function AnnouncementsView() {
       {editId && (
         <div style={modalOverlayStyle} onClick={() => setEditId(null)}>
           <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0, marginBottom: "1.5rem" }}>Edit Announcement</h3>
+            <h3 style={{ marginTop: 0, marginBottom: "1.5rem" }}>{t("editAnnouncementHeading")}</h3>
             <form className="inlineForm" style={{ gridTemplateColumns: "1fr", gap: "1.25rem", border: "none", padding: 0 }} onSubmit={handleUpdate}>
-              <label>Title<Input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></label>
-              <label>Target Audience
+              <label>{t("titleLabel")}<Input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></label>
+              <label>{t("targetAudienceLabel")}
                 <Select value={editForm.audience} onChange={(e) => setEditForm({ ...editForm, audience: e.target.value })}>
-                  <option value="all">All</option>
-                  <option value="teachers">Teachers</option>
-                  <option value="students">Students</option>
+                  <option value="all">{t("audienceEveryone")}</option>
+                  <option value="teachers">{t("teachers")}</option>
+                  <option value="students">{t("students")}</option>
                 </Select>
               </label>
               <label>{t("announcementCategoryLabel")}<Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} list="announcement-categories" /></label>
-              <label>Attachment link<Input value={editForm.attachment_link} onChange={(e) => setEditForm({ ...editForm, attachment_link: e.target.value })} /></label>
+              <label>{t("attachmentLinkLabel")}<Input value={editForm.attachment_link} onChange={(e) => setEditForm({ ...editForm, attachment_link: e.target.value })} /></label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                <label>Publish at<Input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} /></label>
-                <label>Expires at<Input type="datetime-local" value={editForm.expires_at} onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })} /></label>
+                <label>{t("publishAtLabel")}<Input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} /></label>
+                <label>{t("expiresAtLabel")}<Input type="datetime-local" value={editForm.expires_at} onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })} /></label>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>Body</span>
+                <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>{t("bodyLabel")}</span>
                 <RichTextEditor
                   value={editForm.body}
                   onChange={(html) => setEditForm({ ...editForm, body: html })}
                 />
               </div>
-              
+
               {editError && <p className="notice" style={{ color: "var(--rose)" }}>{editError}</p>}
-              
+
               <div className="formActions" style={{ justifyContent: "flex-end", marginTop: "1rem" }}>
-                <button type="button" onClick={() => setEditId(null)}>Cancel</button>
-                <button className="primaryAction" type="submit">Save Changes</button>
+                <button type="button" onClick={() => setEditId(null)}>{t("cancelBtn")}</button>
+                <button className="primaryAction" type="submit">{t("saveChangesBtn")}</button>
               </div>
             </form>
           </div>
