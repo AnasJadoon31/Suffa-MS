@@ -8,6 +8,7 @@ import { peopleApi, type Teacher } from "../lib/endpoints";
 import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 /** Read-only self-view for teachers without teachers.salary.manage — own
  * salary record + payment history only, no ability to browse other teachers. */
@@ -15,13 +16,17 @@ function MySalaryView() {
   const { t } = useTranslation();
   const [data, setData] = useState<MySalary | null>(null);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     void (async () => {
+      setIsLoading(true);
       try {
         setData(await financeApi.getMySalary());
       } catch (err: any) {
         setError(err.response?.data?.detail ?? t("failedLoadSalary"));
+      } finally {
+        setIsLoading(false);
       }
     })();
   }, [t]);
@@ -32,12 +37,14 @@ function MySalaryView() {
         <h2><Banknote size={18} /> {t("salary")}</h2>
         <p className="notice">{t("descMySalary")}</p>
       </div>
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      {data?.record ? (
+      {isLoading && <LoadingState />}
+      {!isLoading && error && <ErrorState message={error} />}
+      {!isLoading && !error && data?.record ? (
         <p className="notice">{t("currentSalaryLine", { currency: data.record.currency, amount: data.record.amount, date: data.record.effective_from })}</p>
       ) : (
-        data && <p className="emptyState">{t("noSalarySetYet")}</p>
+        !isLoading && !error && data && <p className="emptyState">{t("noSalarySetYet")}</p>
       )}
+      {!isLoading && !error && (
       <div className="dataTable">
         <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span></div>
         {data && data.payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
@@ -51,6 +58,7 @@ function MySalaryView() {
           </div>
         ))}
       </div>
+      )}
     </section>
   );
 }
@@ -66,9 +74,22 @@ function AdminSalaryView() {
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    void peopleApi.listTeachers().then(setTeachers);
+    void (async () => {
+      setIsLoading(true);
+      try {
+        setTeachers(await peopleApi.listTeachers());
+        setLoadError("");
+      } catch (err: any) {
+        setLoadError(err.response?.data?.detail ?? t("failedLoadTeachers"));
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadTeacher = async (id: string) => {
@@ -99,6 +120,9 @@ function AdminSalaryView() {
         <h2><Banknote size={18} /> {t("salary")}</h2>
         <p className="notice">{t("descSalary")}</p>
       </div>
+
+      {isLoading && <LoadingState />}
+      {!isLoading && loadError && <ErrorState message={loadError} />}
 
       <div className="moduleToolbar">
         <SearchDropdown

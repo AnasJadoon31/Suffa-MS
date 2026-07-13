@@ -6,6 +6,7 @@ import { academicsApi, operationsApi, type AcademicClass, type Holiday } from ".
 import { useAuth } from "../lib/AuthContext";
 import { HijriTag } from "./HijriTag";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 type HolidayForm = {
   name: string;
@@ -28,14 +29,23 @@ export function HolidaysView() {
   const [editingId, setEditingId] = useState("");
   const [editForm, setEditForm] = useState<HolidayForm>(EMPTY_FORM);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   const load = async () => {
-    const params: Record<string, string> = {};
-    if (filters.category) params.category = filters.category;
-    if (filters.class_id) params.class_id = filters.class_id;
-    if (filters.date_from) params.date_from = filters.date_from;
-    if (filters.date_to) params.date_to = filters.date_to;
-    setHolidays(await operationsApi.listHolidays(params));
+    setIsLoading(true);
+    try {
+      const params: Record<string, string> = {};
+      if (filters.category) params.category = filters.category;
+      if (filters.class_id) params.class_id = filters.class_id;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to) params.date_to = filters.date_to;
+      setHolidays(await operationsApi.listHolidays(params));
+      setError("");
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedLoadHolidays"));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -167,7 +177,7 @@ export function HolidaysView() {
         </form>
       )}
 
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {!isLoading && error && <ErrorState message={error} />}
 
       <div className="dataTable">
         <div className="dataRow header">
@@ -178,8 +188,9 @@ export function HolidaysView() {
           <span>{t("appliesToCol")}</span>
           {canManage && <span></span>}
         </div>
-        {holidays.length === 0 && <p className="emptyState">{t("noHolidays")}</p>}
-        {holidays.map((holiday) => {
+        {isLoading && <LoadingState />}
+        {!isLoading && !error && holidays.length === 0 && <p className="emptyState">{t("noHolidays")}</p>}
+        {!isLoading && !error && holidays.map((holiday) => {
           const isEditing = editingId === holiday.id;
           return (
             <div className="dataRow" key={holiday.id}>

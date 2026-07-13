@@ -16,6 +16,7 @@ import { AudiencePicker } from "./AudiencePicker";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 const emptyForm = { category_id: "", title: "", description: "", video_url: "" };
 
@@ -41,30 +42,44 @@ export function ResourcesView() {
   const [file, setFile] = useState<File | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const [editing, setEditing] = useState<ResourceItem | null>(null);
   const [editAudience, setEditAudience] = useState<Scope>({ all: true });
   const [editError, setEditError] = useState("");
 
   const loadResources = async () => {
-    const { data } = await cachedFetch(
-      `resources:${categoryFilter || "all"}:${classFilter}:${sectionFilter}:${mineOnly}`,
-      () =>
-        operationsApi.listResources({
-          category_id: categoryFilter || undefined,
-          class_id: canManageAll ? classFilter || undefined : undefined,
-          section_id: canManageAll ? sectionFilter || undefined : undefined,
-          mine_only: mineOnly || undefined,
-        }),
-    );
-    setResources(data);
+    setIsLoading(true);
+    try {
+      const { data } = await cachedFetch(
+        `resources:${categoryFilter || "all"}:${classFilter}:${sectionFilter}:${mineOnly}`,
+        () =>
+          operationsApi.listResources({
+            category_id: categoryFilter || undefined,
+            class_id: canManageAll ? classFilter || undefined : undefined,
+            section_id: canManageAll ? sectionFilter || undefined : undefined,
+            mine_only: mineOnly || undefined,
+          }),
+      );
+      setResources(data);
+      setLoadError("");
+    } catch (err: any) {
+      setLoadError(err.response?.data?.detail ?? t("failedLoadResources"));
+    } finally {
+      setIsLoading(false);
+    }
   };
   const refreshAll = async () => {
-    const { data } = await cachedFetch("resource-categories", () => operationsApi.listResourceCategories());
-    setCategories(data);
-    if (canManageAll) {
-      const classList = await academicsApi.listClasses();
-      setClasses(classList);
+    try {
+      const { data } = await cachedFetch("resource-categories", () => operationsApi.listResourceCategories());
+      setCategories(data);
+      if (canManageAll) {
+        const classList = await academicsApi.listClasses();
+        setClasses(classList);
+      }
+    } catch (err: any) {
+      setLoadError(err.response?.data?.detail ?? t("failedLoadResources"));
     }
     await loadResources();
   };
@@ -204,8 +219,10 @@ export function ResourcesView() {
 
       <div className="dataTable">
         <div className="dataRow header"><span>{t("titleCol")}</span><span>{t("categoryCol")}</span><span>{t("ownerCol")}</span><span></span></div>
-        {resources.length === 0 && <p className="emptyState">{t("noResourcesYet")}</p>}
-        {resources.map((r) => (
+        {isLoading && <LoadingState />}
+        {!isLoading && loadError && <ErrorState message={loadError} />}
+        {!isLoading && !loadError && resources.length === 0 && <p className="emptyState">{t("noResourcesYet")}</p>}
+        {!isLoading && !loadError && resources.map((r) => (
           <ResourceRow
             key={r.id}
             resource={r}

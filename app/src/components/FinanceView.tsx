@@ -8,6 +8,7 @@ import { useAuth } from "../lib/AuthContext";
 import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 
 type Tab = "contributions" | "donations" | "summary";
@@ -20,10 +21,23 @@ export function FinanceView() {
   const [categories, setCategories] = useState<PaymentCategory[]>([]);
   const [categoryName, setCategoryName] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const loadCategories = async () => setCategories(await financeApi.listCategories());
   useEffect(() => {
-    void loadCategories();
+    void (async () => {
+      setIsLoading(true);
+      try {
+        await loadCategories();
+        setLoadError("");
+      } catch (err: any) {
+        setLoadError(err.response?.data?.detail ?? t("failedLoadCategories"));
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -60,9 +74,15 @@ export function FinanceView() {
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
-      {tab === "contributions" && <ContributionsTab categories={categories} canManage={canManage} />}
-      {tab === "donations" && <DonationsTab categories={categories} canManage={canManage} />}
-      {tab === "summary" && <SummaryTab />}
+      {isLoading && <LoadingState />}
+      {!isLoading && loadError && <ErrorState message={loadError} />}
+      {!isLoading && !loadError && (
+        <>
+          {tab === "contributions" && <ContributionsTab categories={categories} canManage={canManage} />}
+          {tab === "donations" && <DonationsTab categories={categories} canManage={canManage} />}
+          {tab === "summary" && <SummaryTab />}
+        </>
+      )}
     </section>
   );
 }
@@ -76,14 +96,23 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
   const [filters, setFilters] = useState({ class_id: "", category_id: "", date_from: "", date_to: "" });
   const [form, setForm] = useState({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   const load = async () => {
-    setPayments(await financeApi.listPayments({
-      class_id: filters.class_id || undefined,
-      category_id: filters.category_id || undefined,
-      date_from: filters.date_from || undefined,
-      date_to: filters.date_to || undefined,
-    }));
+    setIsLoading(true);
+    try {
+      setPayments(await financeApi.listPayments({
+        class_id: filters.class_id || undefined,
+        category_id: filters.category_id || undefined,
+        date_from: filters.date_from || undefined,
+        date_to: filters.date_to || undefined,
+      }));
+      setError("");
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedLoadContributions"));
+    } finally {
+      setIsLoading(false);
+    }
   };
   useEffect(() => {
     void load();
@@ -166,11 +195,12 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordPaymentBtn")}</button></div>
         </form>
       )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {!isLoading && error && <ErrorState message={error} />}
       <div className="dataTable">
         <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("dateCol")}</span><span>{t("notesLabel")}</span><span>{t("receiptCol")}</span></div>
-        {payments.length === 0 && <p className="emptyState">{t("noContributionsYet")}</p>}
-        {payments.map((p) => (
+        {isLoading && <LoadingState />}
+        {!isLoading && !error && payments.length === 0 && <p className="emptyState">{t("noContributionsYet")}</p>}
+        {!isLoading && !error && payments.map((p) => (
           <div className="dataRow" key={p.id}>
             <span>{students.find((s) => s.id === p.student_id)?.name ?? p.student_id}</span>
             <span>{categories.find((c) => c.id === p.category_id)?.name ?? "—"}</span>
@@ -213,13 +243,23 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
   const [donorSearch, setDonorSearch] = useState("");
   const [form, setForm] = useState({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   const load = async () => {
-    setDonors(await financeApi.listDonors());
-    setDonations(await financeApi.listDonations());
+    setIsLoading(true);
+    try {
+      setDonors(await financeApi.listDonors());
+      setDonations(await financeApi.listDonations());
+      setError("");
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedLoadDonations"));
+    } finally {
+      setIsLoading(false);
+    }
   };
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const matchingDonors = useMemo(() => {
@@ -304,11 +344,12 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordDonationBtn")}</button></div>
         </form>
       )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {!isLoading && error && <ErrorState message={error} />}
       <div className="dataTable">
         <div className="dataRow header"><span>{t("donorCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("dateCol")}</span><span>{t("notesLabel")}</span><span>{t("receiptCol")}</span></div>
-        {donations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
-        {donations.map((d) => (
+        {isLoading && <LoadingState />}
+        {!isLoading && !error && donations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
+        {!isLoading && !error && donations.map((d) => (
           <div className="dataRow" key={d.id}>
             <span>{donors.find((x) => x.id === d.donor_id)?.name ?? d.donor_id}</span>
             <span>{categories.find((c) => c.id === d.category_id)?.name ?? "—"}</span>
@@ -348,18 +389,23 @@ function SummaryTab() {
   const [range, setRange] = useState({ date_from: "", date_to: "" });
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   const load = async () => {
     setError("");
+    setIsLoading(true);
     try {
       setSummary(await financeApi.summary({ date_from: range.date_from || undefined, date_to: range.date_to || undefined }));
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedLoadSummary"));
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -369,8 +415,9 @@ function SummaryTab() {
         <label>{t("toLabel")}<Input type="date" value={range.date_to} onChange={(e) => setRange({ ...range, date_to: e.target.value })} /></label>
         <div className="formActions"><button className="secondaryAction" type="button" onClick={load}>{t("refreshBtn")}</button></div>
       </div>
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      {summary && (
+      {isLoading && <LoadingState />}
+      {!isLoading && error && <ErrorState message={error} />}
+      {!isLoading && !error && summary && (
         <>
           <div className="metricsRow" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
             <div className="metricCard"><span>{t("contributionsTab")}</span><strong>{summary.total_contributions}</strong></div>

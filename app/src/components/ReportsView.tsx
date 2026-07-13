@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../lib/AuthContext";
 import { academicsApi, type AcademicClass, type AcademicSession, reportingApi } from "../lib/endpoints";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 function ReportCard({
   title,
@@ -45,14 +46,26 @@ export function ReportsView() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    void academicsApi.listClasses().then(setClasses);
-    void academicsApi.listSessions().then((rows) => {
-      setSessions(rows);
-      const active = rows.find((s) => s.is_active);
-      if (active) setSessionId(active.id);
-    });
+    void (async () => {
+      setIsLoading(true);
+      try {
+        const [classList, sessionRows] = await Promise.all([academicsApi.listClasses(), academicsApi.listSessions()]);
+        setClasses(classList);
+        setSessions(sessionRows);
+        const active = sessionRows.find((s) => s.is_active);
+        if (active) setSessionId(active.id);
+        setLoadError("");
+      } catch (err: any) {
+        setLoadError(err.response?.data?.detail ?? t("failedLoadReportFilters"));
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const run = (fn: () => Promise<void>) => {
@@ -68,6 +81,9 @@ export function ReportsView() {
         <h2>{t("reports")}</h2>
         <p className="notice">{t("descReports")}</p>
       </div>
+
+      {isLoading && <LoadingState />}
+      {!isLoading && loadError && <ErrorState message={loadError} />}
 
       <div className="inlineForm">
         <label>{t("fromLabel")}<Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>

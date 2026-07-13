@@ -1,22 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Leave, type Student, type Teacher } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 
-function displayType(type: string | null | undefined): string {
-  if (!type) return "Unknown";
-  return `${type.charAt(0).toUpperCase()}${type.slice(1)}`;
-}
-
-function resolvePerson(record: Leave, personByUserId: Map<string, { name: string; role: string }>) {
+function resolvePerson(record: Leave, personByUserId: Map<string, { name: string; role: string }>, unknownPerson: string) {
   const fallbackPerson = personByUserId.get(record.user_id);
   return {
-    name: record.person_name ?? fallbackPerson?.name ?? "Unknown person",
+    name: record.person_name ?? fallbackPerson?.name ?? unknownPerson,
     type: record.person_type ?? fallbackPerson?.role,
   };
 }
@@ -31,6 +28,7 @@ type PersonOption = {
 };
 
 export function LeaveView() {
+  const { t } = useTranslation();
   const { hasPermission, user } = useAuth();
   const canManage = hasPermission("leave.manage");
   const [leave, setLeave] = useState<Leave[]>([]);
@@ -50,22 +48,33 @@ export function LeaveView() {
   const [searchDraft, setSearchDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const typeLabel = (type: string | null | undefined) => type ? t(`leaveType_${type}`, { defaultValue: type }) : t("unknownLabel");
+  const statusLabel = (status: string) => t(`leaveStatus_${status}`, { defaultValue: status });
 
   const load = async () => {
-    const params: Parameters<typeof operationsApi.listLeave>[0] = {};
-    if (canManage && tab !== "all") params.person_type = tab;
-    if (filters.status) params.status = filters.status;
-    if (filters.class_id) params.class_id = filters.class_id;
-    if (filters.date_from) params.date_from = filters.date_from;
-    if (filters.date_to) params.date_to = filters.date_to;
-    const hasFilters = Object.keys(params).length > 0;
-    if (hasFilters) {
-      setLeave(await operationsApi.listLeave(params));
-      return;
+    setIsLoading(true);
+    try {
+      const params: Parameters<typeof operationsApi.listLeave>[0] = {};
+      if (canManage && tab !== "all") params.person_type = tab;
+      if (filters.status) params.status = filters.status;
+      if (filters.class_id) params.class_id = filters.class_id;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to) params.date_to = filters.date_to;
+      const hasFilters = Object.keys(params).length > 0;
+      if (hasFilters) {
+        setLeave(await operationsApi.listLeave(params));
+      } else {
+        const cacheKey = canManage ? "leave:all" : `leave:${user?.id ?? "me"}`;
+        const { data } = await cachedFetch(cacheKey, () => operationsApi.listLeave());
+        setLeave(data);
+      }
+      setError("");
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedLoadLeave"));
+    } finally {
+      setIsLoading(false);
     }
-    const cacheKey = canManage ? "leave:all" : `leave:${user?.id ?? "me"}`;
-    const { data } = await cachedFetch(cacheKey, () => operationsApi.listLeave());
-    setLeave(data);
   };
 
   useEffect(() => {
@@ -120,14 +129,14 @@ export function LeaveView() {
     if (!query) return leave;
 
     return leave.filter((record) => {
-      const person = resolvePerson(record, personByUserId);
+      const person = resolvePerson(record, personByUserId, t("unknownPersonLabel"));
       return [
         person.name,
-        displayType(person.type),
+        typeLabel(person.type),
         record.start_date,
         record.end_date,
         record.reason ?? "",
-        displayType(record.status),
+        statusLabel(record.status),
       ].some((value) => value.toLowerCase().includes(query));
     });
   }, [leave, personByUserId, searchQuery]);
@@ -140,8 +149,8 @@ export function LeaveView() {
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
-        <h2>Leave</h2>
-        <p className="notice">{canManage ? "Teacher and student leave requests." : "Request leave and track its review status."}</p>
+        <h2>{t("leaveTitle")}</h2>
+        <p className="notice">{canManage ? t("leaveManageSubtitle") : t("leaveSelfSubtitle")}</p>
       </div>
 
       <form
@@ -150,7 +159,7 @@ export function LeaveView() {
           e.preventDefault();
           setError("");
           if (canManage && !form.user_id) {
-            setError("Select a person");
+            setError(t("selectPersonError"));
             return;
           }
           try {
@@ -165,14 +174,14 @@ export function LeaveView() {
             setPersonSearchDraft("");
             await load();
           } catch (err: any) {
-            setError(err.response?.data?.detail ?? "Failed to submit leave");
+            setError(err.response?.data?.detail ?? t("failedSubmitLeave"));
           }
         }}
       >
         {canManage && (
           <>
             <label>
-              Person type
+              {t("personTypeLabel")}
               <Select
                 required
                 value={personType}
@@ -181,21 +190,21 @@ export function LeaveView() {
                   resetPersonSearch();
                 }}
               >
-                <option value="">Select type...</option>
-                <option value="teacher">Teacher</option>
-                <option value="student">Student</option>
+                <option value="">{t("selectTypePlaceholder")}</option>
+                <option value="teacher">{t("leaveType_teacher")}</option>
+                <option value="student">{t("leaveType_student")}</option>
               </Select>
             </label>
             <SearchDropdown
               id="leave-person-search"
-              label="Find person"
+              label={t("findPersonLabel")}
               disabled={!personType}
-              placeholder={personType === "teacher" ? "Name or employee code" : personType === "student" ? "Name or admission #" : "Select type first"}
+              placeholder={personType === "teacher" ? t("teacherSearchPlaceholder") : personType === "student" ? t("studentSearchPlaceholder") : t("selectTypeFirst")}
               items={filteredPersonOptions}
               value={personSearchDraft}
               getKey={(person) => person.userId}
               getLabel={(person) => person.name}
-              getDescription={(person) => `${displayType(person.type)} · ${person.code}`}
+              getDescription={(person) => `${typeLabel(person.type)} · ${person.code}`}
               onQueryChange={(query) => {
                 setPersonSearchDraft(query);
                 setForm({ ...form, user_id: "" });
@@ -204,7 +213,7 @@ export function LeaveView() {
                 setPersonSearchDraft(`${person.name} (${person.code})`);
                 setForm({ ...form, user_id: person.userId });
               }}
-              emptyLabel={personType ? "No matching people" : "Select type first"}
+              emptyLabel={personType ? t("noMatchingPeople") : t("selectTypeFirst")}
             />
             {(personSearchDraft || form.user_id) && (
               <div className="headerActions">
@@ -213,54 +222,54 @@ export function LeaveView() {
                   type="button"
                   onClick={resetPersonSearch}
                 >
-                  Clear
+                  {t("clearBtn")}
                 </button>
               </div>
             )}
           </>
         )}
         <label>
-          Start
+          {t("startLabel")}
           <Input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
         </label>
         <label>
-          End
+          {t("endLabel")}
           <Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
         </label>
         <label>
-          Reason
+          {t("reasonLabel")}
           <Select required value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}>
-            <option value="">Select reason...</option>
-            <option value="Sick Leave">Sick Leave</option>
-            <option value="Casual Leave">Casual Leave</option>
-            <option value="Maternity Leave">Maternity Leave</option>
-            <option value="Paternity Leave">Paternity Leave</option>
-            <option value="Bereavement Leave">Bereavement Leave</option>
-            <option value="Unpaid Leave">Unpaid Leave</option>
-            <option value="Other">Other</option>
+            <option value="">{t("selectReasonPlaceholder")}</option>
+            <option value="Sick Leave">{t("leaveReason_sick")}</option>
+            <option value="Casual Leave">{t("leaveReason_casual")}</option>
+            <option value="Maternity Leave">{t("leaveReason_maternity")}</option>
+            <option value="Paternity Leave">{t("leaveReason_paternity")}</option>
+            <option value="Bereavement Leave">{t("leaveReason_bereavement")}</option>
+            <option value="Unpaid Leave">{t("leaveReason_unpaid")}</option>
+            <option value="Other">{t("otherLabel")}</option>
           </Select>
         </label>
         <div className="formActions">
-          <button className="primaryAction" type="submit"><Plus size={16} /> Request leave</button>
+          <button className="primaryAction" type="submit"><Plus size={16} /> {t("requestLeaveBtn")}</button>
         </div>
       </form>
 
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {!isLoading && error && <ErrorState message={error} />}
 
       {canManage && (
         <div className="filterBar">
-          <button className={tab === "all" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("all")}>All</button>
-          <button className={tab === "teacher" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teacher")}>Teachers</button>
-          <button className={tab === "student" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("student")}>Students</button>
+          <button className={tab === "all" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("all")}>{t("allLabel")}</button>
+          <button className={tab === "teacher" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teacher")}>{t("teachersLabel")}</button>
+          <button className={tab === "student" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("student")}>{t("studentsLabel")}</button>
           <Select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-            <option value="">Any status</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
+            <option value="">{t("anyStatusLabel")}</option>
+            <option value="pending">{t("leaveStatus_pending")}</option>
+            <option value="approved">{t("leaveStatus_approved")}</option>
+            <option value="rejected">{t("leaveStatus_rejected")}</option>
           </Select>
           {tab === "student" && (
             <Select value={filters.class_id} onChange={(e) => setFilters({ ...filters, class_id: e.target.value })}>
-              <option value="">All classes</option>
+              <option value="">{t("allClasses")}</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           )}
@@ -277,15 +286,15 @@ export function LeaveView() {
         }}
       >
         <label className="searchBox">
-          Search leave
+          {t("searchLeaveLabel")}
           <Input
-            placeholder="Name, type, status, date, or reason"
+            placeholder={t("searchLeavePlaceholder")}
             value={searchDraft}
             onChange={(e) => setSearchDraft(e.target.value)}
           />
         </label>
         <div className="formActions">
-          <button className="primaryAction" type="submit"><Search size={16} /> Search</button>
+          <button className="primaryAction" type="submit"><Search size={16} /> {t("searchBtn")}</button>
           {searchQuery && (
             <button
               className="secondaryAction"
@@ -295,7 +304,7 @@ export function LeaveView() {
                 setSearchQuery("");
               }}
             >
-              Clear
+              {t("clearBtn")}
             </button>
           )}
         </div>
@@ -303,22 +312,23 @@ export function LeaveView() {
 
       <div className="dataTable">
         <div className="dataRow header">
-          <span>Person</span>
-          <span>Type</span>
-          <span>Start</span>
-          <span>End</span>
-          <span>Reason</span>
-          <span>Status</span>
+          <span>{t("personLabel")}</span>
+          <span>{t("typeLabel")}</span>
+          <span>{t("startLabel")}</span>
+          <span>{t("endLabel")}</span>
+          <span>{t("reasonLabel")}</span>
+          <span>{t("statusLabel")}</span>
         </div>
-        {leave.length === 0 && <p className="emptyState">No leave records.</p>}
-        {leave.length > 0 && filteredLeave.length === 0 && <p className="emptyState">No leave records match this search.</p>}
-        {filteredLeave.map((record) => {
-          const person = resolvePerson(record, personByUserId);
+        {isLoading && <LoadingState />}
+        {!isLoading && !error && leave.length === 0 && <p className="emptyState">{t("noLeaveRecords")}</p>}
+        {!isLoading && !error && leave.length > 0 && filteredLeave.length === 0 && <p className="emptyState">{t("noLeaveSearchResults")}</p>}
+        {!isLoading && !error && filteredLeave.map((record) => {
+          const person = resolvePerson(record, personByUserId, t("unknownPersonLabel"));
 
           return (
             <div className="dataRow" key={record.id}>
               <span>{person.name}</span>
-              <span>{displayType(person.type)}</span>
+              <span>{typeLabel(person.type)}</span>
               <span>{record.start_date}</span>
               <span>{record.end_date}</span>
               <span>{record.reason || "-"}</span>
@@ -331,12 +341,12 @@ export function LeaveView() {
                       await load();
                     }}
                   >
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
+                    <option value="pending">{t("leaveStatus_pending")}</option>
+                    <option value="approved">{t("leaveStatus_approved")}</option>
+                    <option value="rejected">{t("leaveStatus_rejected")}</option>
                   </Select>
                 ) : (
-                  displayType(record.status)
+                  statusLabel(record.status)
                 )}
               </span>
             </div>

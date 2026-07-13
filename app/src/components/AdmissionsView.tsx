@@ -13,6 +13,7 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { API_BASE } from "../lib/config";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
@@ -66,9 +67,23 @@ function RegistrationsTab({ programs, canReview }: Readonly<{ programs: Program[
   const [form, setForm] = useState({ applicant_name: "", guardian_contact: "", program_id: "", date_of_birth: "", notes: "" });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const load = async () => {
-    if (canReview) setApplications(await operationsApi.listAdmissions());
+    if (!canReview) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      setApplications(await operationsApi.listAdmissions());
+      setLoadError("");
+    } catch (err: any) {
+      setLoadError(err.response?.data?.detail ?? t("failedLoadApplications"));
+    } finally {
+      setIsLoading(false);
+    }
   };
   useEffect(() => {
     void load();
@@ -125,8 +140,10 @@ function RegistrationsTab({ programs, canReview }: Readonly<{ programs: Program[
             <span>{t("statusCol")}</span>
             <span></span>
           </div>
-          {applications.length === 0 && <p className="emptyState">{t("noApplicationsYet")}</p>}
-          {applications.map((a) => (
+          {isLoading && <LoadingState />}
+          {!isLoading && loadError && <ErrorState message={loadError} />}
+          {!isLoading && !loadError && applications.length === 0 && <p className="emptyState">{t("noApplicationsYet")}</p>}
+          {!isLoading && !loadError && applications.map((a) => (
             <div className="dataRow" key={a.id}>
               <span>{a.applicant_name}</span>
               <span>{a.guardian_contact}</span>
@@ -161,10 +178,23 @@ function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
   const [form, setForm] = useState({ program_id: "", title: "", description: "" });
   const [copiedId, setCopiedId] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  const load = async () => setForms(await operationsApi.listAdmissionForms());
+  const load = async () => {
+    setIsLoading(true);
+    try {
+      setForms(await operationsApi.listAdmissionForms());
+      setLoadError("");
+    } catch (err: any) {
+      setLoadError(err.response?.data?.detail ?? t("failedLoadAdmissionForms"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const publicUrl = (token: string) => `${API_BASE}/api/v1/public/admission-forms/${token}`;
@@ -216,8 +246,10 @@ function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
           <span>{t("statusCol")}</span>
           <span></span>
         </div>
-        {forms.length === 0 && <p className="emptyState">{t("noAdmissionFormsYet")}</p>}
-        {forms.map((adm) => (
+        {isLoading && <LoadingState />}
+        {!isLoading && loadError && <ErrorState message={loadError} />}
+        {!isLoading && !loadError && forms.length === 0 && <p className="emptyState">{t("noAdmissionFormsYet")}</p>}
+        {!isLoading && !loadError && forms.map((adm) => (
           <div className="dataRow" key={adm.id}>
             <span>{adm.title}</span>
             <span>{adm.program_name ?? "—"}</span>
@@ -249,10 +281,23 @@ function AdmissionFormsTab({ programs }: Readonly<{ programs: Program[] }>) {
 function EnquiriesTab() {
   const { t } = useTranslation();
   const [enquiries, setEnquiries] = useState<ContactEnquiry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  const load = async () => setEnquiries(await operationsApi.listEnquiries());
+  const load = async () => {
+    setIsLoading(true);
+    try {
+      setEnquiries(await operationsApi.listEnquiries());
+      setLoadError("");
+    } catch (err: any) {
+      setLoadError(err.response?.data?.detail ?? t("failedLoadEnquiries"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -264,8 +309,10 @@ function EnquiriesTab() {
         <span>{t("statusCol")}</span>
         <span></span>
       </div>
-      {enquiries.length === 0 && <p className="emptyState">{t("noEnquiriesYet")}</p>}
-      {enquiries.map((e) => (
+      {isLoading && <LoadingState />}
+      {!isLoading && loadError && <ErrorState message={loadError} />}
+      {!isLoading && !loadError && enquiries.length === 0 && <p className="emptyState">{t("noEnquiriesYet")}</p>}
+      {!isLoading && !loadError && enquiries.map((e) => (
         <div className="dataRow" key={e.id}>
           <span>{e.name}</span>
           <span>{e.contact}</span>

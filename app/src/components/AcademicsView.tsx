@@ -14,6 +14,7 @@ import {
 import { peopleApi, type Teacher } from "../lib/endpoints";
 import { RolloverWizard } from "./RolloverWizard";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 
 export function AcademicsView() {
@@ -71,27 +72,35 @@ export function AcademicsView() {
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [classes, courseMapFilterClass, courseMapSearch]);
 
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
   const refreshAll = async () => {
-    const [p, c, s, t_res, ac] = await Promise.all([
-      academicsApi.listPrograms(),
-      academicsApi.listClasses(),
-      academicsApi.listSessions(),
-      peopleApi.listTeachers(),
-      academicsApi.listAllCourses(),
-    ]);
-    setPrograms(p);
-    setClasses(c);
-    setSessions(s);
-    setTeachers(t_res);
-    setAllCourses(ac);
-    const secByClass: Record<string, Section[]> = {};
-    const courseByClass: Record<string, Course[]> = {};
-    for (const cls of c) {
-      secByClass[cls.id] = await academicsApi.listSections(cls.id);
-      courseByClass[cls.id] = await academicsApi.listCourses(cls.id);
+    try {
+      const [p, c, s, t_res, ac] = await Promise.all([
+        academicsApi.listPrograms(),
+        academicsApi.listClasses(),
+        academicsApi.listSessions(),
+        peopleApi.listTeachers(),
+        academicsApi.listAllCourses(),
+      ]);
+      setPrograms(p);
+      setClasses(c);
+      setSessions(s);
+      setTeachers(t_res);
+      setAllCourses(ac);
+      const secByClass: Record<string, Section[]> = {};
+      const courseByClass: Record<string, Course[]> = {};
+      for (const cls of c) {
+        secByClass[cls.id] = await academicsApi.listSections(cls.id);
+        courseByClass[cls.id] = await academicsApi.listCourses(cls.id);
+      }
+      setSections(secByClass);
+      setCourses(courseByClass);
+      setLoadError("");
+    } catch (e: any) {
+      setLoadError(e.response?.data?.detail ?? t("failedLoadAcademics"));
     }
-    setSections(secByClass);
-    setCourses(courseByClass);
   };
 
   const handleError = (e: unknown) => {
@@ -122,7 +131,12 @@ export function AcademicsView() {
   const [editingSession, setEditingSession] = useState<AcademicSession | null>(null);
 
   useEffect(() => {
-    void refreshAll();
+    void (async () => {
+      setIsLoading(true);
+      await refreshAll();
+      setIsLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -165,7 +179,9 @@ export function AcademicsView() {
         </div>
 
         <div className="tabPanel">
-          {activeTab === "programs" && (
+          {isLoading && <LoadingState />}
+          {!isLoading && loadError && <ErrorState message={loadError} />}
+          {!isLoading && !loadError && activeTab === "programs" && (
             <>
               <h3>{t("programsHeading")}</h3>
               <form
@@ -222,7 +238,7 @@ export function AcademicsView() {
             </>
           )}
 
-          {activeTab === "classes" && (
+          {!isLoading && !loadError && activeTab === "classes" && (
             <>
               <h3>{t("classesHeading")}</h3>
               <form
@@ -324,7 +340,7 @@ export function AcademicsView() {
             </>
           )}
 
-          {activeTab === "courses" && (
+          {!isLoading && !loadError && activeTab === "courses" && (
             <>
               <h3>Courses</h3>
               <form
@@ -381,7 +397,7 @@ export function AcademicsView() {
             </>
           )}
 
-          {activeTab === "classes" && (
+          {!isLoading && !loadError && activeTab === "classes" && (
             <>
               <h3 style={{ marginTop: 24 }}>{t("sectionsCoursesHeading")}</h3>
               <form
@@ -472,7 +488,7 @@ export function AcademicsView() {
             </>
           )}
 
-          {activeTab === "sessions" && (
+          {!isLoading && !loadError && activeTab === "sessions" && (
             <>
               <h3>{t("sessionsHeading")}</h3>
               <form

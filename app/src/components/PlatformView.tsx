@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { platformApi, type FeatureFlag, type PlatformMadrasa } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Input } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 /** Super-admin console: onboard madaris + per-madrasa feature flags (§1). */
 export function PlatformView() {
@@ -16,10 +17,23 @@ export function PlatformView() {
   const [form, setForm] = useState({ name: "", slug: "", principal_username: "" });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const load = async () => setMadaris(await platformApi.listMadaris());
   useEffect(() => {
-    void load();
+    void (async () => {
+      setIsLoading(true);
+      try {
+        await load();
+        setLoadError("");
+      } catch (err: any) {
+        setLoadError(err.response?.data?.detail ?? t("failedLoadMadaris"));
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const openMadrasa = async (madrasa: PlatformMadrasa) => {
@@ -74,7 +88,10 @@ export function PlatformView() {
           <h3>{t("madarisHeading")}</h3>
           <div className="dataTable">
             <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("slugLabel")}</span><span>{t("createdCol")}</span><span></span></div>
-            {madaris.map((m) => (
+            {isLoading && <LoadingState />}
+            {!isLoading && loadError && <ErrorState message={loadError} />}
+            {!isLoading && !loadError && madaris.length === 0 && <p className="emptyState">{t("noMadarisYet")}</p>}
+            {!isLoading && !loadError && madaris.map((m) => (
               <div className="dataRow" key={m.id}>
                 <span>{m.name}</span>
                 <span>{m.slug}</span>

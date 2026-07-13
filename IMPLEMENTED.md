@@ -3,6 +3,67 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-13 — Course-mapping layout (B7-e) + loading/error rollout (§E)
+
+### Leave view i18n follow-up
+- Completed the deferred `LeaveView.tsx` localization pass: every heading,
+  field, filter, status, reason, search label, error, and empty state now uses
+  i18next with English and Urdu translations.
+
+### Dedicated class↔course mapping layout (B7-e)
+- `AcademicsView.tsx`'s Classes tab previously crammed the course list into
+  a third inline column next to sections, cramped for classes with several
+  courses. Replaced with: a course-count badge + "Manage courses" button per
+  class row, opening a new `CourseMappingModal` — a two-column assigned/
+  available course picker in a modal, same `modalOverlay`/`modalCard` idiom
+  already used by `DelegateButton.tsx`. Same `assignCourseToClass`/
+  `unassignCourseFromClass` API calls as before (including the existing
+  delete-confirm dialog on unassign) — presentation-only change.
+- New CSS: `.courseMapColumns`/`.courseMapList`/`.courseMapItem` in
+  `app/src/styles.css`.
+- New i18n keys (en+ur): `manageCoursesBtn`, `manageCoursesTitle`,
+  `assignedCoursesLabel`, `availableCoursesLabel`, `noCoursesAssignedYet`,
+  `noCoursesAvailableLabel`, `unassignBtn` (reused existing `assignBtn`/
+  `deleteRecordConfirm`), `coursesCountLabel_one`/`_other`.
+- While in the file, also wired `AcademicsView.tsx`'s top-level fetch
+  (programs/classes/sections/courses/sessions/teachers) into the shared
+  `LoadingState`/`ErrorState` pattern (was previously silent — no feedback
+  on slow load or a failed fetch).
+
+### Loading/error state rollout (§E), remaining ~15 views
+Following the exact `isLoading`/`error`(or `loadError`) + `<LoadingState/>`/
+`<ErrorState message=.../>` idiom already established in `PeopleView.tsx`/
+`AssessmentsView.tsx` (from the first pass), rolled out to every remaining
+view identified in TO_IMPLEMENT.md §E as missing it:
+- **Priority-first**: `TimetableView.tsx` (slots/classes/teachers initial
+  load — previously silently swallowed classes-fetch failures via
+  `.catch(() => undefined)`), `FinanceView.tsx` (categories load +
+  all 3 sub-tabs: contributions, donations, summary), `HolidaysView.tsx`,
+  `LeaveView.tsx`, `ResourcesView.tsx`, `FormsView.tsx`.
+- **Remainder**: `SettingsView.tsx`, `PlatformView.tsx` (madaris list, plus
+  a new `noMadarisYet` empty state that didn't exist before),
+  `BlogView.tsx`, `ReportsView.tsx` (class/session filter load —
+  non-blocking banner since most report cards don't depend on it),
+  `AdmissionsView.tsx` (all 3 tabs: registrations, admission forms,
+  enquiries), `AnnouncementsView.tsx`, `SalaryView.tsx` (both the
+  admin lookup-any-teacher view and the teacher read-only self-view).
+- Every new user-facing string (loading/error/empty labels) added through
+  i18next in both `en` and `ur` blocks of `app/src/i18n/index.ts`
+  (`failedLoad*` keys per view, `noSettingsYet`, `noMadarisYet`).
+- `ProfileView.tsx` has no data-fetching of its own (reads from
+  `AuthContext`, already populated before render) — verified, no real gap,
+  left unchanged per the "don't force a mechanical swap" guidance.
+- **Found in passing, not fixed**: `LeaveView.tsx` has zero i18next
+  integration anywhere in the file — every label, button, and status option
+  is hardcoded English with no Urdu translation, unlike every sibling view.
+  This violates the CLAUDE.md no-hardcoded-copy mandate but is a
+  pre-existing, file-wide gap well beyond this task's scope; only the one
+  new loading-error string (`failedLoadLeave`) was added through i18next
+  since it's new code. Flagged as a separate follow-up task.
+- Verified: `cd app && npx tsc --noEmit && npm run build` clean;
+  `cd backend && .venv/bin/python -m pytest tests/ -q` still 106 passed
+  (no backend touched this pass).
+
 ## 2026-07-13 — Timetable PDF export was clipped (bug report)
 
 `GET /operations/timetable/export` (and the two other `render_table_pdf`

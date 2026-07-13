@@ -6,6 +6,7 @@ import { operationsApi, type Announcement, type Scope } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { RichTextEditor } from "./RichTextEditor";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 
 function toScope(audience: string): Scope {
@@ -37,6 +38,8 @@ export function AnnouncementsView() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [dates, setDates] = useState({ date_from: "", date_to: "" });
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const knownCategories = useMemo(
     () => [...new Set(announcements.map((a) => a.category).filter(Boolean))] as string[],
@@ -44,13 +47,21 @@ export function AnnouncementsView() {
   );
 
   const load = async () => {
-    const params: Parameters<typeof operationsApi.listAnnouncements>[0] = {};
-    if (canPost && tab !== "all") params.audience = tab;
-    if (search) params.q = search;
-    if (categoryFilter) params.category = categoryFilter;
-    if (dates.date_from) params.date_from = dates.date_from;
-    if (dates.date_to) params.date_to = dates.date_to;
-    setAnnouncements(await operationsApi.listAnnouncements(params));
+    setIsLoading(true);
+    try {
+      const params: Parameters<typeof operationsApi.listAnnouncements>[0] = {};
+      if (canPost && tab !== "all") params.audience = tab;
+      if (search) params.q = search;
+      if (categoryFilter) params.category = categoryFilter;
+      if (dates.date_from) params.date_from = dates.date_from;
+      if (dates.date_to) params.date_to = dates.date_to;
+      setAnnouncements(await operationsApi.listAnnouncements(params));
+      setLoadError("");
+    } catch (err: any) {
+      setLoadError(err.response?.data?.detail ?? t("failedLoadAnnouncements"));
+    } finally {
+      setIsLoading(false);
+    }
   };
   useEffect(() => {
     void load();
@@ -181,8 +192,10 @@ export function AnnouncementsView() {
       </div>
 
       <div className="roster">
-        {announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsListYet")}</p>}
-        {announcements.map((a) => (
+        {isLoading && <LoadingState />}
+        {!isLoading && loadError && <ErrorState message={loadError} />}
+        {!isLoading && !loadError && announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsListYet")}</p>}
+        {!isLoading && !loadError && announcements.map((a) => (
           <div className="rosterRow" key={a.id} style={{ alignItems: "flex-start", cursor: "pointer", transition: "background-color 0.15s ease" }} onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}>
             <div style={{ flex: 1, padding: "0.5rem 0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

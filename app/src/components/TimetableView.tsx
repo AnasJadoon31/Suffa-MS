@@ -16,6 +16,7 @@ import {
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 const DAY_KEYS = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
 
@@ -35,23 +36,35 @@ export function TimetableView() {
   // Teachers get the grid of their own sections only (audit: Teacher-4).
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const load = async () => setSlots(await operationsApi.listTimetable());
 
   useEffect(() => {
-    void load();
-    void academicsApi.listClasses().then(async (c) => {
-      setClasses(c);
-      const secByClass: Record<string, Section[]> = {};
-      const courseByClass: Record<string, Course[]> = {};
-      for (const cls of c) {
-        secByClass[cls.id] = await academicsApi.listSections(cls.id);
-        courseByClass[cls.id] = await academicsApi.listCourses(cls.id);
+    void (async () => {
+      setIsLoading(true);
+      setLoadError("");
+      try {
+        await load();
+        const c = await academicsApi.listClasses();
+        setClasses(c);
+        const secByClass: Record<string, Section[]> = {};
+        const courseByClass: Record<string, Course[]> = {};
+        for (const cls of c) {
+          secByClass[cls.id] = await academicsApi.listSections(cls.id);
+          courseByClass[cls.id] = await academicsApi.listCourses(cls.id);
+        }
+        setSections(secByClass);
+        setCourses(courseByClass);
+        setTeachers(await peopleApi.listTeachers());
+      } catch (err: any) {
+        setLoadError(err.response?.data?.detail ?? t("failedLoadTimetable"));
+      } finally {
+        setIsLoading(false);
       }
-      setSections(secByClass);
-      setCourses(courseByClass);
-    }).catch(() => undefined);
-    void peopleApi.listTeachers().then(setTeachers).catch(() => setTeachers([]));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const myTeacherId = useMemo(
@@ -96,25 +109,32 @@ export function TimetableView() {
         )}
       </div>
 
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {isLoading && <LoadingState />}
+      {!isLoading && loadError && <ErrorState message={loadError} />}
 
-      {viewMode === "grid" && (
-        <GridView slots={visibleSlots} classes={classes} sections={sections} lockToOwn={isTeacher} />
+      {!isLoading && !loadError && (
+        <>
+          {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+
+          {viewMode === "grid" && (
+            <GridView slots={visibleSlots} classes={classes} sections={sections} lockToOwn={isTeacher} />
+          )}
+          {viewMode === "list" && !isTeacher && (
+            <ListView
+              slots={slots}
+              classes={classes}
+              sections={sections}
+              courses={courses}
+              teachers={teachers}
+              canManage={canManage}
+              onChanged={() => void load()}
+              onError={setError}
+            />
+          )}
+          {viewMode === "teachers" && !isTeacher && <ByTeacherView slots={slots} />}
+          {viewMode === "import" && canManage && <ImportView onDone={() => void load()} />}
+        </>
       )}
-      {viewMode === "list" && !isTeacher && (
-        <ListView
-          slots={slots}
-          classes={classes}
-          sections={sections}
-          courses={courses}
-          teachers={teachers}
-          canManage={canManage}
-          onChanged={() => void load()}
-          onError={setError}
-        />
-      )}
-      {viewMode === "teachers" && !isTeacher && <ByTeacherView slots={slots} />}
-      {viewMode === "import" && canManage && <ImportView onDone={() => void load()} />}
     </section>
   );
 }

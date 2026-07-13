@@ -6,6 +6,7 @@ import { operationsApi, type BlogPost } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { RichTextEditor } from "./RichTextEditor";
 import { Input } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -20,10 +21,23 @@ export function BlogView() {
   const [editing, setEditing] = useState<BlogPost | null>(null);
   const [editForm, setEditForm] = useState({ title: "", body: "" });
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const load = async () => setPosts(await operationsApi.listBlogPosts());
   useEffect(() => {
-    void load();
+    void (async () => {
+      setIsLoading(true);
+      try {
+        await load();
+        setLoadError("");
+      } catch (err: any) {
+        setLoadError(err.response?.data?.detail ?? t("failedLoadPosts"));
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startEdit = (post: BlogPost) => {
@@ -96,9 +110,11 @@ export function BlogView() {
 
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
+      {isLoading && <LoadingState />}
+      {!isLoading && loadError && <ErrorState message={loadError} />}
       <div className="blogGrid">
-        {posts.length === 0 && <p className="emptyState">{t("noPostsYet")}</p>}
-        {posts.map((p) => (
+        {!isLoading && !loadError && posts.length === 0 && <p className="emptyState">{t("noPostsYet")}</p>}
+        {!isLoading && !loadError && posts.map((p) => (
           <article className="blogCard" key={p.id}>
             <header>
               <h3>{p.title}</h3>

@@ -6,7 +6,7 @@ import { operationsApi, type FormDef, type FormFieldDefinition, type FormRespons
 import { AudiencePicker } from "./AudiencePicker";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
-
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 const FIELD_TYPES = ["text", "textarea", "radio", "checkbox_group", "dropdown", "label"];
 
@@ -23,6 +23,8 @@ export function FormsView() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
@@ -42,7 +44,17 @@ export function FormsView() {
     [forms]
   );
 
-  const load = async () => setForms(await operationsApi.listForms({ category: categoryFilter || undefined }));
+  const load = async () => {
+    setIsLoading(true);
+    try {
+      setForms(await operationsApi.listForms({ category: categoryFilter || undefined }));
+      setLoadError("");
+    } catch (err: any) {
+      setLoadError(err.response?.data?.detail ?? t("failedLoadForms"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,8 +164,10 @@ export function FormsView() {
 
       <div className="dataTable">
         <div className="dataRow header"><span>{t("titleCol")}</span><span>{t("categoryFilterLabel")}</span><span>{t("fieldsCol")}</span><span></span></div>
-        {forms.length === 0 && <p className="emptyState">{t("noFormsYet")}</p>}
-        {forms.map((f) => (
+        {isLoading && <LoadingState />}
+        {!isLoading && loadError && <ErrorState message={loadError} />}
+        {!isLoading && !loadError && forms.length === 0 && <p className="emptyState">{t("noFormsYet")}</p>}
+        {!isLoading && !loadError && forms.map((f) => (
           <div className="dataRow" key={f.id}>
             <span>{f.title}</span>
             <span>{f.category ?? "—"}</span>

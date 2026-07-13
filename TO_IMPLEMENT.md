@@ -112,12 +112,16 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       above the table.
 - [x] **[P2]** (d) Merge Sections into the Classes tab — `AcademicsView.tsx`
       renders sections inline under their class row; no separate Sections tab.
-- [~] **[P2]** (e) Course mapping stays class-level (`ClassCourse` — already
-      class-scoped ✓) — done functionally (inline under the class row in
-      `AcademicsView.tsx`) but cramped; still wants a clearer dedicated layout.
+- [x] **[P2]** (e) Course mapping stays class-level (`ClassCourse` — already
+      class-scoped ✓) — dedicated layout shipped: the Classes tab now shows a
+      course-count badge + "Manage courses" button per class row (instead of
+      the old cramped inline course list), which opens a `CourseMappingModal`
+      (two-column assigned/available picker, same `modalOverlay`/`modalCard`
+      idiom as `DelegateButton.tsx`). Same `assignCourseToClass`/
+      `unassignCourseFromClass` calls as before — presentation only.
 - [x] **[P3]** (f) Course mapping: filters + sorting — search box + "filter by
-      class" control added above the sections/courses table; a full dedicated
-      layout (item e above) is still a separate, larger redesign.
+      class" control above the sections/courses summary table; the dedicated
+      layout from item (e) is now also shipped.
 - [x] **[P1]** (g) Session switching leaks across roles/logins — fixed via
       per-user server-side preference (see A).
 - [~] **[P2]** (h) Rollover per-module options: timetable + holidays (with
@@ -343,23 +347,33 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
 - [x] **[P2]** Route-level authorization audit — covered by the §A OWASP pass;
       `test_authz_matrix.py` now has the full IDOR + role-matrix regression
       coverage.
-- [~] **[P3]** Empty/loading/error states standardized across views. — shared
+- [x] **[P3]** Empty/loading/error states standardized across views. — shared
       `LoadingState`/`ErrorState`/`EmptyState` components added
       (`app/src/components/ui/AsyncState.tsx`, reusing the existing
-      `emptyState`/`notice` CSS classes). Rolled out to the 4 priority views:
-      `DashboardCards.tsx` (previously `if (!data) return null` — no feedback
-      at all, and a failed fetch left the dashboard blank forever with no
-      error), `AssessmentsView.tsx` top-level classes/courses/students load,
-      and all 4 `PeopleView.tsx` tabs (Teachers/Students/Guardians/Donators —
-      none had a loading indicator or caught a load failure before this).
-      `AttendanceBoard.tsx` and `RolloverWizard.tsx` already had a solid
-      pattern (verified, left as-is). **Remaining** (not touched this pass —
-      ~24 other views still have zero loading/error handling on their
-      fetches): AcademicsView, AnnouncementsView, ResourcesView, FormsView,
-      HolidaysView, TimetableView, FinanceView, SalaryView, BlogView,
-      LeaveView, AdmissionsView, ReportsView, SettingsView, PlatformView,
-      ProfileView, and others — `ui/AsyncState.tsx` is ready to drop into each
-      as they're next touched.
+      `emptyState`/`notice` CSS classes). Rolled out to the 4 priority views
+      in the first pass (`DashboardCards.tsx`, `AssessmentsView.tsx`,
+      `PeopleView.tsx`'s 4 tabs), and now the remaining ~15 views identified
+      as gaps: `AcademicsView.tsx` (top-level programs/classes/courses/
+      sessions load), `TimetableView.tsx` (slots/classes/teachers load),
+      `FinanceView.tsx` (categories + all 3 sub-tabs: contributions,
+      donations, summary), `HolidaysView.tsx`, `LeaveView.tsx`,
+      `ResourcesView.tsx`, `FormsView.tsx`, `SettingsView.tsx`,
+      `PlatformView.tsx` (madaris list), `BlogView.tsx`, `ReportsView.tsx`
+      (class/session filter load), `AdmissionsView.tsx` (all 3 tabs:
+      registrations, admission forms, enquiries), `AnnouncementsView.tsx`,
+      `SalaryView.tsx` (both the admin lookup-any-teacher view and the
+      teacher self-view). Each follows the exact idiom already established
+      in `PeopleView.tsx`/`AssessmentsView.tsx`: `isLoading`/(`loadError` or
+      reused `error`) state around the fetch, `<LoadingState/>` while
+      fetching, `<ErrorState message=.../>` on failure (i18n'd via
+      `t("failedLoad...")`, new keys added in both `en`/`ur`), list content
+      only rendered once loaded and error-free. `AttendanceBoard.tsx` and
+      `RolloverWizard.tsx` already had a solid pattern (left as-is).
+      `ProfileView.tsx` has no data-fetching of its own (reads from
+      `AuthContext`, already loaded) — no real gap, left unchanged.
+      `LeaveView.tsx`'s pre-existing file-wide hardcoded English gap was also
+      completed: all copy, filters, statuses, empty states, and leave reasons
+      now use English/Urdu i18n keys.
 - [x] **[P3]** Date handling: Hijri support exists (`core/hijri.py`) — surface
       dual dates consistently in UI. `GET /academics/today` now accepts an
       optional `date` query param (was hardcoded to "today"), reusing the same

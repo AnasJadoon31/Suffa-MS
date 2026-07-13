@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { operationsApi, type TypedSetting } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
+import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 export function SettingsView() {
   const { t } = useTranslation();
@@ -14,10 +15,23 @@ export function SettingsView() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savedKey, setSavedKey] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const load = async () => setSettings(await operationsApi.settingsCatalog());
   useEffect(() => {
-    void load();
+    void (async () => {
+      setIsLoading(true);
+      try {
+        await load();
+        setLoadError("");
+      } catch (err: any) {
+        setLoadError(err.response?.data?.detail ?? t("failedLoadSettings"));
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const categories = useMemo(() => {
@@ -52,7 +66,10 @@ export function SettingsView() {
       </div>
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
-      {categories.map(([category, items]) => (
+      {isLoading && <LoadingState />}
+      {!isLoading && loadError && <ErrorState message={loadError} />}
+      {!isLoading && !loadError && categories.length === 0 && <p className="emptyState">{t("noSettingsYet")}</p>}
+      {!isLoading && !loadError && categories.map(([category, items]) => (
         <div className="modulePanel" key={category} style={{ marginBottom: 16 }}>
           <h3 className="settingsCategory">{t(`settingsCategory_${category}`, { defaultValue: category })}</h3>
           <div className="settingsList">
