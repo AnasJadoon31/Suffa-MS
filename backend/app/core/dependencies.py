@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -19,6 +19,28 @@ from app.modules.platform.models import MadrasaFeature
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="api/auth/token", auto_error=False)
+
+
+async def set_rls_context(session: AsyncSession, user: User) -> None:
+    """Set transaction-local PostgreSQL variables consumed by tenant RLS.
+
+    SQLite test databases intentionally skip this PostgreSQL-only boundary.
+    ``is_local=true`` makes pool reuse safe because values disappear when the
+    request transaction ends.
+    """
+    bind = session.get_bind()
+    if bind.dialect.name != "postgresql":
+        return
+    await session.execute(
+        text(
+            "SELECT set_config('app.current_madrasa_id', :madrasa_id, true), "
+            "set_config('app.is_super_admin', :is_super_admin, true)"
+        ),
+        {
+            "madrasa_id": str(user.madrasa_id) if user.madrasa_id else "",
+            "is_super_admin": "true" if user.role == UserRole.super_admin else "false",
+        },
+    )
 
 
 async def ensure_request_context_writable(
@@ -67,7 +89,10 @@ async def get_optional_user(
 
     stmt = select(User).where(User.id == user_id, User.status == "active")
     result = await session.execute(stmt)
-    return result.scalar_one_or_none()
+    user = result.scalar_one_or_none()
+    if user is not None:
+        await set_rls_context(session, user)
+    return user
 
 
 async def get_current_user(
@@ -94,6 +119,7 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
+    await set_rls_context(session, user)
     await ensure_request_context_writable(request, user, session)
     return user
 

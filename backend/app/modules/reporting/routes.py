@@ -13,7 +13,8 @@ from app.core.pdf import render_table_pdf
 from app.core.teaching_scope import taught_pairs
 from app.db.core_models import AuditLog
 from app.db.session import get_session
-from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section, TeacherAssignment
+from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section
+from app.modules.operations.models import TimetableSlot
 from app.modules.assessments.models import Assignment, ResultPublication, Submission
 from app.modules.assessments.routes import (
     _build_session_result,
@@ -24,7 +25,7 @@ from app.modules.attendance.models import AttendanceStatus, StudentAttendance, T
 from app.modules.attendance.routes import compute_attendance_summary
 from app.modules.auth.models import User, UserRole
 from app.modules.finance.models import Donation, Donor, Payment, PaymentCategory
-from app.modules.operations.models import Announcement, Resource, TimetableSlot
+from app.modules.operations.models import Announcement, Resource
 from app.modules.operations.routes import _active_session_id, _visible
 from app.modules.people.models import StudentProfile, TeacherProfile
 
@@ -82,17 +83,17 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
                 )
             ).scalars().all()
         )
-        assigned_class_ids = set(
+        scheduled_class_ids = set(
             (
                 await session.execute(
-                    select(TeacherAssignment.class_id).where(
-                        TeacherAssignment.madrasa_id == madrasa.id,
-                        TeacherAssignment.session_id == active_session_id,
+                    select(TimetableSlot.class_id).where(
+                        TimetableSlot.madrasa_id == madrasa.id,
+                        TimetableSlot.session_id == active_session_id,
                     )
                 )
             ).scalars().all()
         )
-        class_count = len(enrolled_class_ids | assigned_class_ids)
+        class_count = len(enrolled_class_ids | scheduled_class_ids)
         attendance_roster_count = (
             await session.execute(
                 select(func.count())

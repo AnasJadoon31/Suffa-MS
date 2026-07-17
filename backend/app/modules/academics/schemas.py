@@ -122,21 +122,6 @@ class CourseCreate(BaseModel):
     name: str
 
 
-class TeacherAssignmentCreate(BaseModel):
-    teacher_id: UUID
-    session_id: UUID
-    class_id: UUID
-    course_id: UUID
-
-
-class TeacherAssignmentRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    teacher_id: UUID
-    session_id: UUID
-    class_id: UUID
-    course_id: UUID
-
 class RolloverMapping(BaseModel):
     current_class_id: UUID
     next_class_id: UUID | None  # None indicates students should graduate (not be enrolled)
@@ -148,7 +133,6 @@ class SessionRolloverRequest(BaseModel):
     gregorian_end: date
     hijri_span: str
     class_mappings: list[RolloverMapping]
-    copy_teacher_assignments: bool = False
     # Per-module copy-or-start-fresh choices (B7-h). Everything defaults to
     # "start fresh"; tick what should carry over into the new session.
     copy_timetable: bool = False

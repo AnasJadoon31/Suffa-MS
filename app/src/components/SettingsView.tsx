@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Settings as SettingsIcon } from "lucide-react";
+import { Check, Settings as SettingsIcon, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { operationsApi, type TypedSetting } from "../lib/endpoints";
+import { filesApi, operationsApi, type TypedSetting } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
@@ -60,6 +60,32 @@ export function SettingsView() {
 
   const draftValue = (item: TypedSetting) => drafts[item.key] ?? item.value;
 
+  const uploadFile = async (item: TypedSetting, file: File) => {
+    setError("");
+    setSavedKey("");
+    try {
+      const contentType = file.type || "application/octet-stream";
+      const { object_key, upload_url } = await filesApi.presignUpload({
+        category: "settings",
+        filename: file.name,
+        content_type: contentType,
+        size_bytes: file.size,
+      });
+      const upload = await fetch(upload_url, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": contentType },
+      });
+      if (!upload.ok) throw new Error(t("failedUploadSettingFile"));
+      await operationsApi.upsertSetting(item.key, object_key);
+      setDrafts((current) => ({ ...current, [item.key]: object_key }));
+      setSavedKey(item.key);
+      await load();
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? err.message ?? t("failedUploadSettingFile"));
+    }
+  };
+
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
@@ -78,7 +104,25 @@ export function SettingsView() {
             {items.map((item) => (
               <label className="settingsRow" key={item.key}>
                 <span className="settingsLabel">{item.label}</span>
-                {item.type === "bool" ? (
+                {item.type === "file" ? (
+                  <div className="settingFileControl">
+                    {draftValue(item) && <span className="notice">{t("fileUploadedLabel")}</span>}
+                    <label className={`secondaryAction${canManage ? "" : " disabled"}`}>
+                      <Upload size={16} /> {t("chooseLogoBtn")}
+                      <input
+                        className="visuallyHidden"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        disabled={!canManage}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) void uploadFile(item, file);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : item.type === "bool" ? (
                   <Select
                     disabled={!canManage}
                     value={draftValue(item)}

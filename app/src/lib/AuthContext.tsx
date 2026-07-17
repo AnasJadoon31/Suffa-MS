@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import i18n from "../i18n";
 import { api, setAcademicSessionId } from "./api";
 import { clearLegacyApiCache, setOfflineAccountKey } from "./offlineCache";
 
@@ -44,6 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await clearLegacyApiCache();
       const res = await api.get("/api/v1/auth/me");
+      const language = res.data.user?.preferred_language === "ur" ? "ur" : "en";
+      await i18n.changeLanguage(language);
+      document.documentElement.dir = language === "ur" ? "rtl" : "ltr";
+      document.documentElement.lang = language;
       setOfflineAccountKey(res.data.madrasa?.id ?? null, res.data.user?.id ?? null);
       setUser(res.data.user);
       setMadrasa(res.data.madrasa);

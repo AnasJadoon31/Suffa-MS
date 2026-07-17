@@ -34,19 +34,24 @@ def _client():
     )
 
 
-def build_object_key(category: str, filename: str) -> str:
+def build_object_key(madrasa_id: uuid.UUID, category: str, filename: str) -> str:
     safe_category = _SAFE_SEGMENT.sub("-", category).strip("-") or "misc"
     raw_suffix = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
     suffix = raw_suffix.lower() if _SAFE_EXTENSION.match(raw_suffix) else "bin"
-    return f"{safe_category}/{uuid.uuid4().hex}.{suffix}"
+    return f"madrasas/{madrasa_id}/{safe_category}/{uuid.uuid4().hex}.{suffix}"
 
 
-def assert_upload_allowed(content_type: str, size_bytes: int | None) -> None:
+def object_key_belongs_to_madrasa(object_key: str, madrasa_id: uuid.UUID) -> bool:
+    """Return whether an object key is inside this tenant's exact namespace."""
+    return object_key.startswith(f"madrasas/{madrasa_id}/")
+
+
+def assert_upload_allowed(content_type: str, size_bytes: int) -> None:
     """Validates the declared content-type/size against the configured
     allowlist/cap before a presigned URL is minted (OWASP A04/A08)."""
     if content_type not in settings.upload_allowed_content_types:
         raise UploadRejected(f"Content type '{content_type}' is not allowed for upload")
-    if size_bytes is not None and size_bytes > settings.upload_max_size_bytes:
+    if size_bytes > settings.upload_max_size_bytes:
         raise UploadRejected(
             f"File exceeds the maximum allowed size of {settings.upload_max_size_bytes} bytes"
         )
@@ -55,16 +60,13 @@ def assert_upload_allowed(content_type: str, size_bytes: int | None) -> None:
 def presign_upload_url(
     object_key: str,
     content_type: str,
+    size_bytes: int,
     expires_in: int = 900,
-    size_bytes: int | None = None,
 ) -> str:
     params = {"Bucket": settings.s3_bucket, "Key": object_key, "ContentType": content_type}
-    if size_bytes is not None:
-        # Pins the signature to this exact Content-Length; the client's PUT
-        # must send a matching header or S3 rejects the request. Combined
-        # with the presign-time size cap above this bounds what can land in
-        # the bucket without requiring a frontend switch to presigned POST.
-        params["ContentLength"] = size_bytes
+    # Pins the signature to this exact Content-Length; the client's PUT must
+    # send a matching value or S3 rejects the request.
+    params["ContentLength"] = size_bytes
     return _client().generate_presigned_url(
         "put_object",
         Params=params,

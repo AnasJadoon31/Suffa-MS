@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
-from .models import AcademicSession, Enrollment, Section, TeacherAssignment
+from .models import AcademicSession, Enrollment, Section
 from .schemas import SessionRolloverRequest
 
 
@@ -110,21 +110,6 @@ async def perform_rollover(
                 )
                 session.add(new_enrollment)
                 
-    if payload.copy_teacher_assignments:
-        assignments_stmt = select(TeacherAssignment).where(TeacherAssignment.session_id == current_session_id)
-        assignments_result = await session.execute(assignments_stmt)
-        old_assignments = assignments_result.scalars().all()
-
-        for old_assignment in old_assignments:
-            new_assignment = TeacherAssignment(
-                madrasa_id=madrasa_id,
-                teacher_id=old_assignment.teacher_id,
-                session_id=new_session.id,
-                class_id=old_assignment.class_id,
-                course_id=old_assignment.course_id
-            )
-            session.add(new_assignment)
-
     if payload.copy_timetable:
         # Timetables belong to classes, which persist across sessions — copy
         # slots verbatim under the new session id (IMPLEMENT.md §10).

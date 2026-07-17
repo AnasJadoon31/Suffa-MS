@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.audit import record_audit
 from app.core.dependencies import get_context_session, get_current_madrasa, get_current_user, require_permission, user_has_permission
 from app.core.error_codes import ErrorCode
-from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars, paginate_sequence
 from app.core.teaching_scope import taught_class_ids, taught_pairs
 from app.db.session import get_session
 from app.modules.auth.models import User, UserRole
@@ -179,7 +179,7 @@ async def _teacher_assignment_class_ids(
     teacher_id = await _current_teacher_id(current_user, session, madrasa_id)
     if teacher_id is None:
         return set()
-    # Timetable slots ∪ legacy TeacherAssignment rows (IMPLEMENT.md §4).
+    # Timetable slots are the sole source of teaching scope.
     return await taught_class_ids(
         session, madrasa_id=madrasa_id, teacher_id=teacher_id, session_id=session_id
     )
@@ -232,13 +232,17 @@ async def _assert_can_mark_entry(
 
 @router.get("/classes", response_model=list[AttendanceClassRead])
 async def attendance_classes(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[AttendanceClassRead]:
     await _require_student_attendance_access(current_user, session)
     active_session = await _active_session(session, madrasa.id)
     if active_session is None:
+        response.headers["X-Total-Count"] = "0"
         return []
 
     is_global = await _has_global_student_attendance_access(current_user, session)
@@ -248,6 +252,7 @@ async def attendance_classes(
     if not is_global:
         teacher_id = await _current_teacher_id(current_user, session, madrasa.id)
         if teacher_id is None:
+            response.headers["X-Total-Count"] = "0"
             return []
         pairs = await taught_pairs(
             session, madrasa_id=madrasa.id, teacher_id=teacher_id, session_id=active_session.id
@@ -255,12 +260,14 @@ async def attendance_classes(
         assigned_class_ids = {pair.class_id for pair in pairs}
         assigned_course_ids = {pair.course_id for pair in pairs}
         if not assigned_class_ids:
+            response.headers["X-Total-Count"] = "0"
             return []
         class_stmt = class_stmt.where(AcademicClass.id.in_(assigned_class_ids))
 
     class_rows = (await session.execute(class_stmt.order_by(AcademicClass.name))).all()
     class_ids = [row[0] for row in class_rows]
     if not class_ids:
+        response.headers["X-Total-Count"] = "0"
         return []
 
     count_rows = (
@@ -293,7 +300,7 @@ async def attendance_classes(
     for class_id, course_name in course_rows:
         course_names[class_id].append(course_name)
 
-    return [
+    return paginate_sequence([
         AttendanceClassRead(
             id=class_id,
             name=class_name,
@@ -301,7 +308,7 @@ async def attendance_classes(
             student_count=student_counts.get(class_id, 0),
         )
         for class_id, class_name in class_rows
-    ]
+    ], limit=limit, offset=offset, response=response)
 
 
 @router.get("/classes/{class_id}/roster", response_model=AttendanceRosterResponse)

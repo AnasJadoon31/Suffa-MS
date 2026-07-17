@@ -28,10 +28,10 @@ from app.modules.academics.models import (
     Madrasa,
     Program,
     Section,
-    TeacherAssignment,
 )
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
 from app.modules.people.models import StudentProfile, TeacherProfile
+from app.modules.operations.models import TimetableSlot
 
 
 @pytest.fixture
@@ -148,9 +148,10 @@ async def seed(db_sessionmaker):
             students.append(student)
 
         db.add(
-            TeacherAssignment(
+            TimetableSlot(
                 madrasa_id=mid, teacher_id=teacher.id, session_id=old_session.id,
-                class_id=class_a.id, course_id=course.id,
+                class_id=class_a.id, section_id=sec_a1.id, course_id=course.id,
+                day_of_week=6, period=1, start_time="16:00", end_time="16:40",
             )
         )
         await db.commit()

@@ -1,36 +1,14 @@
 import { CalendarDays, Languages, Menu } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType, type LazyExoticComponent } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
-import { AcademicsView } from "./components/AcademicsView";
-import { AdmissionsView } from "./components/AdmissionsView";
-import { AnnouncementsView } from "./components/AnnouncementsView";
-import { AssessmentsView } from "./components/AssessmentsView";
-import { AttendanceBoard } from "./components/AttendanceBoard";
-import { BlogView } from "./components/BlogView";
-import { DashboardCards } from "./components/DashboardCards";
-import { FinanceView } from "./components/FinanceView";
-import { FormsView } from "./components/FormsView";
-import { HolidaysView } from "./components/HolidaysView";
-import { LeaveView } from "./components/LeaveView";
 import { LoginScreen } from "./components/LoginScreen";
-import { PeopleView } from "./components/PeopleView";
-import { PlatformView } from "./components/PlatformView";
-import { ProfileView } from "./components/ProfileView";
-import { ReportsView } from "./components/ReportsView";
-import { ResourcesView } from "./components/ResourcesView";
-import { SalaryView } from "./components/SalaryView";
-import { SettingsView } from "./components/SettingsView";
 import { DelegateButton } from "./components/DelegateButton";
 import { SessionReadOnlyBanner, SessionSwitcher } from "./components/SessionSwitcher";
-import { SetPasswordPage } from "./components/SetPasswordPage";
 import { initialsOf, RoleBadge, Sidebar } from "./components/Sidebar";
-import { TimetableView } from "./components/TimetableView";
-import { MyAssessmentsView } from "./components/MyAssessmentsView";
-import { MyAttendanceView } from "./components/MyAttendanceView";
-import { MyTimetableView } from "./components/MyTimetableView";
 import { NotFoundView } from "./components/NotFoundView";
+import { LoadingState } from "./components/ui/AsyncState";
 import { useAuth } from "./lib/AuthContext";
 import { academicsApi } from "./lib/endpoints";
 import {
@@ -42,6 +20,37 @@ import {
   type PortalRoute,
   type ViewId,
 } from "./data/mockData";
+
+const lazyNamed = <T extends Record<string, unknown>, K extends keyof T>(
+  loader: () => Promise<T>,
+  name: K,
+): LazyExoticComponent<Extract<T[K], ComponentType<any>>> => lazy(async () => ({
+  default: (await loader())[name] as Extract<T[K], ComponentType<any>>,
+}));
+
+const AcademicsView = lazyNamed(() => import("./components/AcademicsView"), "AcademicsView");
+const AdmissionsView = lazyNamed(() => import("./components/AdmissionsView"), "AdmissionsView");
+const AnnouncementsView = lazyNamed(() => import("./components/AnnouncementsView"), "AnnouncementsView");
+const AssessmentsView = lazyNamed(() => import("./components/AssessmentsView"), "AssessmentsView");
+const AttendanceBoard = lazyNamed(() => import("./components/AttendanceBoard"), "AttendanceBoard");
+const BlogView = lazyNamed(() => import("./components/BlogView"), "BlogView");
+const DashboardCards = lazyNamed(() => import("./components/DashboardCards"), "DashboardCards");
+const FinanceView = lazyNamed(() => import("./components/FinanceView"), "FinanceView");
+const FormsView = lazyNamed(() => import("./components/FormsView"), "FormsView");
+const HolidaysView = lazyNamed(() => import("./components/HolidaysView"), "HolidaysView");
+const LeaveView = lazyNamed(() => import("./components/LeaveView"), "LeaveView");
+const MyAssessmentsView = lazyNamed(() => import("./components/MyAssessmentsView"), "MyAssessmentsView");
+const MyAttendanceView = lazyNamed(() => import("./components/MyAttendanceView"), "MyAttendanceView");
+const MyTimetableView = lazyNamed(() => import("./components/MyTimetableView"), "MyTimetableView");
+const PeopleView = lazyNamed(() => import("./components/PeopleView"), "PeopleView");
+const PlatformView = lazyNamed(() => import("./components/PlatformView"), "PlatformView");
+const ProfileView = lazyNamed(() => import("./components/ProfileView"), "ProfileView");
+const ReportsView = lazyNamed(() => import("./components/ReportsView"), "ReportsView");
+const ResourcesView = lazyNamed(() => import("./components/ResourcesView"), "ResourcesView");
+const SalaryView = lazyNamed(() => import("./components/SalaryView"), "SalaryView");
+const SetPasswordPage = lazyNamed(() => import("./components/SetPasswordPage"), "SetPasswordPage");
+const SettingsView = lazyNamed(() => import("./components/SettingsView"), "SettingsView");
+const TimetableView = lazyNamed(() => import("./components/TimetableView"), "TimetableView");
 
 // Screen → permission modules, for the per-screen "Delegate…" control (§3).
 const VIEW_MODULES: Partial<Record<ViewId, string[]>> = {
@@ -60,13 +69,14 @@ const VIEW_MODULES: Partial<Record<ViewId, string[]>> = {
   enquiries: ["admissions"],
   finance: ["finance"],
   salary: ["finance"],
+  reports: ["attendance", "assessments", "finance"],
   blog: ["web"],
   settings: ["settings"],
 };
 
 function Workspace() {
   const { t, i18n } = useTranslation();
-  const { isAuthenticated, isLoading, user, madrasa, hasPermission, hasFeature } = useAuth();
+  const { isAuthenticated, isLoading, user, madrasa, hasPermission, hasFeature, updateProfile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
@@ -86,10 +96,20 @@ function Workspace() {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!user) return;
+    const language = user.preferred_language === "ur" ? "ur" : "en";
+    if (i18n.language !== language) void i18n.changeLanguage(language);
+    document.documentElement.dir = language === "ur" ? "rtl" : "ltr";
+    document.documentElement.lang = language;
+  }, [i18n, user]);
+
   async function toggleLanguage(): Promise<void> {
-    await i18n.changeLanguage(isUrdu ? "en" : "ur");
-    document.documentElement.dir = isUrdu ? "ltr" : "rtl";
-    document.documentElement.lang = isUrdu ? "en" : "ur";
+    const language = isUrdu ? "en" : "ur";
+    await i18n.changeLanguage(language);
+    document.documentElement.dir = language === "ur" ? "rtl" : "ltr";
+    document.documentElement.lang = language;
+    await updateProfile({ preferred_language: language });
   }
 
   function renderRoute(route: PortalRoute) {
@@ -195,7 +215,7 @@ function Workspace() {
   }
 
   if (isLoading) {
-    return <div className="loading-screen">Loading...</div>;
+    return <div className="loading-screen">{t("loadingLabel")}</div>;
   }
 
   if (!isAuthenticated) {
@@ -218,9 +238,10 @@ function Workspace() {
 
   return (
     <main className="appShell">
+      <a className="skipLink" href="#main-content">{t("skipToContent")}</a>
       <Sidebar onNavigate={() => setNavOpen(false)} mobileOpen={navOpen} />
       {navOpen && <div className="navOverlay" onClick={() => setNavOpen(false)} />}
-      <section className="workspace">
+      <section className="workspace" id="main-content" tabIndex={-1}>
         <header className="topbar">
           <button
             className="iconButton navToggle"
@@ -262,17 +283,19 @@ function Workspace() {
           </div>
         </header>
         <SessionReadOnlyBanner />
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          {portalRoutes.map((route) => (
-            <Route
-              key={route.key}
-              path={route.path}
-              element={isPortalRouteAccessible(route, user?.role, hasPermission, hasFeature) ? renderRoute(route) : <NotFoundView />}
-            />
-          ))}
-          <Route path="*" element={<NotFoundView />} />
-        </Routes>
+        <Suspense fallback={<LoadingState />}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            {portalRoutes.map((route) => (
+              <Route
+                key={route.key}
+                path={route.path}
+                element={isPortalRouteAccessible(route, user?.role, hasPermission, hasFeature) ? renderRoute(route) : <NotFoundView />}
+              />
+            ))}
+            <Route path="*" element={<NotFoundView />} />
+          </Routes>
+        </Suspense>
       </section>
     </main>
   );
@@ -280,9 +303,11 @@ function Workspace() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/set-password" element={<SetPasswordPage />} />
-      <Route path="*" element={<Workspace />} />
-    </Routes>
+    <Suspense fallback={<LoadingState />}>
+      <Routes>
+        <Route path="/set-password" element={<SetPasswordPage />} />
+        <Route path="*" element={<Workspace />} />
+      </Routes>
+    </Suspense>
   );
 }

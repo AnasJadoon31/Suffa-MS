@@ -15,7 +15,7 @@ Rules:
 - If no targeting key is present the item is visible to anyone passing the
   role gate. Otherwise at least one targeting rule must match the viewer:
   students match via their enrollment (class, section, and the class's
-  courses); teachers via what they teach (timetable ∪ legacy assignments);
+  courses); teachers via what they teach in the timetable;
   ``users`` matches explicit user ids. The principal always sees everything.
 """
 from dataclasses import dataclass, field

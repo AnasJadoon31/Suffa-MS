@@ -17,8 +17,8 @@ import { Select } from "./ui/Field";
 /**
  * "Mini-admin" delegation (IMPLEMENT.md §3): principals drop this button into
  * any screen header to grant that screen's feature codes to a teacher —
- * whole-madrasa or scoped to one class. Grants replace the teacher's full
- * grant set, so the modal loads existing grants first and edits on top.
+ * whole-madrasa or scoped to one class. Editing a scope preserves every grant
+ * outside that exact screen/scope combination.
  */
 export function DelegateButton({ modules }: Readonly<{ modules: string[] }>) {
   const { t } = useTranslation();
@@ -61,19 +61,24 @@ function DelegateModal({ modules, onClose }: Readonly<{ modules: string[]; onClo
   );
 
   useEffect(() => {
-    setSelected(new Set());
     setExisting([]);
     if (!teacherUserId) return;
     void authApi.userPermissions(teacherUserId).then((grants) => {
       setExisting(grants);
-      setSelected(new Set(
-        grants
-          .filter((g) => g.scope_type === null && relevant.some((p) => p.code === g.permission_code))
-          .map((g) => g.permission_code)
-      ));
     }).catch(() => setExisting([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teacherUserId, relevant.length]);
+  }, [teacherUserId]);
+
+  useEffect(() => {
+    setSelected(new Set(
+      relevant
+        .filter((permission) => existing.some((grant) =>
+          grant.permission_code === permission.code
+          && grant.scope_type === (permission.scoped && scopeClassId ? "class" : null)
+          && grant.scope_id === (permission.scoped && scopeClassId ? scopeClassId : null)
+        ))
+        .map((permission) => permission.code)
+    ));
+  }, [existing, relevant, scopeClassId]);
 
   const toggle = (code: string) =>
     setSelected((prev) => {
@@ -87,19 +92,41 @@ function DelegateModal({ modules, onClose }: Readonly<{ modules: string[]; onClo
     setError("");
     setNotice("");
     try {
-      // Preserve every grant outside this screen's modules untouched.
+      const definitions = new Map(relevant.map((permission) => [permission.code, permission]));
+      // Preserve grants outside this screen and scoped grants belonging to a
+      // different class. Non-scopable permissions are always edited globally.
       const untouched = existing
-        .filter((g) => !relevant.some((p) => p.code === g.permission_code))
+        .filter((grant) => {
+          const permission = definitions.get(grant.permission_code);
+          if (!permission) return true;
+          if (!permission.scoped) return false;
+          const activeType = scopeClassId ? "class" : null;
+          const activeId = scopeClassId || null;
+          return grant.scope_type !== activeType || grant.scope_id !== activeId;
+        })
         .map((g) => ({
           code: g.permission_code,
           scope_type: (g.scope_type as "class" | "section" | null) ?? undefined,
           scope_id: g.scope_id ?? undefined,
         }));
-      const updated = [...selected].map((code) => ({
-        code,
-        ...(scopeClassId ? { scope_type: "class" as const, scope_id: scopeClassId } : {}),
-      }));
-      await authApi.setGrants(teacherUserId, [...untouched, ...updated]);
+      const updated = [...selected].map((code) => {
+        const permission = definitions.get(code);
+        return {
+          code,
+          ...(permission?.scoped && scopeClassId
+            ? { scope_type: "class" as const, scope_id: scopeClassId }
+            : {}),
+        };
+      });
+      const next = [...untouched, ...updated];
+      await authApi.setGrants(teacherUserId, next);
+      setExisting(next.map((grant) => ({
+        permission_code: grant.code,
+        scope_type: grant.scope_type ?? null,
+        scope_id: grant.scope_id ?? null,
+        granted_by_id: "",
+        created_at: "",
+      })));
       setNotice(t("delegateSaved"));
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("delegateFailed"));
@@ -127,19 +154,24 @@ function DelegateModal({ modules, onClose }: Readonly<{ modules: string[]; onClo
 
         {teacherUserId && (
           <>
-            <label style={{ display: "block", marginBottom: 12 }}>
-              {t("delegateScopeLabel")}
-              <Select value={scopeClassId} onChange={(e) => setScopeClassId(e.target.value)}>
-                <option value="">{t("wholeMadrasaOption")}</option>
-                {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
-            </label>
+            {relevant.some((permission) => permission.scoped) && (
+              <label style={{ display: "block", marginBottom: 12 }}>
+                {t("delegateScopeLabel")}
+                <Select value={scopeClassId} onChange={(e) => setScopeClassId(e.target.value)}>
+                  <option value="">{t("wholeMadrasaOption")}</option>
+                  {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </label>
+            )}
 
             <div className="delegateList">
               {relevant.map((p) => (
                 <label key={p.code} className="checkboxLabel">
                   <input type="checkbox" checked={selected.has(p.code)} onChange={() => toggle(p.code)} />
-                  {p.label} <small className="notice">({p.code})</small>
+                  <span>
+                    {p.label} <small className="notice">({p.code})</small>
+                    {!p.scoped && <small className="notice"> · {t("madrasaWideOnly")}</small>}
+                  </span>
                 </label>
               ))}
               {relevant.length === 0 && <p className="emptyState">{t("noDelegatablePermissions")}</p>}

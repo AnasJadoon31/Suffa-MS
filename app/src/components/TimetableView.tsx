@@ -41,7 +41,7 @@ export function TimetableView({ mode = "grid", onModeChange }: Readonly<{ mode?:
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  const load = async () => setSlots(await operationsApi.listTimetable());
+  const load = async () => setSlots(await (isTeacher ? operationsApi.listMyTimetable() : operationsApi.listTimetable()));
 
   useEffect(() => {
     void (async () => {
@@ -59,7 +59,7 @@ export function TimetableView({ mode = "grid", onModeChange }: Readonly<{ mode?:
         }
         setSections(secByClass);
         setCourses(courseByClass);
-        setTeachers(await peopleApi.listTeachers());
+        if (!isTeacher) setTeachers(await peopleApi.listTeachers());
       } catch (err: any) {
         setLoadError(err.response?.data?.detail ?? t("failedLoadTimetable"));
       } finally {
@@ -69,14 +69,7 @@ export function TimetableView({ mode = "grid", onModeChange }: Readonly<{ mode?:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const myTeacherId = useMemo(
-    () => teachers.find((teacher) => teacher.user_id === user?.id)?.id ?? null,
-    [teachers, user?.id]
-  );
-  const visibleSlots = useMemo(
-    () => (isTeacher && myTeacherId ? slots.filter((s) => s.teacher_id === myTeacherId) : slots),
-    [slots, isTeacher, myTeacherId]
-  );
+  const visibleSlots = slots;
 
   return (
     <section className="modulePanel">

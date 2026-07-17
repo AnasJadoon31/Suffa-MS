@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, ClipboardList, Copy, Plus, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardList, Copy, Plus, Trash2, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -264,6 +264,22 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
                 }}
               >
                 {adm.is_open ? t("closeFormBtn") : t("reopenFormBtn")}
+              </button>}
+              {canMutate && <button
+                className="tableAction danger"
+                type="button"
+                aria-label={t("deleteAdmissionFormBtn")}
+                onClick={async () => {
+                  if (!window.confirm(t("deleteAdmissionFormConfirm"))) return;
+                  try {
+                    await operationsApi.deleteAdmissionForm(adm.id);
+                    await load();
+                  } catch (err: any) {
+                    setError(err.response?.data?.detail ?? t("failedDeleteAdmissionForm"));
+                  }
+                }}
+              >
+                <Trash2 size={14} /> {t("deleteBtn")}
               </button>}
             </span>
           </div>

@@ -15,10 +15,11 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
 - [x] **[P1] Complete Urdu i18n.** Every view now renders through i18next
       (en + ur); RTL flips with the language toggle. Remaining niceties:
       per-view namespace split + ESLint no-literal-string rule (IMPLEMENT §2).
-- [x] **[P1] Names, not UUIDs.** Audited every screen; timetable/assessments/
-      results already used `*_name` fields. One real leak found and fixed:
-      `FormsView.tsx` response table rendered raw `student_id` — backend now
-      joins `student_name` onto `FormResponseRead`.
+- [x] **[P1] Names, not UUIDs.** Re-audited every screen and corrected checked
+      but incomplete cases: form responses and locked-attendance rows now resolve
+      student names; finance payments/donations return batched student/donor and
+      category names; assignment submissions return student names. The UI uses
+      localized unknown-value fallbacks instead of exposing identifier strings.
 - [x] **[P2] Progressive Web App.** vite-plugin-pwa (autoUpdate SW, manifest,
       icons, network-first API read cache), mobile navbar drawer, dashboard
       quick-links grid, checkbox/touch sizing fixed.
@@ -50,7 +51,11 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       security headers verified, public-form CSRF posture confirmed
       (honeypot + rate limit is the intended mitigation, unauthenticated by
       design), `pip-audit` run (starlette CVEs need a coordinated FastAPI
-      major bump — flagged, not attempted here).
+      major bump — flagged, not attempted here). The follow-up re-audit added
+      PostgreSQL row-level security (including indirect tenant joins),
+      transaction-local tenant context, tenant-prefixed object keys with exact
+      signed upload sizes, cross-tenant download rejection, and draft-safe
+      authenticated blog listings.
 - [x] **[P1] Per-role/per-login session selection.** Now a server-side per-user
       preference (`users.selected_session_id`) + in-memory header; shared
       localStorage key removed.
@@ -65,7 +70,9 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
 - [x] **[P2]** Per-screen "Assign to teachers…" control — `DelegateButton.tsx`
       (principal-only, class-scope picker) wired into every screen in
       `App.tsx`'s `VIEW_MODULES`; teacher portal renders delegated screens via
-      `hasPermission` nav/route gating.
+      `hasPermission` nav/route gating. Re-audit fixed scope editing so changing
+      one module/scope preserves unrelated grants, non-scopable permissions are
+      always madrasa-wide, and backend validation rejects cross-tenant targets.
 
 ### B2. Attendance
 - [x] **[P2]** Admin override of *teacher* attendance —
@@ -257,7 +264,8 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       + validated writes — `SettingsView.tsx` renders it (category-grouped,
       `settings.manage`-gated).
 - [x] **[P2]** Madrasa details + logo + per-role idle timeouts — catalogue
-      keys exist and render in `SettingsView.tsx`.
+      keys render in `SettingsView.tsx`; logo fields now use an image picker,
+      secured presigned upload, and persist the resulting tenant object key.
 - [x] **[P2]** Feature-flag section is super-admin-only — `SettingsView.tsx`
       never renders flags at all (they only exist in the super-admin-only
       `PlatformView.tsx`), so the separation is structural, not a toggle.
@@ -383,13 +391,16 @@ Legend: **[P1]** blocking/broken · **[P2]** major missing feature · **[P3]** U
       also migrated to `hijridate` earlier this session to clear the
       deprecation warning — CLAUDE.md mandate.)
 - [x] **[P2]** Pagination — `limit`/`offset` query params + `X-Total-Count`
-      header added across all list endpoints (academics, assessments,
-      attendance, finance, messaging, operations, people, platform); response
+      header added across every GET endpoint whose response model is a list
+      (auth, academics, assessments, attendance, finance, messaging,
+      operations, people, platform, public and settings); response
       body shape unchanged. Shared frontend page helpers and accessible controls
       now consume those headers in the highest-growth management lists: teachers,
       students, guardians, assignments, registrations, public admission forms,
       and enquiries. Every remaining array-list client uses bounded automatic
       page traversal, so no view silently loses records beyond the first page.
+      An introspection regression test prevents new list endpoints from omitting
+      the pagination contract.
 - [x] **[P3]** Toast/confirm patterns for destructive actions (delete assessment,
       delete slot…). — audited every `api.delete*`/`*Api.delete*` call site
       (8 files). Genuine gaps fixed: `TimetableView.tsx` slot delete had *no*

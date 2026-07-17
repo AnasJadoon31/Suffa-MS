@@ -58,6 +58,7 @@ function wasCapturedOffline(entry: AttendanceLogEntry): boolean {
 }
 
 function TeacherAttendancePanel() {
+  const { t } = useTranslation();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [teacherSearch, setTeacherSearch] = useState("");
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
@@ -75,10 +76,10 @@ function TeacherAttendancePanel() {
         setLogs(await attendanceApi.teacherHistory(selectedTeacherId ? { teacher_id: selectedTeacherId } : undefined));
       } catch (err: any) {
         setLogs([]);
-        setError(err.response?.data?.detail ?? "Could not load teacher attendance");
+        setError(err.response?.data?.detail ?? t("failedLoadTeacherAttendance"));
       }
     })();
-  }, [selectedTeacherId]);
+  }, [selectedTeacherId, t]);
 
   const matchingTeachers = teachers.filter((teacher) => {
     const query = teacherSearch.trim().toLowerCase();
@@ -89,14 +90,14 @@ function TeacherAttendancePanel() {
   return (
     <section className="modulePanel">
       <div className="moduleHeader">
-        <h2>Teacher attendance</h2>
-        <p className="notice">Time-in/time-out logs for teachers.</p>
+        <h2>{t("teacherAttendanceHeading")}</h2>
+        <p className="notice">{t("teacherAttendanceDescription")}</p>
       </div>
       <div className="moduleToolbar">
         <SearchDropdown
           id="teacher-attendance-search"
-          label="Teacher"
-          placeholder="Search teacher name or code"
+          label={t("teacherLabel")}
+          placeholder={t("searchTeacherPlaceholder")}
           items={matchingTeachers}
           value={teacherSearch}
           getKey={(teacher) => teacher.id}
@@ -110,7 +111,7 @@ function TeacherAttendancePanel() {
             setTeacherSearch(`${teacher.name} (${teacher.employee_code})`);
             setSelectedTeacherId(teacher.id);
           }}
-          emptyLabel="No matching teachers"
+          emptyLabel={t("noMatchingTeachers")}
         />
         {(teacherSearch || selectedTeacherId) && (
           <div className="formActions">
@@ -122,7 +123,7 @@ function TeacherAttendancePanel() {
                 setSelectedTeacherId("");
               }}
             >
-              Clear
+              {t("clearBtn")}
             </button>
           </div>
         )}
@@ -130,14 +131,14 @@ function TeacherAttendancePanel() {
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <div className="dataTable">
         <div className="dataRow header">
-          <span>Teacher</span>
-          <span>Date</span>
-          <span>Status</span>
-          <span>Time in</span>
-          <span>Time out</span>
-          <span>Marked by</span>
+          <span>{t("teacherLabel")}</span>
+          <span>{t("dateCol")}</span>
+          <span>{t("statusCol")}</span>
+          <span>{t("timeInLabel")}</span>
+          <span>{t("timeOutLabel")}</span>
+          <span>{t("markedByCol")}</span>
         </div>
-        {logs.length === 0 && <p className="emptyState">No teacher attendance logs yet.</p>}
+        {logs.length === 0 && <p className="emptyState">{t("noTeacherAttendanceLogs")}</p>}
         {logs.map((entry) => (
           <div className="dataRow" key={entry.id}>
             <span>
@@ -145,7 +146,7 @@ function TeacherAttendancePanel() {
               <small>{entry.employee_code}</small>
             </span>
             <span>{entry.attendance_date}</span>
-            <span>{entry.status}</span>
+            <span>{t(entry.status)}</span>
             <span>{formatTime(entry.check_in)}</span>
             <span>{formatTime(entry.check_out)}</span>
             <span>
@@ -231,7 +232,7 @@ function AttendanceHistoryTable({
           )}
           <span>
             <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
-            {entry.source === "approved_leave" && <small className="syncBadge">Approved leave</small>}
+            {entry.source === "approved_leave" && <small className="syncBadge">{t("approvedLeaveLabel")}</small>}
             {entry.overridden && <small className="syncBadge">{t("overriddenLabel")}</small>}
           </span>
           <span>
@@ -297,7 +298,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   }, [searchParams]);
 
   async function handleOverride(entry: (typeof lockedEntries)[number]): Promise<void> {
-    const reason = window.prompt(t("overrideReasonPrompt") ?? "Reason for overriding locked attendance day:");
+    const reason = window.prompt(t("overrideReasonPrompt"));
     if (!reason) return;
     await overrideEntry(entry, reason);
   }
@@ -566,7 +567,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             <ul>
               {lockedEntries.map((entry) => (
                 <li key={entry.idempotency_key}>
-                  {entry.attendance_date} - {entry.subject_id}
+                  {entry.attendance_date} - {roster?.students.find((student) => student.id === entry.subject_id)?.name ?? t("unknownPersonLabel")}
                   <button type="button" onClick={() => void handleOverride(entry)}>
                     {t("override")}
                   </button>
@@ -574,7 +575,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               ))}
             </ul>
           ) : (
-            <p>Ask the Principal to override.</p>
+            <p>{t("askPrincipalOverride")}</p>
           )}
         </div>
       )}
@@ -589,7 +590,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               setSearchParams({});
             }}
           >
-            Student attendance
+            {t("studentAttendanceHeading")}
           </button>
           <button
             className={attendanceMode === "teachers" ? "primaryAction" : "secondaryAction"}
@@ -600,7 +601,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               setSearchParams({ mode: "teachers" });
             }}
           >
-            Teacher attendance
+            {t("teacherAttendanceHeading")}
           </button>
         </div>
       )}
@@ -690,9 +691,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                       <div>
                         <strong>{student.name}</strong>
                         <small>{student.admission_number}{student.section_name ? ` - ${student.section_name}` : ""}</small>
-                        {isApprovedLeaveLocked && <span className="syncBadge">Approved leave</span>}
+                        {isApprovedLeaveLocked && <span className="syncBadge">{t("approvedLeaveLabel")}</span>}
                       </div>
-                      <div className="statusButtons" aria-label={`Attendance for ${student.name}`}>
+                      <div className="statusButtons" aria-label={t("attendanceForStudentLabel", { name: student.name })}>
                         {attendanceOptions.map((option) => (
                           <button
                             className={status === option ? `statusButton active ${option}` : "statusButton"}

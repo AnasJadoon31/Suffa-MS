@@ -26,7 +26,6 @@ from app.modules.academics.models import (
     Madrasa,
     Program,
     Section,
-    TeacherAssignment,
 )
 from app.modules.operations.models import TimetableSlot
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
@@ -49,8 +48,6 @@ from app.modules.academics.schemas import (
     SectionUpdate,
     SessionRolloverRequest,
     StudentEnrollRequest,
-    TeacherAssignmentCreate,
-    TeacherAssignmentRead,
 )
 
 router = APIRouter()
@@ -219,10 +216,6 @@ async def delete_class(
     if class_course_exists:
         raise HTTPException(status_code=409, detail="Cannot delete Class because it has courses assigned to it.")
 
-    teacher_assign_exists = await session.scalar(select(TeacherAssignment.id).where(TeacherAssignment.class_id == class_id).limit(1))
-    if teacher_assign_exists:
-        raise HTTPException(status_code=409, detail="Cannot delete Class because it has teacher assignments.")
-
     enroll_exists = await session.scalar(select(Enrollment.id).where(Enrollment.class_id == class_id).limit(1))
     if enroll_exists:
         raise HTTPException(status_code=409, detail="Cannot delete Class because students are enrolled in it.")
@@ -255,9 +248,12 @@ async def create_section(
 @router.get("/classes/{class_id}/sections", response_model=list[SectionRead])
 async def list_sections(
     class_id: UUID,
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[SectionRead]:
     # Ensure class belongs to this madrasa
     academic_class = await session.get(AcademicClass, class_id)
@@ -265,8 +261,8 @@ async def list_sections(
         raise HTTPException(status_code=404, detail="Class not found")
         
     stmt = select(Section).where(Section.class_id == class_id)
-    result = await session.execute(stmt)
-    return [SectionRead.model_validate(s) for s in result.scalars().all()]
+    rows = await paginate_scalars(session, stmt.order_by(Section.name), limit=limit, offset=offset, response=response)
+    return [SectionRead.model_validate(s) for s in rows]
 
 
 @router.put("/classes/{class_id}/sections/{section_id}", response_model=SectionRead)
@@ -391,10 +387,6 @@ async def delete_course(
     if class_course_exists:
         raise HTTPException(status_code=409, detail="Cannot delete Course because it is assigned to one or more classes.")
 
-    teacher_assign_exists = await session.scalar(select(TeacherAssignment.id).where(TeacherAssignment.course_id == course_id).limit(1))
-    if teacher_assign_exists:
-        raise HTTPException(status_code=409, detail="Cannot delete Course because it is assigned to a teacher.")
-
     await session.delete(course)
     await session.commit()
     return {"status": "success"}
@@ -432,17 +424,20 @@ async def assign_course_to_class(
 @router.get("/classes/{class_id}/courses", response_model=list[CourseRead])
 async def list_assigned_courses(
     class_id: UUID,
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[CourseRead]:
     stmt = (
         select(Course)
         .join(ClassCourse, Course.id == ClassCourse.course_id)
         .where(ClassCourse.class_id == class_id, ClassCourse.madrasa_id == madrasa.id)
     )
-    result = await session.execute(stmt)
-    return [CourseRead.model_validate(c) for c in result.scalars().all()]
+    rows = await paginate_scalars(session, stmt.order_by(Course.name), limit=limit, offset=offset, response=response)
+    return [CourseRead.model_validate(c) for c in rows]
 
 
 @router.delete("/classes/{class_id}/courses/{course_id}")
@@ -464,14 +459,6 @@ async def unassign_class_course(
         raise HTTPException(status_code=404, detail="Course is not assigned to this class")
 
     # Check dependencies for this specific class and course
-    teacher_assign_exists = await session.scalar(
-        select(TeacherAssignment.id)
-        .where(TeacherAssignment.class_id == class_id, TeacherAssignment.course_id == course_id)
-        .limit(1)
-    )
-    if teacher_assign_exists:
-        raise HTTPException(status_code=409, detail="Cannot unassign Course because it has a teacher assigned for this class.")
-
     timetable_exists = await session.scalar(
         select(TimetableSlot.id)
         .where(TimetableSlot.class_id == class_id, TimetableSlot.course_id == course_id)
@@ -564,10 +551,6 @@ async def delete_session(
     if enroll_exists:
         raise HTTPException(status_code=409, detail="Cannot delete Session because students are enrolled in it.")
 
-    teacher_assign_exists = await session.scalar(select(TeacherAssignment.id).where(TeacherAssignment.session_id == session_id).limit(1))
-    if teacher_assign_exists:
-        raise HTTPException(status_code=409, detail="Cannot delete Session because it has teacher assignments.")
-
     if academic_session.is_active:
         raise HTTPException(status_code=409, detail="Cannot delete an active session. Please activate another session first.")
 
@@ -616,54 +599,6 @@ async def _deactivate_all_sessions(session: AsyncSession, madrasa_id: UUID) -> N
     )
     for record in result.scalars().all():
         record.is_active = False
-
-
-# ------------------------------------------------------------ Teacher assignment
-
-@router.post("/teacher-assignments", response_model=TeacherAssignmentRead)
-async def create_teacher_assignment(
-    payload: TeacherAssignmentCreate,
-    current_user: User = Depends(require_permission("assignments.assign_teacher")),
-    madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session),
-) -> TeacherAssignmentRead:
-    teacher = await session.get(TeacherProfile, payload.teacher_id)
-    if teacher is None or teacher.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Teacher not found")
-    await ensure_writable_session(session, madrasa.id, payload.session_id)
-    assignment = TeacherAssignment(madrasa_id=madrasa.id, **payload.model_dump())
-    session.add(assignment)
-    await session.commit()
-    await session.refresh(assignment)
-    return TeacherAssignmentRead.model_validate(assignment)
-
-
-@router.get("/teacher-assignments", response_model=list[TeacherAssignmentRead])
-async def list_teacher_assignments(
-    response: Response,
-    current_user: User = Depends(get_current_user),
-    madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session),
-    teacher_id: UUID | None = None,
-    class_id: UUID | None = None,
-    course_id: UUID | None = None,
-    session_id: UUID | None = None,
-    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
-    offset: int = Query(default=0, ge=0),
-) -> list[TeacherAssignmentRead]:
-    stmt = select(TeacherAssignment).where(TeacherAssignment.madrasa_id == madrasa.id)
-    if teacher_id:
-        stmt = stmt.where(TeacherAssignment.teacher_id == teacher_id)
-    if class_id:
-        stmt = stmt.where(TeacherAssignment.class_id == class_id)
-    if course_id:
-        stmt = stmt.where(TeacherAssignment.course_id == course_id)
-    if session_id:
-        stmt = stmt.where(TeacherAssignment.session_id == session_id)
-    rows = await paginate_scalars(
-        session, stmt.order_by(TeacherAssignment.created_at), limit=limit, offset=offset, response=response
-    )
-    return [TeacherAssignmentRead.model_validate(row) for row in rows]
 
 
 # ------------------------------------------------------------------ Enrollment

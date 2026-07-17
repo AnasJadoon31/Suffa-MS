@@ -9,7 +9,6 @@ export interface Course { id: string; name: string }
 export interface AcademicSession {
   id: string; name: string; gregorian_start: string; gregorian_end: string; hijri_span: string; is_active: boolean;
 }
-export interface TeacherAssignment { id: string; teacher_id: string; session_id: string; class_id: string; course_id: string }
 
 export const academicsApi = {
   today: (date?: string) =>
@@ -61,14 +60,10 @@ export const academicsApi = {
   rolloverSession: (id: string, payload: {
     name: string; gregorian_start: string; gregorian_end: string; hijri_span: string;
     class_mappings: { current_class_id: string; next_class_id: string | null }[];
-    copy_teacher_assignments: boolean; copy_timetable?: boolean; copy_holidays?: boolean; shift_holiday_dates?: boolean;
+    copy_timetable?: boolean; copy_holidays?: boolean; shift_holiday_dates?: boolean;
   }) => api.post<AcademicSession>(`/api/v1/academics/sessions/${id}/rollover`, payload).then((r) => r.data),
   activateSession: (id: string) =>
     api.post<AcademicSession>(`/api/v1/academics/sessions/${id}/activate`).then((r) => r.data),
-  listTeacherAssignments: () =>
-    getAllPages<TeacherAssignment>("/api/v1/academics/teacher-assignments"),
-  createTeacherAssignment: (payload: { teacher_id: string; session_id: string; class_id: string; course_id: string }) =>
-    api.post<TeacherAssignment>("/api/v1/academics/teacher-assignments", payload).then((r) => r.data),
   enrollStudent: (payload: {
     student_id: string; session_id: string; program_id: string; class_id: string; section_id: string;
   }) => api.post("/api/v1/academics/students/enroll", payload).then((r) => r.data),
@@ -312,7 +307,7 @@ export interface SectionResultMatrix {
 export interface ResultsMatrixResponse { session_id: string; sections: SectionResultMatrix[] }
 export interface Submission {
   id: string; assignment_id: string; student_id: string; submitted_at: string; file_key: string;
-  mark: number | null; feedback: string | null; is_late: boolean;
+  mark: number | null; feedback: string | null; is_late: boolean; student_name: string | null;
 }
 export interface GradingScheme { id: string; name: string; bands: { label: string; min_score: number; max_score: number }[] }
 export interface ExamType { id: string; course_id: string; name: string; weightage: number; grading_scheme_id: string }
@@ -590,6 +585,8 @@ export const operationsApi = {
     api.post<AdmissionForm>("/api/v1/operations/admission-forms", payload).then((r) => r.data),
   updateAdmissionForm: (id: string, payload: { title?: string; description?: string; is_open?: boolean }) =>
     api.put<AdmissionForm>(`/api/v1/operations/admission-forms/${id}`, payload).then((r) => r.data),
+  deleteAdmissionForm: (id: string) =>
+    api.delete(`/api/v1/operations/admission-forms/${id}`).then((r) => r.data),
   createAdmission: (payload: {
     applicant_name: string; guardian_contact: string; program_id?: string; date_of_birth?: string; notes?: string;
   }) => api.post<AdmissionApplication>("/api/v1/operations/admissions", payload).then((r) => r.data),
@@ -624,7 +621,7 @@ export interface ContactEnquiry {
 // ------------------------------------------------------------------ Files
 
 export const filesApi = {
-  presignUpload: (payload: { category: string; filename: string; content_type?: string }) =>
+  presignUpload: (payload: { category: string; filename: string; content_type?: string; size_bytes: number }) =>
     api.post<{ object_key: string; upload_url: string }>("/api/v1/files/presign-upload", payload).then((r) => r.data),
   presignDownload: (objectKey: string) =>
     api.get<{ url: string }>("/api/v1/files/presign-download", { params: { object_key: objectKey } }).then((r) => r.data),
@@ -635,12 +632,12 @@ export const filesApi = {
 export interface PaymentCategory { id: string; name: string }
 export interface Payment {
   id: string; student_id: string; category_id: string; amount: number; currency: string;
-  payment_date: string; note: string | null; recorded_by_id: string;
+  payment_date: string; note: string | null; recorded_by_id: string; student_name: string | null; category_name: string | null;
 }
 export interface Donor { id: string; name: string; contact: string }
 export interface Donation {
   id: string; donor_id: string; category_id: string; amount: number; currency: string;
-  donation_date: string; note: string | null; recorded_by_id: string;
+  donation_date: string; note: string | null; recorded_by_id: string; donor_name: string | null; category_name: string | null;
 }
 export interface FinanceSummary { total_contributions: number; total_donations: number; total: number; by_category: Record<string, number> }
 export interface SalaryRecord { id: string; teacher_id: string; amount: number; currency: string; effective_from: string }

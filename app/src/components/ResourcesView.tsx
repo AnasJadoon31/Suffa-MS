@@ -122,7 +122,7 @@ export function ResourcesView() {
             await refreshAll();
           }}
         >
-          <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="e.g. Tajweed" /></label>
+          <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("resourceCategoryExample")} /></label>
           {canManageAll && (
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Input type="checkbox" checked={categoryIsGlobal} onChange={(e) => setCategoryIsGlobal(e.target.checked)} />
@@ -183,7 +183,7 @@ export function ResourcesView() {
               let file_key: string | undefined;
               if (file) {
                 const { object_key, upload_url } = await filesApi.presignUpload({
-                  category: "resources", filename: file.name, content_type: file.type || "application/octet-stream",
+                  category: "resources", filename: file.name, content_type: file.type || "application/octet-stream", size_bytes: file.size,
                 });
                 await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
                 file_key = object_key;

@@ -171,7 +171,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
             className={`tabButton ${activeTab === "courses" ? "active" : ""}`}
             onClick={() => onTabChange?.("courses")}
           >
-            Courses
+            {t("coursesHeading")}
           </button>
           <button
             type="button"
@@ -199,14 +199,14 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
               >
                 <label>
                   {t("programNameLabel")}
-                  <Input required value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder="e.g. Hifz" />
+                  <Input required value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder={t("programExample")} />
                 </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addProgramBtn")}</button>
                 </div>
               </form>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span><span>Actions</span></div>
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("actionsCol")}</span></div>
                 {programs.length === 0 && <p className="emptyState">{t("noProgramsYet")}</p>}
                 {programs.map((p) => (
                   <div className="dataRow" key={p.id}>
@@ -223,16 +223,16 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <Input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
-                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
-                          <button className="tableAction" type="button" onClick={() => setEditingProgram(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
+                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
+                          <button className="tableAction" type="button" onClick={() => setEditingProgram(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
                         </span>
                       </form>
                     ) : (
                       <>
                         <span>{p.name}</span>
                         <span className="actions">
-                          <button className="iconBtn" title="Edit" onClick={() => setEditingProgram(p)}><Edit2 size={16} /></button>
-                          <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteProgram(p.id))}><Trash2 size={16} /></button>
+                          <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingProgram(p)}><Edit2 size={16} /></button>
+                          <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteProgram(p.id))}><Trash2 size={16} /></button>
                         </span>
                       </>
                     )}
@@ -265,7 +265,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 </label>
                 <label>
                   {t("classNameLabel")}
-                  <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Darja 1" />
+                  <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder={t("classExample")} />
                 </label>
                 <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }} title={t("classPortalEnabledHint") ?? ""}>
                   <Input type="checkbox" checked={classPortalEnabled} onChange={(e) => setClassPortalEnabled(e.target.checked)} />
@@ -287,7 +287,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 </Select>
               </div>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span><span>{t("portalCol")}</span><span>Actions</span></div>
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span><span>{t("portalCol")}</span><span>{t("actionsCol")}</span></div>
                 {classesToShow.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
                 {classesToShow.map((c) => (
                   <div className="dataRow" key={c.id}>
@@ -323,8 +323,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           </label>
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
-                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
-                          <button className="tableAction" type="button" onClick={() => setEditingClass(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
+                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
+                          <button className="tableAction" type="button" onClick={() => setEditingClass(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
                         </span>
                       </form>
                     ) : (
@@ -333,8 +333,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         <span>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
                         <span>{c.default_portal_enabled ? t("yesLabel") : t("noLabel")}</span>
                         <span className="actions">
-                          <button className="iconBtn" title="Edit" onClick={() => setEditingClass(c)}><Edit2 size={16} /></button>
-                          <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteClass(c.id))}><Trash2 size={16} /></button>
+                          <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingClass(c)}><Edit2 size={16} /></button>
+                          <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteClass(c.id))}><Trash2 size={16} /></button>
                         </span>
                       </>
                     )}
@@ -346,7 +346,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
 
           {!isLoading && !loadError && activeTab === "courses" && (
             <>
-              <h3>Courses</h3>
+              <h3>{t("coursesHeading")}</h3>
               <form
                 className="inlineForm"
                 onSubmit={async (e) => {
@@ -358,15 +358,15 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
               >
                 <label>
                   {t("courseNameLabel")}
-                  <Input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="e.g. Quran" />
+                  <Input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder={t("courseExample")} />
                 </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addCourseBtn")}</button>
                 </div>
               </form>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span><span>Actions</span></div>
-                {allCourses.length === 0 && <p className="emptyState">No courses yet.</p>}
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("actionsCol")}</span></div>
+                {allCourses.length === 0 && <p className="emptyState">{t("noCoursesYet")}</p>}
                 {allCourses.map((c) => (
                   <div className="dataRow" key={c.id}>
                     {editingCourse?.id === c.id ? (
@@ -382,16 +382,16 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <Input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
-                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
-                          <button className="tableAction" type="button" onClick={() => setEditingCourse(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
+                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
+                          <button className="tableAction" type="button" onClick={() => setEditingCourse(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
                         </span>
                       </form>
                     ) : (
                       <>
                         <span>{c.name}</span>
                         <span className="actions">
-                          <button className="iconBtn" title="Edit" onClick={() => setEditingCourse(c)}><Edit2 size={16} /></button>
-                          <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteCourse(c.id))}><Trash2 size={16} /></button>
+                          <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingCourse(c)}><Edit2 size={16} /></button>
+                          <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteCourse(c.id))}><Trash2 size={16} /></button>
                         </span>
                       </>
                     )}
@@ -423,7 +423,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 </label>
                 <label>
                   {t("sectionNameLabel")}
-                  <Input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder="e.g. A" />
+                  <Input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder={t("sectionExample")} />
                 </label>
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSectionBtn")}</button>
@@ -455,15 +455,15 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               } catch (err) { handleError(err); }
                             }}>
                               <Input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} style={{ padding: "4px 8px", minHeight: "30px", width: "120px" }} />
-                              <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
-                              <button className="tableAction" type="button" onClick={() => setEditingSection(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
+                              <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
+                              <button className="tableAction" type="button" onClick={() => setEditingSection(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
                             </form>
                           ) : (
                             <>
                               <span>{s.name}</span>
                               <span className="actions" style={{ marginLeft: "auto" }}>
-                                <button className="iconBtn" title="Edit" onClick={() => setEditingSection(s)}><Edit2 size={14} /></button>
-                                <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteSection(c.id, s.id))}><Trash2 size={14} /></button>
+                                <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSection(s)}><Edit2 size={14} /></button>
+                                <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSection(c.id, s.id))}><Trash2 size={14} /></button>
                               </span>
                             </>
                           )}
@@ -513,7 +513,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 </div>
               </form>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("spanCol")}</span><span>{t("activeCol")}</span><span>Actions</span></div>
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("spanCol")}</span><span>{t("activeCol")}</span><span>{t("actionsCol")}</span></div>
                 {sessions.length === 0 && <p className="emptyState">{t("noSessionsYet")}</p>}
                 {sessions.map((s) => (
                   <div className="dataRow" key={s.id}>
@@ -541,8 +541,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <Input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} />
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
-                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>Save</button>
-                          <button className="tableAction" type="button" onClick={() => setEditingSession(null)} style={{ margin: 0, color: "var(--muted)" }}>Cancel</button>
+                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
+                          <button className="tableAction" type="button" onClick={() => setEditingSession(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
                         </span>
                       </form>
                     ) : (
@@ -561,8 +561,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               Year-End Rollover
                             </button>
                           )}
-                          <button className="iconBtn" title="Edit" onClick={() => setEditingSession(s)}><Edit2 size={16} /></button>
-                          {!s.is_active && <button className="iconBtn" title="Delete" onClick={() => handleDelete(() => academicsApi.deleteSession(s.id))}><Trash2 size={16} /></button>}
+                          <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSession(s)}><Edit2 size={16} /></button>
+                          {!s.is_active && <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSession(s.id))}><Trash2 size={16} /></button>}
                         </span>
                       </>
                     )}

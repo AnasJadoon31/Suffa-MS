@@ -1,7 +1,7 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +36,44 @@ from app.modules.messaging.schemas import WhatsAppLinkResponse
 from app.modules.people.models import StudentProfile, TeacherProfile
 
 router = APIRouter()
+
+
+async def _payment_reads(session: AsyncSession, rows: list[Payment]) -> list[PaymentRead]:
+    if not rows:
+        return []
+    student_names = dict((await session.execute(
+        select(StudentProfile.id, StudentProfile.name).where(
+            StudentProfile.id.in_({row.student_id for row in rows})
+        )
+    )).all())
+    category_names = dict((await session.execute(
+        select(PaymentCategory.id, PaymentCategory.name).where(
+            PaymentCategory.id.in_({row.category_id for row in rows})
+        )
+    )).all())
+    return [PaymentRead(
+        **PaymentRead.model_validate(row).model_dump(exclude={"student_name", "category_name"}),
+        student_name=student_names.get(row.student_id),
+        category_name=category_names.get(row.category_id),
+    ) for row in rows]
+
+
+async def _donation_reads(session: AsyncSession, rows: list[Donation]) -> list[DonationRead]:
+    if not rows:
+        return []
+    donor_names = dict((await session.execute(
+        select(Donor.id, Donor.name).where(Donor.id.in_({row.donor_id for row in rows}))
+    )).all())
+    category_names = dict((await session.execute(
+        select(PaymentCategory.id, PaymentCategory.name).where(
+            PaymentCategory.id.in_({row.category_id for row in rows})
+        )
+    )).all())
+    return [DonationRead(
+        **DonationRead.model_validate(row).model_dump(exclude={"donor_name", "category_name"}),
+        donor_name=donor_names.get(row.donor_id),
+        category_name=category_names.get(row.category_id),
+    ) for row in rows]
 
 
 async def _receipt_context(
@@ -86,11 +124,17 @@ async def create_category(
 
 @router.get("/categories", response_model=list[PaymentCategoryRead])
 async def list_categories(
+    response: Response,
     current_user: User = Depends(require_permission("finance.reports.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[PaymentCategoryRead]:
-    rows = (await session.execute(select(PaymentCategory).where(PaymentCategory.madrasa_id == madrasa.id))).scalars().all()
+    rows = await paginate_scalars(
+        session, select(PaymentCategory).where(PaymentCategory.madrasa_id == madrasa.id).order_by(PaymentCategory.name),
+        limit=limit, offset=offset, response=response,
+    )
     return [PaymentCategoryRead.model_validate(row) for row in rows]
 
 
@@ -123,7 +167,7 @@ async def create_payment(
     )
     await session.commit()
     await session.refresh(payment)
-    return PaymentRead.model_validate(payment)
+    return (await _payment_reads(session, [payment]))[0]
 
 
 @router.get("/payments", response_model=list[PaymentRead])
@@ -166,7 +210,7 @@ async def list_payments(
     rows = await paginate_scalars(
         session, stmt.order_by(Payment.payment_date.desc()), limit=limit, offset=offset, response=response
     )
-    return [PaymentRead.model_validate(row) for row in rows]
+    return await _payment_reads(session, list(rows))
 
 
 @router.get("/payments/{payment_id}/receipt")
@@ -281,7 +325,7 @@ async def create_donation(
     )
     await session.commit()
     await session.refresh(donation)
-    return DonationRead.model_validate(donation)
+    return (await _donation_reads(session, [donation]))[0]
 
 
 @router.get("/donations", response_model=list[DonationRead])
@@ -309,7 +353,7 @@ async def list_donations(
     rows = await paginate_scalars(
         session, stmt.order_by(Donation.donation_date.desc()), limit=limit, offset=offset, response=response
     )
-    return [DonationRead.model_validate(row) for row in rows]
+    return await _donation_reads(session, list(rows))
 
 
 @router.get("/donations/{donation_id}/receipt")

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.audit import record_audit
 from app.core.config import settings
 from app.core.permissions import registry
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars, paginate_sequence
 from app.core.rate_limit import LOGIN_LOCKOUT_SECONDS, LOGIN_MAX_ATTEMPTS, assert_not_locked_out, clear_failures, record_failure
 from app.core.security import ALGORITHM, hash_password, verify_password, issue_token
 from app.core.settings_catalog import CATALOG_BY_KEY
@@ -17,11 +18,12 @@ from app.core.dependencies import (
     get_current_madrasa,
     get_enabled_features,
     require_permission,
+    set_rls_context,
 )
 from app.db.session import get_session
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
 from app.modules.auth.service import UsernameTakenError, provision_login
-from app.modules.academics.models import AcademicSession, Madrasa
+from app.modules.academics.models import AcademicClass, AcademicSession, Madrasa, Section
 from app.modules.operations.models import MadrasaSetting
 from app.modules.auth.schemas import (
     ChangePasswordRequest,
@@ -93,6 +95,7 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    await set_rls_context(session, user)
     await clear_failures(lockout_key)
     minutes = await _session_lifetime_minutes(session, user)
     token = issue_token(str(user.id), minutes=minutes, extra={"tenant": tenant.slug, "role": str(user.role)})
@@ -243,8 +246,16 @@ async def change_password(
 
 
 @router.get("/permissions")
-async def permissions(current_user: User = Depends(get_current_user)) -> list[dict[str, str | bool]]:
-    return [permission.__dict__ for permission in registry.all()]
+async def permissions(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> list[dict[str, str | bool]]:
+    return paginate_sequence(
+        [permission.__dict__ for permission in registry.all()],
+        limit=limit, offset=offset, response=response,
+    )
 
 
 @router.put("/permissions/grants")
@@ -259,18 +270,40 @@ async def grant_permissions(
 
     # Normalise both request forms into (code, scope_type, scope_id) tuples.
     requested = [PermissionGrant(code=code) for code in payload.permission_codes] + payload.grants
+    definitions = {}
     try:
         for grant in requested:
-            registry.require_known(grant.code)
+            definitions[grant.code] = registry.require_known(grant.code)
     except KeyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     for grant in requested:
         if (grant.scope_type is None) != (grant.scope_id is None):
             raise HTTPException(status_code=400, detail=f"Grant {grant.code}: scope_type and scope_id must be set together")
+        if grant.scope_type is not None and not definitions[grant.code].scoped:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Grant {grant.code} is madrasa-wide and cannot be class/section scoped",
+            )
 
     target = await session.get(User, payload.user_id)
     if target is None or target.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="User not found")
+
+    for grant in requested:
+        if grant.scope_type is None:
+            continue
+        scope_model = AcademicClass if grant.scope_type == "class" else Section
+        scope_exists = await session.scalar(
+            select(scope_model.id).where(
+                scope_model.id == grant.scope_id,
+                scope_model.madrasa_id == madrasa.id,
+            )
+        )
+        if scope_exists is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Grant {grant.code}: scope does not belong to the active madrasa",
+            )
 
     existing_stmt = select(UserPermission).where(UserPermission.user_id == payload.user_id)
     existing = (await session.execute(existing_stmt)).scalars().all()
@@ -311,9 +344,12 @@ async def grant_permissions(
 @router.get("/users/{user_id}/permissions", response_model=list[PermissionGrantRead])
 async def list_user_permissions(
     user_id: UUID,
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[PermissionGrantRead]:
     if current_user.role != UserRole.principal and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Only the Principal can view another user's permissions")
@@ -322,7 +358,9 @@ async def list_user_permissions(
     if target is None or target.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="User not found")
 
-    result = await session.execute(
-        select(UserPermission).where(UserPermission.user_id == user_id).order_by(UserPermission.permission_code)
+    rows = await paginate_scalars(
+        session,
+        select(UserPermission).where(UserPermission.user_id == user_id).order_by(UserPermission.permission_code),
+        limit=limit, offset=offset, response=response,
     )
-    return [PermissionGrantRead.model_validate(row) for row in result.scalars().all()]
+    return [PermissionGrantRead.model_validate(row) for row in rows]

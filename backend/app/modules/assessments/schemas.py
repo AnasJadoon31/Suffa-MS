@@ -83,6 +83,7 @@ class SubmissionRead(BaseModel):
     mark: float | None
     feedback: str | None
     is_late: bool = False
+    student_name: str | None = None
 
 
 class GradeBand(BaseModel):

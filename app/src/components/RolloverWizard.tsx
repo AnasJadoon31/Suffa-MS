@@ -21,7 +21,6 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
     gregorian_start: "",
     gregorian_end: "",
     hijri_span: "",
-    copy_teacher_assignments: true,
     copy_timetable: true,
     copy_holidays: false,
     shift_holiday_dates: true,
@@ -71,7 +70,7 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
             <p style={{ margin: 0, color: "var(--muted)" }}>{t("rolloverStep1Hint")}</p>
             <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {t("newSessionNameLabel")}
-              <Input className="inputField" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. 2026-2027" />
+              <Input className="inputField" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("academicSessionExample")} />
             </label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
               <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -89,10 +88,6 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
             </label>
             <fieldset className="sectionPicker">
               <legend>{t("rolloverCopyLegend")}</legend>
-              <label className="checkboxLabel">
-                <input type="checkbox" checked={form.copy_teacher_assignments} onChange={(e) => setForm({ ...form, copy_teacher_assignments: e.target.checked })} />
-                {t("copyTeacherAssignmentsLabel")}
-              </label>
               <label className="checkboxLabel">
                 <input type="checkbox" checked={form.copy_timetable} onChange={(e) => setForm({ ...form, copy_timetable: e.target.checked })} />
                 {t("copyTimetableLabel")}

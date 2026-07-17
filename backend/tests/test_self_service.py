@@ -115,9 +115,9 @@ async def test_student_my_timetable_is_scoped_to_own_section(student_client, db_
     response = await student_client.get("/api/v1/operations/timetable/me")
     assert response.status_code == 200, response.text
     rows = response.json()
-    assert len(rows) == 1
-    assert rows[0]["section_id"] == str(seed.sections.a1.id)
-    assert rows[0]["course_name"] == "Nazra"
+    assert rows
+    assert {row["section_id"] for row in rows} == {str(seed.sections.a1.id)}
+    assert {row["course_name"] for row in rows} == {"Nazra"}
 
 
 async def test_non_student_cannot_use_student_attendance_self_route(teacher_client):

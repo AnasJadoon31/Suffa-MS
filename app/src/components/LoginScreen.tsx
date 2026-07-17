@@ -34,9 +34,9 @@ export function LoginScreen() {
       await login(token, tenant);
     } catch (err: any) {
       if (err.response?.status === 401) {
-        setError("Invalid credentials. Please try again.");
+        setError(t("invalidCredentials"));
       } else {
-        setError("Unable to connect to the server. Please try again later.");
+        setError(t("serverUnavailable"));
       }
     } finally {
       setIsLoading(false);
@@ -124,10 +124,10 @@ export function LoginScreen() {
                 {isLoading ? (
                   <>
                     <Loader2 size={18} className="spin" />
-                    Signing in...
+                    {t("signingIn")}
                   </>
                 ) : (
-                  "Sign In to Workspace"
+                  t("signInButton")
                 )}
               </button>
             </form>

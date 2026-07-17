@@ -69,7 +69,7 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
             }
           }}
         >
-          <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="e.g. Tuition" /></label>
+          <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("tuitionExample")} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addCategoryBtn")}</button></div>
         </form>
       )}
@@ -203,8 +203,8 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
         {!isLoading && !error && payments.length === 0 && <p className="emptyState">{t("noContributionsYet")}</p>}
         {!isLoading && !error && payments.map((p) => (
           <div className="dataRow" key={p.id}>
-            <span>{students.find((s) => s.id === p.student_id)?.name ?? p.student_id}</span>
-            <span>{categories.find((c) => c.id === p.category_id)?.name ?? "—"}</span>
+            <span>{p.student_name ?? t("unknownPersonLabel")}</span>
+            <span>{p.category_name ?? t("unknownLabel")}</span>
             <span>{p.currency} {p.amount}</span>
             <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
             <span>{p.note ?? "—"}</span>
@@ -352,8 +352,8 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
         {!isLoading && !error && donations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
         {!isLoading && !error && donations.map((d) => (
           <div className="dataRow" key={d.id}>
-            <span>{donors.find((x) => x.id === d.donor_id)?.name ?? d.donor_id}</span>
-            <span>{categories.find((c) => c.id === d.category_id)?.name ?? "—"}</span>
+            <span>{d.donor_name ?? t("unknownPersonLabel")}</span>
+            <span>{d.category_name ?? t("unknownLabel")}</span>
             <span>{d.currency} {d.amount}</span>
             <span>{d.donation_date}<HijriTag date={d.donation_date} /></span>
             <span>{d.note ?? "—"}</span>

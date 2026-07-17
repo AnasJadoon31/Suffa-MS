@@ -11,7 +11,7 @@ window pass `?limit=&offset=`; callers that ignore the new params get the
 first page (limit=50) rather than an unbounded dump.
 """
 
-from typing import Sequence
+from typing import Sequence, TypeVar
 
 from fastapi import Query, Response
 from sqlalchemy import func, select
@@ -21,6 +21,15 @@ from sqlalchemy.sql import Select
 
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
+T = TypeVar("T")
+
+
+def paginate_sequence(
+    items: Sequence[T], *, limit: int, offset: int, response: Response
+) -> list[T]:
+    """Paginate an already-materialized catalogue or enriched result list."""
+    response.headers["X-Total-Count"] = str(len(items))
+    return list(items[offset:offset + limit])
 
 # Routes declare these two Query params inline (FastAPI can't unpack a tuple
 # dependency into two path-operation params), e.g.:

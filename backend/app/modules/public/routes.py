@@ -7,13 +7,14 @@ exposing tenant slugs or requiring auth. Rate limiting is applied per route.
 """
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_session
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.modules.academics.models import Madrasa, Program
 from app.modules.operations.models import AdmissionApplication, AdmissionForm, BlogPost, ContactEnquiry
 from app.modules.operations.schemas import AdmissionApplicationRead, BlogPostRead, ContactEnquiryCreate
@@ -69,17 +70,20 @@ async def submit_contact_enquiry(
 async def public_blog_feed(
     public_key: str,
     request: Request,
+    response: Response,
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[BlogPostRead]:
     await _throttle(request, "blog")
     madrasa = await _madrasa_by_key(session, public_key)
-    rows = (
-        await session.execute(
-            select(BlogPost)
+    rows = await paginate_scalars(
+        session,
+        select(BlogPost)
             .where(BlogPost.madrasa_id == madrasa.id, BlogPost.published.is_(True))
-            .order_by(BlogPost.created_at.desc())
-        )
-    ).scalars().all()
+            .order_by(BlogPost.created_at.desc()),
+        limit=limit, offset=offset, response=response,
+    )
     return [BlogPostRead.model_validate(row) for row in rows]
 
 

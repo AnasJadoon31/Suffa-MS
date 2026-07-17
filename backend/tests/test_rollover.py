@@ -5,7 +5,8 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import select
 
-from app.modules.academics.models import AcademicSession, Enrollment, Section, TeacherAssignment
+from app.modules.academics.models import AcademicSession, Enrollment, Section
+from app.modules.operations.models import TimetableSlot
 
 
 def rollover_payload(seed, **overrides):
@@ -17,7 +18,7 @@ def rollover_payload(seed, **overrides):
         "class_mappings": [
             {"current_class_id": str(seed.class_a.id), "next_class_id": str(seed.class_b.id)}
         ],
-        "copy_teacher_assignments": True,
+        "copy_timetable": True,
     }
     payload.update(overrides)
     return payload
@@ -48,13 +49,13 @@ async def test_rollover_moves_students_into_next_class_sections(client, db_sessi
         assert by_student[seed.students[0].id] == seed.sections.b1.id  # Alif -> Alif
         assert by_student[seed.students[1].id] == seed.sections.b2.id  # Bay -> Bay
 
-        assignments = (
+        slots = (
             await db.execute(
-                select(TeacherAssignment).where(TeacherAssignment.session_id == new_session_id)
+                select(TimetableSlot).where(TimetableSlot.session_id == new_session_id)
             )
         ).scalars().all()
-        assert len(assignments) == 1
-        assert assignments[0].madrasa_id == seed.madrasa.id
+        assert len(slots) == 1
+        assert slots[0].madrasa_id == seed.madrasa.id
 
         old_session = await db.get(AcademicSession, seed.old_session.id)
         new_session = await db.get(AcademicSession, new_session_id)
@@ -109,18 +110,18 @@ async def test_rollover_unknown_session_is_404(client, seed):
     assert response.status_code == 404
 
 
-async def test_rollover_can_skip_teacher_assignments(client, db_sessionmaker, seed):
+async def test_rollover_can_start_with_a_fresh_timetable(client, db_sessionmaker, seed):
     response = await client.post(
         f"/api/v1/academics/sessions/{seed.old_session.id}/rollover",
-        json=rollover_payload(seed, copy_teacher_assignments=False),
+        json=rollover_payload(seed, copy_timetable=False),
     )
     assert response.status_code == 200, response.text
     new_session_id = UUID(response.json()["id"])
 
     async with db_sessionmaker() as db:
-        assignments = (
+        slots = (
             await db.execute(
-                select(TeacherAssignment).where(TeacherAssignment.session_id == new_session_id)
+                select(TimetableSlot).where(TimetableSlot.session_id == new_session_id)
             )
         ).scalars().all()
-        assert assignments == []
+        assert slots == []

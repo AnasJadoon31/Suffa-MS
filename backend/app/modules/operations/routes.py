@@ -16,7 +16,7 @@ from app.core.dependencies import (
     user_has_permission,
 )
 from app.core.error_codes import ErrorCode
-from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars, paginate_sequence
 from app.core.teaching_scope import taught_class_ids, teacher_teaches
 from app.db.session import get_session
 from app.modules.academics.models import (
@@ -408,6 +408,18 @@ async def export_timetable(
             (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
         )
     )
+    if current_user.role == UserRole.teacher:
+        teacher_profile_id = (
+            await session.execute(
+                select(TeacherProfile.id).where(
+                    TeacherProfile.madrasa_id == madrasa.id,
+                    TeacherProfile.user_id == current_user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if teacher_profile_id is None:
+            raise HTTPException(status_code=404, detail="No timetable slots to export")
+        stmt = stmt.where(TimetableSlot.teacher_id == teacher_profile_id)
     if class_id:
         stmt = stmt.where(TimetableSlot.class_id == class_id)
     rows = (await session.execute(stmt.order_by(AcademicClass.name, Section.name, TimetableSlot.start_time))).all()
@@ -545,6 +557,19 @@ async def list_timetable(
             (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
         )
     )
+    if current_user.role == UserRole.teacher:
+        teacher_profile_id = (
+            await session.execute(
+                select(TeacherProfile.id).where(
+                    TeacherProfile.madrasa_id == madrasa.id,
+                    TeacherProfile.user_id == current_user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if teacher_profile_id is None:
+            response.headers["X-Total-Count"] = "0"
+            return []
+        stmt = stmt.where(TimetableSlot.teacher_id == teacher_profile_id)
     if class_id:
         stmt = stmt.where(TimetableSlot.class_id == class_id)
     if section_id:
@@ -904,10 +929,8 @@ async def _require_teachable_scope(
         if not await teacher_teaches(session, madrasa_id=madrasa_id, teacher_id=teacher.id, session_id=active_session_id, class_id=class_id):
             raise HTTPException(status_code=403, detail="You do not teach one of the targeted classes")
     for section_id in scope.sections:
-        # A legacy (class-wide, section_id=None) TeacherAssignment matches any
-        # section of *its own* class — but teacher_teaches() only enforces
-        # that when class_id is also given, so resolve it here rather than
-        # letting an unscoped section_id-only check match every class.
+        # Resolve the section's class as well so both dimensions must match a
+        # real timetable slot.
         section = await session.get(Section, section_id)
         section_class_id = section.class_id if section is not None else None
         if not await teacher_teaches(
@@ -953,9 +976,12 @@ async def create_resource_category(
 
 @router.get("/resource-categories", response_model=list[ResourceCategoryRead])
 async def list_resource_categories(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[ResourceCategoryRead]:
     # Admins see every category (global + every teacher's); everyone else
     # sees only global categories plus their own private ones (B9).
@@ -963,7 +989,9 @@ async def list_resource_categories(
     stmt = select(ResourceCategory).where(ResourceCategory.madrasa_id == madrasa.id)
     if not is_admin:
         stmt = stmt.where((ResourceCategory.owner_id.is_(None)) | (ResourceCategory.owner_id == current_user.id))
-    rows = (await session.execute(stmt.order_by(ResourceCategory.name))).scalars().all()
+    rows = await paginate_scalars(
+        session, stmt.order_by(ResourceCategory.name), limit=limit, offset=offset, response=response
+    )
     return [_category_read(row, current_user.id) for row in rows]
 
 
@@ -1299,13 +1327,19 @@ async def submit_form_response(
 @router.get("/forms/{form_id}/responses", response_model=list[FormResponseRead])
 async def list_form_responses(
     form_id: UUID,
+    response: Response,
     current_user: User = Depends(require_permission("forms.responses.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[FormResponseRead]:
     await _get_form_or_404(session, form_id, madrasa.id)
-    result = await session.execute(select(FormResponse).where(FormResponse.form_id == form_id))
-    responses = result.scalars().all()
+    responses = await paginate_scalars(
+        session,
+        select(FormResponse).where(FormResponse.form_id == form_id).order_by(FormResponse.created_at),
+        limit=limit, offset=offset, response=response,
+    )
     student_ids = {r.student_id for r in responses}
     names: dict[UUID, str] = {}
     if student_ids:
@@ -1471,16 +1505,18 @@ async def create_blog_post(
 @router.get("/blog", response_model=list[BlogPostRead])
 async def list_blog_posts(
     response: Response,
-    current_user: Optional[User] = Depends(get_optional_user),
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     published_only: bool = False,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[BlogPostRead]:
-    # Anonymous visitors (the public marketing site) only ever see published posts.
+    # The public feed has its own endpoint. Inside the authenticated app only
+    # principals/blog managers may see drafts.
     stmt = select(BlogPost).where(BlogPost.madrasa_id == madrasa.id)
-    if published_only or current_user is None:
+    can_manage_blog = await user_has_permission(current_user, "blog.manage", session)
+    if published_only or not can_manage_blog:
         stmt = stmt.where(BlogPost.published.is_(True))
     rows = await paginate_scalars(
         session, stmt.order_by(BlogPost.created_at.desc()), limit=limit, offset=offset, response=response
@@ -1612,6 +1648,32 @@ async def update_admission_form(
     return await _admission_form_read(session, form)
 
 
+@router.delete("/admission-forms/{form_id}")
+async def delete_admission_form(
+    form_id: UUID,
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    form = await session.get(AdmissionForm, form_id)
+    if form is None or form.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Admission form not found")
+    has_applications = await session.scalar(
+        select(AdmissionApplication.id).where(
+            AdmissionApplication.madrasa_id == madrasa.id,
+            AdmissionApplication.form_id == form.id,
+        ).limit(1)
+    )
+    if has_applications is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="This form has applications; close it to preserve submitted records",
+        )
+    await session.delete(form)
+    await session.commit()
+    return {"status": "deleted"}
+
+
 @router.post("/admissions", response_model=AdmissionApplicationRead)
 async def create_admission_application(
     payload: AdmissionApplicationCreate,
@@ -1714,21 +1776,29 @@ async def set_enquiry_status(
 
 @router.get("/settings", response_model=list[SettingRead])
 async def list_settings(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[SettingRead]:
-    result = await session.execute(
-        select(MadrasaSetting).where(MadrasaSetting.madrasa_id == madrasa.id).order_by(MadrasaSetting.key)
+    rows = await paginate_scalars(
+        session,
+        select(MadrasaSetting).where(MadrasaSetting.madrasa_id == madrasa.id).order_by(MadrasaSetting.key),
+        limit=limit, offset=offset, response=response,
     )
-    return [SettingRead.model_validate(row) for row in result.scalars().all()]
+    return [SettingRead.model_validate(row) for row in rows]
 
 
 @router.get("/settings/catalog", response_model=list[TypedSettingRead])
 async def list_settings_catalog(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[TypedSettingRead]:
     """Every defined setting with its stored (or default) value, categorised —
     drives the real settings page (§7). Readable by all madrasa members."""
@@ -1740,7 +1810,7 @@ async def list_settings_catalog(
             await session.execute(select(MadrasaSetting).where(MadrasaSetting.madrasa_id == madrasa.id))
         ).scalars().all()
     }
-    return [
+    return paginate_sequence([
         TypedSettingRead(
             key=item.key,
             category=item.category,
@@ -1749,7 +1819,7 @@ async def list_settings_catalog(
             value=stored.get(item.key, item.default),
         )
         for item in CATALOG
-    ]
+    ], limit=limit, offset=offset, response=response)
 
 
 @router.put("/settings", response_model=SettingRead)

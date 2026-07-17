@@ -33,6 +33,8 @@ class PaymentRead(BaseModel):
     payment_date: date
     note: str | None
     recorded_by_id: UUID
+    student_name: str | None = None
+    category_name: str | None = None
 
 
 class DonorCreate(BaseModel):
@@ -66,6 +68,8 @@ class DonationRead(BaseModel):
     donation_date: date
     note: str | None
     recorded_by_id: UUID
+    donor_name: str | None = None
+    category_name: str | None = None
 
 
 class FinanceSummary(BaseModel):

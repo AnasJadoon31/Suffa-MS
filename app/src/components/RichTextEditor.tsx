@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Select } from "./ui/Field";
 import {
   AlignLeft,
@@ -18,13 +19,14 @@ type RichTextEditorProps = Readonly<{
 }>;
 
 const FONT_OPTIONS = [
-  { label: "Default", value: "" },
-  { label: "Serif", value: "Georgia" },
-  { label: "Sans-serif", value: "Arial" },
-  { label: "Urdu (Nastaliq)", value: "Noto Nastaliq Urdu" },
+  { labelKey: "defaultFontLabel", value: "" },
+  { labelKey: "serifFontLabel", value: "Georgia" },
+  { labelKey: "sansSerifFontLabel", value: "Arial" },
+  { labelKey: "urduFontLabel", value: "Noto Nastaliq Urdu" },
 ];
 
 export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
+  const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
 
   // Only push external value in when it differs (e.g. form reset) — writing
@@ -53,24 +55,24 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
 
   return (
     <div className="richTextEditor">
-      <div className="richTextToolbar" role="toolbar" aria-label="Text formatting">
-        <button type="button" title="Bold" onMouseDown={(e) => { e.preventDefault(); exec("bold"); }}><Bold size={14} /></button>
-        <button type="button" title="Italic" onMouseDown={(e) => { e.preventDefault(); exec("italic"); }}><Italic size={14} /></button>
-        <button type="button" title="Underline" onMouseDown={(e) => { e.preventDefault(); exec("underline"); }}><Underline size={14} /></button>
-        <button type="button" title="Heading" onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h2"); }}><Heading2 size={14} /></button>
-        <button type="button" title="Paragraph" onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "p"); }}>¶</button>
-        <button type="button" title="Bulleted list" onMouseDown={(e) => { e.preventDefault(); exec("insertUnorderedList"); }}><List size={14} /></button>
-        <button type="button" title="Numbered list" onMouseDown={(e) => { e.preventDefault(); exec("insertOrderedList"); }}><ListOrdered size={14} /></button>
-        <button type="button" title="Left-to-right" onMouseDown={(e) => { e.preventDefault(); setDirection("ltr"); }}><AlignLeft size={14} /></button>
-        <button type="button" title="Right-to-left (Urdu)" onMouseDown={(e) => { e.preventDefault(); setDirection("rtl"); }}><AlignRight size={14} /></button>
+      <div className="richTextToolbar" role="toolbar" aria-label={t("textFormattingLabel")}>
+        <button type="button" title={t("boldLabel")} onMouseDown={(e) => { e.preventDefault(); exec("bold"); }}><Bold size={14} /></button>
+        <button type="button" title={t("italicLabel")} onMouseDown={(e) => { e.preventDefault(); exec("italic"); }}><Italic size={14} /></button>
+        <button type="button" title={t("underlineLabel")} onMouseDown={(e) => { e.preventDefault(); exec("underline"); }}><Underline size={14} /></button>
+        <button type="button" title={t("headingLabel")} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h2"); }}><Heading2 size={14} /></button>
+        <button type="button" title={t("paragraphLabel")} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "p"); }}>¶</button>
+        <button type="button" title={t("bulletedListLabel")} onMouseDown={(e) => { e.preventDefault(); exec("insertUnorderedList"); }}><List size={14} /></button>
+        <button type="button" title={t("numberedListLabel")} onMouseDown={(e) => { e.preventDefault(); exec("insertOrderedList"); }}><ListOrdered size={14} /></button>
+        <button type="button" title={t("leftToRightLabel")} onMouseDown={(e) => { e.preventDefault(); setDirection("ltr"); }}><AlignLeft size={14} /></button>
+        <button type="button" title={t("rightToLeftUrduLabel")} onMouseDown={(e) => { e.preventDefault(); setDirection("rtl"); }}><AlignRight size={14} /></button>
         <Select
-          title="Font"
+          title={t("fontLabel")}
           defaultValue=""
           onChange={(e) => {
             if (e.target.value) exec("fontName", e.target.value);
           }}
         >
-          {FONT_OPTIONS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
+          {FONT_OPTIONS.map((f) => <option key={f.labelKey} value={f.value}>{t(f.labelKey)}</option>)}
         </Select>
       </div>
       <div

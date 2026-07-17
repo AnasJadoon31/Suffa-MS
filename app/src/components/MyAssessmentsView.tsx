@@ -45,7 +45,7 @@ export function MyAssessmentsView() {
     setError("");
     try {
       const { object_key, upload_url } = await filesApi.presignUpload({
-        category: "submissions", filename: file.name, content_type: file.type || "application/octet-stream",
+        category: "submissions", filename: file.name, content_type: file.type || "application/octet-stream", size_bytes: file.size,
       });
       await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
       await assessmentsApi.submitAssignment(assignment.id, object_key);

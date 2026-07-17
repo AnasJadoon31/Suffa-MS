@@ -34,9 +34,11 @@ function QuickLinks({ onNavigate }: Readonly<{ onNavigate?: (view: ViewId) => vo
   const { t } = useTranslation();
   const { hasPermission, hasFeature, user } = useAuth();
   if (!onNavigate) return null;
+  const priorityViews: ViewId[] = ["attendance", "timetable", "announcements", "assessments", "people", "finance"];
   const visible = navItems.filter(
     (item) => item.id !== "dashboard" && isNavItemAccessible(item, user?.role, hasPermission, hasFeature),
-  );
+  ).sort((a, b) => priorityViews.indexOf(a.id) - priorityViews.indexOf(b.id))
+    .filter((item) => priorityViews.includes(item.id));
   return (
     <nav className="quickLinks" aria-label={t("quickLinksLabel")}>
       {visible.map((item) => {
@@ -92,19 +94,23 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
   const markedAttendanceTotal = data.attendance.present + data.attendance.absent + data.attendance.leave;
   const attendanceRosterTotal = data.attendance.total_students ?? markedAttendanceTotal;
   const attendanceDetail = attendanceRosterTotal
-    ? `${Math.round((data.attendance.present / attendanceRosterTotal) * 100)}% present · ${markedAttendanceTotal}/${attendanceRosterTotal} marked`
-    : "No active roster";
+    ? t("presentMarkedSummary", {
+        percent: Math.round((data.attendance.present / attendanceRosterTotal) * 100),
+        marked: markedAttendanceTotal,
+        total: attendanceRosterTotal,
+      })
+    : t("noActiveRoster");
   const cards = [
     {
       label: t("students"),
       value: String(studentCount),
-      detail: `${data.counts.classes} active classes`,
+      detail: t("activeClassesCount", { count: data.counts.classes }),
       icon: GraduationCap,
     },
     {
       label: t("teachers"),
       value: String(teacherCount),
-      detail: "Active teacher profiles",
+      detail: t("activeTeacherProfiles"),
       icon: UserRoundCog,
     },
     {
@@ -113,13 +119,13 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
       detail: attendanceDetail,
       icon: ClipboardCheck,
     },
-    { label: t("missingSync"), value: String(data.attendance.missing_sync_teachers), detail: "Teachers without today's mark", icon: AlertTriangle },
-    { label: t("monthlyIncome"), value: `${data.finance.month_total.toLocaleString()} ${data.finance.currency}`, detail: "Contributions + donations", icon: CircleDollarSign },
+    { label: t("missingSync"), value: String(data.attendance.missing_sync_teachers), detail: t("teachersWithoutTodayMark"), icon: AlertTriangle },
+    { label: t("monthlyIncome"), value: `${data.finance.month_total.toLocaleString()} ${data.finance.currency}`, detail: t("contributionsAndDonations"), icon: CircleDollarSign },
   ];
 
   return (
     <>
-      <section className="metricGrid" aria-label="Dashboard summary">
+      <section className="metricGrid" aria-label={t("dashboardSummaryLabel")}>
         {cards.map((card) => {
           const Icon = card.icon;
           return (
@@ -134,7 +140,7 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
       </section>
       {data.attendance.missing_sync_teacher_list.length > 0 && (
         <section className="modulePanel">
-          <div className="moduleHeader"><h2>Missing attendance sync</h2></div>
+          <div className="moduleHeader"><h2>{t("missingAttendanceSyncHeading")}</h2></div>
           <ul>
             {data.attendance.missing_sync_teacher_list.map((teacher) => <li key={teacher.id}>{teacher.name}</li>)}
           </ul>
@@ -142,7 +148,7 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
       )}
       {data.activity.length > 0 && (
         <section className="modulePanel">
-          <div className="moduleHeader"><h2>Recent activity</h2></div>
+          <div className="moduleHeader"><h2>{t("recentActivityHeading")}</h2></div>
           <ul>
             {data.activity.map((line) => <li key={line}>{line}</li>)}
           </ul>
@@ -177,7 +183,7 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
       setAttendance(await attendanceApi.teacherCheckIn());
       await loadLogs();
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? "Could not check in");
+      setError(err.response?.data?.detail ?? t("failedCheckIn"));
     }
   };
 
@@ -187,27 +193,27 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
       setAttendance(await attendanceApi.teacherCheckOut());
       await loadLogs();
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? "Could not check out");
+      setError(err.response?.data?.detail ?? t("failedCheckOut"));
     }
   };
 
   return (
     <>
-      <section className="metricGrid" aria-label="Dashboard summary">
+      <section className="metricGrid" aria-label={t("dashboardSummaryLabel")}>
         <article className="metricCard">
-          <span>My classes</span>
+          <span>{t("myClassesHeading")}</span>
           <strong>{data.my_classes.length}</strong>
-          <small>{data.my_classes.map((c) => `${c.class_name} · ${c.course_name}`).join(", ") || "No assignments yet"}</small>
+          <small>{data.my_classes.map((c) => `${c.class_name} · ${c.course_name}`).join(", ") || t("noAssignmentsYet")}</small>
         </article>
         <article className="metricCard">
-          <span>Pending submissions</span>
+          <span>{t("pendingSubmissionsHeading")}</span>
           <strong>{data.pending_submissions}</strong>
-          <small>Ungraded across your classes</small>
+          <small>{t("ungradedAcrossClasses")}</small>
         </article>
         <article className="metricCard">
-          <span>Today attendance</span>
-          <strong>{attendance?.check_in ? formatTime(attendance.check_in) : "Not in"}</strong>
-          <small>Out: {formatTime(attendance?.check_out)}</small>
+          <span>{t("todayAttendance")}</span>
+          <strong>{attendance?.check_in ? formatTime(attendance.check_in) : t("notCheckedIn")}</strong>
+          <small>{t("checkedOutAt", { time: formatTime(attendance?.check_out) })}</small>
         </article>
       </section>
       <section className="modulePanel">
@@ -245,35 +251,35 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
         </div>
       </section>
       <section className="modulePanel">
-        <div className="moduleHeader"><h2>Time in / time out</h2></div>
+        <div className="moduleHeader"><h2>{t("timeInOutHeading")}</h2></div>
         <div className="formActions">
           <button className="primaryAction" type="button" disabled={readOnly || !!attendance?.check_in} onClick={() => void checkIn()}>
-            <LogIn size={16} /> Time in
+            <LogIn size={16} /> {t("timeInLabel")}
           </button>
           <button className="secondaryAction" type="button" disabled={readOnly || !attendance?.check_in || !!attendance?.check_out} onClick={() => void checkOut()}>
-            <LogOut size={16} /> Time out
+            <LogOut size={16} /> {t("timeOutLabel")}
           </button>
         </div>
         {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       </section>
       <section className="modulePanel">
-        <div className="moduleHeader"><h2>Today's timetable</h2></div>
-        {data.today_timetable.length === 0 && <p className="emptyState">No periods today.</p>}
+        <div className="moduleHeader"><h2>{t("todaysTimetableHeading")}</h2></div>
+        {data.today_timetable.length === 0 && <p className="emptyState">{t("noPeriodsToday")}</p>}
         <ul>
           {data.today_timetable.map((slot, i) => (
-            <li key={i}>{slot.start_time} – {slot.end_time} (period {slot.period})</li>
+            <li key={i}>{slot.start_time} – {slot.end_time} ({t("periodLabel", { period: slot.period })})</li>
           ))}
         </ul>
       </section>
       <section className="modulePanel">
-        <div className="moduleHeader"><h2>My attendance log</h2></div>
+        <div className="moduleHeader"><h2>{t("myAttendanceLogHeading")}</h2></div>
         <div className="dataTable">
-          <div className="dataRow header"><span>Date</span><span>Status</span><span>Time in</span><span>Time out</span></div>
-          {logs.length === 0 && <p className="emptyState">No teacher attendance logs yet.</p>}
+          <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("statusCol")}</span><span>{t("timeInLabel")}</span><span>{t("timeOutLabel")}</span></div>
+          {logs.length === 0 && <p className="emptyState">{t("noTeacherAttendanceLogs")}</p>}
           {logs.slice(0, 10).map((entry) => (
             <div className="dataRow" key={entry.id}>
               <span>{entry.attendance_date}</span>
-              <span>{entry.status}</span>
+              <span>{t(entry.status)}</span>
               <span>{formatTime(entry.check_in)}</span>
               <span>{formatTime(entry.check_out)}</span>
             </div>
@@ -295,7 +301,7 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
     setError("");
     try {
       const { object_key, upload_url } = await filesApi.presignUpload({
-        category: "submissions", filename: file.name, content_type: file.type || "application/octet-stream",
+        category: "submissions", filename: file.name, content_type: file.type || "application/octet-stream", size_bytes: file.size,
       });
       await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
       await assessmentsApi.submitAssignment(assignment.id, object_key);
@@ -337,7 +343,7 @@ function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashb
 
   return (
     <>
-      <section className="metricGrid" aria-label="Dashboard summary">
+      <section className="metricGrid" aria-label={t("dashboardSummaryLabel")}>
         <article className="metricCard">
           <span>{t("overallScoreLabel")}</span>
           <strong>{data.latest_result?.overall_score ?? "—"}</strong>

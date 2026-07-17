@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import select
 
 from app.core.dependencies import user_has_permission, user_has_permission_scoped
+from app.modules.academics.models import AcademicClass, Madrasa, Program
 from app.modules.auth.models import UserPermission
 
 
@@ -48,6 +49,57 @@ async def test_grant_endpoint_rejects_unknown_code(client, seed):
         json={"user_id": str(seed.teacher_user.id), "permission_codes": ["no.such.permission"]},
     )
     assert response.status_code == 400
+
+
+async def test_grant_endpoint_rejects_scope_for_global_only_permission(client, seed):
+    response = await client.put(
+        "/api/v1/auth/permissions/grants",
+        json={
+            "user_id": str(seed.teacher_user.id),
+            "grants": [
+                {"code": "holidays.manage", "scope_type": "class", "scope_id": str(seed.class_a.id)}
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "madrasa-wide" in response.json()["detail"]
+
+
+async def test_grant_endpoint_rejects_scope_from_another_madrasa(
+    client, seed, db_sessionmaker,
+):
+    async with db_sessionmaker() as db:
+        other_madrasa = Madrasa(name="Other Madrasa", slug="other")
+        db.add(other_madrasa)
+        await db.flush()
+        other_program = Program(madrasa_id=other_madrasa.id, name="Other program")
+        db.add(other_program)
+        await db.flush()
+        other_class = AcademicClass(
+            madrasa_id=other_madrasa.id,
+            program_id=other_program.id,
+            name="Other class",
+        )
+        db.add(other_class)
+        await db.commit()
+
+    response = await client.put(
+        "/api/v1/auth/permissions/grants",
+        json={
+            "user_id": str(seed.teacher_user.id),
+            "grants": [
+                {
+                    "code": "assignments.create",
+                    "scope_type": "class",
+                    "scope_id": str(other_class.id),
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "active madrasa" in response.json()["detail"]
 
 
 async def test_scoped_grant_does_not_satisfy_global_check(db_sessionmaker, seed):

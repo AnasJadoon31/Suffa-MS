@@ -174,9 +174,9 @@ export const portalRoutes: readonly PortalRoute[] = [
   { key: "financeSummary", path: "/finance/summary", view: "finance", permission: "finance.reports.view", feature: "finance", roles: ["principal", "teacher"] },
   { key: "salary", path: "/salary", view: "salary", permission: "teachers.salary.manage", feature: "salary", roles: ["principal", "teacher"] },
   { key: "mySalary", path: "/my-salary", view: "my_salary", feature: "salary", roles: ["teacher"] },
-  { key: "reports", path: "/reports", view: "reports", permission: "attendance.take", feature: "reports", roles: ["principal", "teacher"] },
+  { key: "reports", path: "/reports", view: "reports", permissionsAny: ["attendance.take", "assessments.marks.enter", "finance.reports.view", "teachers.salary.manage"], feature: "reports", roles: ["principal", "teacher"] },
   { key: "blog", path: "/blog", view: "blog", feature: "blog", roles: ["principal", "teacher"] },
-  { key: "settings", path: "/settings", view: "settings", permission: "academics.manage" },
+  { key: "settings", path: "/settings", view: "settings", permission: "settings.manage" },
   { key: "profile", path: "/my-profile", view: "profile", roles: ["teacher", "student"] },
 ];
 

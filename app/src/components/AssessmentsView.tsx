@@ -336,7 +336,7 @@ function AssignmentsTab({
               <SubmissionRow
                 key={s.id}
                 submission={s}
-                studentName={students.find((st) => st.id === s.student_id)?.name ?? s.student_id}
+                studentName={s.student_name ?? students.find((st) => st.id === s.student_id)?.name ?? t("unknownPersonLabel")}
                 onGraded={() => void openSubmissions(selected)}
               />
             ))}
@@ -383,7 +383,7 @@ function AssignmentCreateForm({
           let attachment_key: string | undefined;
           if (attachmentFile) {
             const { object_key, upload_url } = await filesApi.presignUpload({
-              category: "assignments", filename: attachmentFile.name, content_type: attachmentFile.type || "application/octet-stream",
+              category: "assignments", filename: attachmentFile.name, content_type: attachmentFile.type || "application/octet-stream", size_bytes: attachmentFile.size,
             });
             await fetch(upload_url, { method: "PUT", body: attachmentFile, headers: { "Content-Type": attachmentFile.type || "application/octet-stream" } });
             attachment_key = object_key;
@@ -824,7 +824,7 @@ function GradingSetup({
             {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </label>
-        <label>{t("examNameLabel")}<Input required value={examForm.name} onChange={(e) => setExamForm({ ...examForm, name: e.target.value })} placeholder="Midterm" /></label>
+        <label>{t("examNameLabel")}<Input required value={examForm.name} onChange={(e) => setExamForm({ ...examForm, name: e.target.value })} placeholder={t("examExample")} /></label>
         <label>{t("weightageLabel")}<Input required type="number" value={examForm.weightage} onChange={(e) => setExamForm({ ...examForm, weightage: e.target.value })} placeholder="40" /></label>
         <label>
           {t("gradingSchemeLabel")}

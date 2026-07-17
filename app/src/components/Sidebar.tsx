@@ -38,7 +38,7 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
         </div>
       </div>
 
-      <nav className="navScroll" aria-label="Primary">
+      <nav className="navScroll" aria-label={t("primaryNavigationLabel")}>
         {navGroups.map((group) => {
           const visible = group.items.filter(
             (item) => isNavItemAccessible(item, user?.role, hasPermission, hasFeature),

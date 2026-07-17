@@ -3,6 +3,30 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-17 — Full checked-item, endpoint, security, and PWA re-audit
+
+- Re-verified every checked `TO_IMPLEMENT.md` claim against implementation and
+  fixed the incomplete cases: delegated scope editing, teacher timetable scope,
+  UUID/name rendering, settings logo upload, admission-form deletion, draft-blog
+  visibility, and complete list pagination.
+- Made timetable slots the only live teacher-assignment source. Removed the
+  legacy assignment API/UI/rollover behavior and added regression coverage that
+  historical `teacher_assignments` rows grant no teaching access.
+- Hardened files end to end: required byte size, exact signed content length,
+  tenant-prefixed keys, and cross-tenant download rejection. Added PostgreSQL
+  RLS policies and per-transaction tenant context as a database-level backstop.
+- Completed admission-form deletion semantics (delete empty forms; require
+  closing forms that already have applications), protected management blog
+  drafts, and validated delegated scope targets server-side.
+- Finished missing Urdu strings across dashboards, attendance, academics,
+  accessibility labels, rich-text controls, and common examples. Improved
+  mobile-safe settings file controls and localized fallback states.
+- Added response name enrichment for finance and submissions without N+1
+  queries, and a contract test requiring `limit`, `offset`, and
+  `X-Total-Count` on every GET list endpoint.
+- Verification: backend suite **132 passed**; production TypeScript/Vite PWA
+  build passed and generated its service worker and manifest.
+
 ## 2026-07-13 — Final portal-audit backlog closure
 
 - Archived sessions are now centrally read-only: authenticated unsafe HTTP
@@ -672,3 +696,30 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
 - Added student-only attendance history and role-scoped timetable endpoints; the general timetable endpoint now requires management permission.
 - Forced self-service attendance and leave queries to remain self-scoped even when the user also holds management permissions, and enforced enrollment/section scope on assignment detail and submission APIs.
 - Scoped offline reference data and attendance outbox rows by madrasa and user, and removed the shared service-worker API response cache to prevent cross-login data exposure.
+# 2026-07-17 — Responsive UI system, visual regression loop, and endpoint contract
+
+Completed a whole-PWA design-system and responsive verification pass using
+deterministic authenticated Playwright fixtures. The reusable audit harness at
+`app/scripts/visual-audit.mjs` captures login plus 12 representative portal
+routes at 1440×1000 and 390×844; baseline and final evidence lives under
+`app/artifacts/ui-audit/`. The final pass reports no browser console errors and
+no horizontal overflow on any captured route.
+
+The shared UI system now provides complete token aliases, 44px primary touch
+targets, a keyboard skip link, reduced-motion handling, safe-area-aware mobile
+spacing, a compact sticky mobile app bar, a fully usable mobile navigation
+drawer, responsive datetime fields, cleaner empty tables, and a six-item
+task-priority dashboard shortcut grid. Login status/error copy is now fully
+English/Urdu i18n-backed. The announcement datetime pair was the one concrete
+overflow defect found by the final visual audit (130px at 390px wide); it now
+collapses to one column on phones.
+
+All portal screens are route-lazy-loaded behind a shared accessible loading
+state. The production build moved from one 230.59 KB-gzip JS bundle to a
+182.60 KB-gzip initial chunk with individual route chunks no larger than 6.41
+KB gzip, satisfying the 200 KB initial / 80 KB route SPA budget.
+
+Added `backend/tests/test_frontend_endpoint_contract.py`, which extracts PWA
+API calls and verifies that each method/path matches a registered FastAPI
+route (including dynamic path segments). Together with the existing behavioral
+and authorization tests, the backend suite is now 120 tests.

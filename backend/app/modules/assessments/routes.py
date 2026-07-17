@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -129,7 +129,7 @@ async def _require_class_course_scope(
         raise HTTPException(status_code=403, detail="Not assigned to this class/course")
 
     active_session_id = await _active_session_id(session, madrasa_id)
-    # Timetable slots are the source of truth (∪ legacy TeacherAssignment rows).
+    # Timetable slots are the sole source of teaching scope.
     if not await teacher_teaches(
         session,
         madrasa_id=madrasa_id,
@@ -495,22 +495,33 @@ async def submit_assignment(
 @router.get("/assignments/{assignment_id}/submissions", response_model=list[SubmissionRead])
 async def list_submissions(
     assignment_id: UUID,
+    response: Response,
     current_user: User = Depends(require_permission("assignments.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[SubmissionRead]:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
     await _require_class_course_scope(
         session, current_user, madrasa.id, assignment.class_id, assignment.course_id, bypass_permission="assignments.view_all"
     )
-    rows = (
-        await session.execute(select(Submission).where(Submission.assignment_id == assignment_id))
-    ).scalars().all()
+    rows = await paginate_scalars(
+        session,
+        select(Submission).where(Submission.assignment_id == assignment_id).order_by(Submission.submitted_at),
+        limit=limit, offset=offset, response=response,
+    )
     due_date = _aware(assignment.due_date)
+    student_names = dict((await session.execute(
+        select(StudentProfile.id, StudentProfile.name).where(
+            StudentProfile.id.in_({row.student_id for row in rows})
+        )
+    )).all()) if rows else {}
     results = []
     for row in rows:
         item = SubmissionRead.model_validate(row)
         item.is_late = _aware(row.submitted_at) > due_date
+        item.student_name = student_names.get(row.student_id)
         results.append(item)
     return results
 
@@ -566,11 +577,17 @@ async def create_grading_scheme(
 
 @router.get("/grading-schemes", response_model=list[GradingSchemeRead])
 async def list_grading_schemes(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[GradingSchemeRead]:
-    rows = (await session.execute(select(GradingScheme).where(GradingScheme.madrasa_id == madrasa.id))).scalars().all()
+    rows = await paginate_scalars(
+        session, select(GradingScheme).where(GradingScheme.madrasa_id == madrasa.id).order_by(GradingScheme.name),
+        limit=limit, offset=offset, response=response,
+    )
     return [GradingSchemeRead.model_validate(row) for row in rows]
 
 
@@ -607,15 +624,18 @@ async def create_exam_type(
 
 @router.get("/exam-types", response_model=list[ExamTypeRead])
 async def list_exam_types(
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     course_id: UUID | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[ExamTypeRead]:
     stmt = select(ExamType).where(ExamType.madrasa_id == madrasa.id)
     if course_id:
         stmt = stmt.where(ExamType.course_id == course_id)
-    rows = (await session.execute(stmt)).scalars().all()
+    rows = await paginate_scalars(session, stmt.order_by(ExamType.name), limit=limit, offset=offset, response=response)
     return [ExamTypeRead.model_validate(row) for row in rows]
 
 
@@ -933,9 +953,7 @@ async def get_result_card(
 async def _teacher_names_by_section_course(
     session: AsyncSession, madrasa_id: UUID, session_id: UUID, class_id: UUID
 ) -> dict[tuple[UUID | None, UUID], str]:
-    """(section_id, course_id) → teacher name, from timetable slots, with
-    class-wide legacy TeacherAssignment rows keyed (None, course_id)."""
-    from app.modules.academics.models import TeacherAssignment
+    """(section_id, course_id) → teacher name from timetable slots."""
     from app.modules.operations.models import TimetableSlot
 
     names: dict[tuple[UUID | None, UUID], str] = {}
@@ -953,20 +971,6 @@ async def _teacher_names_by_section_course(
     ).all()
     for section_id, course_id, name in slot_rows:
         names[(section_id, course_id)] = name
-    assignment_rows = (
-        await session.execute(
-            select(TeacherAssignment.course_id, TeacherProfile.name)
-            .join(TeacherProfile, TeacherProfile.id == TeacherAssignment.teacher_id)
-            .where(
-                TeacherAssignment.madrasa_id == madrasa_id,
-                TeacherAssignment.session_id == session_id,
-                TeacherAssignment.class_id == class_id,
-            )
-            .distinct()
-        )
-    ).all()
-    for course_id, name in assignment_rows:
-        names.setdefault((None, course_id), name)
     return names
 
 
@@ -1115,7 +1119,7 @@ async def _matrix_sections(
             raise HTTPException(status_code=404, detail="Class has no sections")
 
     # Authorization: principal (implicit) or global marks permission; a
-    # teacher may view sections they teach in (timetable ∪ legacy).
+    # Teachers may view only sections they teach in the timetable.
     if current_user.role != UserRole.principal and not await user_has_permission(
         current_user, "assessments.marks.enter", session
     ):

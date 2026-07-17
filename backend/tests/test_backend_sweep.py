@@ -264,8 +264,9 @@ async def test_timetable_import_dry_run_and_commit(client, seed, db_sessionmaker
     assert good.json()["created"] == 2
     async with db_sessionmaker() as db:
         stored = (await db.execute(select(TimetableSlot))).scalars().all()
-        assert len(stored) == 2
-        assert sorted(s.period for s in stored) == [1, 2]  # auto-derived
+        imported = [slot for slot in stored if slot.day_of_week == 0]
+        assert len(imported) == 2
+        assert sorted(s.period for s in imported) == [1, 2]  # auto-derived
 
 
 # ---------------------------------------------------------------- settings
@@ -357,8 +358,8 @@ async def test_rollover_copies_timetable_and_shifted_holidays(client, seed, db_s
         copied_slots = (
             await db.execute(select(TimetableSlot).where(TimetableSlot.session_id != seed.old_session.id))
         ).scalars().all()
-        assert len(copied_slots) == 1
-        assert str(copied_slots[0].session_id) == new_session_id
+        assert len(copied_slots) == 2
+        assert {str(slot.session_id) for slot in copied_slots} == {new_session_id}
 
         holidays = (await db.execute(select(Holiday).order_by(Holiday.start_date))).scalars().all()
         assert len(holidays) == 2

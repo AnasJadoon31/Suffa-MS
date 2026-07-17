@@ -251,7 +251,7 @@ export function FormsView() {
               {responses.length === 0 && <p className="emptyState">{t("noResponsesYet")}</p>}
               {responses.map((r) => (
                 <div className="dataRow" key={r.id}>
-                  <span>{r.student_name ?? r.student_id}</span>
+                  <span>{r.student_name ?? t("unknownPersonLabel")}</span>
                   <span>{new Date(r.created_at).toLocaleString()}</span>
                   <span>{JSON.stringify(r.response_data)}</span>
                 </div>
