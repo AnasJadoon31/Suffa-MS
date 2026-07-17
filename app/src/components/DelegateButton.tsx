@@ -37,12 +37,12 @@ export function DelegateButton({ modules }: Readonly<{ modules: string[] }>) {
   );
 }
 
-function DelegateModal({ modules, onClose }: Readonly<{ modules: string[]; onClose: () => void }>) {
+export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readonly<{ modules?: string[]; initialTeacherUserId?: string; onClose: () => void }>) {
   const { t } = useTranslation();
   const [catalog, setCatalog] = useState<PermissionDef[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
-  const [teacherUserId, setTeacherUserId] = useState("");
+  const [teacherUserId, setTeacherUserId] = useState(initialTeacherUserId ?? "");
   const [existing, setExisting] = useState<PermissionGrant[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [scopeClassId, setScopeClassId] = useState("");
@@ -56,7 +56,7 @@ function DelegateModal({ modules, onClose }: Readonly<{ modules: string[]; onClo
   }, []);
 
   const relevant = useMemo(
-    () => catalog.filter((p) => modules.includes(p.module)),
+    () => modules ? catalog.filter((p) => modules.includes(p.module)) : catalog,
     [catalog, modules]
   );
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, GraduationCap, HandCoins, KeyRound, Plus, UserPlus, UserRoundCog, UsersRound, X } from "lucide-react";
+import { Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../lib/AuthContext";
@@ -23,6 +23,7 @@ import { LoadingState } from "./ui/AsyncState";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { AdmissionsView } from "./AdmissionsView";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { DelegateModal } from "./DelegateButton";
 
 function SendCredentialsButton({
   subjectType,
@@ -313,9 +314,11 @@ function TeacherDetail({
   onClose,
 }: Readonly<{ teacher: Teacher; canSalary: boolean; onClose: () => void }>) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [payments, setPayments] = useState<SalaryPayment[]>([]);
   const [payForm, setPayForm] = useState({ amount: "", payment_date: "", period_covered: "", method: "cash" });
   const [error, setError] = useState("");
+  const [showDelegate, setShowDelegate] = useState(false);
 
   const load = async () => {
     if (!canSalary) return;
@@ -334,7 +337,14 @@ function TeacherDetail({
     <div className="modulePanel detailPanel">
       <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between" }}>
         <h3>{teacher.name} · {teacher.employee_code}</h3>
-        <button className="tableAction" type="button" onClick={onClose}><X size={16} /></button>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {user?.role === "principal" && (
+            <button className="secondaryAction" type="button" onClick={() => setShowDelegate(true)}>
+              <ShieldCheck size={16} /> {t("delegateBtn")}
+            </button>
+          )}
+          <button className="tableAction" type="button" onClick={onClose}><X size={16} /></button>
+        </div>
       </div>
       <dl className="detailGrid">
         <dt>{t("whatsappCol")}</dt><dd>{teacher.whatsapp_number || "—"}</dd>
@@ -342,6 +352,12 @@ function TeacherDetail({
         <dt>{t("joinDateLabel")}</dt><dd>{teacher.join_date ?? "—"}</dd>
         <dt>{t("statusCol")}</dt><dd>{teacher.status}</dd>
       </dl>
+      {showDelegate && (
+        <DelegateModal
+          initialTeacherUserId={teacher.user_id}
+          onClose={() => setShowDelegate(false)}
+        />
+      )}
 
       {canSalary && (
         <>
