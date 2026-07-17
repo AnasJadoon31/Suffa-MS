@@ -114,16 +114,7 @@ async def get_me(
     else:
         stmt = select(UserPermission.permission_code).where(UserPermission.user_id == current_user.id)
         result = await session.execute(stmt)
-        permissions_set = set(result.scalars().all())
-
-        if current_user.role == UserRole.teacher:
-            # Teachers implicitly hold all scoped capabilities; their actual
-            # access is determined dynamically by timetable slots.
-            for permission in registry.all():
-                if permission.scoped:
-                    permissions_set.add(permission.code)
-
-        permissions = sorted(permissions_set)
+        permissions = sorted(result.scalars().all())
 
     return CurrentUserResponse(
         user=UserRead.model_validate(current_user),
