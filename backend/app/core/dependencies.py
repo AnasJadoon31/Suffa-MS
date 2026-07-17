@@ -290,6 +290,14 @@ async def user_has_permission(user: User, code: str, session: AsyncSession) -> b
     use user_has_permission_scoped where a scope is known."""
     if user.role == UserRole.principal:
         return True
+
+    # Teacher derived capabilities: teachers implicitly hold capability for scoped=True
+    # permissions. Individual endpoints must independently verify their class/course scope
+    # (via Timetable slots) before allowing action.
+    if user.role == UserRole.teacher:
+        permission_def = registry._items.get(code)
+        if permission_def and permission_def.scoped:
+            return True
     stmt = select(UserPermission).where(
         UserPermission.user_id == user.id,
         UserPermission.permission_code == code,
