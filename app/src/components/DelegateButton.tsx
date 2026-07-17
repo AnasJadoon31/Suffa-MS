@@ -46,6 +46,7 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
   const [existing, setExisting] = useState<PermissionGrant[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [scopeClassId, setScopeClassId] = useState("");
+  const [taughtClasses, setTaughtClasses] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -55,10 +56,19 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
     void academicsApi.listClasses().then(setClasses).catch(() => setClasses([]));
   }, []);
 
-  const relevant = useMemo(
-    () => modules ? catalog.filter((p) => modules.includes(p.module)) : catalog,
-    [catalog, modules]
-  );
+  useEffect(() => {
+    setTaughtClasses([]);
+    if (!teacherUserId) return;
+    void peopleApi.taughtClasses(teacherUserId).then(setTaughtClasses).catch(() => setTaughtClasses([]));
+  }, [teacherUserId]);
+
+  const relevant = useMemo(() => {
+    let list = modules ? catalog.filter((p) => modules.includes(p.module)) : catalog;
+    if (scopeClassId) {
+      list = list.filter((p) => p.scoped);
+    }
+    return list;
+  }, [catalog, modules, scopeClassId]);
 
   useEffect(() => {
     setExisting([]);
@@ -71,14 +81,23 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
   useEffect(() => {
     setSelected(new Set(
       relevant
-        .filter((permission) => existing.some((grant) =>
-          grant.permission_code === permission.code
-          && grant.scope_type === (permission.scoped && scopeClassId ? "class" : null)
-          && grant.scope_id === (permission.scoped && scopeClassId ? scopeClassId : null)
-        ))
+        .filter((permission) => {
+          const explicitlyGranted = existing.some((grant) =>
+            grant.permission_code === permission.code
+            && grant.scope_type === (permission.scoped && scopeClassId ? "class" : null)
+            && grant.scope_id === (permission.scoped && scopeClassId ? scopeClassId : null)
+          );
+          if (explicitlyGranted) return true;
+
+          if (permission.scoped && scopeClassId && taughtClasses.includes(scopeClassId)) {
+            return true;
+          }
+
+          return false;
+        })
         .map((permission) => permission.code)
     ));
-  }, [existing, relevant, scopeClassId]);
+  }, [existing, relevant, scopeClassId, taughtClasses]);
 
   const toggle = (code: string) =>
     setSelected((prev) => {

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_madrasa, require_permission
+from app.core.dependencies import get_current_madrasa, get_current_user, require_permission
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.academics.models import Madrasa
@@ -171,6 +171,41 @@ async def reissue_teacher_credentials(
     url = reissue_set_password_link(session, madrasa_id=madrasa.id, actor_id=current_user.id, user=user)
     await session.commit()
     return {"username": user.username, "set_password_url": url}
+
+
+@router.get("/teachers/{user_id}/taught-classes", response_model=list[str])
+async def list_teacher_taught_classes(
+    user_id: UUID,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> list[str]:
+    from app.core.teaching_scope import taught_class_ids
+    from app.modules.operations.routes import _active_session_id
+
+    # The principal can view any teacher's assigned classes.
+    # A teacher can view their own assigned classes.
+    if current_user.role != UserRole.principal and current_user.id != user_id:
+        from app.core.dependencies import user_has_permission
+        if not await user_has_permission(current_user, "teachers.view", session):
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+    teacher = (
+        await session.execute(select(TeacherProfile).where(TeacherProfile.user_id == user_id))
+    ).scalar_one_or_none()
+
+    if teacher is None or teacher.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    active_session_id = await _active_session_id(session, madrasa.id)
+    if active_session_id is None:
+        return []
+
+    cids = await taught_class_ids(session, madrasa_id=madrasa.id, teacher_id=teacher.id, session_id=active_session_id)
+    return [str(cid) for cid in cids]
 
 
 # ----------------------------------------------------------------- Students

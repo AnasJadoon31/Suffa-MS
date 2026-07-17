@@ -29,7 +29,11 @@ export async function cachedFetch<T>(key: string, fetcher: () => Promise<T>): Pr
     const fetchedAt = new Date().toISOString();
     await db.refCache.put({ key: scopedKey, data, fetched_at: fetchedAt });
     return { data, fromCache: false, fetchedAt };
-  } catch (error) {
+  } catch (error: any) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      await db.refCache.delete(scopedKey);
+      throw error;
+    }
     const cached = await db.refCache.get(scopedKey);
     if (cached) {
       return { data: cached.data as T, fromCache: true, fetchedAt: cached.fetched_at };

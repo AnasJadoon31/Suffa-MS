@@ -127,6 +127,7 @@ export const peopleApi = {
   }) =>
     api.post<Teacher>("/api/v1/people/teachers", payload).then((r) => r.data),
   deactivateTeacher: (id: string) => api.post(`/api/v1/people/teachers/${id}/deactivate`).then((r) => r.data),
+  taughtClasses: (userId: string) => api.get<string[]>(`/api/v1/people/teachers/${userId}/taught-classes`).then((r) => r.data),
 
   listStudents: (search?: string) =>
     getAllPages<Student>("/api/v1/people/students", { search }),
