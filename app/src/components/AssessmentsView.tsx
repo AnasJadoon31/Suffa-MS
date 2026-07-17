@@ -31,7 +31,8 @@ export type AssessmentTab = "assignments" | "grading" | "results" | "setup";
 
 export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{ tab?: AssessmentTab; onTabChange?: (tab: AssessmentTab) => void }>) {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const isTeacher = user?.role === 'teacher';
   const readOnly = useSessionReadOnly();
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -78,16 +79,16 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
         <p className="notice">{t("assessmentsSubtitle")}</p>
       </div>
       <div className="formActions" style={{ marginBottom: 16 }}>
-        {hasPermission("assignments.create") && <button className={tab === "assignments" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("assignments")}>
+        {(isTeacher || hasPermission("assignments.create")) && <button className={tab === "assignments" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("assignments")}>
           <ClipboardList size={16} /> {t("assignmentsTab")}
         </button>}
-        {hasPermission("assessments.marks.enter") && <button className={tab === "grading" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("grading")}>
+        {(isTeacher || hasPermission("assessments.marks.enter")) && <button className={tab === "grading" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("grading")}>
           <BookOpen size={16} /> {t("gradingTab")}
         </button>}
         {(hasPermission("grading.schemes.manage") || hasPermission("assessments.exam_types.manage")) && <button className={tab === "setup" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("setup")}>
           <BookOpen size={16} /> {t("gradingSetupBtn")}
         </button>}
-        {hasPermission("assessments.marks.enter") && <button className={tab === "results" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("results")}>
+        {(isTeacher || hasPermission("assessments.marks.enter")) && <button className={tab === "results" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("results")}>
           <Send size={16} /> {t("resultsTab")}
         </button>}
       </div>
@@ -99,7 +100,7 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
           courses={courses}
           students={students}
           teachers={teachers}
-          canCreate={!readOnly && hasPermission("assignments.create")}
+          canCreate={!readOnly && (isTeacher || hasPermission("assignments.create"))}
           canPublishAll={hasPermission("assignments.manage_all")}
         />
       )}
