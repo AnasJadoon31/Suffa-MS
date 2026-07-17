@@ -4,6 +4,8 @@ WORKDIR /web
 # arrive as a build arg — a runtime env var only reaches server-side code.
 ARG NEXT_PUBLIC_API_BASE
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 COPY package*.json ./
 RUN --mount=type=cache,id=suffa-ms-web-npm,target=/root/.npm \
     npm ci --no-audit --no-fund

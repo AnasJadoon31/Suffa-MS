@@ -2,6 +2,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 ARG VITE_API_BASE
 ENV VITE_API_BASE=$VITE_API_BASE
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 COPY package*.json ./
 RUN --mount=type=cache,id=suffa-ms-app-npm,target=/root/.npm \
     npm ci --no-audit --no-fund

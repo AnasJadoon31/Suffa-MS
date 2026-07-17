@@ -7,7 +7,10 @@ const nextConfig = {
   // under .next/standalone/web/ instead of .next/standalone/ - breaking the
   // Dockerfile's flat COPY + `node server.js`.
   outputFileTracingRoot: path.resolve(),
-  experimental: {}
+  experimental: {
+    cpus: 1,
+    workerThreads: false
+  }
 };
 
 export default nextConfig;
