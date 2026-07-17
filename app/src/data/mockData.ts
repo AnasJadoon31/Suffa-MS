@@ -178,6 +178,9 @@ export const portalRoutes: readonly PortalRoute[] = [
   { key: "blog", path: "/blog", view: "blog", feature: "blog", roles: ["principal", "teacher"] },
   { key: "settings", path: "/settings", view: "settings", permission: "settings.manage" },
   { key: "profile", path: "/my-profile", view: "profile", roles: ["teacher", "student"] },
+  // Implicit routes for teachers to access their own classes
+  { key: "attendanceTeacher", path: "/attendance", view: "attendance", roles: ["teacher"], feature: "attendance" },
+  { key: "assessmentGradingTeacher", path: "/assessments/grading", view: "assessments", roles: ["teacher"], feature: "assessments" },
 ];
 
 export function isPortalRouteAccessible(
