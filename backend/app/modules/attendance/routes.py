@@ -137,6 +137,8 @@ def build_record(entry: AttendanceEntry, madrasa_id: UUID, marked_by_id: UUID, o
 
 
 async def _require_student_attendance_access(current_user: User, session: AsyncSession) -> None:
+    if current_user.role == "teacher":
+        return
     if await user_has_permission(current_user, "attendance.take", session):
         return
     if await user_has_permission(current_user, "students.attendance.manage", session):
