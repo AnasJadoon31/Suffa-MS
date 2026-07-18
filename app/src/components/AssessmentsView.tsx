@@ -7,6 +7,7 @@ import {
   assessmentsApi,
   filesApi,
   messagingApi,
+  operationsApi,
   peopleApi,
   type AcademicClass,
   type Assignment,
@@ -19,6 +20,7 @@ import {
   type Student,
   type Submission,
   type Teacher,
+  type TimetableSlot,
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { consumePendingClassNav } from "../lib/pendingNav";
@@ -38,6 +40,7 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [teacherSlots, setTeacherSlots] = useState<TimetableSlot[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -46,11 +49,18 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
       setIsLoading(true);
       setLoadError("");
       try {
-        const c = await academicsApi.listClasses();
+        const [allClasses, ownSlots] = await Promise.all([
+          academicsApi.listClasses(),
+          isTeacher ? operationsApi.listMyTimetable() : Promise.resolve(null),
+        ]);
+        setTeacherSlots(ownSlots);
+        const taughtClassIds = ownSlots ? new Set(ownSlots.map((slot) => slot.class_id)) : null;
+        const c = taughtClassIds ? allClasses.filter((cls) => taughtClassIds.has(cls.id)) : allClasses;
         setClasses(c);
         const allCourses = (await Promise.all(c.map((cls) => academicsApi.listCourses(cls.id)))).flat();
+        const taughtCourseIds = ownSlots ? new Set(ownSlots.map((slot) => slot.course_id)) : null;
         const unique = new Map(allCourses.map((course) => [course.id, course]));
-        setCourses([...unique.values()]);
+        setCourses([...unique.values()].filter((course) => !taughtCourseIds || taughtCourseIds.has(course.id)));
         try {
           setStudents(await peopleApi.listStudents());
         } catch {
@@ -100,6 +110,7 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
           courses={courses}
           students={students}
           teachers={teachers}
+          teacherSlots={teacherSlots}
           canCreate={!readOnly && (isTeacher || hasPermission("assignments.create"))}
           canPublishAll={hasPermission("assignments.manage_all")}
         />
@@ -132,9 +143,10 @@ function AssignmentsTab({
   courses,
   students,
   teachers,
+  teacherSlots,
   canCreate,
   canPublishAll,
-}: Readonly<{ classes: AcademicClass[]; courses: Course[]; students: Student[]; teachers: Teacher[]; canCreate: boolean; canPublishAll: boolean }>) {
+}: Readonly<{ classes: AcademicClass[]; courses: Course[]; students: Student[]; teachers: Teacher[]; teacherSlots: TimetableSlot[] | null; canCreate: boolean; canPublishAll: boolean }>) {
   const { t } = useTranslation();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filters, setFilters] = useState(() => {
@@ -184,8 +196,14 @@ function AssignmentsTab({
       setFilterSections([]);
       return;
     }
-    void academicsApi.listSections(filters.class_id).then(setFilterSections);
-  }, [filters.class_id]);
+    void academicsApi.listSections(filters.class_id).then((rows) => {
+      if (!teacherSlots) return setFilterSections(rows);
+      const allowed = new Set(
+        teacherSlots.filter((slot) => slot.class_id === filters.class_id).map((slot) => slot.section_id)
+      );
+      setFilterSections(rows.filter((section) => allowed.has(section.id)));
+    });
+  }, [filters.class_id, teacherSlots]);
 
   const categories = useMemo(
     () => [...new Set(assignments.map((a) => a.category).filter(Boolean))] as string[],
@@ -239,6 +257,7 @@ function AssignmentsTab({
         <AssignmentCreateForm
           classes={classes}
           courses={courses}
+          teacherSlots={teacherSlots}
           canPublishAll={canPublishAll}
           onCreated={() => {
             setShowCreate(false);
@@ -351,9 +370,10 @@ function AssignmentsTab({
 function AssignmentCreateForm({
   classes,
   courses,
+  teacherSlots,
   canPublishAll,
   onCreated,
-}: Readonly<{ classes: AcademicClass[]; courses: Course[]; canPublishAll: boolean; onCreated: () => void }>) {
+}: Readonly<{ classes: AcademicClass[]; courses: Course[]; teacherSlots: TimetableSlot[] | null; canPublishAll: boolean; onCreated: () => void }>) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ class_id: "", course_id: "", title: "", category: "", instructions: "", due_date: "" });
   const [sections, setSections] = useState<Section[]>([]);
@@ -368,8 +388,14 @@ function AssignmentCreateForm({
       setSections([]);
       return;
     }
-    void academicsApi.listSections(form.class_id).then(setSections);
-  }, [form.class_id]);
+    void academicsApi.listSections(form.class_id).then((rows) => {
+      if (!teacherSlots) return setSections(rows);
+      const allowed = new Set(
+        teacherSlots.filter((slot) => slot.class_id === form.class_id).map((slot) => slot.section_id)
+      );
+      setSections(rows.filter((section) => allowed.has(section.id)));
+    });
+  }, [form.class_id, teacherSlots]);
 
   const toggleSection = (id: string) =>
     setSectionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));

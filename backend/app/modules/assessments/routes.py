@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -18,7 +18,7 @@ from app.core.error_codes import ErrorCode
 from app.core.hijri import to_hijri_string
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.core.pdf import render_result_card_pdf
-from app.core.teaching_scope import teacher_teaches
+from app.core.teaching_scope import taught_pairs, teacher_teaches
 from app.db.session import get_session
 from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section
 from app.modules.assessments.models import Assignment, ExamType, GradingScheme, Mark, ResultPublication, Submission
@@ -58,6 +58,26 @@ async def _teacher_profile(session: AsyncSession, current_user: User) -> Teacher
     return (
         await session.execute(select(TeacherProfile).where(TeacherProfile.user_id == current_user.id))
     ).scalar_one_or_none()
+
+
+def require_assessment_staff(permission_code: str):
+    """Allow explicitly delegated staff or a real teacher profile.
+
+    Timetable scope is enforced by each handler after its class/course is
+    known.  This dependency only opens that scoped path; it does not grant a
+    teacher madrasa-wide access.
+    """
+    async def checker(
+        current_user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(get_session),
+    ) -> User:
+        if await user_has_permission(current_user, permission_code, session):
+            return current_user
+        if current_user.role == UserRole.teacher and await _teacher_profile(session, current_user):
+            return current_user
+        raise HTTPException(status_code=403, detail=f"Missing permission: {permission_code}")
+
+    return checker
 
 
 async def _student_profile(session: AsyncSession, current_user: User, madrasa_id: UUID) -> StudentProfile | None:
@@ -114,6 +134,7 @@ async def _require_class_course_scope(
     madrasa_id: UUID,
     class_id: UUID,
     course_id: UUID,
+    section_id: UUID | None = None,
     bypass_permission: str | None = None,
 ) -> None:
     """Enforces FR-RBAC-03: a teacher may only act on a class+course they are
@@ -137,6 +158,7 @@ async def _require_class_course_scope(
         session_id=active_session_id,
         class_id=class_id,
         course_id=course_id,
+        section_id=section_id,
     ):
         raise HTTPException(status_code=403, detail="Not assigned to this class/course")
 
@@ -174,12 +196,52 @@ async def _require_course_scope(
         raise HTTPException(status_code=403, detail="Not assigned to this course")
 
 
+async def _require_student_course_scope(
+    session: AsyncSession,
+    current_user: User,
+    madrasa_id: UUID,
+    student_id: UUID,
+    course_id: UUID,
+) -> None:
+    """Prevent a course teacher from grading another section's students."""
+    student = await session.get(StudentProfile, student_id)
+    if student is None or student.madrasa_id != madrasa_id:
+        raise HTTPException(status_code=404, detail="Student not found")
+    if current_user.role != UserRole.teacher:
+        return
+    active_session_id = await _active_session_id(session, madrasa_id)
+    enrollment = (
+        await session.execute(
+            select(Enrollment).where(
+                Enrollment.madrasa_id == madrasa_id,
+                Enrollment.session_id == active_session_id,
+                Enrollment.student_id == student_id,
+            )
+        )
+    ).scalar_one_or_none()
+    teacher = await _teacher_profile(session, current_user)
+    if (
+        enrollment is None
+        or teacher is None
+        or not await teacher_teaches(
+            session,
+            madrasa_id=madrasa_id,
+            teacher_id=teacher.id,
+            session_id=active_session_id,
+            class_id=enrollment.class_id,
+            course_id=course_id,
+            section_id=enrollment.section_id,
+        )
+    ):
+        raise HTTPException(status_code=403, detail="Student is not in your timetable section")
+
+
 # ------------------------------------------------------------------- Assignments
 
 @router.post("/assignments", response_model=list[AssignmentRead])
 async def create_assignment(
     payload: AssignmentCreate,
-    current_user: User = Depends(require_permission("assignments.create")),
+    current_user: User = Depends(require_assessment_staff("assignments.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> list[AssignmentRead]:
@@ -325,6 +387,29 @@ async def list_assignments(
     if created_by_id:
         stmt = stmt.where(Assignment.created_by_id == created_by_id)
 
+    teacher = await _teacher_profile(session, current_user)
+    if current_user.role == UserRole.teacher and not await user_has_permission(
+        current_user, "assignments.view_all", session
+    ):
+        active_session_id = await _active_session_id(session, madrasa.id)
+        pairs = await taught_pairs(
+            session,
+            madrasa_id=madrasa.id,
+            teacher_id=teacher.id,
+            session_id=active_session_id,
+        ) if teacher is not None and active_session_id is not None else []
+        if not pairs:
+            response.headers["X-Total-Count"] = "0"
+            return []
+        stmt = stmt.where(or_(*(
+            and_(
+                Assignment.class_id == pair.class_id,
+                Assignment.course_id == pair.course_id,
+                or_(Assignment.section_id.is_(None), Assignment.section_id == pair.section_id),
+            )
+            for pair in pairs
+        )))
+
     student = await _student_profile(session, current_user, madrasa.id)
     enrollment = None
     if student is not None:
@@ -379,10 +464,15 @@ async def get_assignment(
     if student is not None:
         await _require_student_assignment_access(session, current_user, madrasa.id, assignment)
     else:
-        if current_user.role != UserRole.principal and not await user_has_permission(current_user, "assignments.create", session):
+        if (
+            current_user.role != UserRole.principal
+            and current_user.role != UserRole.teacher
+            and not await user_has_permission(current_user, "assignments.create", session)
+        ):
             raise HTTPException(status_code=403, detail=ErrorCode.ASSIGNMENT_NOT_ASSIGNED)
         await _require_class_course_scope(
             session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
+            section_id=assignment.section_id,
             bypass_permission="assignments.manage_all",
         )
     return AssignmentRead.model_validate(assignment)
@@ -392,13 +482,14 @@ async def get_assignment(
 async def update_assignment(
     assignment_id: UUID,
     payload: AssignmentUpdate,
-    current_user: User = Depends(require_permission("assignments.create")),
+    current_user: User = Depends(require_assessment_staff("assignments.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> AssignmentRead:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
     await _require_class_course_scope(
-        session, current_user, madrasa.id, assignment.class_id, assignment.course_id, bypass_permission="assignments.manage_all"
+        session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
+        section_id=assignment.section_id, bypass_permission="assignments.manage_all"
     )
     targets = [assignment]
     if payload.apply_to_batch and assignment.batch_id is not None:
@@ -409,6 +500,11 @@ async def update_assignment(
                 )
             )
         ).scalars().all()
+        for row in targets:
+            await _require_class_course_scope(
+                session, current_user, madrasa.id, row.class_id, row.course_id,
+                section_id=row.section_id, bypass_permission="assignments.manage_all",
+            )
 
     updates = payload.model_dump(exclude_unset=True, exclude={"apply_to_batch"})
     for row in targets:
@@ -426,14 +522,15 @@ async def update_assignment(
 @router.delete("/assignments/{assignment_id}")
 async def delete_assignment(
     assignment_id: UUID,
-    current_user: User = Depends(require_permission("assignments.create")),
+    current_user: User = Depends(require_assessment_staff("assignments.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     whole_batch: bool = False,
 ) -> dict[str, int | str]:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
     await _require_class_course_scope(
-        session, current_user, madrasa.id, assignment.class_id, assignment.course_id, bypass_permission="assignments.manage_all"
+        session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
+        section_id=assignment.section_id, bypass_permission="assignments.manage_all"
     )
     targets = [assignment]
     if whole_batch and assignment.batch_id is not None:
@@ -444,6 +541,11 @@ async def delete_assignment(
                 )
             )
         ).scalars().all()
+        for row in targets:
+            await _require_class_course_scope(
+                session, current_user, madrasa.id, row.class_id, row.course_id,
+                section_id=row.section_id, bypass_permission="assignments.manage_all",
+            )
     for row in targets:
         submissions = (
             await session.execute(select(Submission).where(Submission.assignment_id == row.id))
@@ -496,7 +598,7 @@ async def submit_assignment(
 async def list_submissions(
     assignment_id: UUID,
     response: Response,
-    current_user: User = Depends(require_permission("assignments.create")),
+    current_user: User = Depends(require_assessment_staff("assignments.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
@@ -504,7 +606,8 @@ async def list_submissions(
 ) -> list[SubmissionRead]:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
     await _require_class_course_scope(
-        session, current_user, madrasa.id, assignment.class_id, assignment.course_id, bypass_permission="assignments.view_all"
+        session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
+        section_id=assignment.section_id, bypass_permission="assignments.view_all"
     )
     rows = await paginate_scalars(
         session,
@@ -530,7 +633,7 @@ async def list_submissions(
 async def grade_submission(
     submission_id: UUID,
     payload: SubmissionGrade,
-    current_user: User = Depends(require_permission("assignments.create")),
+    current_user: User = Depends(require_assessment_staff("assignments.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> SubmissionRead:
@@ -539,7 +642,8 @@ async def grade_submission(
         raise HTTPException(status_code=404, detail="Submission not found")
     assignment = await _get_assignment_or_404(session, submission.assignment_id, madrasa.id)
     await _require_class_course_scope(
-        session, current_user, madrasa.id, assignment.class_id, assignment.course_id, bypass_permission="assignments.manage_all"
+        session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
+        section_id=assignment.section_id, bypass_permission="assignments.manage_all"
     )
     if payload.mark is not None:
         submission.mark = payload.mark
@@ -644,7 +748,7 @@ async def list_exam_types(
 @router.put("/marks", response_model=MarkRead)
 async def enter_mark(
     payload: MarkUpsert,
-    current_user: User = Depends(require_permission("assessments.marks.enter")),
+    current_user: User = Depends(require_assessment_staff("assessments.marks.enter")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> MarkRead:
@@ -652,6 +756,9 @@ async def enter_mark(
     if exam_type is None or exam_type.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Exam type not found")
     await _require_course_scope(session, current_user, madrasa.id, exam_type.course_id)
+    await _require_student_course_scope(
+        session, current_user, madrasa.id, payload.student_id, exam_type.course_id
+    )
 
     teacher = await _teacher_profile(session, current_user)
     existing = (
@@ -975,18 +1082,22 @@ async def _teacher_names_by_section_course(
 
 
 async def _section_matrix(
-    session: AsyncSession, madrasa_id: UUID, section: Section, active_session_id: UUID
+    session: AsyncSession,
+    madrasa_id: UUID,
+    section: Section,
+    active_session_id: UUID,
+    allowed_course_ids: set[UUID] | None = None,
 ) -> SectionResultMatrix:
     academic_class = await session.get(AcademicClass, section.class_id)
 
-    course_rows = (
-        await session.execute(
-            select(Course)
-            .join(ClassCourse, ClassCourse.course_id == Course.id)
-            .where(ClassCourse.class_id == section.class_id)
-            .order_by(Course.name)
-        )
-    ).scalars().all()
+    course_stmt = (
+        select(Course)
+        .join(ClassCourse, ClassCourse.course_id == Course.id)
+        .where(ClassCourse.class_id == section.class_id)
+    )
+    if allowed_course_ids is not None:
+        course_stmt = course_stmt.where(Course.id.in_(allowed_course_ids))
+    course_rows = (await session.execute(course_stmt.order_by(Course.name))).scalars().all()
 
     exam_types_by_course: dict[UUID, list[ExamType]] = {}
     for course in course_rows:
@@ -1097,7 +1208,7 @@ async def _matrix_sections(
     madrasa: Madrasa,
     section_id: UUID | None,
     class_id: UUID | None,
-) -> tuple[UUID, list[Section]]:
+) -> tuple[UUID, list[Section], dict[UUID, set[UUID]] | None]:
     if section_id is None and class_id is None:
         raise HTTPException(status_code=400, detail="Pass section_id or class_id")
     active_session_id = await _active_session_id(session, madrasa.id)
@@ -1118,26 +1229,29 @@ async def _matrix_sections(
         if not sections:
             raise HTTPException(status_code=404, detail="Class has no sections")
 
-    # Authorization: principal (implicit) or global marks permission; a
-    # Teachers may view only sections they teach in the timetable.
+    course_scope: dict[UUID, set[UUID]] | None = None
+    # Authorization: principal (implicit) or global marks permission. A
+    # timetable-scoped teacher sees just the sections/courses they teach.
     if current_user.role != UserRole.principal and not await user_has_permission(
         current_user, "assessments.marks.enter", session
     ):
         teacher = await _teacher_profile(session, current_user)
         if teacher is None:
             raise HTTPException(status_code=403, detail="Not allowed to view these results")
-        for section in sections:
-            if not await teacher_teaches(
-                session,
-                madrasa_id=madrasa.id,
-                teacher_id=teacher.id,
-                session_id=active_session_id,
-                class_id=section.class_id,
-                section_id=section.id,
-            ):
-                raise HTTPException(status_code=403, detail="Not allowed to view these results")
+        pairs = await taught_pairs(
+            session,
+            madrasa_id=madrasa.id,
+            teacher_id=teacher.id,
+            session_id=active_session_id,
+        )
+        course_scope = {}
+        for pair in pairs:
+            course_scope.setdefault(pair.section_id, set()).add(pair.course_id)
+        sections = [section for section in sections if section.id in course_scope]
+        if not sections:
+            raise HTTPException(status_code=403, detail="Not allowed to view these results")
 
-    return active_session_id, sections
+    return active_session_id, sections, course_scope
 
 
 @router.get("/results/matrix", response_model=ResultsMatrixResponse)
@@ -1148,10 +1262,21 @@ async def get_results_matrix(
     section_id: UUID | None = None,
     class_id: UUID | None = None,
 ) -> ResultsMatrixResponse:
-    active_session_id, sections = await _matrix_sections(session, current_user, madrasa, section_id, class_id)
+    active_session_id, sections, course_scope = await _matrix_sections(
+        session, current_user, madrasa, section_id, class_id
+    )
     return ResultsMatrixResponse(
         session_id=active_session_id,
-        sections=[await _section_matrix(session, madrasa.id, s, active_session_id) for s in sections],
+        sections=[
+            await _section_matrix(
+                session,
+                madrasa.id,
+                section,
+                active_session_id,
+                course_scope.get(section.id, set()) if course_scope is not None else None,
+            )
+            for section in sections
+        ],
     )
 
 
@@ -1171,8 +1296,19 @@ async def export_results(
 
     from app.core.pdf import render_table_pdf
 
-    active_session_id, sections = await _matrix_sections(session, current_user, madrasa, section_id, class_id)
-    matrices = [await _section_matrix(session, madrasa.id, s, active_session_id) for s in sections]
+    active_session_id, sections, course_scope = await _matrix_sections(
+        session, current_user, madrasa, section_id, class_id
+    )
+    matrices = [
+        await _section_matrix(
+            session,
+            madrasa.id,
+            section,
+            active_session_id,
+            course_scope.get(section.id, set()) if course_scope is not None else None,
+        )
+        for section in sections
+    ]
 
     if format == "pdf":
         # One PDF per export; sections stacked as header rows inside the table.

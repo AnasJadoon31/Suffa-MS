@@ -1,10 +1,12 @@
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.dependencies import require_feature
 from app.core.logging import setup_logging
+from app.db.session import get_session
 from app.modules.academics.routes import router as academics_router
 from app.modules.assessments.routes import router as assessments_router
 from app.modules.attendance.routes import router as attendance_router
@@ -132,6 +134,11 @@ def create_app() -> FastAPI:
     @app.get("/healthz", tags=["system"])
     async def healthz() -> dict[str, str]:
         return {"status": "ok", "service": "mms-api"}
+
+    @app.get("/readyz", tags=["system"])
+    async def readyz(session=Depends(get_session)) -> dict[str, str]:
+        await session.execute(text("SELECT 1"))
+        return {"status": "ready", "service": "mms-api"}
 
     return app
 

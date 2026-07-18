@@ -4,13 +4,45 @@ copy options, security headers."""
 import re
 from datetime import date
 
+import pytest
 from sqlalchemy import select
 
+from app.core.config import Settings
 from app.core.security import hash_password, verify_password
 from app.modules.auth.models import User, UserRole
 from app.modules.finance.models import PaymentCategory
 from app.modules.operations.models import Holiday, Leave, TimetableSlot
 from app.modules.people.models import Guardian
+
+
+# --------------------------------------------------------- production posture
+
+def test_production_config_rejects_default_secret_and_service_urls():
+    with pytest.raises(ValueError, match="SECRET_KEY"):
+        Settings(
+            _env_file=None,
+            environment="production",
+            secret_key="dev-only-change-me",
+            database_url="postgresql+asyncpg://mms:mms_password@localhost:5432/mms",
+            redis_url="redis://localhost:6379/0",
+        )
+
+
+def test_production_config_accepts_explicit_secure_services():
+    configured = Settings(
+        _env_file=None,
+        environment="production",
+        secret_key="a" * 64,
+        database_url="postgresql+asyncpg://mms:secret@postgres:5432/mms",
+        redis_url="redis://redis:6379/0",
+    )
+    assert configured.environment == "production"
+
+
+async def test_readiness_checks_database(client):
+    response = await client.get("/readyz")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
 
 
 # ---------------------------------------------------------------- hijri

@@ -8,6 +8,7 @@ class+course in assessments.
 from sqlalchemy import select
 
 from app.modules.academics.models import TeacherAssignment
+from app.modules.assessments.models import ExamType, GradingScheme
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
 from app.modules.operations.models import TimetableSlot
 from app.modules.people.models import TeacherProfile
@@ -170,6 +171,133 @@ async def test_slot_alone_grants_assessment_scope(client, teacher_client, seed, 
         await db.commit()
 
     denied = await teacher_client.post("/api/v1/assessments/assignments", json=assignment)
+    assert denied.status_code == 403
+
+
+async def test_timetable_teacher_can_create_assignment_without_manual_permission(
+    teacher_client, seed,
+):
+    """A timetable assignment is the teaching authorization source of truth.
+
+    A teacher must not need a second, manual ``assignments.create`` grant just
+    to use Assessments for the class/course already assigned in the timetable.
+    """
+    response = await teacher_client.post(
+        "/api/v1/assessments/assignments",
+        json={
+            "class_id": str(seed.class_a.id),
+            "course_id": str(seed.course.id),
+            "section_ids": [str(seed.sections.a1.id)],
+            "title": "Timetable-authorized assignment",
+            "instructions": "Revise today's lesson",
+            "due_date": "2024-07-01T00:00:00Z",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+
+async def test_teacher_lists_only_assessments_in_timetable_scope(
+    client, teacher_client, seed,
+):
+    in_scope = {
+        "class_id": str(seed.class_a.id),
+        "course_id": str(seed.course.id),
+        "section_ids": [str(seed.sections.a1.id)],
+        "title": "Visible assessment",
+        "instructions": "In scope",
+        "due_date": "2024-07-01T00:00:00Z",
+    }
+    out_of_scope = {
+        **in_scope,
+        "class_id": str(seed.class_b.id),
+        "section_ids": [str(seed.sections.b1.id)],
+        "title": "Hidden assessment",
+    }
+    assert (await client.post("/api/v1/assessments/assignments", json=in_scope)).status_code == 200
+    assert (await client.post("/api/v1/assessments/assignments", json=out_of_scope)).status_code == 200
+
+    response = await teacher_client.get("/api/v1/assessments/assignments")
+
+    assert response.status_code == 200
+    assert {row["title"] for row in response.json()} == {"Visible assessment"}
+
+
+async def test_teacher_cannot_open_another_sections_assignment(
+    client, teacher_client, seed,
+):
+    created = await client.post(
+        "/api/v1/assessments/assignments",
+        json={
+            "class_id": str(seed.class_a.id),
+            "course_id": str(seed.course.id),
+            "section_ids": [str(seed.sections.a2.id)],
+            "title": "Other section",
+            "instructions": "Not in the teacher timetable",
+            "due_date": "2024-07-01T00:00:00Z",
+        },
+    )
+    assignment_id = created.json()[0]["id"]
+
+    response = await teacher_client.get(f"/api/v1/assessments/assignments/{assignment_id}")
+
+    assert response.status_code == 403
+
+
+async def test_teacher_class_matrix_contains_only_timetable_sections(
+    teacher_client, seed,
+):
+    """Selecting a class must work when the teacher teaches one of its sections."""
+    response = await teacher_client.get(
+        "/api/v1/assessments/results/matrix",
+        params={"class_id": str(seed.class_a.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    assert {section["section_id"] for section in response.json()["sections"]} == {
+        str(seed.sections.a1.id)
+    }
+
+
+async def test_teacher_enters_marks_only_for_students_in_timetable_section(
+    teacher_client, seed, db_sessionmaker,
+):
+    async with db_sessionmaker() as db:
+        scheme = GradingScheme(
+            madrasa_id=seed.madrasa.id,
+            name="Default",
+            bands=[{"label": "Pass", "min_score": 0, "max_score": 100}],
+        )
+        db.add(scheme)
+        await db.flush()
+        exam = ExamType(
+            madrasa_id=seed.madrasa.id,
+            course_id=seed.course.id,
+            name="Quiz",
+            weightage=1,
+            grading_scheme_id=scheme.id,
+        )
+        db.add(exam)
+        await db.commit()
+
+    allowed = await teacher_client.put(
+        "/api/v1/assessments/marks",
+        json={
+            "exam_type_id": str(exam.id),
+            "student_id": str(seed.students[0].id),
+            "score": 90,
+        },
+    )
+    denied = await teacher_client.put(
+        "/api/v1/assessments/marks",
+        json={
+            "exam_type_id": str(exam.id),
+            "student_id": str(seed.students[1].id),
+            "score": 90,
+        },
+    )
+
+    assert allowed.status_code == 200, allowed.text
     assert denied.status_code == 403
 
 

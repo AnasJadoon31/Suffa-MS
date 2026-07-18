@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -52,6 +52,33 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _validate_production_settings(self) -> "Settings":
+        if self.environment.lower() == "development":
+            return self
+
+        unsafe_secrets = {"", "change-me", "dev-only-change-me"}
+        if (
+            self.secret_key in unsafe_secrets
+            or self.secret_key.startswith("replace-")
+            or len(self.secret_key) < 32
+        ):
+            raise ValueError("SECRET_KEY must be a random value of at least 32 characters in production")
+        if (
+            not self.database_url
+            or "mms_password@localhost" in self.database_url
+            or "replace-db-password" in self.database_url
+            or "postgres-host" in self.database_url
+        ):
+            raise ValueError("DATABASE_URL must be explicitly configured in production")
+        if (
+            not self.redis_url
+            or "localhost:6379" in self.redis_url
+            or "redis-host" in self.redis_url
+        ):
+            raise ValueError("REDIS_URL must be explicitly configured in production")
+        return self
 
 
 settings = Settings()

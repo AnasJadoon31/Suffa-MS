@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     image: suffa-ms-backend
     environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       S3_ENDPOINT: ${MINIO_ENDPOINT}
@@ -28,7 +29,7 @@ services:
       - coolify
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).read()\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read()\""]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -38,12 +39,14 @@ services:
     image: suffa-ms-backend
     command: arq app.worker.WorkerSettings
     environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       SECRET_KEY: ${SECRET_KEY}
       DEFAULT_TENANT: ${DEFAULT_TENANT:-suffa}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - default
       - coolify
