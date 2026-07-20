@@ -97,6 +97,11 @@ class GradingSchemeCreate(BaseModel):
     bands: list[GradeBand]
 
 
+class GradingSchemeUpdate(BaseModel):
+    name: str | None = None
+    bands: list[GradeBand] | None = None
+
+
 class GradingSchemeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
@@ -109,6 +114,13 @@ class ExamTypeCreate(BaseModel):
     name: str
     weightage: float = Field(gt=0)
     grading_scheme_id: UUID
+
+
+class ExamTypeUpdate(BaseModel):
+    course_id: UUID | None = None
+    name: str | None = None
+    weightage: float | None = Field(default=None, gt=0)
+    grading_scheme_id: UUID | None = None
 
 
 class ExamTypeRead(BaseModel):

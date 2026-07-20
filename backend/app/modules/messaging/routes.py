@@ -1,12 +1,15 @@
+import base64
 from datetime import UTC, datetime
 from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, require_permission
+from app.core.config import settings
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.academics.models import AcademicClass, AcademicSession, Course, Enrollment, Madrasa
@@ -53,6 +56,8 @@ async def render_and_dispatch(
     recipient_type: str,
     recipient_id: UUID,
     phone_number: str,
+    attachment_bytes: bytes | None = None,
+    attachment_name: str = "report.pdf",
 ) -> WhatsAppLinkResponse:
     template = (
         await session.execute(
@@ -81,6 +86,26 @@ async def render_and_dispatch(
         )
     )
     await session.commit()
+
+    if attachment_bytes is not None and settings.evolution_api_url and settings.evolution_api_key and settings.evolution_instance:
+        endpoint = f"{settings.evolution_api_url.rstrip('/')}/message/sendMedia/{settings.evolution_instance}"
+        payload = {
+            "number": number,
+            "mediatype": "document",
+            "mimetype": "application/pdf",
+            "media": base64.b64encode(attachment_bytes).decode("ascii"),
+            "fileName": attachment_name,
+            "caption": message,
+        }
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                endpoint,
+                headers={"apikey": settings.evolution_api_key, "Content-Type": "application/json"},
+                json=payload,
+            )
+        if response.is_error:
+            raise HTTPException(status_code=502, detail=f"WhatsApp media delivery failed: {response.text}")
+        return WhatsAppLinkResponse(normalised_number=number, direct_sent=True)
 
     return WhatsAppLinkResponse(normalised_number=number, url=f"https://wa.me/{number}?text={quote(message)}")
 
@@ -171,6 +196,9 @@ async def send_report(
     guardian = await _primary_guardian(session, student.id)
     phone = guardian.phone_numbers.split(",")[0].strip()
 
+    from app.modules.assessments.routes import _render_result_card
+
+    report_pdf = await _render_result_card(session, madrasa.id, student, publication.session_id)
     return await render_and_dispatch(
         session,
         madrasa=madrasa,
@@ -191,6 +219,8 @@ async def send_report(
         recipient_type="guardian",
         recipient_id=guardian.id,
         phone_number=phone,
+        attachment_bytes=report_pdf,
+        attachment_name=f"result-{student.admission_number}.pdf",
     )
 
 

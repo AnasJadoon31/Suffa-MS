@@ -161,7 +161,7 @@ export const peopleApi = {
 
 // -------------------------------------------------------------------- Messaging
 
-export interface WhatsAppLink { normalised_number: string; url: string }
+export interface WhatsAppLink { normalised_number: string; url: string; direct_sent: boolean }
 
 export const messagingApi = {
   sendCredentials: (payload: { subject_type: "student" | "teacher"; subject_id: string; set_password_url: string }) =>
@@ -177,6 +177,7 @@ export interface AttendanceClassOption {
   name: string;
   course_names: string[];
   student_count: number;
+  sections: { id: string; name: string; student_count: number }[];
 }
 export interface AttendanceRosterStudent {
   id: string;
@@ -190,6 +191,8 @@ export interface AttendanceRoster {
   session_name: string;
   class_id: string;
   class_name: string;
+  section_id: string | null;
+  section_name: string | null;
   students: AttendanceRosterStudent[];
 }
 export interface AttendanceMarker {
@@ -241,6 +244,7 @@ export interface StudentAttendanceHistory extends ClassAttendanceHistory {
 export interface AttendanceDateRange {
   start_date?: string;
   end_date?: string;
+  section_id?: string;
 }
 export interface TeacherAttendanceToday {
   session_id: string;
@@ -255,8 +259,8 @@ export interface TeacherAttendanceToday {
 
 export const attendanceApi = {
   listClasses: () => getAllPages<AttendanceClassOption>("/api/v1/attendance/classes"),
-  classRoster: (classId: string) =>
-    api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`).then((r) => r.data),
+  classRoster: (classId: string, sectionId?: string) =>
+    api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`, { params: { section_id: sectionId } }).then((r) => r.data),
   classHistory: (classId: string, range?: AttendanceDateRange) =>
     api
       .get<ClassAttendanceHistory>(`/api/v1/attendance/classes/${classId}/history`, { params: range })
@@ -350,11 +354,17 @@ export const assessmentsApi = {
   listGradingSchemes: () => getAllPages<GradingScheme>("/api/v1/assessments/grading-schemes"),
   createGradingScheme: (payload: { name: string; bands: GradingScheme["bands"] }) =>
     api.post<GradingScheme>("/api/v1/assessments/grading-schemes", payload).then((r) => r.data),
+  updateGradingScheme: (id: string, payload: { name?: string; bands?: GradingScheme["bands"] }) =>
+    api.put<GradingScheme>(`/api/v1/assessments/grading-schemes/${id}`, payload).then((r) => r.data),
+  deleteGradingScheme: (id: string) => api.delete(`/api/v1/assessments/grading-schemes/${id}`).then((r) => r.data),
 
   listExamTypes: (courseId?: string) =>
     getAllPages<ExamType>("/api/v1/assessments/exam-types", { course_id: courseId }),
   createExamType: (payload: { course_id: string; name: string; weightage: number; grading_scheme_id: string }) =>
     api.post<ExamType>("/api/v1/assessments/exam-types", payload).then((r) => r.data),
+  updateExamType: (id: string, payload: { course_id?: string; name?: string; weightage?: number; grading_scheme_id?: string }) =>
+    api.put<ExamType>(`/api/v1/assessments/exam-types/${id}`, payload).then((r) => r.data),
+  deleteExamType: (id: string) => api.delete(`/api/v1/assessments/exam-types/${id}`).then((r) => r.data),
 
   enterMark: (payload: { exam_type_id: string; student_id: string; score: number }) =>
     api.put("/api/v1/assessments/marks", payload).then((r) => r.data),
@@ -590,6 +600,7 @@ export const operationsApi = {
     api.delete(`/api/v1/operations/admission-forms/${id}`).then((r) => r.data),
   createAdmission: (payload: {
     applicant_name: string; guardian_contact: string; program_id?: string; date_of_birth?: string; notes?: string;
+    extra_data?: Record<string, string>;
   }) => api.post<AdmissionApplication>("/api/v1/operations/admissions", payload).then((r) => r.data),
   setAdmissionStatus: (id: string, status: string) =>
     api.post<AdmissionApplication>(`/api/v1/operations/admissions/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
@@ -615,9 +626,28 @@ export interface AdmissionApplication {
   date_of_birth: string | null; notes: string | null; status: string;
   form_id: string | null; extra_data: Record<string, unknown> | null; created_at: string;
 }
+export interface PublicAdmissionForm {
+  title: string;
+  description: string;
+  program_name: string;
+  fields_definition: FormFieldDefinition[];
+  is_open: boolean;
+}
 export interface ContactEnquiry {
   id: string; name: string; contact: string; message: string; status: string; created_at: string;
 }
+
+export const publicApi = {
+  admissionForm: (token: string) =>
+    api.get<PublicAdmissionForm>(`/api/v1/public/admission-forms/${token}`).then((response) => response.data),
+  submitAdmission: (token: string, payload: {
+    applicant_name: string;
+    guardian_contact: string;
+    date_of_birth?: string;
+    extra_data?: Record<string, unknown>;
+    website?: string;
+  }) => api.post<AdmissionApplication>(`/api/v1/public/admission-forms/${token}`, payload).then((response) => response.data),
+};
 
 // ------------------------------------------------------------------ Files
 

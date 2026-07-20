@@ -336,6 +336,7 @@ class AdmissionApplicationCreate(BaseModel):
     program_id: UUID | None = None
     date_of_birth: date | None = None
     notes: str | None = None
+    extra_data: dict | None = None
 
 
 class AdmissionApplicationRead(BaseModel):

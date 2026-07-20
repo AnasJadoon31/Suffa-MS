@@ -80,3 +80,8 @@ def presign_download_url(object_key: str, expires_in: int = 900) -> str:
         Params={"Bucket": settings.s3_bucket, "Key": object_key},
         ExpiresIn=expires_in,
     )
+
+
+def download_object_bytes(object_key: str) -> bytes:
+    response = _client().get_object(Bucket=settings.s3_bucket, Key=object_key)
+    return response["Body"].read()

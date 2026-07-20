@@ -46,6 +46,7 @@ class Section(Base, IdMixin, TenantMixin, TimestampMixin):
 
 class Course(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "courses"
+    __table_args__ = (UniqueConstraint("madrasa_id", "name", name="uq_course_madrasa_name"),)
 
     name: Mapped[str] = mapped_column(String(160))
 

@@ -3,7 +3,7 @@ from datetime import date as DateType
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -330,7 +330,16 @@ async def create_course(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> CourseRead:
-    course = Course(madrasa_id=madrasa.id, name=payload.name)
+    name = payload.name.strip()
+    duplicate = await session.scalar(
+        select(Course.id).where(
+            Course.madrasa_id == madrasa.id,
+            func.lower(func.trim(Course.name)) == name.lower(),
+        ).limit(1)
+    )
+    if duplicate is not None:
+        raise HTTPException(status_code=409, detail="A course with this name already exists")
+    course = Course(madrasa_id=madrasa.id, name=name)
     session.add(course)
     await session.commit()
     await session.refresh(course)
@@ -364,7 +373,17 @@ async def update_course(
         raise HTTPException(status_code=404, detail="Course not found")
     
     if payload.name is not None:
-        course.name = payload.name
+        name = payload.name.strip()
+        duplicate = await session.scalar(
+            select(Course.id).where(
+                Course.madrasa_id == madrasa.id,
+                Course.id != course_id,
+                func.lower(func.trim(Course.name)) == name.lower(),
+            ).limit(1)
+        )
+        if duplicate is not None:
+            raise HTTPException(status_code=409, detail="A course with this name already exists")
+        course.name = name
         
     await session.commit()
     await session.refresh(course)

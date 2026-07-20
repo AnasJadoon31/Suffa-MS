@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { academicsApi, peopleApi, type AcademicClass, type Course, type Scope, type Section } from "../lib/endpoints";
+import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Course, type Scope, type Section } from "../lib/endpoints";
+import { useAuth } from "../lib/AuthContext";
 import { Select } from "./ui/Field";
 
 type Mode = "all" | "teachers" | "students" | "classes" | "sections" | "courses" | "users";
@@ -16,6 +17,7 @@ export function AudiencePicker({
   onChange,
 }: Readonly<{ value: Scope; onChange: (scope: Scope) => void }>) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [sections, setSections] = useState<Record<string, Section[]>>({});
   const [courses, setCourses] = useState<Course[]>([]);
@@ -32,13 +34,31 @@ export function AudiencePicker({
   );
 
   useEffect(() => {
-    void academicsApi.listClasses().then(async (list) => {
+    void Promise.all([
+      academicsApi.listClasses(),
+      user?.role === "teacher" ? operationsApi.listMyTimetable() : Promise.resolve([]),
+    ]).then(async ([allClasses, slots]) => {
+      const taughtClassIds = new Set(slots.map((slot) => slot.class_id));
+      const list = user?.role === "teacher" ? allClasses.filter((item) => taughtClassIds.has(item.id)) : allClasses;
       setClasses(list);
       const byClass: Record<string, Section[]> = {};
-      for (const cls of list) byClass[cls.id] = await academicsApi.listSections(cls.id);
+      for (const cls of list) {
+        const rows = await academicsApi.listSections(cls.id);
+        if (user?.role !== "teacher") byClass[cls.id] = rows;
+        else {
+          const assigned = new Set(slots.filter((slot) => slot.class_id === cls.id).map((slot) => slot.section_id));
+          byClass[cls.id] = rows.filter((section) => assigned.has(section.id));
+        }
+      }
       setSections(byClass);
     }).catch(() => setClasses([]));
-    void academicsApi.listAllCourses().then(setCourses).catch(() => setCourses([]));
+    void Promise.all([
+      academicsApi.listAllCourses(),
+      user?.role === "teacher" ? operationsApi.listMyTimetable() : Promise.resolve([]),
+    ]).then(([rows, slots]) => {
+      const assigned = new Set(slots.map((slot) => slot.course_id));
+      setCourses(user?.role === "teacher" ? rows.filter((course) => assigned.has(course.id)) : rows);
+    }).catch(() => setCourses([]));
     void Promise.all([peopleApi.listTeachers(), peopleApi.listStudents()])
       .then(([teachers, students]) => {
         setPeople([
@@ -47,7 +67,7 @@ export function AudiencePicker({
         ]);
       })
       .catch(() => setPeople([]));
-  }, []);
+  }, [user?.role]);
 
   const emptyScope: Scope = { all: false, roles: [], classes: [], sections: [], courses: [], users: [] };
 

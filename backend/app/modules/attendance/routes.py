@@ -26,6 +26,7 @@ from app.modules.attendance.schemas import (
     AttendanceOverrideResponse,
     AttendanceRosterResponse,
     AttendanceRosterStudent,
+    AttendanceSectionRead,
     AttendanceStatus,
     AttendanceSummary,
     AttendanceDayBreakdown,
@@ -201,6 +202,24 @@ async def _assert_can_mark_class(
         raise HTTPException(status_code=403, detail="Attendance access is not assigned for this class")
 
 
+async def _assert_can_mark_section(
+    current_user: User,
+    session: AsyncSession,
+    madrasa_id: UUID,
+    session_id: UUID,
+    class_id: UUID,
+    section_id: UUID,
+) -> None:
+    if await _has_global_student_attendance_access(current_user, session):
+        return
+    teacher_id = await _current_teacher_id(current_user, session, madrasa_id)
+    pairs = await taught_pairs(
+        session, madrasa_id=madrasa_id, teacher_id=teacher_id, session_id=session_id
+    ) if teacher_id else []
+    if not any(pair.class_id == class_id and pair.section_id == section_id for pair in pairs):
+        raise HTTPException(status_code=403, detail="Attendance access is not assigned for this section")
+
+
 async def _assert_can_mark_entry(
     current_user: User,
     session: AsyncSession,
@@ -218,18 +237,21 @@ async def _assert_can_mark_entry(
     if await _has_global_student_attendance_access(current_user, session):
         return
 
-    class_id = (
+    enrollment_scope = (
         await session.execute(
-            select(Enrollment.class_id).where(
+            select(Enrollment.class_id, Enrollment.section_id).where(
                 Enrollment.madrasa_id == madrasa_id,
                 Enrollment.student_id == entry.subject_id,
                 Enrollment.session_id == entry.session_id,
             )
         )
-    ).scalar_one_or_none()
-    if class_id is None:
+    ).one_or_none()
+    if enrollment_scope is None:
         raise HTTPException(status_code=403, detail="Student is not enrolled in this session")
-    await _assert_can_mark_class(current_user, session, madrasa_id, entry.session_id, class_id)
+    class_id, section_id = enrollment_scope
+    await _assert_can_mark_section(
+        current_user, session, madrasa_id, entry.session_id, class_id, section_id
+    )
 
 
 @router.get("/classes", response_model=list[AttendanceClassRead])
@@ -249,6 +271,7 @@ async def attendance_classes(
 
     is_global = await _has_global_student_attendance_access(current_user, session)
     assigned_course_ids: set[UUID] = set()
+    assigned_section_ids: set[UUID] | None = None
     class_stmt = select(AcademicClass.id, AcademicClass.name).where(AcademicClass.madrasa_id == madrasa.id)
 
     if not is_global:
@@ -261,6 +284,7 @@ async def attendance_classes(
         )
         assigned_class_ids = {pair.class_id for pair in pairs}
         assigned_course_ids = {pair.course_id for pair in pairs}
+        assigned_section_ids = {pair.section_id for pair in pairs}
         if not assigned_class_ids:
             response.headers["X-Total-Count"] = "0"
             return []
@@ -272,20 +296,39 @@ async def attendance_classes(
         response.headers["X-Total-Count"] = "0"
         return []
 
+    section_stmt = select(Section.id, Section.class_id, Section.name).where(
+        Section.madrasa_id == madrasa.id,
+        Section.class_id.in_(class_ids),
+    )
+    if assigned_section_ids is not None:
+        section_stmt = section_stmt.where(Section.id.in_(assigned_section_ids))
+    section_rows = (await session.execute(section_stmt.order_by(Section.name))).all()
+    visible_section_ids = [row[0] for row in section_rows]
+
     count_rows = (
         await session.execute(
-            select(Enrollment.class_id, func.count(StudentProfile.id))
+            select(Enrollment.section_id, func.count(StudentProfile.id))
             .join(StudentProfile, StudentProfile.id == Enrollment.student_id)
             .where(
                 Enrollment.madrasa_id == madrasa.id,
                 Enrollment.session_id == active_session.id,
                 Enrollment.class_id.in_(class_ids),
+                Enrollment.section_id.in_(visible_section_ids),
                 StudentProfile.status == "active",
             )
-            .group_by(Enrollment.class_id)
+            .group_by(Enrollment.section_id)
         )
     ).all()
-    student_counts = {row[0]: row[1] for row in count_rows}
+    section_student_counts = {row[0]: row[1] for row in count_rows}
+    sections_by_class: defaultdict[UUID, list[AttendanceSectionRead]] = defaultdict(list)
+    for section_id, class_id, section_name in section_rows:
+        sections_by_class[class_id].append(
+            AttendanceSectionRead(
+                id=section_id,
+                name=section_name,
+                student_count=section_student_counts.get(section_id, 0),
+            )
+        )
 
     course_stmt = (
         select(ClassCourse.class_id, Course.name)
@@ -307,7 +350,8 @@ async def attendance_classes(
             id=class_id,
             name=class_name,
             course_names=course_names[class_id],
-            student_count=student_counts.get(class_id, 0),
+            student_count=sum(section.student_count for section in sections_by_class[class_id]),
+            sections=sections_by_class[class_id],
         )
         for class_id, class_name in class_rows
     ], limit=limit, offset=offset, response=response)
@@ -316,6 +360,7 @@ async def attendance_classes(
 @router.get("/classes/{class_id}/roster", response_model=AttendanceRosterResponse)
 async def attendance_class_roster(
     class_id: UUID,
+    section_id: UUID | None = None,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -329,11 +374,19 @@ async def attendance_class_roster(
     if academic_class is None or academic_class.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
+    section = None
+    if section_id is not None:
+        section = await session.get(Section, section_id)
+        if section is None or section.madrasa_id != madrasa.id or section.class_id != class_id:
+            raise HTTPException(status_code=404, detail="Section not found")
+        await _assert_can_mark_section(
+            current_user, session, madrasa.id, active_session.id, class_id, section_id
+        )
+    else:
+        await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
 
-    rows = (
-        await session.execute(
-            select(
+    roster_stmt = (
+        select(
                 StudentProfile.id,
                 StudentProfile.admission_number,
                 StudentProfile.name,
@@ -349,14 +402,24 @@ async def attendance_class_roster(
                 StudentProfile.status == "active",
             )
             .order_by(Section.name, StudentProfile.name)
-        )
-    ).all()
+    )
+    if section_id is not None:
+        roster_stmt = roster_stmt.where(Enrollment.section_id == section_id)
+    elif current_user.role == UserRole.teacher and not await _has_global_student_attendance_access(current_user, session):
+        teacher_id = await _current_teacher_id(current_user, session, madrasa.id)
+        pairs = await taught_pairs(
+            session, madrasa_id=madrasa.id, teacher_id=teacher_id, session_id=active_session.id
+        ) if teacher_id else []
+        roster_stmt = roster_stmt.where(Enrollment.section_id.in_({pair.section_id for pair in pairs}))
+    rows = (await session.execute(roster_stmt)).all()
 
     return AttendanceRosterResponse(
         session_id=active_session.id,
         session_name=active_session.name,
         class_id=academic_class.id,
         class_name=academic_class.name,
+        section_id=section_id,
+        section_name=section.name if section is not None else None,
         students=[
             AttendanceRosterStudent(
                 id=student_id,
@@ -628,6 +691,7 @@ async def _class_history_entries(
     madrasa_id: UUID,
     session_id: UUID,
     class_id: UUID,
+    section_id: UUID | None = None,
     student_id: UUID | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
@@ -669,6 +733,8 @@ async def _class_history_entries(
     )
     if student_id is not None:
         stmt = stmt.where(StudentAttendance.student_id == student_id)
+    if section_id is not None:
+        stmt = stmt.where(Enrollment.section_id == section_id)
     if start_date is not None:
         stmt = stmt.where(StudentAttendance.attendance_date >= start_date)
     if end_date is not None:
@@ -686,18 +752,19 @@ async def _class_history_entries(
     if student_id is not None:
         student_ids = {student_id}
     else:
-        student_id_rows = (
-            await session.execute(
-                select(StudentProfile.id)
-                .join(Enrollment, Enrollment.student_id == StudentProfile.id)
-                .where(
-                    Enrollment.madrasa_id == madrasa_id,
-                    Enrollment.session_id == session_id,
-                    Enrollment.class_id == class_id,
-                    StudentProfile.status == "active",
-                )
+        student_stmt = (
+            select(StudentProfile.id)
+            .join(Enrollment, Enrollment.student_id == StudentProfile.id)
+            .where(
+                Enrollment.madrasa_id == madrasa_id,
+                Enrollment.session_id == session_id,
+                Enrollment.class_id == class_id,
+                StudentProfile.status == "active",
             )
-        ).all()
+        )
+        if section_id is not None:
+            student_stmt = student_stmt.where(Enrollment.section_id == section_id)
+        student_id_rows = (await session.execute(student_stmt)).all()
         student_ids = {row[0] for row in student_id_rows}
 
     approved_leave_entries = await _approved_leave_history_entries(
@@ -713,6 +780,7 @@ async def _class_history_entries(
 @router.get("/classes/{class_id}/history", response_model=ClassAttendanceHistoryResponse)
 async def attendance_class_history(
     class_id: UUID,
+    section_id: UUID | None = None,
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
     current_user: User = Depends(get_current_user),
@@ -728,7 +796,15 @@ async def attendance_class_history(
     if academic_class is None or academic_class.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
+    if section_id is not None:
+        section = await session.get(Section, section_id)
+        if section is None or section.madrasa_id != madrasa.id or section.class_id != class_id:
+            raise HTTPException(status_code=404, detail="Section not found")
+        await _assert_can_mark_section(
+            current_user, session, madrasa.id, active_session.id, class_id, section_id
+        )
+    else:
+        await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
 
     effective_start = start_date or active_session.gregorian_start
     effective_end = end_date or active_session.gregorian_end
@@ -737,6 +813,7 @@ async def attendance_class_history(
         madrasa_id=madrasa.id,
         session_id=active_session.id,
         class_id=class_id,
+        section_id=section_id,
         start_date=effective_start,
         end_date=effective_end,
     )
@@ -753,6 +830,7 @@ async def attendance_class_history(
 async def attendance_student_history(
     class_id: UUID,
     student_id: UUID,
+    section_id: UUID | None = None,
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
     current_user: User = Depends(get_current_user),
@@ -768,22 +846,31 @@ async def attendance_student_history(
     if academic_class is None or academic_class.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
-
-    student_row = (
-        await session.execute(
-            select(StudentProfile.id, StudentProfile.admission_number, StudentProfile.name, Section.id, Section.name)
-            .join(Enrollment, Enrollment.student_id == StudentProfile.id)
-            .outerjoin(Section, Section.id == Enrollment.section_id)
-            .where(
-                Enrollment.madrasa_id == madrasa.id,
-                Enrollment.session_id == active_session.id,
-                Enrollment.class_id == class_id,
-                StudentProfile.id == student_id,
-                StudentProfile.status == "active",
-            )
+    if section_id is not None:
+        section = await session.get(Section, section_id)
+        if section is None or section.madrasa_id != madrasa.id or section.class_id != class_id:
+            raise HTTPException(status_code=404, detail="Section not found")
+        await _assert_can_mark_section(
+            current_user, session, madrasa.id, active_session.id, class_id, section_id
         )
-    ).first()
+    else:
+        await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
+
+    student_stmt = (
+        select(StudentProfile.id, StudentProfile.admission_number, StudentProfile.name, Section.id, Section.name)
+        .join(Enrollment, Enrollment.student_id == StudentProfile.id)
+        .outerjoin(Section, Section.id == Enrollment.section_id)
+        .where(
+            Enrollment.madrasa_id == madrasa.id,
+            Enrollment.session_id == active_session.id,
+            Enrollment.class_id == class_id,
+            StudentProfile.id == student_id,
+            StudentProfile.status == "active",
+        )
+    )
+    if section_id is not None:
+        student_stmt = student_stmt.where(Enrollment.section_id == section_id)
+    student_row = (await session.execute(student_stmt)).first()
     if student_row is None:
         raise HTTPException(status_code=404, detail="Student not found in this class")
 
@@ -794,6 +881,7 @@ async def attendance_student_history(
         madrasa_id=madrasa.id,
         session_id=active_session.id,
         class_id=class_id,
+        section_id=section_id,
         student_id=student_id,
         start_date=effective_start,
         end_date=effective_end,

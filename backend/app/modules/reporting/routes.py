@@ -8,9 +8,9 @@ from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_madrasa, get_current_user, require_permission
-from app.core.pdf import render_table_pdf
-from app.core.teaching_scope import taught_pairs
+from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.pdf import load_report_branding, render_table_pdf
+from app.core.teaching_scope import taught_pairs, teacher_teaches
 from app.db.core_models import AuditLog
 from app.db.session import get_session
 from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section
@@ -414,13 +414,46 @@ def _csv_response(filename: str, headers: list[str], rows: list[list[str]]) -> R
     )
 
 
-def _pdf_response(filename: str, title: str, subtitle: str, headers: list[str], rows: list[list[str]]) -> Response:
-    content = render_table_pdf(title, subtitle, headers, rows)
+async def _pdf_response(
+    session: AsyncSession,
+    madrasa: Madrasa,
+    filename: str,
+    title: str,
+    subtitle: str,
+    headers: list[str],
+    rows: list[list[str]],
+) -> Response:
+    content = render_table_pdf(title, subtitle, headers, rows, await load_report_branding(session, madrasa))
     return Response(
         content=content,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}.pdf"'},
     )
+
+
+async def _require_teacher_report_scope(
+    session: AsyncSession,
+    current_user: User,
+    madrasa_id: UUID,
+    permission_code: str,
+    class_id: UUID,
+    section_id: UUID | None,
+    session_id: UUID,
+) -> None:
+    if current_user.role == UserRole.principal or await user_has_permission(current_user, permission_code, session):
+        return
+    teacher = await _teacher_profile(session, current_user)
+    if teacher is None or section_id is None:
+        raise HTTPException(status_code=403, detail="Choose one of your assigned sections")
+    if not await teacher_teaches(
+        session,
+        madrasa_id=madrasa_id,
+        teacher_id=teacher.id,
+        session_id=session_id,
+        class_id=class_id,
+        section_id=section_id,
+    ):
+        raise HTTPException(status_code=403, detail="Report access is not assigned for this section")
 
 
 @router.get("/reports/attendance")
@@ -430,10 +463,14 @@ async def attendance_report(
     end_date: date = Query(...),
     section_id: UUID | None = None,
     format: str = Query("csv", pattern="^(csv|pdf)$"),
-    current_user: User = Depends(require_permission("attendance.take")),
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
+    active_session_id = await _active_session_id(session, madrasa.id)
+    await _require_teacher_report_scope(
+        session, current_user, madrasa.id, "attendance.take", class_id, section_id, active_session_id
+    )
     stmt = select(Enrollment, StudentProfile).join(StudentProfile, StudentProfile.id == Enrollment.student_id).where(
         Enrollment.madrasa_id == madrasa.id, Enrollment.class_id == class_id
     )
@@ -456,7 +493,7 @@ async def attendance_report(
     filename = f"attendance-summary-{start_date}-to-{end_date}"
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return _pdf_response(filename, "Attendance Summary", f"{start_date} to {end_date}", headers, rows)
+    return await _pdf_response(session, madrasa, filename, "Attendance Summary", f"{start_date} to {end_date}", headers, rows)
 
 
 @router.get("/reports/results")
@@ -465,10 +502,13 @@ async def results_report(
     session_id: UUID,
     section_id: UUID | None = None,
     format: str = Query("csv", pattern="^(csv|pdf)$"),
-    current_user: User = Depends(require_permission("assessments.marks.enter")),
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
+    await _require_teacher_report_scope(
+        session, current_user, madrasa.id, "assessments.marks.enter", class_id, section_id, session_id
+    )
     stmt = (
         select(Enrollment, StudentProfile)
         .join(StudentProfile, StudentProfile.id == Enrollment.student_id)
@@ -515,7 +555,7 @@ async def results_report(
     filename = f"results-{class_name}-{session_name}".replace(" ", "-").lower()
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return _pdf_response(filename, "Results Report", f"{class_name} — {session_name}", headers, rows)
+    return await _pdf_response(session, madrasa, filename, "Results Report", f"{class_name} — {session_name}", headers, rows)
 
 
 @router.get("/reports/finance")
@@ -557,7 +597,7 @@ async def finance_report(
     filename = f"finance-report-{start_date}-to-{end_date}"
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return _pdf_response(filename, "Finance Report", f"{start_date} to {end_date}", headers, rows)
+    return await _pdf_response(session, madrasa, filename, "Finance Report", f"{start_date} to {end_date}", headers, rows)
 
 
 @router.get("/reports/salary")
@@ -600,7 +640,7 @@ async def salary_report(
     filename = f"salary-report-{start_date}-to-{end_date}"
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return _pdf_response(filename, "Salary Report", f"{start_date} to {end_date}", headers, rows)
+    return await _pdf_response(session, madrasa, filename, "Salary Report", f"{start_date} to {end_date}", headers, rows)
 
 
 @router.get("/reports/donations")
@@ -636,4 +676,4 @@ async def donations_report(
     filename = f"donations-report-{start_date}-to-{end_date}"
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return _pdf_response(filename, "Donations Report", f"{start_date} to {end_date}", headers, rows)
+    return await _pdf_response(session, madrasa, filename, "Donations Report", f"{start_date} to {end_date}", headers, rows)

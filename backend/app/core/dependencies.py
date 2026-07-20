@@ -326,6 +326,22 @@ async def user_has_permission_scoped(
     return False
 
 
+async def user_has_permission_grant(user: User, code: str, session: AsyncSession) -> bool:
+    """Return whether the user has this permission at any scope.
+
+    This is the appropriate entry gate for endpoints that validate the actual
+    class/section later from their payload. Using the madrasa-wide-only check
+    there made correctly delegated, scoped permissions impossible to use.
+    """
+    if user.role == UserRole.principal:
+        return True
+    stmt = select(UserPermission.id).where(
+        UserPermission.user_id == user.id,
+        UserPermission.permission_code == code,
+    )
+    return (await session.execute(stmt)).scalar_one_or_none() is not None
+
+
 def require_permission(code: str):
     """Returns a dependency callable — use as Depends(require_permission("some.code"))."""
     registry.require_known(code)  # fail fast at import time on a typo'd code
@@ -335,6 +351,21 @@ def require_permission(code: str):
         session: AsyncSession = Depends(get_session),
     ) -> User:
         if not await user_has_permission(current_user, code, session):
+            raise HTTPException(status_code=403, detail=f"Missing permission: {code}")
+        return current_user
+
+    return permission_checker
+
+
+def require_permission_grant(code: str):
+    """Require a grant at any scope; payload-level scope checks must follow."""
+    registry.require_known(code)
+
+    async def permission_checker(
+        current_user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(get_session),
+    ) -> User:
+        if not await user_has_permission_grant(current_user, code, session):
             raise HTTPException(status_code=403, detail=f"Missing permission: {code}")
         return current_user
 

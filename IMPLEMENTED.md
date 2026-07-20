@@ -687,6 +687,31 @@ Suite: 60 backend tests green.
   `typing.Union.__getitem__` TypeError at mapper configuration).
 
 Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
+
+## 2026-07-20 — Teacher/admin portal issue sweep
+
+- Fixed teacher navigation and permission handling for assessments, scoped
+  resources/forms, and permission changes refreshed when the portal regains
+  focus. Walk-in admissions now enforce `admissions.manage` server-side.
+- Made attendance and report access section-aware: teachers only receive their
+  timetable-assigned sections, while principals/unscoped managers retain the
+  full class view.
+- Added case-insensitive per-madrasa course-name uniqueness (API validation,
+  database index, and migration), plus grading scheme/exam type edit/delete
+  APIs and a row-based modal grading editor.
+- Moved the reported create/edit workflows into reusable modals, relocated the
+  People class filter, removed walk-in admissions from People, and expanded
+  admissions with guardian, identity, address, prior-school, and medical data.
+- Added a real public admission page instead of exposing the JSON API URL.
+- Added madrasa logo/contact branding to the authenticated shell and generated
+  reports/receipts/result cards; branding refreshes immediately after settings
+  updates.
+- Added optional Evolution API v2 document delivery for WhatsApp result cards
+  and receipts, with the existing text-link flow retained when direct delivery
+  is not configured.
+- Added targeted regressions in `test_reported_portal_issues.py`. Validation:
+  146 backend tests pass, Python compile succeeds, Alembic has one head, and the
+  frontend TypeScript/Vite production build succeeds.
 # 2026-07-13 — Route-based portal isolation
 
 - Replaced persisted in-app view state with real React Router URLs for every portal page.

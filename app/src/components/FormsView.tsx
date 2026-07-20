@@ -8,6 +8,7 @@ import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 const FIELD_TYPES = ["text", "textarea", "radio", "checkbox_group", "dropdown", "label"];
 
@@ -32,7 +33,7 @@ export function FormsView() {
   const [formDescription, setFormDescription] = useState("");
   const [formCategory, setFormCategory] = useState("");
   const [allowMultiple, setAllowMultiple] = useState(false);
-  const [audience, setAudience] = useState<Scope>({ all: true });
+  const [audience, setAudience] = useState<Scope>(user?.role === "teacher" ? { all: false } : { all: true });
   const [fields, setFields] = useState<FormFieldDefinition[]>([
     { key: "", label: "", type: "text", required: true, options: [] },
   ]);
@@ -40,6 +41,7 @@ export function FormsView() {
   const [editing, setEditing] = useState<FormDef | null>(null);
   const [editAudience, setEditAudience] = useState<Scope>({ all: true });
   const [editError, setEditError] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
 
   const knownCategories = useMemo(
     () => [...new Set(forms.map((f) => f.category).filter(Boolean))] as string[],
@@ -79,7 +81,11 @@ export function FormsView() {
         <p className="notice">{t("descForms")}</p>
       </div>
 
-      {canCreate && (
+      {canCreate && <div className="formActions" style={{ marginBottom: 12 }}>
+        <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createFormBtn")}</button>
+      </div>}
+
+      {canCreate && showCreate && <Modal title={t("createFormBtn")} onClose={() => setShowCreate(false)}>
         <form
           className="inlineForm"
           style={{ gridTemplateColumns: "1fr" }}
@@ -100,6 +106,7 @@ export function FormsView() {
               setFormCategory("");
               setAllowMultiple(false);
               setFields([{ key: "", label: "", type: "text", required: true, options: [] }]);
+              setShowCreate(false);
               await load();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedCreateForm"));
@@ -151,7 +158,7 @@ export function FormsView() {
             <button className="primaryAction" type="submit"><Plus size={16} /> {t("createFormBtn")}</button>
           </div>
         </form>
-      )}
+      </Modal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <datalist id="form-categories">
         {knownCategories.map((c) => <option key={c} value={c} />)}

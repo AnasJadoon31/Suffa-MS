@@ -10,7 +10,7 @@ from app.core.audit import record_audit
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission
 from app.core.hijri import to_hijri_string
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
-from app.core.pdf import render_receipt_pdf
+from app.core.pdf import load_report_branding, render_receipt_pdf
 from app.db.session import get_session
 from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
 from app.modules.auth.models import User
@@ -96,8 +96,12 @@ async def _receipt_context(
     }
 
 
-def _receipt_response(context: dict[str, str], note: str | None) -> Response:
-    pdf_bytes = render_receipt_pdf(**context, note=note)
+async def _receipt_response(
+    session: AsyncSession, madrasa: Madrasa, context: dict[str, str], note: str | None
+) -> Response:
+    pdf_bytes = render_receipt_pdf(
+        **context, note=note, branding=await load_report_branding(session, madrasa)
+    )
     filename = f"receipt-{context['receipt_number'].lower()}.pdf"
     return Response(
         content=pdf_bytes,
@@ -227,7 +231,7 @@ async def payment_receipt(
     context = await _receipt_context(
         session, madrasa, kind="Contribution", row=payment, payer_name=student.name if student else "—"
     )
-    return _receipt_response(context, payment.note)
+    return await _receipt_response(session, madrasa, context, payment.note)
 
 
 @router.post("/payments/{payment_id}/receipt-share", response_model=WhatsAppLinkResponse)
@@ -244,6 +248,11 @@ async def share_payment_receipt(
     guardian = await _primary_guardian(session, payment.student_id)
     context = await _receipt_context(
         session, madrasa, kind="Contribution", row=payment, payer_name=student.name if student else "—"
+    )
+    receipt_pdf = render_receipt_pdf(
+        **context,
+        note=payment.note,
+        branding=await load_report_branding(session, madrasa),
     )
     return await render_and_dispatch(
         session,
@@ -262,6 +271,8 @@ async def share_payment_receipt(
         recipient_type="guardian",
         recipient_id=guardian.id,
         phone_number=guardian.phone_numbers.split(",")[0].strip(),
+        attachment_bytes=receipt_pdf,
+        attachment_name=f"receipt-{context['receipt_number'].lower()}.pdf",
     )
 
 
@@ -370,7 +381,7 @@ async def donation_receipt(
     context = await _receipt_context(
         session, madrasa, kind="Donation", row=donation, payer_name=donor.name if donor else "—"
     )
-    return _receipt_response(context, donation.note)
+    return await _receipt_response(session, madrasa, context, donation.note)
 
 
 @router.post("/donations/{donation_id}/receipt-share", response_model=WhatsAppLinkResponse)
@@ -387,6 +398,11 @@ async def share_donation_receipt(
     if donor is None:
         raise HTTPException(status_code=404, detail="Donor not found")
     context = await _receipt_context(session, madrasa, kind="Donation", row=donation, payer_name=donor.name)
+    receipt_pdf = render_receipt_pdf(
+        **context,
+        note=donation.note,
+        branding=await load_report_branding(session, madrasa),
+    )
     return await render_and_dispatch(
         session,
         madrasa=madrasa,
@@ -404,6 +420,8 @@ async def share_donation_receipt(
         recipient_type="donor",
         recipient_id=donor.id,
         phone_number=donor.contact,
+        attachment_bytes=receipt_pdf,
+        attachment_name=f"receipt-{context['receipt_number'].lower()}.pdf",
     )
 
 

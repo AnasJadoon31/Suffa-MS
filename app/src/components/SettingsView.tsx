@@ -10,7 +10,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 
 export function SettingsView() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, refreshProfile } = useAuth();
   const readOnly = useSessionReadOnly();
   const canManage = !readOnly && hasPermission("settings.manage");
   const [settings, setSettings] = useState<TypedSetting[]>([]);
@@ -53,6 +53,7 @@ export function SettingsView() {
       await operationsApi.upsertSetting(item.key, value);
       setSavedKey(item.key);
       await load();
+      if (item.key.startsWith("madrasa.")) await refreshProfile();
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedSaveSetting"));
     }
@@ -81,6 +82,7 @@ export function SettingsView() {
       setDrafts((current) => ({ ...current, [item.key]: object_key }));
       setSavedKey(item.key);
       await load();
+      await refreshProfile();
     } catch (err: any) {
       setError(err.response?.data?.detail ?? err.message ?? t("failedUploadSettingFile"));
     }

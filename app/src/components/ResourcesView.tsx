@@ -18,12 +18,13 @@ import { cachedFetch } from "../lib/offlineCache";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 const emptyForm = { category_id: "", title: "", description: "", video_url: "" };
 
 export function ResourcesView() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const readOnly = useSessionReadOnly();
   const canManage = !readOnly && hasPermission("resources.manage");
   const canManageAll = hasPermission("resources.manage_all");
@@ -40,7 +41,7 @@ export function ResourcesView() {
   const [categoryName, setCategoryName] = useState("");
   const [categoryIsGlobal, setCategoryIsGlobal] = useState(true);
   const [form, setForm] = useState(emptyForm);
-  const [audience, setAudience] = useState<Scope>({ all: true });
+  const [audience, setAudience] = useState<Scope>(user?.role === "teacher" ? { all: false } : { all: true });
   const [file, setFile] = useState<File | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -50,6 +51,8 @@ export function ResourcesView() {
   const [editing, setEditing] = useState<ResourceItem | null>(null);
   const [editAudience, setEditAudience] = useState<Scope>({ all: true });
   const [editError, setEditError] = useState("");
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [showResourceForm, setShowResourceForm] = useState(false);
 
   const loadResources = async () => {
     setIsLoading(true);
@@ -110,7 +113,12 @@ export function ResourcesView() {
         <p className="notice">{t("descResources")}</p>
       </div>
 
-      {canManage && (
+      {canManage && <div className="formActions" style={{ marginBottom: 12 }}>
+        <button className="secondaryAction" type="button" onClick={() => setShowCategoryForm(true)}><FolderPlus size={16} /> {t("addCategoryBtn")}</button>
+        <button className="primaryAction" type="button" onClick={() => setShowResourceForm(true)}><Plus size={16} /> {t("addResourceBtn")}</button>
+      </div>}
+
+      {canManage && showCategoryForm && <Modal title={t("addCategoryBtn")} onClose={() => setShowCategoryForm(false)}>
         <form
           className="inlineForm"
           onSubmit={async (e) => {
@@ -119,6 +127,7 @@ export function ResourcesView() {
             if (!categoryName) return;
             await operationsApi.createResourceCategory(categoryName, categoryIsGlobal);
             setCategoryName("");
+            setShowCategoryForm(false);
             await refreshAll();
           }}
         >
@@ -131,7 +140,7 @@ export function ResourcesView() {
           )}
           <div className="formActions"><button className="primaryAction" type="submit"><FolderPlus size={16} /> {t("addCategoryBtn")}</button></div>
         </form>
-      )}
+      </Modal>}
 
       <div className="moduleToolbar">
         <div className="searchBox">
@@ -171,7 +180,7 @@ export function ResourcesView() {
         )}
       </div>
 
-      {canManage && (
+      {canManage && showResourceForm && <Modal title={t("addResourceBtn")} onClose={() => setShowResourceForm(false)}>
         <form
           className="inlineForm"
           onSubmit={async (e) => {
@@ -194,6 +203,7 @@ export function ResourcesView() {
               });
               setForm({ ...emptyForm, category_id: form.category_id });
               setFile(null);
+              setShowResourceForm(false);
               setNotice(t("resourceAdded"));
               await refreshAll();
             } catch (err: any) {
@@ -215,7 +225,7 @@ export function ResourcesView() {
           <AudiencePicker value={audience} onChange={setAudience} />
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addResourceBtn")}</button></div>
         </form>
-      )}
+      </Modal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 

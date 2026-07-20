@@ -48,6 +48,7 @@ class CurrentUserResponse(BaseModel):
     # Per-madrasa feature flags (super-admin controlled); frontend hides
     # disabled modules, backend enforces via require_feature.
     features: dict[str, bool] = {}
+    branding: dict[str, str] = {}
 
 
 class ProvisionUserRequest(BaseModel):

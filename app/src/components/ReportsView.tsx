@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../lib/AuthContext";
-import { academicsApi, type AcademicClass, type AcademicSession, reportingApi } from "../lib/endpoints";
+import { academicsApi, operationsApi, type AcademicClass, type AcademicSession, type Section, type TimetableSlot, reportingApi } from "../lib/endpoints";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 
@@ -38,10 +38,14 @@ function ReportCard({
 
 export function ReportsView() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const isTeacher = user?.role === "teacher";
   const [classes, setClasses] = useState<AcademicClass[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [teacherSlots, setTeacherSlots] = useState<TimetableSlot[]>([]);
   const [sessions, setSessions] = useState<AcademicSession[]>([]);
   const [classId, setClassId] = useState("");
+  const [sectionId, setSectionId] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -53,8 +57,14 @@ export function ReportsView() {
     void (async () => {
       setIsLoading(true);
       try {
-        const [classList, sessionRows] = await Promise.all([academicsApi.listClasses(), academicsApi.listSessions()]);
-        setClasses(classList);
+        const [classList, sessionRows, slots] = await Promise.all([
+          academicsApi.listClasses(),
+          academicsApi.listSessions(),
+          isTeacher ? operationsApi.listMyTimetable() : Promise.resolve([]),
+        ]);
+        setTeacherSlots(slots);
+        const taughtClassIds = new Set(slots.map((slot) => slot.class_id));
+        setClasses(isTeacher ? classList.filter((item) => taughtClassIds.has(item.id)) : classList);
         setSessions(sessionRows);
         const active = sessionRows.find((s) => s.is_active);
         if (active) setSessionId(active.id);
@@ -67,6 +77,22 @@ export function ReportsView() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setSectionId("");
+    if (!classId) {
+      setSections([]);
+      return;
+    }
+    void academicsApi.listSections(classId).then((rows) => {
+      if (!isTeacher) {
+        setSections(rows);
+        return;
+      }
+      const assigned = new Set(teacherSlots.filter((slot) => slot.class_id === classId).map((slot) => slot.section_id));
+      setSections(rows.filter((section) => assigned.has(section.id)));
+    }).catch(() => setSections([]));
+  }, [classId, isTeacher, teacherSlots]);
 
   const run = (fn: () => Promise<void>) => {
     setError("");
@@ -92,9 +118,9 @@ export function ReportsView() {
 
       <ReportCard
         title={t("attendanceReportHeading")}
-        disabled={!classId || !hasRange}
+        disabled={!classId || !sectionId || !hasRange}
         onDownload={(format) =>
-          run(() => reportingApi.downloadAttendanceReport({ class_id: classId, start_date: startDate, end_date: endDate }, format))
+          run(() => reportingApi.downloadAttendanceReport({ class_id: classId, section_id: sectionId, start_date: startDate, end_date: endDate }, format))
         }
       >
         <label>
@@ -104,14 +130,21 @@ export function ReportsView() {
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </label>
+        <label>
+          {t("sectionLabel")}
+          <Select value={sectionId} onChange={(e) => setSectionId(e.target.value)} disabled={!classId}>
+            <option value="">{t("selectEllipsis")}</option>
+            {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
+          </Select>
+        </label>
       </ReportCard>
 
-      {hasPermission("assessments.marks.enter") && (
+      {(isTeacher || hasPermission("assessments.marks.enter")) && (
         <ReportCard
           title={t("resultsReportHeading")}
-          disabled={!classId || !sessionId}
+          disabled={!classId || !sectionId || !sessionId}
           onDownload={(format) =>
-            run(() => reportingApi.downloadResultsReport({ class_id: classId, session_id: sessionId }, format))
+            run(() => reportingApi.downloadResultsReport({ class_id: classId, section_id: sectionId, session_id: sessionId }, format))
           }
         >
           <label>
@@ -119,6 +152,13 @@ export function ReportsView() {
             <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
               <option value="">{t("selectEllipsis")}</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </label>
+          <label>
+            {t("sectionLabel")}
+            <Select value={sectionId} onChange={(e) => setSectionId(e.target.value)} disabled={!classId}>
+              <option value="">{t("selectEllipsis")}</option>
+              {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
             </Select>
           </label>
           <label>

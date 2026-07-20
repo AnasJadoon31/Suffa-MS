@@ -219,7 +219,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
                   onClick={async () => {
                     try {
                       const link = await financeApi.sharePaymentReceipt(p.id);
-                      window.open(link.url, "_blank", "noopener,noreferrer");
+                      if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
                     } catch (err: any) {
                       setError(err.response?.data?.detail ?? t("failedShareReceipt"));
                     }
@@ -368,7 +368,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
                   onClick={async () => {
                     try {
                       const link = await financeApi.shareDonationReceipt(d.id);
-                      window.open(link.url, "_blank", "noopener,noreferrer");
+                      if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
                     } catch (err: any) {
                       setError(err.response?.data?.detail ?? t("failedShareReceipt"));
                     }

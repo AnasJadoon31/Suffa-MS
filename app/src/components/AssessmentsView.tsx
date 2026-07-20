@@ -28,6 +28,7 @@ import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 export type AssessmentTab = "assignments" | "grading" | "results" | "setup";
 
@@ -770,10 +771,19 @@ function GradingSetup({
   canCreateExamType,
 }: Readonly<{ courses: Course[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
   const { t } = useTranslation();
+  const defaultBands = [
+    { label: "Mumtaz", min_score: 90, max_score: 100 },
+    { label: "Jayyid", min_score: 60, max_score: 89.99 },
+    { label: "Rasib", min_score: 0, max_score: 59.99 },
+  ];
   const [schemes, setSchemes] = useState<GradingScheme[]>([]);
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
-  const [schemeForm, setSchemeForm] = useState({ name: "", bandsText: "Mumtaz:90-100, Jayyid:60-89.99, Rasib:0-59.99" });
+  const [schemeForm, setSchemeForm] = useState({ name: "", bands: defaultBands });
   const [examForm, setExamForm] = useState({ course_id: "", name: "", weightage: "", grading_scheme_id: "" });
+  const [editingScheme, setEditingScheme] = useState<GradingScheme | null>(null);
+  const [editingExam, setEditingExam] = useState<ExamType | null>(null);
+  const [showSchemeForm, setShowSchemeForm] = useState(false);
+  const [showExamForm, setShowExamForm] = useState(false);
   const [error, setError] = useState("");
 
   const load = async () => {
@@ -784,23 +794,32 @@ function GradingSetup({
     void load();
   }, []);
 
-  const parseBands = (text: string) =>
-    text.split(",").map((chunk) => {
-      const [label, range] = chunk.trim().split(":");
-      const [min, max] = range.split("-").map(Number);
-      return { label: label.trim(), min_score: min, max_score: max };
-    });
-
   return (
     <div className="modulePanel" style={{ marginBottom: 16 }}>
-      {canCreateScheme && <form
+      <div className="formActions" style={{ marginBottom: 12 }}>
+        {canCreateScheme && <button className="primaryAction" type="button" onClick={() => {
+          setEditingScheme(null);
+          setSchemeForm({ name: "", bands: defaultBands });
+          setShowSchemeForm(true);
+        }}><Plus size={16} /> {t("addSchemeBtn")}</button>}
+        {canCreateExamType && <button className="primaryAction" type="button" onClick={() => {
+          setEditingExam(null);
+          setExamForm({ course_id: "", name: "", weightage: "", grading_scheme_id: "" });
+          setShowExamForm(true);
+        }}><Plus size={16} /> {t("addExamTypeBtn")}</button>}
+      </div>
+      {showSchemeForm && <Modal title={editingScheme ? t("editBtn") : t("addSchemeBtn")} onClose={() => setShowSchemeForm(false)}><form
         className="inlineForm"
         onSubmit={async (e) => {
           e.preventDefault();
           setError("");
           try {
-            await assessmentsApi.createGradingScheme({ name: schemeForm.name, bands: parseBands(schemeForm.bandsText) });
-            setSchemeForm({ name: "", bandsText: "" });
+            const payload = { name: schemeForm.name, bands: schemeForm.bands };
+            if (editingScheme) await assessmentsApi.updateGradingScheme(editingScheme.id, payload);
+            else await assessmentsApi.createGradingScheme(payload);
+            setSchemeForm({ name: "", bands: defaultBands });
+            setEditingScheme(null);
+            setShowSchemeForm(false);
             await load();
           } catch (err: any) {
             setError(err.response?.data?.detail ?? t("failedCreateScheme"));
@@ -808,36 +827,58 @@ function GradingSetup({
         }}
       >
         <label>{t("schemeNameLabel")}<Input required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} /></label>
-        <label style={{ gridColumn: "span 2" }}>
-          {t("bandsLabel")}
-          <Input required value={schemeForm.bandsText} onChange={(e) => setSchemeForm({ ...schemeForm, bandsText: e.target.value })} />
-        </label>
+        <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
+          <strong>{t("bandsLabel")}</strong>
+          {schemeForm.bands.map((band, index) => <div className="inlineForm" style={{ margin: 0 }} key={index}>
+            <label>{t("nameLabel")}<Input required value={band.label} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /></label>
+            <label>Min<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: Number(event.target.value) } : item) })} /></label>
+            <label>Max<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: Number(event.target.value) } : item) })} /></label>
+            <button className="tableAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={14} /></button>
+          </div>)}
+          <button className="secondaryAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: [...schemeForm.bands, { label: "", min_score: 0, max_score: 100 }] })}><Plus size={14} /> {t("addFieldBtn")}</button>
+        </div>
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addSchemeBtn")}</button></div>
-      </form>}
+      </form></Modal>}
       <div className="dataTable">
-        <div className="dataRow header"><span>{t("schemeCol")}</span><span>{t("bandsCol")}</span></div>
+        <div className="dataRow header"><span>{t("schemeCol")}</span><span>{t("bandsCol")}</span><span>{t("actionsCol")}</span></div>
         {schemes.map((s) => (
           <div className="dataRow" key={s.id}>
             <span>{s.name}</span>
             <span>{s.bands.map((b) => `${b.label} (${b.min_score}-${b.max_score})`).join(", ")}</span>
+            <span className="actions">
+              {canCreateScheme && <button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
+                setEditingScheme(s);
+                setSchemeForm({ name: s.name, bands: s.bands.map((band) => ({ ...band })) });
+                setShowSchemeForm(true);
+              }}><Pencil size={15} /></button>}
+              {canCreateScheme && <button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {
+                if (!window.confirm(t("deleteRecordConfirm"))) return;
+                try { await assessmentsApi.deleteGradingScheme(s.id); await load(); }
+                catch (err: any) { setError(err.response?.data?.detail ?? t("genericError")); }
+              }}><Trash2 size={15} /></button>}
+            </span>
           </div>
         ))}
       </div>
 
-      {canCreateExamType && <form
+      {showExamForm && <Modal title={editingExam ? t("editBtn") : t("addExamTypeBtn")} onClose={() => setShowExamForm(false)}><form
         className="inlineForm"
         style={{ marginTop: 16 }}
         onSubmit={async (e) => {
           e.preventDefault();
           setError("");
           try {
-            await assessmentsApi.createExamType({
+            const payload = {
               course_id: examForm.course_id,
               name: examForm.name,
               weightage: Number(examForm.weightage),
               grading_scheme_id: examForm.grading_scheme_id,
-            });
+            };
+            if (editingExam) await assessmentsApi.updateExamType(editingExam.id, payload);
+            else await assessmentsApi.createExamType(payload);
             setExamForm({ course_id: "", name: "", weightage: "", grading_scheme_id: "" });
+            setEditingExam(null);
+            setShowExamForm(false);
             await load();
           } catch (err: any) {
             setError(err.response?.data?.detail ?? t("failedCreateExamType"));
@@ -861,14 +902,26 @@ function GradingSetup({
           </Select>
         </label>
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addExamTypeBtn")}</button></div>
-      </form>}
+      </form></Modal>}
       <div className="dataTable">
-        <div className="dataRow header"><span>{t("courseCol")}</span><span>{t("examCol")}</span><span>{t("weightageCol")}</span></div>
+        <div className="dataRow header"><span>{t("courseCol")}</span><span>{t("examCol")}</span><span>{t("weightageCol")}</span><span>{t("actionsCol")}</span></div>
         {examTypes.map((et) => (
           <div className="dataRow" key={et.id}>
             <span>{courses.find((c) => c.id === et.course_id)?.name ?? "—"}</span>
             <span>{et.name}</span>
             <span>{et.weightage}%</span>
+            <span className="actions">
+              {canCreateExamType && <button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
+                setEditingExam(et);
+                setExamForm({ course_id: et.course_id, name: et.name, weightage: String(et.weightage), grading_scheme_id: et.grading_scheme_id });
+                setShowExamForm(true);
+              }}><Pencil size={15} /></button>}
+              {canCreateExamType && <button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {
+                if (!window.confirm(t("deleteRecordConfirm"))) return;
+                try { await assessmentsApi.deleteExamType(et.id); await load(); }
+                catch (err: any) { setError(err.response?.data?.detail ?? t("genericError")); }
+              }}><Trash2 size={15} /></button>}
+            </span>
           </div>
         ))}
       </div>
@@ -937,7 +990,8 @@ function ResultsTab({
     setNotice("");
     try {
       const link = await messagingApi.sendReport({ student_id: studentId, result_link: window.location.origin });
-      window.open(link.url, "_blank", "noopener,noreferrer");
+      if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
+      else if (link.direct_sent) setNotice(t("whatsappDocumentSent"));
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedSendReport"));
     }

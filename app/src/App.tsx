@@ -45,6 +45,7 @@ const MyTimetableView = lazyNamed(() => import("./components/MyTimetableView"), 
 const PeopleView = lazyNamed(() => import("./components/PeopleView"), "PeopleView");
 const PlatformView = lazyNamed(() => import("./components/PlatformView"), "PlatformView");
 const ProfileView = lazyNamed(() => import("./components/ProfileView"), "ProfileView");
+const PublicAdmissionPage = lazyNamed(() => import("./components/PublicAdmissionPage"), "PublicAdmissionPage");
 const ReportsView = lazyNamed(() => import("./components/ReportsView"), "ReportsView");
 const ResourcesView = lazyNamed(() => import("./components/ResourcesView"), "ResourcesView");
 const SalaryView = lazyNamed(() => import("./components/SalaryView"), "SalaryView");
@@ -139,13 +140,13 @@ function Workspace() {
       case "assessmentResults":
         return <AssessmentsView tab="results" onTabChange={(tab) => navigate(`/assessments/${tab}`)} />;
       case "peopleStudents":
-        return <PeopleView initialTab="students" onTabChange={(tab) => navigate(tab === "admissions" ? "/admissions" : `/people/${tab}`)} />;
+        return <PeopleView initialTab="students" onTabChange={(tab) => navigate(`/people/${tab}`)} />;
       case "peopleTeachers":
-        return <PeopleView initialTab="teachers" onTabChange={(tab) => navigate(tab === "admissions" ? "/admissions" : `/people/${tab}`)} />;
+        return <PeopleView initialTab="teachers" onTabChange={(tab) => navigate(`/people/${tab}`)} />;
       case "peopleGuardians":
-        return <PeopleView initialTab="guardians" onTabChange={(tab) => navigate(tab === "admissions" ? "/admissions" : `/people/${tab}`)} />;
+        return <PeopleView initialTab="guardians" onTabChange={(tab) => navigate(`/people/${tab}`)} />;
       case "peopleDonators":
-        return <PeopleView initialTab="donators" onTabChange={(tab) => navigate(tab === "admissions" ? "/admissions" : `/people/${tab}`)} />;
+        return <PeopleView initialTab="donators" onTabChange={(tab) => navigate(`/people/${tab}`)} />;
       case "financeContributions":
         return <FinanceView tab="contributions" onTabChange={(tab) => navigate(`/finance/${tab}`)} />;
       case "financeDonations":
@@ -198,7 +199,7 @@ function Workspace() {
       case "blog":
         return <BlogView />;
       case "admissions":
-        return <PeopleView initialTab="admissions" showTabs={false} />;
+        return <AdmissionsView section="registrations" />;
       case "admission_forms":
         return <AdmissionsView section="forms" />;
       case "enquiries":
@@ -306,6 +307,7 @@ export default function App() {
     <Suspense fallback={<LoadingState />}>
       <Routes>
         <Route path="/set-password" element={<SetPasswordPage />} />
+        <Route path="/public/admission/:token" element={<PublicAdmissionPage />} />
         <Route path="*" element={<Workspace />} />
       </Routes>
     </Suspense>

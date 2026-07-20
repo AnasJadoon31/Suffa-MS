@@ -13,6 +13,7 @@ from app.core.dependencies import (
     get_optional_user,
     require_active_session,
     require_permission,
+    require_permission_grant,
     user_has_permission,
 )
 from app.core.error_codes import ErrorCode
@@ -395,7 +396,7 @@ async def export_timetable(
     section, stacked in class/section order."""
     from fastapi.responses import Response
 
-    from app.core.pdf import render_table_pdf
+    from app.core.pdf import load_report_branding, render_table_pdf
 
     stmt = (
         select(TimetableSlot, AcademicClass.name, Section.name, Course.name, TeacherProfile.name)
@@ -447,7 +448,8 @@ async def export_timetable(
             table_rows.append(row)
 
     pdf_bytes = render_table_pdf(
-        "Timetable", f"{madrasa.name} — {context_session.name}", headers, table_rows
+        "Timetable", f"{madrasa.name} — {context_session.name}", headers, table_rows,
+        await load_report_branding(session, madrasa),
     )
     return Response(
         content=pdf_bytes,
@@ -959,7 +961,7 @@ def _category_read(row: ResourceCategory, current_user_id: UUID) -> ResourceCate
 @router.post("/resource-categories", response_model=ResourceCategoryRead)
 async def create_resource_category(
     payload: ResourceCategoryCreate,
-    current_user: User = Depends(require_permission("resources.manage")),
+    current_user: User = Depends(require_permission_grant("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> ResourceCategoryRead:
@@ -998,7 +1000,7 @@ async def list_resource_categories(
 @router.delete("/resource-categories/{category_id}")
 async def delete_resource_category(
     category_id: UUID,
-    current_user: User = Depends(require_permission("resources.manage")),
+    current_user: User = Depends(require_permission_grant("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
@@ -1037,7 +1039,7 @@ async def _resource_read(session: AsyncSession, resource: Resource) -> ResourceR
 @router.post("/resources", response_model=ResourceRead)
 async def create_resource(
     payload: ResourceCreate,
-    current_user: User = Depends(require_permission("resources.manage")),
+    current_user: User = Depends(require_permission_grant("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> ResourceRead:
@@ -1068,7 +1070,7 @@ async def create_resource(
 async def update_resource(
     resource_id: UUID,
     payload: ResourceUpdate,
-    current_user: User = Depends(require_permission("resources.manage")),
+    current_user: User = Depends(require_permission_grant("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> ResourceRead:
@@ -1100,7 +1102,7 @@ async def update_resource(
 @router.delete("/resources/{resource_id}")
 async def delete_resource(
     resource_id: UUID,
-    current_user: User = Depends(require_permission("resources.manage")),
+    current_user: User = Depends(require_permission_grant("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
@@ -1169,7 +1171,7 @@ async def _form_admin(current_user: User, session: AsyncSession) -> bool:
 @router.post("/forms", response_model=FormRead)
 async def create_form(
     payload: FormCreate,
-    current_user: User = Depends(require_permission("forms.create")),
+    current_user: User = Depends(require_permission_grant("forms.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> FormRead:
@@ -1196,7 +1198,7 @@ async def create_form(
 async def update_form(
     form_id: UUID,
     payload: FormUpdate,
-    current_user: User = Depends(require_permission("forms.create")),
+    current_user: User = Depends(require_permission_grant("forms.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> FormRead:
@@ -1229,7 +1231,7 @@ async def update_form(
 @router.delete("/forms/{form_id}")
 async def delete_form(
     form_id: UUID,
-    current_user: User = Depends(require_permission("forms.create")),
+    current_user: User = Depends(require_permission_grant("forms.create")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
@@ -1677,6 +1679,7 @@ async def delete_admission_form(
 @router.post("/admissions", response_model=AdmissionApplicationRead)
 async def create_admission_application(
     payload: AdmissionApplicationCreate,
+    current_user: User = Depends(require_permission("admissions.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> AdmissionApplicationRead:

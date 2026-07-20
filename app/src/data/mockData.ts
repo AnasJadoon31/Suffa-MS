@@ -136,11 +136,12 @@ export type PortalRoute = Readonly<{
   permissionsAny?: readonly string[];
   feature?: string;
   roles?: readonly string[];
+  implicitTeacher?: boolean;
 }>;
 
 export const portalRoutes: readonly PortalRoute[] = [
   { key: "dashboard", path: "/dashboard", view: "dashboard" },
-  { key: "attendance", path: "/attendance", view: "attendance", permission: "attendance.take", feature: "attendance" },
+  { key: "attendance", path: "/attendance", view: "attendance", permission: "attendance.take", feature: "attendance", implicitTeacher: true },
   { key: "myAttendance", path: "/my-attendance", view: "my_attendance", feature: "attendance", roles: ["teacher", "student"] },
   { key: "timetableGrid", path: "/timetable/grid", view: "timetable", permission: "timetable.manage", feature: "timetable", roles: ["principal", "teacher"] },
   { key: "timetableList", path: "/timetable/list", view: "timetable", permission: "timetable.manage", feature: "timetable", roles: ["principal", "teacher"] },
@@ -155,10 +156,10 @@ export const portalRoutes: readonly PortalRoute[] = [
   { key: "academicClasses", path: "/academics/classes", view: "academics", permission: "academics.manage" },
   { key: "academicCourses", path: "/academics/courses", view: "academics", permission: "academics.manage" },
   { key: "academicSessions", path: "/academics/sessions", view: "academics", permission: "academics.manage" },
-  { key: "assessmentAssignments", path: "/assessments/assignments", view: "assessments", permission: "assignments.create", feature: "assessments" },
-  { key: "assessmentGrading", path: "/assessments/grading", view: "assessments", permission: "assessments.marks.enter", feature: "assessments" },
+  { key: "assessmentAssignments", path: "/assessments/assignments", view: "assessments", permission: "assignments.create", feature: "assessments", implicitTeacher: true },
+  { key: "assessmentGrading", path: "/assessments/grading", view: "assessments", permission: "assessments.marks.enter", feature: "assessments", implicitTeacher: true },
   { key: "assessmentSetup", path: "/assessments/setup", view: "assessments", permissionsAny: ["grading.schemes.manage", "assessments.exam_types.manage"], feature: "assessments" },
-  { key: "assessmentResults", path: "/assessments/results", view: "assessments", permission: "assessments.marks.enter", feature: "assessments" },
+  { key: "assessmentResults", path: "/assessments/results", view: "assessments", permission: "assessments.marks.enter", feature: "assessments", implicitTeacher: true },
   { key: "myAssessments", path: "/my-assessments", view: "my_assessments", feature: "assessments", roles: ["student"] },
   { key: "resources", path: "/resources", view: "resources", feature: "resources" },
   { key: "forms", path: "/forms", view: "forms", feature: "forms" },
@@ -174,13 +175,10 @@ export const portalRoutes: readonly PortalRoute[] = [
   { key: "financeSummary", path: "/finance/summary", view: "finance", permission: "finance.reports.view", feature: "finance", roles: ["principal", "teacher"] },
   { key: "salary", path: "/salary", view: "salary", permission: "teachers.salary.manage", feature: "salary", roles: ["principal", "teacher"] },
   { key: "mySalary", path: "/my-salary", view: "my_salary", feature: "salary", roles: ["teacher"] },
-  { key: "reports", path: "/reports", view: "reports", permissionsAny: ["attendance.take", "assessments.marks.enter", "finance.reports.view", "teachers.salary.manage"], feature: "reports", roles: ["principal", "teacher"] },
+  { key: "reports", path: "/reports", view: "reports", permissionsAny: ["attendance.take", "assessments.marks.enter", "finance.reports.view", "teachers.salary.manage"], feature: "reports", roles: ["principal", "teacher"], implicitTeacher: true },
   { key: "blog", path: "/blog", view: "blog", feature: "blog", roles: ["principal", "teacher"] },
   { key: "settings", path: "/settings", view: "settings", permission: "settings.manage" },
   { key: "profile", path: "/my-profile", view: "profile", roles: ["teacher", "student"] },
-  // Implicit routes for teachers to access their own classes
-  { key: "attendanceTeacher", path: "/attendance", view: "attendance", roles: ["teacher"], feature: "attendance" },
-  { key: "assessmentGradingTeacher", path: "/assessments/grading", view: "assessments", roles: ["teacher"], feature: "assessments" },
 ];
 
 export function isPortalRouteAccessible(
@@ -189,10 +187,13 @@ export function isPortalRouteAccessible(
   hasPermission: (permission: string) => boolean,
   hasFeature: (feature: string) => boolean,
 ): boolean {
+  const hasRequiredPermission =
+    (!route.permission || hasPermission(route.permission)) &&
+    (!route.permissionsAny || route.permissionsAny.some(hasPermission));
+  const permissionAllowed = hasRequiredPermission || (route.implicitTeacher === true && userRole === "teacher");
   return Boolean(
     userRole &&
-    (!route.permission || hasPermission(route.permission)) &&
-    (!route.permissionsAny || route.permissionsAny.some(hasPermission)) &&
+    permissionAllowed &&
     (!route.feature || hasFeature(route.feature)) &&
     (!route.roles || route.roles.includes(userRole)),
   );

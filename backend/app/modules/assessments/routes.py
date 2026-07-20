@@ -17,7 +17,7 @@ from app.core.dependencies import (
 from app.core.error_codes import ErrorCode
 from app.core.hijri import to_hijri_string
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
-from app.core.pdf import render_result_card_pdf
+from app.core.pdf import load_report_branding, render_result_card_pdf
 from app.core.teaching_scope import taught_pairs, teacher_teaches
 from app.db.session import get_session
 from app.modules.academics.models import AcademicClass, AcademicSession, ClassCourse, Course, Enrollment, Madrasa, Section
@@ -29,8 +29,10 @@ from app.modules.assessments.schemas import (
     CourseResult,
     ExamTypeCreate,
     ExamTypeRead,
+    ExamTypeUpdate,
     GradingSchemeCreate,
     GradingSchemeRead,
+    GradingSchemeUpdate,
     MarkRead,
     MarkUpsert,
     MatrixCourse,
@@ -695,6 +697,43 @@ async def list_grading_schemes(
     return [GradingSchemeRead.model_validate(row) for row in rows]
 
 
+@router.put("/grading-schemes/{scheme_id}", response_model=GradingSchemeRead)
+async def update_grading_scheme(
+    scheme_id: UUID,
+    payload: GradingSchemeUpdate,
+    current_user: User = Depends(require_permission("grading.schemes.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> GradingSchemeRead:
+    scheme = await session.get(GradingScheme, scheme_id)
+    if scheme is None or scheme.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Grading scheme not found")
+    if payload.name is not None:
+        scheme.name = payload.name
+    if payload.bands is not None:
+        scheme.bands = [band.model_dump() for band in payload.bands]
+    await session.commit()
+    await session.refresh(scheme)
+    return GradingSchemeRead.model_validate(scheme)
+
+
+@router.delete("/grading-schemes/{scheme_id}")
+async def delete_grading_scheme(
+    scheme_id: UUID,
+    current_user: User = Depends(require_permission("grading.schemes.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    scheme = await session.get(GradingScheme, scheme_id)
+    if scheme is None or scheme.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Grading scheme not found")
+    if await session.scalar(select(ExamType.id).where(ExamType.grading_scheme_id == scheme_id).limit(1)):
+        raise HTTPException(status_code=409, detail="Cannot delete a grading scheme used by an exam type")
+    await session.delete(scheme)
+    await session.commit()
+    return {"status": "deleted"}
+
+
 def _band_for_score(bands: list[dict], score: float) -> str | None:
     for band in bands:
         if band["min_score"] <= score <= band["max_score"]:
@@ -712,6 +751,9 @@ async def create_exam_type(
     session: AsyncSession = Depends(get_session),
 ) -> ExamTypeRead:
     await _require_course_scope(session, current_user, madrasa.id, payload.course_id)
+    scheme = await session.get(GradingScheme, payload.grading_scheme_id)
+    if scheme is None or scheme.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Grading scheme not found")
 
     exam_type = ExamType(
         madrasa_id=madrasa.id,
@@ -741,6 +783,53 @@ async def list_exam_types(
         stmt = stmt.where(ExamType.course_id == course_id)
     rows = await paginate_scalars(session, stmt.order_by(ExamType.name), limit=limit, offset=offset, response=response)
     return [ExamTypeRead.model_validate(row) for row in rows]
+
+
+@router.put("/exam-types/{exam_type_id}", response_model=ExamTypeRead)
+async def update_exam_type(
+    exam_type_id: UUID,
+    payload: ExamTypeUpdate,
+    current_user: User = Depends(require_permission("assessments.exam_types.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> ExamTypeRead:
+    exam_type = await session.get(ExamType, exam_type_id)
+    if exam_type is None or exam_type.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Exam type not found")
+    target_course_id = payload.course_id or exam_type.course_id
+    await _require_course_scope(session, current_user, madrasa.id, target_course_id)
+    if payload.grading_scheme_id is not None:
+        scheme = await session.get(GradingScheme, payload.grading_scheme_id)
+        if scheme is None or scheme.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Grading scheme not found")
+        exam_type.grading_scheme_id = payload.grading_scheme_id
+    if payload.course_id is not None:
+        exam_type.course_id = payload.course_id
+    if payload.name is not None:
+        exam_type.name = payload.name
+    if payload.weightage is not None:
+        exam_type.weightage = payload.weightage
+    await session.commit()
+    await session.refresh(exam_type)
+    return ExamTypeRead.model_validate(exam_type)
+
+
+@router.delete("/exam-types/{exam_type_id}")
+async def delete_exam_type(
+    exam_type_id: UUID,
+    current_user: User = Depends(require_permission("assessments.exam_types.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    exam_type = await session.get(ExamType, exam_type_id)
+    if exam_type is None or exam_type.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Exam type not found")
+    await _require_course_scope(session, current_user, madrasa.id, exam_type.course_id)
+    if await session.scalar(select(Mark.id).where(Mark.exam_type_id == exam_type_id).limit(1)):
+        raise HTTPException(status_code=409, detail="Cannot delete an exam type that already has marks")
+    await session.delete(exam_type)
+    await session.commit()
+    return {"status": "deleted"}
 
 
 # ------------------------------------------------------------------------- Marks
@@ -995,6 +1084,7 @@ async def _render_result_card(session: AsyncSession, madrasa_id: UUID, student: 
     ]
 
     today = datetime.now(UTC).date()
+    madrasa = await session.get(Madrasa, madrasa_id)
     return render_result_card_pdf(
         student_name=student.name,
         admission_number=student.admission_number,
@@ -1004,6 +1094,7 @@ async def _render_result_card(session: AsyncSession, madrasa_id: UUID, student: 
         course_rows=course_rows,
         overall_score=f"{result.overall_score:g}" if result.overall_score is not None else "—",
         published=result.published,
+        branding=await load_report_branding(session, madrasa) if madrasa else None,
     )
 
 
@@ -1294,7 +1385,7 @@ async def export_results(
     import csv
     import io
 
-    from app.core.pdf import render_table_pdf
+    from app.core.pdf import load_report_branding, render_table_pdf
 
     active_session_id, sections, course_scope = await _matrix_sections(
         session, current_user, madrasa, section_id, class_id
@@ -1328,7 +1419,8 @@ async def export_results(
             for course in matrix.courses:
                 rows.append([course.course_name, course.teacher_name or "—"] + [""] * (len(headers) - 2))
         pdf_bytes = render_table_pdf(
-            "Results", f"{madrasa.name} — session results", headers, rows
+            "Results", f"{madrasa.name} — session results", headers, rows,
+            await load_report_branding(session, madrasa),
         )
         return Response(
             content=pdf_bytes,

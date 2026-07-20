@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     ]
     upload_max_size_bytes: int = 20 * 1024 * 1024  # 20MB
 
+    # Optional Evolution API v2 connection. When configured, WhatsApp report
+    # and receipt actions send the PDF as a real document instead of opening
+    # a click-to-chat URL that cannot pre-attach files.
+    evolution_api_url: str = ""
+    evolution_api_key: str = ""
+    evolution_instance: str = ""
+
     @field_validator("upload_allowed_content_types", mode="before")
     @classmethod
     def _split_content_types(cls, value: str | list[str]) -> list[str]:

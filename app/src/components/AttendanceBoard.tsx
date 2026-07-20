@@ -260,6 +260,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [marked, setMarked] = useState<Record<string, AttendanceStatus>>({});
   const [classes, setClasses] = useState<AttendanceClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(() => searchParams.get("class"));
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(() => searchParams.get("section"));
   const [activeTab, setActiveTab] = useState<AttendanceTab>(() => searchParams.get("view") === "history" ? "studentHistory" : "calendar");
   const [roster, setRoster] = useState<AttendanceRoster | null>(null);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
@@ -293,6 +294,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   useEffect(() => {
     setAttendanceMode(searchParams.get("mode") === "teachers" ? "teachers" : "students");
     setSelectedClassId(searchParams.get("class"));
+    setSelectedSectionId(searchParams.get("section"));
     setActiveTab(searchParams.get("view") === "history" ? "studentHistory" : "calendar");
     setSelectedStudentId(searchParams.get("student") ?? "");
   }, [searchParams]);
@@ -303,8 +305,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     await overrideEntry(entry, reason);
   }
 
-  function selectClass(classId: string): void {
+  function selectClass(classId: string, sectionId: string): void {
     setSelectedClassId(classId);
+    setSelectedSectionId(sectionId);
     setActiveTab("calendar");
     setCalendarMonth(new Date());
     setSelectedDate(toDateKey(new Date()));
@@ -317,11 +320,12 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setHasUnsavedMarks(false);
     setSaveMessage("");
     setMarked({});
-    setSearchParams({ class: classId, view: "calendar" });
+    setSearchParams({ class: classId, section: sectionId, view: "calendar" });
   }
 
   function returnToClasses(): void {
     setSelectedClassId(null);
+    setSelectedSectionId(null);
     setActiveTab("calendar");
     setClassHistory(null);
     setStudentHistory(null);
@@ -341,8 +345,11 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         // Deep link from the dashboard's "open class list" button (§C):
         // jump straight into the roster instead of making the teacher pick again.
         const pending = consumePendingClassNav();
-        if (pending && data.some((c) => c.id === pending.classId)) {
-          selectClass(pending.classId);
+        const pendingClass = pending ? data.find((c) => c.id === pending.classId) : undefined;
+        const pendingSection = pendingClass?.sections.find((section) => section.id === pending?.sectionId)
+          ?? pendingClass?.sections[0];
+        if (pendingClass && pendingSection) {
+          selectClass(pendingClass.id, pendingSection.id);
         }
       } catch (err: any) {
         setError(err.response?.data?.detail ?? t("failedLoadAttendanceClasses"));
@@ -365,7 +372,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   }, []);
 
   useEffect(() => {
-    if (!selectedClassId) {
+    if (!selectedClassId || !selectedSectionId) {
       setRoster(null);
       setSessionId(null);
       setMarked({});
@@ -380,8 +387,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       setHasUnsavedMarks(false);
       setSaveMessage("");
       try {
-        const { data } = await cachedFetch(`attendance-roster-${selectedClassId}`, () =>
-          attendanceApi.classRoster(selectedClassId),
+        const { data } = await cachedFetch(`attendance-roster-${selectedClassId}-${selectedSectionId}`, () =>
+          attendanceApi.classRoster(selectedClassId, selectedSectionId),
         );
         setRoster(data);
         setSessionId(data.session_id);
@@ -393,15 +400,15 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         setIsLoadingRoster(false);
       }
     })();
-  }, [selectedClassId, t]);
+  }, [selectedClassId, selectedSectionId, t]);
 
   useEffect(() => {
-    if (!selectedClassId) return;
+    if (!selectedClassId || !selectedSectionId) return;
     void (async () => {
       setIsLoadingClassHistory(true);
       setError("");
       try {
-        setClassHistory(await attendanceApi.classHistory(selectedClassId, monthRange(calendarMonth)));
+        setClassHistory(await attendanceApi.classHistory(selectedClassId, { ...monthRange(calendarMonth), section_id: selectedSectionId ?? undefined }));
       } catch (err: any) {
         setClassHistory(null);
         setError(err.response?.data?.detail ?? t("failedLoadAttendanceHistory"));
@@ -409,23 +416,23 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         setIsLoadingClassHistory(false);
       }
     })();
-  }, [selectedClassId, calendarMonth, t]);
+  }, [selectedClassId, selectedSectionId, calendarMonth, t]);
 
   useEffect(() => {
     if (activeTab === "studentHistory" && !selectedStudentId && roster?.students.length) {
       setSelectedStudentId(roster.students[0].id);
-      setSearchParams({ class: selectedClassId ?? "", view: "history", student: roster.students[0].id });
+      setSearchParams({ class: selectedClassId ?? "", section: selectedSectionId ?? "", view: "history", student: roster.students[0].id });
     }
-  }, [activeTab, roster, selectedClassId, selectedStudentId, setSearchParams]);
+  }, [activeTab, roster, selectedClassId, selectedSectionId, selectedStudentId, setSearchParams]);
 
   useEffect(() => {
-    if (!selectedClassId || activeTab !== "studentHistory" || !selectedStudentId) return;
+    if (!selectedClassId || !selectedSectionId || activeTab !== "studentHistory" || !selectedStudentId) return;
     void (async () => {
       setIsLoadingStudentHistory(true);
       setError("");
       try {
         setStudentHistory(
-          await attendanceApi.studentHistory(selectedClassId, selectedStudentId, monthRange(studentMonth)),
+          await attendanceApi.studentHistory(selectedClassId, selectedStudentId, { ...monthRange(studentMonth), section_id: selectedSectionId ?? undefined }),
         );
       } catch (err: any) {
         setStudentHistory(null);
@@ -434,7 +441,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         setIsLoadingStudentHistory(false);
       }
     })();
-  }, [activeTab, selectedClassId, selectedStudentId, studentMonth, t]);
+  }, [activeTab, selectedClassId, selectedSectionId, selectedStudentId, studentMonth, t]);
 
   function mark(studentId: string, status: AttendanceStatus): void {
     if (approvedLeaveStudentIds.has(studentId)) return;
@@ -488,7 +495,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     }
   }
 
-  const headerTitle = roster ? roster.class_name : t("chooseAttendanceClass");
+  const headerTitle = roster ? `${roster.class_name} / ${roster.section_name ?? ""}` : t("chooseAttendanceClass");
   const headerEyebrow = roster ? `${t("sessionLabel")}: ${roster.session_name}` : t("classesHeading");
 
   const todayKey = toDateKey(new Date());
@@ -610,21 +617,21 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
       {attendanceMode === "students" && !selectedClassId && (
         <div className="attendanceClassGrid" aria-label={t("chooseAttendanceClass")}>
-          {classes.map((item) => (
-            <button className="attendanceClassButton" key={item.id} type="button" onClick={() => selectClass(item.id)}>
+          {classes.flatMap((item) => item.sections.map((section) => (
+            <button className="attendanceClassButton" key={section.id} type="button" onClick={() => selectClass(item.id, section.id)}>
               <span className="attendanceClassIcon" aria-hidden="true"><BookOpen size={18} /></span>
               <span className="attendanceClassBody">
-                <strong>{item.name}</strong>
+                <strong>{item.name} / {section.name}</strong>
                 <small>{item.course_names.join(", ") || t("noCoursesAssigned")}</small>
                 <span className="attendanceClassMeta">
                   <UsersRound size={15} />
-                  {t("studentCount", { count: item.student_count })}
+                  {t("studentCount", { count: section.student_count })}
                 </span>
               </span>
               <ChevronRight size={18} aria-hidden="true" />
             </button>
-          ))}
-          {!isLoadingClasses && classes.length === 0 && <p className="emptyState">{t("noAttendanceClasses")}</p>}
+          )))}
+          {!isLoadingClasses && classes.every((item) => item.sections.length === 0) && <p className="emptyState">{t("noAttendanceClasses")}</p>}
           {isLoadingClasses && <p className="emptyState">{t("loadingLabel")}</p>}
         </div>
       )}
@@ -636,7 +643,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             type="button"
             onClick={() => {
               setActiveTab("calendar");
-              setSearchParams({ class: selectedClassId, view: "calendar" });
+              setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", view: "calendar" });
             }}
           >
             {t("calendarTab")}
@@ -646,7 +653,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             type="button"
             onClick={() => {
               setActiveTab("studentHistory");
-              setSearchParams({ class: selectedClassId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
+              setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
             }}
           >
             {t("studentAttendanceHistory")}
@@ -772,7 +779,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 onClick={() => {
                   setSelectedStudentId(student.id);
                   setStudentSelectedDate(null);
-                  setSearchParams({ class: selectedClassId, view: "history", student: student.id });
+                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", view: "history", student: student.id });
                 }}
               >
                 <strong>{student.name}</strong>

@@ -16,6 +16,11 @@ export interface Madrasa {
   id: string;
   slug: string;
   name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  logo_url?: string;
 }
 
 interface AuthContextType {
@@ -30,6 +35,7 @@ interface AuthContextType {
   logout: () => void;
   updateSelectedSession: (sessionId: string | null) => Promise<void>;
   updateProfile: (payload: { preferred_language?: string }) => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,7 +57,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.lang = language;
       setOfflineAccountKey(res.data.madrasa?.id ?? null, res.data.user?.id ?? null);
       setUser(res.data.user);
-      setMadrasa(res.data.madrasa);
+      const branding = res.data.branding ?? {};
+      let logoUrl: string | undefined;
+      if (branding["madrasa.logo_file_id"]) {
+        try {
+          const logo = await api.get("/api/v1/files/presign-download", { params: { object_key: branding["madrasa.logo_file_id"] } });
+          logoUrl = logo.data.url;
+        } catch {
+          logoUrl = undefined;
+        }
+      }
+      setMadrasa(res.data.madrasa ? {
+        ...res.data.madrasa,
+        address: branding["madrasa.address"],
+        phone: branding["madrasa.phone"],
+        email: branding["madrasa.email"],
+        website: branding["madrasa.website"],
+        logo_url: logoUrl,
+      } : null);
       setPermissions(res.data.permissions ?? []);
       setFeatures(res.data.features ?? {});
       setAcademicSessionId(res.data.user?.selected_session_id ?? null);
@@ -84,8 +107,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOfflineAccountKey(null, null);
     };
 
+    const refreshDelegatedAccess = () => {
+      if (localStorage.getItem("mms_token")) void fetchProfile();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshDelegatedAccess();
+    };
+
     window.addEventListener("unauthorized", handleUnauthorized);
-    return () => window.removeEventListener("unauthorized", handleUnauthorized);
+    window.addEventListener("focus", refreshDelegatedAccess);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("unauthorized", handleUnauthorized);
+      window.removeEventListener("focus", refreshDelegatedAccess);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   const login = async (token: string, tenant: string) => {
@@ -126,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, madrasa, permissions, isAuthenticated: !!user, isLoading, hasPermission, hasFeature, login, logout, updateSelectedSession, updateProfile }}
+      value={{ user, madrasa, permissions, isAuthenticated: !!user, isLoading, hasPermission, hasFeature, login, logout, updateSelectedSession, updateProfile, refreshProfile: fetchProfile }}
     >
       {children}
     </AuthContext.Provider>

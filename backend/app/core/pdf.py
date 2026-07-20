@@ -1,4 +1,5 @@
 import io
+from dataclasses import dataclass
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -9,7 +10,52 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image as ReportImage, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+
+@dataclass(frozen=True)
+class ReportBranding:
+    name: str
+    address: str = ""
+    phone: str = ""
+    email: str = ""
+    website: str = ""
+    logo_bytes: bytes | None = None
+
+
+async def load_report_branding(session, madrasa) -> ReportBranding:
+    from sqlalchemy import select
+
+    from app.core.storage import download_object_bytes
+    from app.modules.operations.models import MadrasaSetting
+
+    rows = (
+        await session.execute(
+            select(MadrasaSetting.key, MadrasaSetting.value).where(
+                MadrasaSetting.madrasa_id == madrasa.id,
+                MadrasaSetting.key.in_([
+                    "madrasa.address", "madrasa.phone", "madrasa.email",
+                    "madrasa.website", "madrasa.logo_file_id",
+                ]),
+            )
+        )
+    ).all()
+    values = {key: value for key, value in rows}
+    logo_bytes = None
+    logo_key = values.get("madrasa.logo_file_id")
+    if logo_key:
+        try:
+            logo_bytes = download_object_bytes(logo_key)
+        except Exception:
+            logo_bytes = None
+    return ReportBranding(
+        name=madrasa.name,
+        address=values.get("madrasa.address", ""),
+        phone=values.get("madrasa.phone", ""),
+        email=values.get("madrasa.email", ""),
+        website=values.get("madrasa.website", ""),
+        logo_bytes=logo_bytes,
+    )
 
 FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 URDU_FONT = "NotoNaskhArabic"
@@ -52,7 +98,13 @@ def bilingual_line(urdu_label: str, value: str, *, bold: bool = False) -> str:
     return f'{escape(value)} <font name="{font}">{shaped_label}</font>'
 
 
-def render_table_pdf(title: str, subtitle: str, headers: list[str], rows: list[list[str]]) -> bytes:
+def render_table_pdf(
+    title: str,
+    subtitle: str,
+    headers: list[str],
+    rows: list[list[str]],
+    branding: ReportBranding | None = None,
+) -> bytes:
     """Wide grids (timetables, result matrices) were overflowing the page:
     a plain reportlab Table auto-sizes columns to fit its content, and with
     many columns of unwrapped multi-line text (course + teacher names) the
@@ -72,11 +124,22 @@ def render_table_pdf(title: str, subtitle: str, headers: list[str], rows: list[l
     header_style = ParagraphStyle("cellHeader", parent=cell_style, textColor=colors.white, fontName="Helvetica-Bold")
     section_style = ParagraphStyle("cellSection", parent=cell_style, fontName="Helvetica-Bold")
 
-    elements = [
+    elements = []
+    if branding:
+        if branding.logo_bytes:
+            logo = ReportImage(io.BytesIO(branding.logo_bytes), width=54, height=54, kind="proportional")
+            logo.hAlign = "CENTER"
+            elements.append(logo)
+        elements.append(Paragraph(escape(branding.name), styles["Heading1"]))
+        contact = " · ".join(filter(None, [branding.address, branding.phone, branding.email, branding.website]))
+        if contact:
+            elements.append(Paragraph(escape(contact), styles["Normal"]))
+        elements.append(Spacer(1, 10))
+    elements.extend([
         Paragraph(escape(title), styles["Title"]),
         Paragraph(escape(subtitle), styles["Normal"]),
         Spacer(1, 16),
-    ]
+    ])
 
     # Rows produced by callers use a "— label —" marker in the first cell for
     # group/section separators (one weekly grid per section, one block per
@@ -130,6 +193,7 @@ def render_receipt_pdf(
     hijri_date: str,
     recorded_by: str,
     note: str | None = None,
+    branding: ReportBranding | None = None,
 ) -> bytes:
     _ensure_urdu_font()
     buffer = io.BytesIO()
@@ -137,12 +201,18 @@ def render_receipt_pdf(
     styles = getSampleStyleSheet()
     urdu_title_style = ParagraphStyle("urduTitle", fontName=URDU_FONT_BOLD, fontSize=15, alignment=2, leading=22)
 
-    elements = [
-        Paragraph(escape(madrasa_name), styles["Title"]),
+    elements = []
+    if branding and branding.logo_bytes:
+        logo = ReportImage(io.BytesIO(branding.logo_bytes), width=54, height=54, kind="proportional")
+        logo.hAlign = "CENTER"
+        elements.append(logo)
+    elements.extend([
+        Paragraph(escape(branding.name if branding else madrasa_name), styles["Title"]),
+        *([Paragraph(escape(" · ".join(filter(None, [branding.address, branding.phone, branding.email, branding.website]))), styles["Normal"])] if branding and any([branding.address, branding.phone, branding.email, branding.website]) else []),
         Paragraph(f"{receipt_kind} Receipt", styles["Heading2"]),
         Paragraph(f'<font name="{URDU_FONT_BOLD}">{shape_urdu("رسید")}</font>', urdu_title_style),
         Spacer(1, 12),
-    ]
+    ])
 
     detail_rows = [
         ["Receipt #", receipt_number],
@@ -185,6 +255,7 @@ def render_result_card_pdf(
     course_rows: list[list[str]],
     overall_score: str,
     published: bool,
+    branding: ReportBranding | None = None,
 ) -> bytes:
     _ensure_urdu_font()
     buffer = io.BytesIO()
@@ -193,7 +264,18 @@ def render_result_card_pdf(
     urdu_style = ParagraphStyle("urdu", fontName="Helvetica", fontSize=13, alignment=2, leading=20)
     urdu_title_style = ParagraphStyle("urduTitle", fontName=URDU_FONT_BOLD, fontSize=16, alignment=2, leading=24)
 
-    elements = [
+    elements = []
+    if branding:
+        if branding.logo_bytes:
+            logo = ReportImage(io.BytesIO(branding.logo_bytes), width=54, height=54, kind="proportional")
+            logo.hAlign = "CENTER"
+            elements.append(logo)
+        elements.append(Paragraph(escape(branding.name), styles["Heading1"]))
+        contact = " · ".join(filter(None, [branding.address, branding.phone, branding.email, branding.website]))
+        if contact:
+            elements.append(Paragraph(escape(contact), styles["Normal"]))
+        elements.append(Spacer(1, 10))
+    elements.extend([
         Paragraph("Result Card", styles["Title"]),
         Paragraph(f'<font name="{URDU_FONT_BOLD}">{shape_urdu("نتائج کارڈ")}</font>', urdu_title_style),
         Spacer(1, 10),
@@ -202,7 +284,7 @@ def render_result_card_pdf(
         Paragraph(f"Session: {escape(session_name)}", styles["Normal"]),
         Paragraph(f"Date: {gregorian_date} ({hijri_date})", styles["Normal"]),
         Spacer(1, 16),
-    ]
+    ])
 
     headers = ["Course", "Score", "Band"]
     table = Table([headers, *course_rows], repeatRows=1)

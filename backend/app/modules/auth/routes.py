@@ -116,11 +116,24 @@ async def get_me(
         result = await session.execute(stmt)
         permissions = sorted(result.scalars().all())
 
+    profile_rows = (
+        await session.execute(
+            select(MadrasaSetting.key, MadrasaSetting.value).where(
+                MadrasaSetting.madrasa_id == madrasa.id,
+                MadrasaSetting.key.in_([
+                    "madrasa.address", "madrasa.phone", "madrasa.email",
+                    "madrasa.website", "madrasa.logo_file_id",
+                ]),
+            )
+        )
+    ).all()
+
     return CurrentUserResponse(
         user=UserRead.model_validate(current_user),
         madrasa=MadrasaRead.model_validate(madrasa),
         permissions=permissions,
         features=await get_enabled_features(madrasa.id, session),
+        branding={key: value for key, value in profile_rows},
     )
 
 

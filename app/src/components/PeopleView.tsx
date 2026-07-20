@@ -21,7 +21,6 @@ import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { LoadingState } from "./ui/AsyncState";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
-import { AdmissionsView } from "./AdmissionsView";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { DelegateModal } from "./DelegateButton";
 
@@ -42,7 +41,7 @@ function SendCredentialsButton({
         subject_id: subjectId,
         set_password_url: setPasswordUrl,
       });
-      window.open(link.url, "_blank", "noopener,noreferrer");
+      if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedSendCredentials"));
     }
@@ -81,7 +80,7 @@ function ReissueCredentialsButton({
           subject_id: subjectId,
           set_password_url: fullUrl,
         });
-        window.open(link.url, "_blank", "noopener,noreferrer");
+        if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
       } catch {
         // No number on file; the link is still on the clipboard.
       }
@@ -99,7 +98,7 @@ function ReissueCredentialsButton({
   );
 }
 
-export type PeopleTab = "teachers" | "students" | "guardians" | "donators" | "admissions";
+export type PeopleTab = "teachers" | "students" | "guardians" | "donators";
 
 export function PeopleView({
   initialTab = "teachers",
@@ -135,11 +134,6 @@ export function PeopleView({
         {hasPermission("students.view") && <button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("guardians")}>
           <UsersRound size={16} /> {t("guardians")}
         </button>}
-        {hasPermission("admissions.manage") && (
-          <button className={tab === "admissions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("admissions")}>
-            <GraduationCap size={16} /> {t("walkInAdmissions")}
-          </button>
-        )}
         {canViewFinance && (
           <button className={tab === "donators" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("donators")}>
             <HandCoins size={16} /> {t("donatorsTab")}
@@ -150,7 +144,6 @@ export function PeopleView({
       {tab === "students" && <StudentsTab canCreate={!readOnly && hasPermission("students.add")} canFinance={canFinance} />}
       {tab === "guardians" && <GuardiansTab canCreate={!readOnly && hasPermission("students.add")} canSendCredentials={!readOnly && hasPermission("students.send_credentials")} />}
       {tab === "donators" && canViewFinance && <DonatorsTab canWrite={canFinance} />}
-      {tab === "admissions" && hasPermission("admissions.manage") && <AdmissionsView section="registrations" />}
     </section>
   );
 }
@@ -504,11 +497,14 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           }}
           emptyLabel={t("noStudentsYet")}
         />
-        <div className="formActions">
-          <Select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
+        <label className="searchBox" htmlFor="student-class-filter">
+          {t("classLabel")}
+          <Select id="student-class-filter" value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
             <option value="">{t("allClasses")}</option>
             {classOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
+        </label>
+        <div className="formActions">
           {search && (
             <button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
               {t("cancelBtn")}

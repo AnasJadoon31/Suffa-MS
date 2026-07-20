@@ -14,7 +14,8 @@ class WhatsAppLinkRequest(BaseModel):
 
 class WhatsAppLinkResponse(BaseModel):
     normalised_number: str
-    url: str
+    url: str = ""
+    direct_sent: bool = False
 
 
 class SendReportRequest(BaseModel):

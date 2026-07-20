@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, ClipboardList, Copy, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardList, Copy, Eye, Plus, Trash2, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -11,11 +11,11 @@ import {
   type Program,
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
-import { API_BASE } from "../lib/config";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
@@ -50,7 +50,14 @@ export function AdmissionsView({ section = "registrations" }: Readonly<{ section
 function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ programs: Program[]; canReview: boolean; canMutate: boolean }>) {
   const { t } = useTranslation();
   const [applications, setApplications] = useState<AdmissionApplication[]>([]);
-  const [form, setForm] = useState({ applicant_name: "", guardian_contact: "", program_id: "", date_of_birth: "", notes: "" });
+  const emptyForm = {
+    applicant_name: "", guardian_name: "", guardian_relationship: "", guardian_contact: "", guardian_cnic: "",
+    program_id: "", date_of_birth: "", gender: "", b_form_number: "", address: "", previous_school: "",
+    previous_class: "", medical_notes: "", notes: "",
+  };
+  const [form, setForm] = useState(emptyForm);
+  const [showCreate, setShowCreate] = useState(false);
+  const [detail, setDetail] = useState<AdmissionApplication | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -83,7 +90,10 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
 
   return (
     <>
-      {canMutate && <form
+      {canMutate && <div className="formActions" style={{ marginBottom: 12 }}>
+        <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("submitApplicationBtn")}</button>
+      </div>}
+      {canMutate && showCreate && <Modal title={t("submitApplicationBtn")} onClose={() => setShowCreate(false)}><form
         className="inlineForm"
         onSubmit={async (e) => {
           e.preventDefault();
@@ -96,8 +106,20 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
               program_id: form.program_id || undefined,
               date_of_birth: form.date_of_birth || undefined,
               notes: form.notes || undefined,
+              extra_data: {
+                guardian_name: form.guardian_name,
+                guardian_relationship: form.guardian_relationship,
+                guardian_cnic: form.guardian_cnic,
+                gender: form.gender,
+                b_form_number: form.b_form_number,
+                address: form.address,
+                previous_school: form.previous_school,
+                previous_class: form.previous_class,
+                medical_notes: form.medical_notes,
+              },
             });
-            setForm({ applicant_name: "", guardian_contact: "", program_id: "", date_of_birth: "", notes: "" });
+            setForm(emptyForm);
+            setShowCreate(false);
             setNotice(t("applicationSubmitted"));
             await load();
           } catch (err: any) {
@@ -106,18 +128,27 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
         }}
       >
         <label>{t("applicantNameLabel")}<Input required value={form.applicant_name} onChange={(e) => setForm({ ...form, applicant_name: e.target.value })} /></label>
+        <label>{t("guardianNameLabel")}<Input required value={form.guardian_name} onChange={(e) => setForm({ ...form, guardian_name: e.target.value })} /></label>
+        <label>{t("relationshipLabel")}<Input required value={form.guardian_relationship} onChange={(e) => setForm({ ...form, guardian_relationship: e.target.value })} /></label>
         <label>{t("guardianContactLabel")}<Input required value={form.guardian_contact} onChange={(e) => setForm({ ...form, guardian_contact: e.target.value })} /></label>
+        <label>{t("guardianCnicLabel")}<Input value={form.guardian_cnic} onChange={(e) => setForm({ ...form, guardian_cnic: e.target.value })} /></label>
         <label>
           {t("programLabel")}
-          <Select value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+          <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
             <option value="">{t("selectEllipsis")}</option>
             {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
         </label>
-        <label>{t("dobLabel")}<Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
+        <label>{t("dobLabel")}<Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
+        <label>{t("genderLabel")}<Select required value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="">{t("selectEllipsis")}</option><option value="male">{t("maleLabel")}</option><option value="female">{t("femaleLabel")}</option></Select></label>
+        <label>{t("bFormLabel")}<Input required value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
+        <label>{t("addressLabel")}<Input required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+        <label>{t("previousSchoolLabel")}<Input value={form.previous_school} onChange={(e) => setForm({ ...form, previous_school: e.target.value })} /></label>
+        <label>{t("previousClassLabel")}<Input value={form.previous_class} onChange={(e) => setForm({ ...form, previous_class: e.target.value })} /></label>
+        <label>{t("medicalNotesLabel")}<Input value={form.medical_notes} onChange={(e) => setForm({ ...form, medical_notes: e.target.value })} /></label>
         <label>{t("notesLabel")}<Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("submitApplicationBtn")}</button></div>
-      </form>}
+      </form></Modal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 
@@ -142,6 +173,7 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
               <span>{a.form_id ? t("sourcePublicForm") : t("sourceWalkIn")}</span>
               <span>{a.status}</span>
               <span>
+                <button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(a)}><Eye size={14} /></button>
                 {canMutate && a.status === "pending" && (
                   <>
                     <button className="tableAction" type="button" onClick={async () => { await operationsApi.setAdmissionStatus(a.id, "accepted"); await load(); }}>
@@ -158,6 +190,14 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
         </div>
       )}
       {canReview && <PaginationControls state={pagination} total={total} onChange={setPagination} />}
+      {detail && <Modal title={detail.applicant_name} onClose={() => setDetail(null)}>
+        <dl className="detailGrid">
+          <dt>{t("guardianContactLabel")}</dt><dd>{detail.guardian_contact}</dd>
+          <dt>{t("dobLabel")}</dt><dd>{detail.date_of_birth ?? "—"}</dd>
+          <dt>{t("notesLabel")}</dt><dd>{detail.notes ?? "—"}</dd>
+          {Object.entries(detail.extra_data ?? {}).map(([key, value]) => <div key={key} style={{ display: "contents" }}><dt>{key.replaceAll("_", " ")}</dt><dd>{String(value || "—")}</dd></div>)}
+        </dl>
+      </Modal>}
     </>
   );
 }
@@ -174,6 +214,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
   const [loadError, setLoadError] = useState("");
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
+  const [showCreate, setShowCreate] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
@@ -194,7 +235,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination]);
 
-  const publicUrl = (token: string) => `${API_BASE}/api/v1/public/admission-forms/${token}`;
+  const publicUrl = (token: string) => `${window.location.origin}/public/admission/${token}`;
 
   const copyLink = async (adm: AdmissionForm) => {
     await navigator.clipboard.writeText(publicUrl(adm.public_token));
@@ -205,7 +246,10 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
   return (
     <>
       <p className="notice">{t("admissionFormsHint")}</p>
-      {canMutate && <form
+      {canMutate && <div className="formActions" style={{ marginBottom: 12 }}>
+        <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</button>
+      </div>}
+      {canMutate && showCreate && <Modal title={t("createAdmissionFormBtn")} onClose={() => setShowCreate(false)}><form
         className="inlineForm"
         onSubmit={async (e) => {
           e.preventDefault();
@@ -217,6 +261,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
               description: form.description,
             });
             setForm({ program_id: "", title: "", description: "" });
+            setShowCreate(false);
             await load();
           } catch (err: any) {
             setError(err.response?.data?.detail ?? t("failedCreateForm"));
@@ -233,7 +278,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
         <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
         <label>{t("descriptionLabel")}<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("createAdmissionFormBtn")}</button></div>
-      </form>}
+      </form></Modal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
       <div className="dataTable">

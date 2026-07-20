@@ -31,7 +31,9 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
   return (
     <aside className={mobileOpen ? "sidebar sidebarOpen" : "sidebar"}>
       <div className="brand">
-        <span className="brandMark">م</span>
+        {madrasa?.logo_url
+          ? <img className="brandLogo" src={madrasa.logo_url} alt="" />
+          : <span className="brandMark">م</span>}
         <div className="brandText">
           <strong>{madrasa?.name ?? t("appName")}</strong>
           <small>{t("appName")}</small>
