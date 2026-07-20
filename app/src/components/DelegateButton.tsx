@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import { ShieldCheck, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -12,7 +13,7 @@ import {
   type Teacher,
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
-import { Select } from "./ui/Field";
+import { Select, Checkbox } from "./ui/Field";
 
 /**
  * "Mini-admin" delegation (IMPLEMENT.md §3): principals drop this button into
@@ -29,9 +30,9 @@ export function DelegateButton({ modules }: Readonly<{ modules: string[] }>) {
 
   return (
     <>
-      <button className="secondaryAction" type="button" onClick={() => setOpen(true)}>
+      <Button className="secondaryAction" type="button" onClick={() => setOpen(true)}>
         <ShieldCheck size={16} /> {t("delegateBtn")}
-      </button>
+      </Button>
       {open && <DelegateModal modules={modules} onClose={() => setOpen(false)} />}
     </>
   );
@@ -157,7 +158,7 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
       <div className="modalCard">
         <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between" }}>
           <h3>{t("delegateHeading")}</h3>
-          <button className="tableAction" type="button" onClick={onClose}><X size={16} /></button>
+          <Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>
         </div>
         <p className="notice">{t("delegateHint")}</p>
 
@@ -186,7 +187,7 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
             <div className="delegateList">
               {relevant.map((p) => (
                 <label key={p.code} className="checkboxLabel">
-                  <input type="checkbox" checked={selected.has(p.code)} onChange={() => toggle(p.code)} />
+                  <Checkbox  checked={selected.has(p.code)} onChange={() => toggle(p.code)} />
                   <span>
                     {p.label} <small className="notice">({p.code})</small>
                     {!p.scoped && <small className="notice"> · {t("madrasaWideOnly")}</small>}
@@ -199,8 +200,8 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
             {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
             {notice && <p className="notice">{notice}</p>}
             <div className="formActions">
-              <button className="primaryAction" type="button" onClick={() => void save()}>{t("saveBtn")}</button>
-              <button className="secondaryAction" type="button" onClick={onClose}>{t("cancelBtn")}</button>
+              <Button className="primaryAction" type="button" onClick={() => void save()}>{t("saveBtn")}</Button>
+              <Button className="secondaryAction" type="button" onClick={onClose}>{t("cancelBtn")}</Button>
             </div>
           </>
         )}

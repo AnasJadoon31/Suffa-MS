@@ -1,18 +1,23 @@
+import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
-import { Edit2, Plus, Send, Trash2 } from "lucide-react";
+import { Edit2, FileText, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDialog } from "../lib/DialogContext";
 
 import { operationsApi, type FormDef, type FormFieldDefinition, type FormResponse, type Scope } from "../lib/endpoints";
 import { AudiencePicker } from "./AudiencePicker";
 import { useAuth } from "../lib/AuthContext";
-import { Input, Select } from "./ui/Field";
+import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
 
 export function FormsView() {
   const { t } = useTranslation();
+  const { alert, confirm } = useDialog();
   const { user, hasPermission } = useAuth();
   const readOnly = useSessionReadOnly();
   const canCreate = !readOnly && hasPermission("forms.create");
@@ -74,63 +79,61 @@ export function FormsView() {
   const canEditForm = (form: FormDef) => !readOnly && (canManageAll || form.created_by_id === user?.id);
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("forms")}</h2>
-        <p className="notice">{t("descForms")}</p>
-      </div>
+    <PageSection>
+      <PageHeader
+        title={t("forms")}
+        icon={<FileText size={18} />}
+        notice={t("descForms")}
+      />
 
       {canCreate && <div className="formActions" style={{ marginBottom: 12 }}>
-        <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createFormBtn")}</button>
+        <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createFormBtn")}</Button>
       </div>}
 
-      {canCreate && showCreate && <Modal title={t("createFormBtn")} onClose={() => setShowCreate(false)}>
-        <form
-          className="inlineForm"
-          style={{ gridTemplateColumns: "1fr" }}
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            const fieldError = validateFormFields(fields);
-            if (fieldError) {
-              setError(t(fieldError));
-              return;
-            }
-            const cleanFields = cleanFormFields(fields);
-            if (!formTitle || cleanFields.length === 0) return;
-            try {
-              await operationsApi.createForm({
-                title: formTitle, description: formDescription, category: formCategory || undefined,
-                fields: cleanFields, allow_multiple: allowMultiple, visibility_scope: audience,
-              });
-              setFormTitle("");
-              setFormDescription("");
-              setFormCategory("");
-              setAllowMultiple(false);
-              setFields([emptyFormField()]);
-              setShowCreate(false);
-              await load();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? t("failedCreateForm"));
-            }
-          }}
-        >
-          <div className="inlineForm" style={{ margin: 0, padding: 0, border: "none", background: "none" }}>
-            <label>{t("titleLabel")}<Input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></label>
-            <label>{t("descriptionLabel")}<Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} /></label>
-            <label>{t("formCategoryLabel")}<Input value={formCategory} onChange={(e) => setFormCategory(e.target.value)} placeholder={t("formCategoryPlaceholder") ?? ""} list="form-categories" /></label>
-            <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} /> {t("allowMultipleLabel")}
-            </label>
-          </div>
+      {canCreate && showCreate && <FormModal
+            title={t("createFormBtn")} onClose={() => setShowCreate(false)}
+            onSubmit={async (e) => {
+                      e.preventDefault();
+                      setError("");
+                      const fieldError = validateFormFields(fields);
+                      if (fieldError) {
+                        setError(t(fieldError));
+                        return;
+                      }
+                      const cleanFields = cleanFormFields(fields);
+                      if (!formTitle || cleanFields.length === 0) return;
+                      try {
+                        await operationsApi.createForm({
+                          title: formTitle, description: formDescription, category: formCategory || undefined,
+                          fields: cleanFields, allow_multiple: allowMultiple, visibility_scope: audience,
+                        });
+                        setFormTitle("");
+                        setFormDescription("");
+                        setFormCategory("");
+                        setAllowMultiple(false);
+                        setFields([emptyFormField()]);
+                        setShowCreate(false);
+                        await load();
+                      } catch (err: any) {
+                        setError(err.response?.data?.detail ?? t("failedCreateForm"));
+                      }
+                    }}
+            submitLabel={t("createFormBtn")}
+            submitIcon={<Plus size={16} />}
+          >
+            <div className="inlineForm" style={{ margin: 0, padding: 0, border: "none", background: "none" }}>
+                      <label>{t("titleLabel")}<Input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></label>
+                      <label>{t("descriptionLabel")}<Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} /></label>
+                      <label>{t("formCategoryLabel")}<Input value={formCategory} onChange={(e) => setFormCategory(e.target.value)} placeholder={t("formCategoryPlaceholder") ?? ""} list="form-categories" /></label>
+                      <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} /> {t("allowMultipleLabel")}
+                      </label>
+                    </div>
+
           <AudiencePicker value={audience} onChange={setAudience} />
 
           <FormFieldsEditor fields={fields} onChange={setFields} />
-          <div className="formActions">
-            <button className="primaryAction" type="submit"><Plus size={16} /> {t("createFormBtn")}</button>
-          </div>
-        </form>
-      </Modal>}
+          </FormModal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <datalist id="form-categories">
         {knownCategories.map((c) => <option key={c} value={c} />)}
@@ -143,21 +146,17 @@ export function FormsView() {
         </Select>
       </div>
 
-      <div className="dataTable">
-        <div className="dataRow header"><span>{t("titleCol")}</span><span>{t("categoryFilterLabel")}</span><span>{t("fieldsCol")}</span><span></span></div>
-        {isLoading && <LoadingState />}
-        {!isLoading && loadError && <ErrorState message={loadError} />}
-        {!isLoading && !loadError && forms.length === 0 && <p className="emptyState">{t("noFormsYet")}</p>}
-        {!isLoading && !loadError && forms.map((f) => (
-          <div className="dataRow" key={f.id}>
-            <span>{f.title}</span>
-            <span>{f.category ?? "—"}</span>
-            <span>{f.fields_definition.length}</span>
+      <DataTable<FormDef>
+        columns={[
+          { header: t("titleCol"), render: (f) => f.title },
+          { header: t("categoryFilterLabel"), render: (f) => f.category ?? "—" },
+          { header: t("fieldsCol"), render: (f) => f.fields_definition.length },
+          { header: t("actionsCol"), render: (f) => (
             <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="tableAction" type="button" onClick={() => void openForm(f)}>{t("openBtn")}</button>
+              <Button className="tableAction" type="button" onClick={() => void openForm(f)}>{t("openBtn")}</Button>
               {canEditForm(f) && (
                 <>
-                  <button
+                  <Button
                     className="iconBtn" type="button" title={t("editBtn") ?? ""}
                     onClick={() => {
                       setEditing(f);
@@ -166,32 +165,37 @@ export function FormsView() {
                     }}
                   >
                     <Edit2 size={14} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     className="iconBtn" type="button" title={t("deleteBtn") ?? ""}
                     onClick={async () => {
-                      if (!confirm(t("deleteFormConfirm") ?? "")) return;
+                      if (!(await confirm(t("deleteFormConfirm") ?? ""))) return;
                       try {
                         await operationsApi.deleteForm(f.id);
                         if (selected?.id === f.id) setSelected(null);
                         await load();
                       } catch (err: any) {
-                        alert(err.response?.data?.detail ?? t("failedDeleteForm"));
+                        await alert(err.response?.data?.detail ?? t("failedDeleteForm"));
                       }
                     }}
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </Button>
                 </>
               )}
             </span>
-          </div>
-        ))}
-      </div>
+          )},
+        ]}
+        data={forms}
+        keyExtractor={(f) => f.id}
+        isLoading={isLoading}
+        error={loadError}
+        emptyMessage={t("noFormsYet")}
+      />
 
       {selected && (
-        <Modal title={selected.title} onClose={() => setSelected(null)}><div className="modulePanel" style={{ marginTop: 16 }}>
-          <h3>{selected.title}</h3>
+        <Modal title={selected.title} onClose={() => setSelected(null)}>
+          <div style={{ padding: "16px 0" }}>
           {notice && <p className="notice">{notice}</p>}
           <form
             className="inlineForm"
@@ -220,7 +224,7 @@ export function FormsView() {
               </label>
             ))}
             <div className="formActions">
-              <button className="primaryAction" type="submit" disabled={readOnly}><Send size={16} /> {t("submitResponseBtn")}</button>
+              <Button className="primaryAction" type="submit" disabled={readOnly}><Send size={16} /> {t("submitResponseBtn")}</Button>
             </div>
           </form>
 
@@ -237,7 +241,8 @@ export function FormsView() {
               ))}
             </div>
           )}
-        </div></Modal>
+        </div>
+        </Modal>
       )}
 
       {editing && (
@@ -281,13 +286,13 @@ export function FormsView() {
               <AudiencePicker value={editAudience} onChange={setEditAudience} />
               {editError && <p className="notice" style={{ color: "var(--rose)" }}>{editError}</p>}
               <div className="formActions" style={{ justifyContent: "flex-end" }}>
-                <button type="button" onClick={() => setEditing(null)}>{t("cancelBtn")}</button>
-                <button className="primaryAction" type="submit">{t("editBtn")}</button>
+                <Button type="button" onClick={() => setEditing(null)}>{t("cancelBtn")}</Button>
+                <Button className="primaryAction" type="submit">{t("editBtn")}</Button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </section>
+    </PageSection>
   );
 }

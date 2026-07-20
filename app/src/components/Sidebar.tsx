@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router-dom";
@@ -79,9 +80,9 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
             <strong>{user.username}</strong>
             <RoleBadge role={user.role} />
           </div>
-          <button className="iconButton" type="button" title={t("logout")} aria-label={t("logout")} onClick={logout}>
+          <Button className="iconButton" type="button" title={t("logout")} aria-label={t("logout")} onClick={logout}>
             <LogOut size={16} />
-          </button>
+          </Button>
         </div>
       )}
     </aside>

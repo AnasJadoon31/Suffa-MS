@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Select } from "./ui/Field";
@@ -56,15 +57,15 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   return (
     <div className="richTextEditor">
       <div className="richTextToolbar" role="toolbar" aria-label={t("textFormattingLabel")}>
-        <button type="button" title={t("boldLabel")} onMouseDown={(e) => { e.preventDefault(); exec("bold"); }}><Bold size={14} /></button>
-        <button type="button" title={t("italicLabel")} onMouseDown={(e) => { e.preventDefault(); exec("italic"); }}><Italic size={14} /></button>
-        <button type="button" title={t("underlineLabel")} onMouseDown={(e) => { e.preventDefault(); exec("underline"); }}><Underline size={14} /></button>
-        <button type="button" title={t("headingLabel")} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h2"); }}><Heading2 size={14} /></button>
-        <button type="button" title={t("paragraphLabel")} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "p"); }}>¶</button>
-        <button type="button" title={t("bulletedListLabel")} onMouseDown={(e) => { e.preventDefault(); exec("insertUnorderedList"); }}><List size={14} /></button>
-        <button type="button" title={t("numberedListLabel")} onMouseDown={(e) => { e.preventDefault(); exec("insertOrderedList"); }}><ListOrdered size={14} /></button>
-        <button type="button" title={t("leftToRightLabel")} onMouseDown={(e) => { e.preventDefault(); setDirection("ltr"); }}><AlignLeft size={14} /></button>
-        <button type="button" title={t("rightToLeftUrduLabel")} onMouseDown={(e) => { e.preventDefault(); setDirection("rtl"); }}><AlignRight size={14} /></button>
+        <Button type="button" title={t("boldLabel")} onMouseDown={(e) => { e.preventDefault(); exec("bold"); }}><Bold size={14} /></Button>
+        <Button type="button" title={t("italicLabel")} onMouseDown={(e) => { e.preventDefault(); exec("italic"); }}><Italic size={14} /></Button>
+        <Button type="button" title={t("underlineLabel")} onMouseDown={(e) => { e.preventDefault(); exec("underline"); }}><Underline size={14} /></Button>
+        <Button type="button" title={t("headingLabel")} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h2"); }}><Heading2 size={14} /></Button>
+        <Button type="button" title={t("paragraphLabel")} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "p"); }}>¶</Button>
+        <Button type="button" title={t("bulletedListLabel")} onMouseDown={(e) => { e.preventDefault(); exec("insertUnorderedList"); }}><List size={14} /></Button>
+        <Button type="button" title={t("numberedListLabel")} onMouseDown={(e) => { e.preventDefault(); exec("insertOrderedList"); }}><ListOrdered size={14} /></Button>
+        <Button type="button" title={t("leftToRightLabel")} onMouseDown={(e) => { e.preventDefault(); setDirection("ltr"); }}><AlignLeft size={14} /></Button>
+        <Button type="button" title={t("rightToLeftUrduLabel")} onMouseDown={(e) => { e.preventDefault(); setDirection("rtl"); }}><AlignRight size={14} /></Button>
         <Select
           title={t("fontLabel")}
           defaultValue=""

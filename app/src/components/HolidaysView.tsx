@@ -1,14 +1,18 @@
+import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Save, Trash2, X, Palmtree } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDialog } from "../lib/DialogContext";
 
 import { academicsApi, operationsApi, type AcademicClass, type Holiday } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { HijriTag } from "./HijriTag";
-import { Input, Select } from "./ui/Field";
+import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 type HolidayForm = {
   name: string;
@@ -22,6 +26,7 @@ const EMPTY_FORM: HolidayForm = { name: "", category: "", start_date: "", end_da
 
 export function HolidaysView() {
   const { t } = useTranslation();
+  const { confirm, alert } = useDialog();
   const { hasPermission } = useAuth();
   const readOnly = useSessionReadOnly();
   const canManage = !readOnly && hasPermission("holidays.manage");
@@ -102,7 +107,7 @@ export function HolidaysView() {
   };
 
   const deleteHoliday = async (holiday: Holiday) => {
-    if (!window.confirm(t("deleteHolidayConfirm", { name: holiday.name }))) return;
+    if (!(await confirm(t("deleteHolidayConfirm", { name: holiday.name })))) return;
     setError("");
     try {
       await operationsApi.deleteHoliday(holiday.id);
@@ -118,8 +123,8 @@ export function HolidaysView() {
       <small className="notice">{t("holidayClassesHint")}</small>
       {classes.map((c) => (
         <label key={c.id} className="checkboxLabel">
-          <input
-            type="checkbox"
+          <Checkbox
+            
             checked={value.includes(c.id)}
             onChange={() =>
               onChange(value.includes(c.id) ? value.filter((x) => x !== c.id) : [...value, c.id])
@@ -132,11 +137,12 @@ export function HolidaysView() {
   );
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("holidays")}</h2>
-        <p className="notice">{t("descHolidays")}</p>
-      </div>
+    <PageSection>
+      <PageHeader
+        title={t("holidays")}
+        icon={<Palmtree size={18} />}
+        notice={t("descHolidays")}
+      />
 
       <div className="filterBar">
         <Select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
@@ -151,119 +157,101 @@ export function HolidaysView() {
         <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
       </div>
 
-      {canManage && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addHolidayBtn")}</button>}
+      {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addHolidayBtn")}</Button>}
       {canManage && showCreate && (
-        <Modal title={t("addHolidayBtn")} onClose={() => setShowCreate(false)}><form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            try {
-              await operationsApi.createHoliday({
-                name: form.name,
-                category: form.category || undefined,
-                start_date: form.start_date,
-                end_date: form.end_date,
-                class_ids: form.class_ids,
-              });
-              setForm(EMPTY_FORM);
-              setShowCreate(false);
-              await load();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? t("failedAddHoliday"));
-            }
-          }}
-        >
-          <label>{t("nameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>{t("categoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("holidayCategoryPlaceholder")} /></label>
-          <label>{t("startLabel")}<Input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
-          <label>{t("endLabel")}<Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
-          {classes.length > 0 && classPicker(form.class_ids, (class_ids) => setForm({ ...form, class_ids }))}
-          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addHolidayBtn")}</button></div>
-        </form></Modal>
+        <FormModal
+                title={t("addHolidayBtn")} onClose={() => setShowCreate(false)}
+                onSubmit={async (e) => {
+                          e.preventDefault();
+                          setError("");
+                          try {
+                            await operationsApi.createHoliday({
+                              name: form.name,
+                              category: form.category || undefined,
+                              start_date: form.start_date,
+                              end_date: form.end_date,
+                              class_ids: form.class_ids,
+                            });
+                            setForm(EMPTY_FORM);
+                            setShowCreate(false);
+                            await load();
+                          } catch (err: any) {
+                            setError(err.response?.data?.detail ?? t("failedAddHoliday"));
+                          }
+                        }}
+                submitLabel={t("addHolidayBtn")}
+                submitIcon={<Plus size={16} />}
+              >
+                <label>{t("nameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+
+              <label>{t("categoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("holidayCategoryPlaceholder")} /></label>
+
+              <label>{t("startLabel")}<Input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
+
+              <label>{t("endLabel")}<Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
+
+              {classes.length > 0 && classPicker(form.class_ids, (class_ids) => setForm({ ...form, class_ids }))}
+              </FormModal>
       )}
 
       {!isLoading && error && <ErrorState message={error} />}
 
-      <div className="dataTable">
-        <div className="dataRow header">
-          <span>{t("nameLabel")}</span>
-          <span>{t("categoryCol")}</span>
-          <span>{t("startLabel")}</span>
-          <span>{t("endLabel")}</span>
-          <span>{t("appliesToCol")}</span>
-          {canManage && <span></span>}
-        </div>
-        {isLoading && <LoadingState />}
-        {!isLoading && !error && holidays.length === 0 && <p className="emptyState">{t("noHolidays")}</p>}
-        {!isLoading && !error && holidays.map((holiday) => {
-          const isEditing = editingId === holiday.id;
-          return (
-            <div className="dataRow" key={holiday.id}>
-              <span>
-                {isEditing ? (
-                  <Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-                ) : holiday.name}
-              </span>
-              <span>
-                {isEditing ? (
-                  <Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} />
-                ) : holiday.category ?? "—"}
-              </span>
-              <span>
-                {isEditing ? (
-                  <Input required type="date" value={editForm.start_date} onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })} />
-                ) : (
-                  <>
-                    {holiday.start_date}
-                    <HijriTag date={holiday.start_date} />
-                  </>
-                )}
-              </span>
-              <span>
-                {isEditing ? (
-                  <Input required type="date" value={editForm.end_date} onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })} />
-                ) : (
-                  <>
-                    {holiday.end_date}
-                    <HijriTag date={holiday.end_date} />
-                  </>
-                )}
-              </span>
-              <span>{classNames(holiday.class_ids)}</span>
-              {canManage && (
-                <span>
-                  {isEditing ? (
-                    <>
-                      <button className="tableAction" type="button" onClick={() => void saveHoliday(holiday.id)}>
-                        <Save size={14} /> {t("saveBtn")}
-                      </button>
-                      <button className="tableAction" type="button" onClick={cancelEditing}>
-                        <X size={14} /> {t("cancelBtn")}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="tableAction" type="button" onClick={() => startEditing(holiday)}>
-                        <Pencil size={14} /> {t("editBtn")}
-                      </button>
-                      <button className="tableAction" type="button" onClick={() => void deleteHoliday(holiday)}>
-                        <Trash2 size={14} /> {t("deleteBtn")}
-                      </button>
-                    </>
-                  )}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <DataTable<Holiday>
+        columns={[
+          { header: t("nameLabel"), render: (holiday) => editingId === holiday.id ? (
+            <Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+          ) : holiday.name },
+          { header: t("categoryCol"), render: (holiday) => editingId === holiday.id ? (
+            <Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} />
+          ) : holiday.category ?? "—" },
+          { header: t("startLabel"), render: (holiday) => editingId === holiday.id ? (
+            <Input required type="date" value={editForm.start_date} onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })} />
+          ) : (
+            <>
+              {holiday.start_date}
+              <HijriTag date={holiday.start_date} />
+            </>
+          ) },
+          { header: t("endLabel"), render: (holiday) => editingId === holiday.id ? (
+            <Input required type="date" value={editForm.end_date} onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })} />
+          ) : (
+            <>
+              {holiday.end_date}
+              <HijriTag date={holiday.end_date} />
+            </>
+          ) },
+          { header: t("appliesToCol"), render: (holiday) => classNames(holiday.class_ids) },
+          ...(canManage ? [{ header: t("actionsCol"), render: (holiday: Holiday) => editingId === holiday.id ? (
+            <>
+              <Button className="tableAction" type="button" onClick={() => void saveHoliday(holiday.id)}>
+                <Save size={14} /> {t("saveBtn")}
+              </Button>
+              <Button className="tableAction" type="button" onClick={cancelEditing}>
+                <X size={14} /> {t("cancelBtn")}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button className="tableAction" type="button" onClick={() => startEditing(holiday)}>
+                <Pencil size={14} /> {t("editBtn")}
+              </Button>
+              <Button className="tableAction" type="button" onClick={() => void deleteHoliday(holiday)}>
+                <Trash2 size={14} /> {t("deleteBtn")}
+              </Button>
+            </>
+          ) }] : []),
+        ]}
+        data={holidays}
+        keyExtractor={(h) => h.id}
+        isLoading={isLoading}
+        emptyMessage={t("noHolidays")}
+      />
       {editingId && classes.length > 0 && (
-        <div className="modulePanel" style={{ marginTop: 12 }}>
+        <PageSection style={{ marginTop: 12 }}>
           <strong>{t("appliesToCol")}</strong>
           {classPicker(editForm.class_ids, (class_ids) => setEditForm({ ...editForm, class_ids }))}
-        </div>
+        </PageSection>
       )}
-    </section>
+    </PageSection>
   );
 }

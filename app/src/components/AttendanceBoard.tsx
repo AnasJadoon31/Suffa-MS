@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import {
   ArrowLeft,
   BookOpen,
@@ -16,7 +17,12 @@ import { AttendanceCalendar, monthRange, toDateKey, type ClassDayStats, type Hol
 import { useAttendanceOutbox } from "../hooks/useAttendanceOutbox";
 import { useAuth } from "../lib/AuthContext";
 import {
+  academicsApi,
   attendanceApi,
+  operationsApi,
+  peopleApi,
+  type AcademicClass,
+  type AcademicSession,
   type AttendanceClassOption,
   type AttendanceLogEntry,
   type AttendanceRoster,
@@ -25,15 +31,17 @@ import {
   type StudentAttendanceHistory,
   type Teacher,
   type TeacherAttendanceLogEntry,
-  operationsApi,
-  peopleApi,
+  type TeacherAttendanceToday
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
 import { consumePendingClassNav } from "../lib/pendingNav";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Input } from "./ui/Field";
+import { DataTable } from "./ui/DataTable";
 
 
 const attendanceOptions = ["present", "absent", "leave"] as const;
@@ -88,11 +96,8 @@ function TeacherAttendancePanel() {
   });
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("teacherAttendanceHeading")}</h2>
-        <p className="notice">{t("teacherAttendanceDescription")}</p>
-      </div>
+    <PageSection>
+      <PageHeader title={t("teacherAttendanceHeading")} notice={t("teacherAttendanceDescription")} />
       <div className="moduleToolbar">
         <SearchDropdown
           id="teacher-attendance-search"
@@ -115,7 +120,7 @@ function TeacherAttendancePanel() {
         />
         {(teacherSearch || selectedTeacherId) && (
           <div className="formActions">
-            <button
+            <Button
               className="secondaryAction"
               type="button"
               onClick={() => {
@@ -124,39 +129,35 @@ function TeacherAttendancePanel() {
               }}
             >
               {t("clearBtn")}
-            </button>
+            </Button>
           </div>
         )}
       </div>
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <div className="dataTable">
-        <div className="dataRow header">
-          <span>{t("teacherLabel")}</span>
-          <span>{t("dateCol")}</span>
-          <span>{t("statusCol")}</span>
-          <span>{t("timeInLabel")}</span>
-          <span>{t("timeOutLabel")}</span>
-          <span>{t("markedByCol")}</span>
-        </div>
-        {logs.length === 0 && <p className="emptyState">{t("noTeacherAttendanceLogs")}</p>}
-        {logs.map((entry) => (
-          <div className="dataRow" key={entry.id}>
-            <span>
+      <DataTable<TeacherAttendanceLogEntry>
+        columns={[
+          { header: t("teacherLabel"), render: (entry) => (
+            <>
               <strong>{entry.teacher_name}</strong>
               <small>{entry.employee_code}</small>
-            </span>
-            <span>{entry.attendance_date}</span>
-            <span>{t(entry.status)}</span>
-            <span>{formatTime(entry.check_in)}</span>
-            <span>{formatTime(entry.check_out)}</span>
-            <span>
+            </>
+          ) },
+          { header: t("dateCol"), render: (entry) => entry.attendance_date },
+          { header: t("statusCol"), render: (entry) => t(entry.status) },
+          { header: t("timeInLabel"), render: (entry) => formatTime(entry.check_in) },
+          { header: t("timeOutLabel"), render: (entry) => formatTime(entry.check_out) },
+          { header: t("markedByCol"), render: (entry) => (
+            <>
               <strong>{entry.marked_by.display_name}</strong>
               <small>{entry.marked_by.username}</small>
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
+            </>
+          ) },
+        ]}
+        data={logs}
+        keyExtractor={(entry) => entry.id}
+        emptyMessage={t("noTeacherAttendanceLogs")}
+      />
+    </PageSection>
   );
 }
 
@@ -207,46 +208,42 @@ function AttendanceHistoryTable({
 }: Readonly<{ entries: AttendanceLogEntry[]; includeStudent: boolean }>) {
   const { t } = useTranslation();
 
-  if (entries.length === 0) {
-    return <p className="emptyState">{t("noAttendanceHistory")}</p>;
-  }
-
   return (
-    <div className={includeStudent ? "dataTable attendanceHistoryTable" : "dataTable attendanceHistoryTable compact"}>
-      <div className="dataRow header">
-        <span>{t("dateCol")}</span>
-        {includeStudent && <span>{t("studentCol")}</span>}
-        <span>{t("statusCol")}</span>
-        <span>{t("markedByCol")}</span>
-        <span>{t("capturedAtCol")}</span>
-        <span>{t("syncedAtCol")}</span>
-      </div>
-      {entries.map((entry) => (
-        <div className="dataRow" key={entry.id}>
-          <span>{entry.attendance_date}</span>
-          {includeStudent && (
-            <span>
-              <strong>{entry.student_name}</strong>
-              <small>{entry.admission_number}</small>
-            </span>
-          )}
-          <span>
+    <DataTable<AttendanceLogEntry>
+      className={includeStudent ? "attendanceHistoryTable" : "attendanceHistoryTable compact"}
+      columns={[
+        { header: t("dateCol"), render: (entry) => entry.attendance_date },
+        ...(includeStudent ? [{ header: t("studentCol"), render: (entry: AttendanceLogEntry) => (
+          <>
+            <strong>{entry.student_name}</strong>
+            <small>{entry.admission_number}</small>
+          </>
+        ) }] : []),
+        { header: t("statusCol"), render: (entry) => (
+          <>
             <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
             {entry.source === "approved_leave" && <small className="syncBadge">{t("approvedLeaveLabel")}</small>}
             {entry.overridden && <small className="syncBadge">{t("overriddenLabel")}</small>}
-          </span>
-          <span>
+          </>
+        ) },
+        { header: t("markedByCol"), render: (entry) => (
+          <>
             <strong>{entry.marked_by.display_name}</strong>
             <small>{entry.marked_by.username} - {entry.marked_by.role}</small>
-          </span>
-          <span>
+          </>
+        ) },
+        { header: t("capturedAtCol"), render: (entry) => (
+          <>
             {formatDateTime(entry.marked_at)}
             {wasCapturedOffline(entry) && <small className="syncBadge">{t("offlineCaptureLabel")}</small>}
-          </span>
-          <span>{formatDateTime(entry.synced_at)}</span>
-        </div>
-      ))}
-    </div>
+          </>
+        ) },
+        { header: t("syncedAtCol"), render: (entry) => formatDateTime(entry.synced_at) },
+      ]}
+      data={entries}
+      keyExtractor={(entry) => entry.id}
+      emptyMessage={t("noAttendanceHistory")}
+    />
   );
 }
 
@@ -553,10 +550,10 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </div>
         {selectedClassId && (
           <div className="headerActions">
-            <button className="secondaryAction" type="button" onClick={returnToClasses}>
+            <Button className="secondaryAction" type="button" onClick={returnToClasses}>
               <ArrowLeft size={17} />
               {t("classesHeading")}
-            </button>
+            </Button>
           </div>
         )}
       </header>
@@ -575,9 +572,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               {lockedEntries.map((entry) => (
                 <li key={entry.idempotency_key}>
                   {entry.attendance_date} - {roster?.students.find((student) => student.id === entry.subject_id)?.name ?? t("unknownPersonLabel")}
-                  <button type="button" onClick={() => void handleOverride(entry)}>
+                  <Button type="button" onClick={() => void handleOverride(entry)}>
                     {t("override")}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -589,7 +586,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
       {canManageTeacherAttendance && (
         <div className="formActions" style={{ marginTop: 16 }}>
-          <button
+          <Button
             className={attendanceMode === "students" ? "primaryAction" : "secondaryAction"}
             type="button"
             onClick={() => {
@@ -598,8 +595,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             }}
           >
             {t("studentAttendanceHeading")}
-          </button>
-          <button
+          </Button>
+          <Button
             className={attendanceMode === "teachers" ? "primaryAction" : "secondaryAction"}
             type="button"
             onClick={() => {
@@ -609,7 +606,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             }}
           >
             {t("teacherAttendanceHeading")}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -618,7 +615,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       {attendanceMode === "students" && !selectedClassId && (
         <div className="attendanceClassGrid" aria-label={t("chooseAttendanceClass")}>
           {classes.flatMap((item) => item.sections.map((section) => (
-            <button className="attendanceClassButton" key={section.id} type="button" onClick={() => selectClass(item.id, section.id)}>
+            <Button className="attendanceClassButton" key={section.id} type="button" onClick={() => selectClass(item.id, section.id)}>
               <span className="attendanceClassIcon" aria-hidden="true"><BookOpen size={18} /></span>
               <span className="attendanceClassBody">
                 <strong>{item.name} / {section.name}</strong>
@@ -629,7 +626,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 </span>
               </span>
               <ChevronRight size={18} aria-hidden="true" />
-            </button>
+            </Button>
           )))}
           {!isLoadingClasses && classes.every((item) => item.sections.length === 0) && <p className="emptyState">{t("noAttendanceClasses")}</p>}
           {isLoadingClasses && <p className="emptyState">{t("loadingLabel")}</p>}
@@ -638,7 +635,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
       {attendanceMode === "students" && selectedClassId && (
         <div className="formActions" style={{ marginTop: 16 }}>
-          <button
+          <Button
             className={activeTab === "calendar" ? "primaryAction" : "secondaryAction"}
             type="button"
             onClick={() => {
@@ -647,8 +644,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             }}
           >
             {t("calendarTab")}
-          </button>
-          <button
+          </Button>
+          <Button
             className={activeTab === "studentHistory" ? "primaryAction" : "secondaryAction"}
             type="button"
             onClick={() => {
@@ -657,7 +654,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             }}
           >
             {t("studentAttendanceHistory")}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -702,7 +699,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                       </div>
                       <div className="statusButtons" aria-label={t("attendanceForStudentLabel", { name: student.name })}>
                         {attendanceOptions.map((option) => (
-                          <button
+                          <Button
                             className={status === option ? `statusButton active ${option}` : "statusButton"}
                             key={option}
                             type="button"
@@ -710,7 +707,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                             onClick={() => mark(student.id, option)}
                           >
                             {t(option)}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </article>
@@ -724,7 +721,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                   <span>{t("markedStudents")}</span>
                   <strong>{markedCount}</strong>
                   <small>{t("outboxHelp")}</small>
-                  <button
+                  <Button
                     className="primaryAction"
                     type="button"
                     onClick={() => void saveAttendance()}
@@ -732,8 +729,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                   >
                     <Save size={18} />
                     {t("saveAttendance")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     className="secondaryAction"
                     type="button"
                     onClick={() => void sync()}
@@ -741,7 +738,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                   >
                     <CloudUpload size={18} />
                     {t("syncNow")}
-                  </button>
+                  </Button>
                 </footer>
               </div>
             )}
@@ -750,10 +747,10 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               <>
                 <AttendanceHistoryTable entries={selectedDayEntries} includeStudent />
                 {isSelectedToday && (
-                  <button className="secondaryAction" type="button" onClick={startEditingToday}>
+                  <Button className="secondaryAction" type="button" onClick={startEditingToday}>
                     <Pencil size={16} />
                     {t("editAttendance")}
-                  </button>
+                  </Button>
                 )}
               </>
             )}
@@ -772,7 +769,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               onChange={(event) => setStudentSearch(event.target.value)}
             />
             {filteredStudents.map((student) => (
-              <button
+              <Button
                 className={student.id === selectedStudentId ? "attendanceStudentListButton active" : "attendanceStudentListButton"}
                 type="button"
                 key={student.id}
@@ -784,7 +781,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               >
                 <strong>{student.name}</strong>
                 <small>{student.admission_number}</small>
-              </button>
+              </Button>
             ))}
             {filteredStudents.length === 0 && <p className="emptyState">{t("noStudentsFound")}</p>}
           </div>

@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LogIn, Building2, KeyRound, Loader2 } from "lucide-react";
@@ -120,7 +121,7 @@ export function LoginScreen() {
                 </div>
               </div>
 
-              <button type="submit" className="login-button" disabled={isLoading}>
+              <Button type="submit" className="login-button" disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 size={18} className="spin" />
@@ -129,7 +130,7 @@ export function LoginScreen() {
                 ) : (
                   t("signInButton")
                 )}
-              </button>
+              </Button>
             </form>
           </div>
         </div>

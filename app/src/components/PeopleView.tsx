@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
 import { Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -20,10 +21,12 @@ import {
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { LoadingState } from "./ui/AsyncState";
+import { DataTable, type Column } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { DelegateModal } from "./DelegateButton";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 function SendCredentialsButton({
   subjectType,
@@ -50,9 +53,9 @@ function SendCredentialsButton({
 
   return (
     <>
-      <button className="secondaryAction" type="button" disabled={readOnly} onClick={() => void send()}>
+      <Button className="secondaryAction" type="button" disabled={readOnly} onClick={() => void send()}>
         {t("sendCredentialsBtn")}
-      </button>
+      </Button>
       {error && <span className="notice" style={{ color: "var(--rose)" }}>{error}</span>}
     </>
   );
@@ -93,9 +96,9 @@ function ReissueCredentialsButton({
   };
 
   return (
-    <button className="tableAction" type="button" disabled={readOnly} title={t("loginLinkTitle")} onClick={() => void reissue()}>
+    <Button className="tableAction" type="button" disabled={readOnly} title={t("loginLinkTitle")} onClick={() => void reissue()}>
       <KeyRound size={14} /> {state === "copied" ? t("linkCopied") : state === "error" ? t("failedLabel") : t("loginLinkBtn")}
-    </button>
+    </Button>
   );
 }
 
@@ -120,32 +123,29 @@ export function PeopleView({
   };
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("peopleTitle")}</h2>
-        <p className="notice">{t("peopleSubtitle")}</p>
-      </div>
+    <PageSection>
+      <PageHeader title={t("peopleTitle")} notice={t("peopleSubtitle")} />
       {showTabs && <div className="formActions" style={{ marginBottom: 16 }}>
-        {hasPermission("teachers.view") && <button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("teachers")}>
+        {hasPermission("teachers.view") && <Button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("teachers")}>
           <UserRoundCog size={16} /> {t("teachers")}
-        </button>}
-        {hasPermission("students.view") && <button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("students")}>
+        </Button>}
+        {hasPermission("students.view") && <Button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("students")}>
           <GraduationCap size={16} /> {t("students")}
-        </button>}
-        {hasPermission("students.view") && <button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("guardians")}>
+        </Button>}
+        {hasPermission("students.view") && <Button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("guardians")}>
           <UsersRound size={16} /> {t("guardians")}
-        </button>}
+        </Button>}
         {canViewFinance && (
-          <button className={tab === "donators" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("donators")}>
+          <Button className={tab === "donators" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("donators")}>
             <HandCoins size={16} /> {t("donatorsTab")}
-          </button>
+          </Button>
         )}
       </div>}
       {tab === "teachers" && <TeachersTab canCreate={!readOnly && hasPermission("teachers.add")} canSalary={canSalary} />}
       {tab === "students" && <StudentsTab canCreate={!readOnly && hasPermission("students.add")} canFinance={canFinance} />}
       {tab === "guardians" && <GuardiansTab canCreate={!readOnly && hasPermission("students.add")} canSendCredentials={!readOnly && hasPermission("students.send_credentials")} />}
       {tab === "donators" && canViewFinance && <DonatorsTab canWrite={canFinance} />}
-    </section>
+    </PageSection>
   );
 }
 
@@ -237,32 +237,41 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
         />
         <div className="formActions">
           {search && (
-            <button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
+            <Button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
               {t("cancelBtn")}
-            </button>
+            </Button>
           )}
           {canCreate && (
-            <button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
+            <Button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
               <UserPlus size={16} /> {t("addTeacherBtn")}
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {showCreate && canCreate && (
-        <Modal title={t("addTeacherBtn")} onClose={() => setShowCreate(false)}><form className="inlineForm" onSubmit={onSubmit}>
-          <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
-          <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>{t("whatsappNumberLabel")}<Input value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} /></label>
-          <label>{t("qualificationsLabel")}<Input value={form.qualifications} onChange={(e) => setForm({ ...form, qualifications: e.target.value })} /></label>
-          <label>{t("joinDateLabel")}<Input type="date" value={form.join_date} onChange={(e) => setForm({ ...form, join_date: e.target.value })} /></label>
-          <label>{t("cnicLabel")}<Input value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} /></label>
-          <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-          <label>{t("emergencyContactLabel")}<Input value={form.emergency_contact} onChange={(e) => setForm({ ...form, emergency_contact: e.target.value })} /></label>
-          <div className="formActions">
-            <button className="primaryAction" type="submit"><UserPlus size={16} /> {t("addTeacherBtn")}</button>
-          </div>
-        </form></Modal>
+        <FormModal
+                title={t("addTeacherBtn")} onClose={() => setShowCreate(false)}
+                onSubmit={onSubmit}
+                submitLabel={t("addTeacherBtn")}
+                submitIcon={<UserPlus size={16} />}
+              >
+                <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
+
+              <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+
+              <label>{t("whatsappNumberLabel")}<Input value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} /></label>
+
+              <label>{t("qualificationsLabel")}<Input value={form.qualifications} onChange={(e) => setForm({ ...form, qualifications: e.target.value })} /></label>
+
+              <label>{t("joinDateLabel")}<Input type="date" value={form.join_date} onChange={(e) => setForm({ ...form, join_date: e.target.value })} /></label>
+
+              <label>{t("cnicLabel")}<Input value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} /></label>
+
+              <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+
+              <label>{t("emergencyContactLabel")}<Input value={form.emergency_contact} onChange={(e) => setForm({ ...form, emergency_contact: e.target.value })} /></label>
+              </FormModal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -270,31 +279,26 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
         <SendCredentialsButton subjectType="teacher" subjectId={justCreated.id} setPasswordUrl={justCreated.set_password_url} />
       )}
 
-      <div className="dataTable">
-        <div className="dataRow header">
-          <span>{t("codeCol")}</span>
-          <span>{t("nameLabel")}</span>
-          <span>{t("whatsappCol")}</span>
-          <span>{t("statusCol")}</span>
-          <span></span>
-        </div>
-        {isLoading && <LoadingState />}
-        {!isLoading && teachers.length === 0 && <p className="emptyState">{t("noTeachersYet")}</p>}
-        {teachers.map((teacher) => (
-          <div className="dataRow" key={teacher.id}>
-            <span>{teacher.employee_code}</span>
-            <span>{teacher.name}</span>
-            <span>{teacher.whatsapp_number || "—"}</span>
-            <span>{teacher.status}</span>
-            <span>
-              <button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(teacher)}>
+      <DataTable<Teacher>
+        columns={[
+          { header: t("codeCol"), render: (teacher) => teacher.employee_code },
+          { header: t("nameLabel"), render: (teacher) => teacher.name },
+          { header: t("whatsappCol"), render: (teacher) => teacher.whatsapp_number || "—" },
+          { header: t("statusCol"), render: (teacher) => teacher.status },
+          { header: t("actionsCol"), render: (teacher) => (
+            <>
+              <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(teacher)}>
                 <Eye size={14} />
-              </button>
+              </Button>
               <ReissueCredentialsButton subjectType="teacher" subjectId={teacher.id} />
-            </span>
-          </div>
-        ))}
-      </div>
+            </>
+          )},
+        ]}
+        data={teachers}
+        keyExtractor={(teacher) => teacher.id}
+        isLoading={isLoading}
+        emptyMessage={t("noTeachersYet")}
+      />
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {detail && <Modal title={detail.name} onClose={() => setDetail(null)}><TeacherDetail teacher={detail} canSalary={canSalary} onClose={() => setDetail(null)} /></Modal>}
@@ -328,18 +332,20 @@ function TeacherDetail({
   }, [teacher.id]);
 
   return (
-    <div className="modulePanel detailPanel">
-      <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between" }}>
-        <h3>{teacher.name} · {teacher.employee_code}</h3>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          {user?.role === "principal" && (
-            <button className="secondaryAction" type="button" onClick={() => setShowDelegate(true)}>
-              <ShieldCheck size={16} /> {t("delegateBtn")}
-            </button>
-          )}
-          <button className="tableAction" type="button" onClick={onClose}><X size={16} /></button>
-        </div>
-      </div>
+    <div className="detailPanel">
+      <PageHeader
+        title={`${teacher.name} · ${teacher.employee_code}`}
+        actions={
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {user?.role === "principal" && (
+              <Button className="secondaryAction" type="button" onClick={() => setShowDelegate(true)}>
+                <ShieldCheck size={16} /> {t("delegateBtn")}
+              </Button>
+            )}
+            <Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>
+          </div>
+        }
+      />
       <dl className="detailGrid">
         <dt>{t("whatsappCol")}</dt><dd>{teacher.whatsapp_number || "—"}</dd>
         <dt>{t("qualificationsLabel")}</dt><dd>{teacher.qualifications ?? "—"}</dd>
@@ -391,7 +397,7 @@ function TeacherDetail({
             <label>{t("dateCol")}<Input required type="date" value={payForm.payment_date} onChange={(e) => setPayForm({ ...payForm, payment_date: e.target.value })} /></label>
             <label>{t("periodCoveredCol")}<Input required value={payForm.period_covered} onChange={(e) => setPayForm({ ...payForm, period_covered: e.target.value })} placeholder={t("monthYearExample")} /></label>
             <label>{t("methodCol")}<Input required value={payForm.method} onChange={(e) => setPayForm({ ...payForm, method: e.target.value })} /></label>
-            <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordSalaryBtn")}</button></div>
+            <div className="formActions"><Button className="primaryAction" type="submit"><Plus size={16} /> {t("recordSalaryBtn")}</Button></div>
           </form>
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
         </>
@@ -507,29 +513,35 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
         </label>
         <div className="formActions">
           {search && (
-            <button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
+            <Button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
               {t("cancelBtn")}
-            </button>
+            </Button>
           )}
           {canCreate && (
-            <button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
+            <Button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
               <UserPlus size={16} /> {t("addStudentBtn")}
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {showCreate && canCreate && (
-        <Modal title={t("addStudentBtn")} onClose={() => setShowCreate(false)}><form className="inlineForm" onSubmit={onSubmit}>
-          <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
-          <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>{t("dobLabel")}<Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
-          <label>{t("bFormLabel")}<Input value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
-          <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-          <div className="formActions">
-            <button className="primaryAction" type="submit"><UserPlus size={16} /> {t("addStudentBtn")}</button>
-          </div>
-        </form></Modal>
+        <FormModal
+                title={t("addStudentBtn")} onClose={() => setShowCreate(false)}
+                onSubmit={onSubmit}
+                submitLabel={t("addStudentBtn")}
+                submitIcon={<UserPlus size={16} />}
+              >
+                <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
+
+              <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+
+              <label>{t("dobLabel")}<Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
+
+              <label>{t("bFormLabel")}<Input value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
+
+              <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+              </FormModal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -537,33 +549,27 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
         <SendCredentialsButton subjectType="student" subjectId={justCreated.id} setPasswordUrl={justCreated.set_password_url} />
       )}
 
-      <div className="dataTable">
-        <div className="dataRow header">
-          <span>{t("admissionNumberCol")}</span>
-          <span>{t("nameLabel")}</span>
-          <span>{t("dobCol")}</span>
-          <span>{t("portalCol")}</span>
-          <span>{t("statusCol")}</span>
-          <span></span>
-        </div>
-        {isLoading && <LoadingState />}
-        {!isLoading && visible.length === 0 && <p className="emptyState">{t("noStudentsYet")}</p>}
-        {visible.map((s) => (
-          <div className="dataRow" key={s.id}>
-            <span>{s.admission_number}</span>
-            <span>{s.name}</span>
-            <span>{s.date_of_birth}</span>
-            <span>{s.portal_enabled ? t("enabledLabel") : t("disabledLabel")}</span>
-            <span>{s.status}</span>
-            <span>
-              <button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(s)}>
+      <DataTable<Student>
+        columns={[
+          { header: t("admissionNumberCol"), render: (s) => s.admission_number },
+          { header: t("nameLabel"), render: (s) => s.name },
+          { header: t("dobCol"), render: (s) => s.date_of_birth },
+          { header: t("portalCol"), render: (s) => s.portal_enabled ? t("enabledLabel") : t("disabledLabel") },
+          { header: t("statusCol"), render: (s) => s.status },
+          { header: t("actionsCol"), render: (s) => (
+            <>
+              <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(s)}>
                 <Eye size={14} />
-              </button>
+              </Button>
               {s.portal_enabled && <ReissueCredentialsButton subjectType="student" subjectId={s.id} />}
-            </span>
-          </div>
-        ))}
-      </div>
+            </>
+          )},
+        ]}
+        data={visible}
+        keyExtractor={(s) => s.id}
+        isLoading={isLoading}
+        emptyMessage={t("noStudentsYet")}
+      />
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {detail && <Modal title={detail.name} onClose={() => setDetail(null)}><StudentDetail student={detail} canFinance={canFinance} onClose={() => setDetail(null)} /></Modal>}
@@ -596,11 +602,11 @@ function StudentDetail({
   }, [student.id]);
 
   return (
-    <div className="modulePanel detailPanel">
-      <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between" }}>
-        <h3>{student.name} · {student.admission_number}</h3>
-        <button className="tableAction" type="button" onClick={onClose}><X size={16} /></button>
-      </div>
+    <div className="detailPanel">
+      <PageHeader
+        title={`${student.name} · ${student.admission_number}`}
+        actions={<Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>}
+      />
       <dl className="detailGrid">
         <dt>{t("dobCol")}</dt><dd>{student.date_of_birth}</dd>
         <dt>{t("portalCol")}</dt><dd>{student.portal_enabled ? t("enabledLabel") : t("disabledLabel")}</dd>
@@ -662,7 +668,7 @@ function StudentDetail({
             </label>
             <label>{t("amountCol")}<Input required type="number" value={feeForm.amount} onChange={(e) => setFeeForm({ ...feeForm, amount: e.target.value })} /></label>
             <label>{t("dateCol")}<Input required type="date" value={feeForm.payment_date} onChange={(e) => setFeeForm({ ...feeForm, payment_date: e.target.value })} /></label>
-            <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordFeeBtn")}</button></div>
+            <div className="formActions"><Button className="primaryAction" type="submit"><Plus size={16} /> {t("recordFeeBtn")}</Button></div>
           </form>
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
         </>
@@ -727,65 +733,63 @@ function GuardiansTab({
 
   return (
     <>
-      {canCreate && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><UserPlus size={16} /> {t("addGuardianBtn")}</button>}
+      {canCreate && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><UserPlus size={16} /> {t("addGuardianBtn")}</Button>}
       {canCreate && showCreate && (
-        <Modal title={t("addGuardianBtn")} onClose={() => setShowCreate(false)}><form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            try {
-              await peopleApi.createGuardian({
-                name: form.name,
-                relationship: form.relationship,
-                phone_numbers: form.phone_numbers,
-                cnic: form.cnic || undefined,
-                address: form.address || undefined,
-              });
-              setForm({ name: "", relationship: "", phone_numbers: "", cnic: "", address: "" });
-              setShowCreate(false);
-              await load();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? t("failedCreateGuardian"));
-            }
-          }}
-        >
-          <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>{t("relationshipLabel")}<Input required value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} placeholder={t("relationshipPlaceholder")} /></label>
-          <label>{t("phoneCol")}<Input required value={form.phone_numbers} onChange={(e) => setForm({ ...form, phone_numbers: e.target.value })} /></label>
-          <label>{t("cnicLabel")}<Input value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} /></label>
-          <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-          <div className="formActions"><button className="primaryAction" type="submit"><UserPlus size={16} /> {t("addGuardianBtn")}</button></div>
-        </form></Modal>
+        <FormModal
+                title={t("addGuardianBtn")} onClose={() => setShowCreate(false)}
+                onSubmit={async (e) => {
+                          e.preventDefault();
+                          setError("");
+                          try {
+                            await peopleApi.createGuardian({
+                              name: form.name,
+                              relationship: form.relationship,
+                              phone_numbers: form.phone_numbers,
+                              cnic: form.cnic || undefined,
+                              address: form.address || undefined,
+                            });
+                            setForm({ name: "", relationship: "", phone_numbers: "", cnic: "", address: "" });
+                            setShowCreate(false);
+                            await load();
+                          } catch (err: any) {
+                            setError(err.response?.data?.detail ?? t("failedCreateGuardian"));
+                          }
+                        }}
+                submitLabel={t("addGuardianBtn")}
+                submitIcon={<UserPlus size={16} />}
+              >
+                <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+
+              <label>{t("relationshipLabel")}<Input required value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} placeholder={t("relationshipPlaceholder")} /></label>
+
+              <label>{t("phoneCol")}<Input required value={form.phone_numbers} onChange={(e) => setForm({ ...form, phone_numbers: e.target.value })} /></label>
+
+              <label>{t("cnicLabel")}<Input value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} /></label>
+
+              <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+              </FormModal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
-      <div className="dataTable">
-        <div className="dataRow header">
-          <span>{t("nameLabel")}</span>
-          <span>{t("relationshipLabel")}</span>
-          <span>{t("phoneCol")}</span>
-          <span>{t("portalCol")}</span>
-          <span></span>
-        </div>
-        {isLoading && <LoadingState />}
-        {!isLoading && guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
-        {guardians.map((g) => (
-          <div className="dataRow" key={g.id}>
-            <span>{g.name}</span>
-            <span>{g.relationship}</span>
-            <span>{g.phone_numbers}</span>
-            <span>{g.user_id ? t("enabledLabel") : t("disabledLabel")}</span>
-            <span>
-              {canSendCredentials && (
-                <button className="tableAction" type="button" onClick={() => void provisionLogin(g)}>
-                  <KeyRound size={14} /> {t("loginLinkBtn")}
-                </button>
-              )}
-            </span>
-          </div>
-        ))}
-      </div>
+      <DataTable<Guardian>
+        columns={[
+          { header: t("nameLabel"), render: (g) => g.name },
+          { header: t("relationshipLabel"), render: (g) => g.relationship },
+          { header: t("phoneCol"), render: (g) => g.phone_numbers },
+          { header: t("portalCol"), render: (g) => g.user_id ? t("enabledLabel") : t("disabledLabel") },
+          { header: t("actionsCol"), render: (g) => (
+            canSendCredentials ? (
+              <Button className="tableAction" type="button" onClick={() => void provisionLogin(g)}>
+                <KeyRound size={14} /> {t("loginLinkBtn")}
+              </Button>
+            ) : null
+          )},
+        ]}
+        data={guardians}
+        keyExtractor={(g) => g.id}
+        isLoading={isLoading}
+        emptyMessage={t("noGuardiansYet")}
+      />
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
     </>
   );
@@ -822,30 +826,30 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
   return (
     <>
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <div className="dataTable">
-        <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("contactCol")}</span><span></span></div>
-        {isLoading && <LoadingState />}
-        {!isLoading && donors.length === 0 && <p className="emptyState">{t("noDonorsYet")}</p>}
-        {donors.map((d) => (
-          <div className="dataRow" key={d.id}>
-            <span>{d.name}</span>
-            <span>{d.contact}</span>
-            <span>
-              <button className="tableAction" type="button" onClick={() => void openDonor(d)}>
-                <Eye size={14} /> {t("viewBtn")}
-              </button>
-            </span>
-          </div>
-        ))}
-      </div>
+      <DataTable<Donor>
+        columns={[
+          { header: t("nameLabel"), render: (d) => d.name },
+          { header: t("contactCol"), render: (d) => d.contact },
+          { header: t("actionsCol"), render: (d) => (
+            <Button className="tableAction" type="button" onClick={() => void openDonor(d)}>
+              <Eye size={14} /> {t("viewBtn")}
+            </Button>
+          )},
+        ]}
+        data={donors}
+        keyExtractor={(d) => d.id}
+        isLoading={isLoading}
+        emptyMessage={t("noDonorsYet")}
+      />
 
       {selected && (
-        <Modal title={selected.name} onClose={() => setSelected(null)}><div className="modulePanel detailPanel">
-          <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between" }}>
-            <h3>{selected.name}</h3>
-            <button className="tableAction" type="button" onClick={() => setSelected(null)}><X size={16} /></button>
-          </div>
-          <h4>{t("donationHistoryHeading")}</h4>
+        <Modal title={selected.name} onClose={() => setSelected(null)}>
+          <div className="detailPanel">
+            <PageHeader
+              title={selected.name}
+              actions={<Button className="tableAction" type="button" onClick={() => setSelected(null)}><X size={16} /></Button>}
+            />
+            <h4>{t("donationHistoryHeading")}</h4>
           <div className="dataTable">
             <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("amountCol")}</span><span>{t("categoryCol")}</span></div>
             {donations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
@@ -885,10 +889,11 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
             </label>
             <label>{t("amountCol")}<Input required type="number" value={donationForm.amount} onChange={(e) => setDonationForm({ ...donationForm, amount: e.target.value })} /></label>
             <label>{t("dateCol")}<Input required type="date" value={donationForm.donation_date} onChange={(e) => setDonationForm({ ...donationForm, donation_date: e.target.value })} /></label>
-            <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addDonationBtn")}</button></div>
+            <div className="formActions"><Button className="primaryAction" type="submit"><Plus size={16} /> {t("addDonationBtn")}</Button></div>
           </form>}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-        </div></Modal>
+          </div>
+        </Modal>
       )}
     </>
   );

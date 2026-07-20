@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { operationsApi, type TimetableSlot } from "../lib/endpoints";
+import { PageSection, PageHeader } from "./ui/Layout";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 
 const DAY_KEYS = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
@@ -20,8 +21,8 @@ export function MyTimetableView() {
   }, [t]);
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader"><h2>{t("myTimetable")}</h2><p className="notice">{t("descMyTimetable")}</p></div>
+    <PageSection>
+      <PageHeader title={t("myTimetable")} notice={t("descMyTimetable")} />
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
       {!loading && !error && slots.length === 0 && <p className="emptyState">{t("noSlotsYet")}</p>}
@@ -29,7 +30,7 @@ export function MyTimetableView() {
         const daySlots = slots.filter((slot) => slot.day_of_week === day);
         if (daySlots.length === 0) return null;
         return (
-          <div className="modulePanel" key={dayKey} style={{ marginTop: 12 }}>
+          <PageSection key={dayKey} style={{ marginTop: 12 }}>
             <h3>{t(dayKey)}</h3>
             <div className="dataTable">
               {daySlots.map((slot) => (
@@ -41,9 +42,9 @@ export function MyTimetableView() {
                 </div>
               ))}
             </div>
-          </div>
+          </PageSection>
         );
       })}
-    </section>
+    </PageSection>
   );
 }

@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { FileDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,6 +7,7 @@ import { useAuth } from "../lib/AuthContext";
 import { academicsApi, operationsApi, type AcademicClass, type AcademicSession, type Section, type TimetableSlot, reportingApi } from "../lib/endpoints";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 function ReportCard({
   title,
@@ -19,20 +21,20 @@ function ReportCard({
   onDownload: (format: "csv" | "pdf") => void;
 }>) {
   return (
-    <div className="modulePanel">
-      <div className="moduleHeader"><h3>{title}</h3></div>
+    <PageSection>
+      <PageHeader title={title} />
       <div className="inlineForm">
         {children}
         <div className="formActions">
-          <button className="secondaryAction" type="button" disabled={disabled} onClick={() => onDownload("csv")}>
+          <Button className="secondaryAction" type="button" disabled={disabled} onClick={() => onDownload("csv")}>
             <FileDown size={16} /> CSV
-          </button>
-          <button className="secondaryAction" type="button" disabled={disabled} onClick={() => onDownload("pdf")}>
+          </Button>
+          <Button className="secondaryAction" type="button" disabled={disabled} onClick={() => onDownload("pdf")}>
             <FileDown size={16} /> PDF
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </PageSection>
   );
 }
 
@@ -119,11 +121,8 @@ export function ReportsView() {
   const hasRange = Boolean(startDate && endDate);
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("reports")}</h2>
-        <p className="notice">{t("descReports")}</p>
-      </div>
+    <PageSection>
+      <PageHeader title={t("reports")} notice={t("descReports")} />
 
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
@@ -193,6 +192,6 @@ export function ReportsView() {
       )}
 
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-    </section>
+    </PageSection>
   );
 }

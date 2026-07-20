@@ -1,6 +1,8 @@
+import { Button } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { FileDown, LayoutGrid, List, Plus, Trash2, Upload, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDialog } from "../lib/DialogContext";
 
 import {
   academicsApi,
@@ -17,8 +19,10 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 const DAY_KEYS = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
 
@@ -26,6 +30,7 @@ export type TimetableMode = "grid" | "list" | "teachers" | "import";
 
 export function TimetableView({ mode = "grid", onModeChange }: Readonly<{ mode?: TimetableMode; onModeChange?: (mode: TimetableMode) => void }>) {
   const { t } = useTranslation();
+  const { alert, confirm } = useDialog();
   const { hasPermission, user } = useAuth();
   const readOnly = useSessionReadOnly();
   const canManage = !readOnly && hasPermission("timetable.manage");
@@ -73,35 +78,32 @@ export function TimetableView({ mode = "grid", onModeChange }: Readonly<{ mode?:
   const visibleSlots = slots;
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("timetable")}</h2>
-        <p className="notice">{t("descTimetable")}</p>
-      </div>
+    <PageSection>
+      <PageHeader title={t("timetable")} notice={t("descTimetable")} />
 
       <div className="formActions" style={{ marginBottom: 16 }}>
-        <button className={viewMode === "grid" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("grid")}>
+        <Button className={viewMode === "grid" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("grid")}>
           <LayoutGrid size={16} /> {t("weeklyGridTab")}
-        </button>
+        </Button>
         {!isTeacher && (
-          <button className={viewMode === "list" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("list")}>
+          <Button className={viewMode === "list" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("list")}>
             <List size={16} /> {t("listTab")}
-          </button>
+          </Button>
         )}
         {!isTeacher && (
-          <button className={viewMode === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("teachers")}>
+          <Button className={viewMode === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("teachers")}>
             <Users size={16} /> {t("byTeacherTab")}
-          </button>
+          </Button>
         )}
         {canManage && (
-          <button className={viewMode === "import" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("import")}>
+          <Button className={viewMode === "import" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("import")}>
             <Upload size={16} /> {t("importTab")}
-          </button>
+          </Button>
         )}
         {canManage && (
-          <button className="secondaryAction" type="button" onClick={() => void operationsApi.exportTimetablePdf()}>
+          <Button className="secondaryAction" type="button" onClick={() => void operationsApi.exportTimetablePdf()}>
             <FileDown size={16} /> {t("exportTimetablePdfBtn")}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -131,7 +133,7 @@ export function TimetableView({ mode = "grid", onModeChange }: Readonly<{ mode?:
           {viewMode === "import" && canManage && <ImportView onDone={() => void load()} />}
         </>
       )}
-    </section>
+    </PageSection>
   );
 }
 
@@ -267,75 +269,80 @@ function ListView({
 
   return (
     <>
-      {canManage && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addSlotBtn")}</button>}
+      {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addSlotBtn")}</Button>}
       {canManage && showCreate && (
-        <Modal title={t("addSlotBtn")} onClose={() => setShowCreate(false)}><form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            onError("");
-            const { class_id, section_id, course_id, teacher_id, day_of_week, start_time, end_time } = form;
-            if (!class_id || !section_id || !course_id || !teacher_id || !start_time || !end_time) return;
-            try {
-              // Period auto-derived server-side from the start time (§4).
-              await operationsApi.createTimetableSlot({
-                class_id, section_id, course_id, teacher_id,
-                day_of_week: Number(day_of_week), start_time, end_time,
-              });
-              setForm({ ...form, start_time: "", end_time: "" });
-              setShowCreate(false);
-              onChanged();
-            } catch (err: any) {
-              onError(err.response?.data?.detail ?? t("failedCreateSlot"));
-            }
-          }}
-        >
-          <label>
-            {t("classLabel")}
-            <Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: "", course_id: "" })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </label>
-          <label>
-            {t("sectionLabel")}
-            <Select required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {(sections[form.class_id] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </Select>
-          </label>
-          <label>
-            {t("courseLabel")}
-            <Select required value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {(courses[form.class_id] ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </label>
-          <label>
-            {t("teacherLabel")}
-            <Select required value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
-            </Select>
-          </label>
-          <label>
-            {t("dayLabel")}
-            <Select value={form.day_of_week} onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}>
-              {DAY_KEYS.map((d, i) => <option key={d} value={i}>{t(d)}</option>)}
-            </Select>
-          </label>
-          <label>
-            {t("startTimeLabel")}
-            <Input required type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
-          </label>
-          <label>
-            {t("endTimeLabel")}
-            <Input required type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
-          </label>
-          <div className="formActions">
-            <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSlotBtn")}</button>
-          </div>
-        </form></Modal>
+        <FormModal
+                title={t("addSlotBtn")} onClose={() => setShowCreate(false)}
+                onSubmit={async (e) => {
+                          e.preventDefault();
+                          onError("");
+                          const { class_id, section_id, course_id, teacher_id, day_of_week, start_time, end_time } = form;
+                          if (!class_id || !section_id || !course_id || !teacher_id || !start_time || !end_time) return;
+                          try {
+                            // Period auto-derived server-side from the start time (§4).
+                            await operationsApi.createTimetableSlot({
+                              class_id, section_id, course_id, teacher_id,
+                              day_of_week: Number(day_of_week), start_time, end_time,
+                            });
+                            setForm({ ...form, start_time: "", end_time: "" });
+                            setShowCreate(false);
+                            onChanged();
+                          } catch (err: any) {
+                            onError(err.response?.data?.detail ?? t("failedCreateSlot"));
+                          }
+                        }}
+                submitLabel={t("addSlotBtn")}
+                submitIcon={<Plus size={16} />}
+              >
+                <label>
+                          {t("classLabel")}
+                          <Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: "", course_id: "" })}>
+                            <option value="">{t("selectEllipsis")}</option>
+                            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </Select>
+                        </label>
+
+              <label>
+                          {t("sectionLabel")}
+                          <Select required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}>
+                            <option value="">{t("selectEllipsis")}</option>
+                            {(sections[form.class_id] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </Select>
+                        </label>
+
+              <label>
+                          {t("courseLabel")}
+                          <Select required value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
+                            <option value="">{t("selectEllipsis")}</option>
+                            {(courses[form.class_id] ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </Select>
+                        </label>
+
+              <label>
+                          {t("teacherLabel")}
+                          <Select required value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })}>
+                            <option value="">{t("selectEllipsis")}</option>
+                            {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
+                          </Select>
+                        </label>
+
+              <label>
+                          {t("dayLabel")}
+                          <Select value={form.day_of_week} onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}>
+                            {DAY_KEYS.map((d, i) => <option key={d} value={i}>{t(d)}</option>)}
+                          </Select>
+                        </label>
+
+              <label>
+                          {t("startTimeLabel")}
+                          <Input required type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+                        </label>
+
+              <label>
+                          {t("endTimeLabel")}
+                          <Input required type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
+                        </label>
+              </FormModal>
       )}
 
       <div className="filterBar">
@@ -361,43 +368,39 @@ function ListView({
         </Select>
       </div>
 
-      <div className="dataTable">
-        <div className="dataRow header">
-          <span>{t("dayLabel")}</span><span>{t("periodCol")}</span><span>{t("timeCol")}</span>
-          <span>{t("classSectionCol")}</span><span>{t("courseCol")}</span><span>{t("teacherCol")}</span><span></span>
-        </div>
-        {filtered.length === 0 && <p className="emptyState">{t("noSlotsYet")}</p>}
-        {filtered.map((s) => (
-          <div className="dataRow" key={s.id}>
-            <span>{t(DAY_KEYS[s.day_of_week])}</span>
-            <span>{s.period}</span>
-            <span>{s.start_time}–{s.end_time}</span>
-            <span>{s.class_name ?? "—"} / {s.section_name ?? "—"}</span>
-            <span>{s.course_name ?? "—"}</span>
-            <span>{s.teacher_name ?? "—"}</span>
-            <span>
-              {canManage && (
-                <button
-                  className="tableAction"
-                  type="button"
-                  onClick={async () => {
-                    if (!window.confirm(t("deleteSlotConfirm"))) return;
-                    onError("");
-                    try {
-                      await operationsApi.deleteTimetableSlot(s.id);
-                      onChanged();
-                    } catch (err: any) {
-                      onError(err.response?.data?.detail ?? t("failedDeleteSlot"));
-                    }
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </span>
-          </div>
-        ))}
-      </div>
+      <DataTable<TimetableSlot>
+        columns={[
+          { header: t("dayLabel"), render: (s) => t(DAY_KEYS[s.day_of_week]) },
+          { header: t("periodCol"), render: (s) => s.period },
+          { header: t("timeCol"), render: (s) => `${s.start_time}–${s.end_time}` },
+          { header: t("classSectionCol"), render: (s) => `${s.class_name ?? "—"} / ${s.section_name ?? "—"}` },
+          { header: t("courseCol"), render: (s) => s.course_name ?? "—" },
+          { header: t("teacherCol"), render: (s) => s.teacher_name ?? "—" },
+          { header: t("actionsCol"), render: (s) => (
+            canManage ? (
+              <Button
+                className="tableAction"
+                type="button"
+                onClick={async () => {
+                  if (!(await confirm(t("deleteSlotConfirm")))) return;
+                  onError("");
+                  try {
+                    await operationsApi.deleteTimetableSlot(s.id);
+                    onChanged();
+                  } catch (err: any) {
+                    onError(err.response?.data?.detail ?? t("failedDeleteSlot"));
+                  }
+                }}
+              >
+                <Trash2 size={14} />
+              </Button>
+            ) : null
+          )},
+        ]}
+        data={filtered}
+        keyExtractor={(s) => s.id}
+        emptyMessage={t("noSlotsYet")}
+      />
     </>
   );
 }
@@ -427,7 +430,7 @@ function ByTeacherView({ slots }: Readonly<{ slots: TimetableSlot[] }>) {
   return (
     <div className="teacherAssignments">
       {byTeacher.map((entry) => (
-        <div className="modulePanel" key={entry.teacher} style={{ marginBottom: 12 }}>
+        <PageSection key={entry.teacher} style={{ marginBottom: 12 }}>
           <h3>{entry.teacher}</h3>
           <ul>
             {[...entry.pairs.values()]
@@ -438,7 +441,7 @@ function ByTeacherView({ slots }: Readonly<{ slots: TimetableSlot[] }>) {
                 </li>
               ))}
           </ul>
-        </div>
+        </PageSection>
       ))}
     </div>
   );
@@ -493,10 +496,10 @@ function ImportView({ onDone }: Readonly<{ onDone: () => void }>) {
       />
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <div className="formActions">
-        <button className="secondaryAction" type="button" onClick={() => void run(true)}>{t("dryRunBtn")}</button>
-        <button className="primaryAction" type="button" disabled={!allOk} onClick={() => void run(false)}>
+        <Button className="secondaryAction" type="button" onClick={() => void run(true)}>{t("dryRunBtn")}</Button>
+        <Button className="primaryAction" type="button" disabled={!allOk} onClick={() => void run(false)}>
           <Upload size={16} /> {t("importCommitBtn")}
-        </button>
+        </Button>
       </div>
       {result && (
         <div className="dataTable" style={{ marginTop: 12 }}>

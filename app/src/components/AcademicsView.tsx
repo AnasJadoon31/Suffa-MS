@@ -1,6 +1,8 @@
+import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Plus, Edit2, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDialog } from "../lib/DialogContext";
 import axios from "axios";
 
 import {
@@ -13,16 +15,18 @@ import {
 } from "../lib/endpoints";
 import { peopleApi, type Teacher } from "../lib/endpoints";
 import { RolloverWizard } from "./RolloverWizard";
-import { Input, Select } from "./ui/Field";
+import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 
 export type AcademicTab = "programs" | "classes" | "courses" | "sessions";
 
 export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?: AcademicTab; onTabChange?: (tab: AcademicTab) => void }>) {
   const { t } = useTranslation();
+  const { alert, confirm } = useDialog();
   const readOnly = useSessionReadOnly();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
@@ -109,18 +113,18 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
     }
   };
 
-  const handleError = (e: unknown) => {
+  const handleError = async (e: unknown) => {
     if (axios.isAxiosError(e) && e.response?.status === 409) {
-      alert(e.response.data.detail === "course_name_exists" ? t("courseNameExists") : (e.response.data.detail || t("recordInUseError")));
+      await alert(e.response.data.detail === "course_name_exists" ? t("courseNameExists") : (e.response.data.detail || t("recordInUseError")));
     } else {
       console.error(e);
-      alert(t("genericError"));
+      await alert(t("genericError"));
     }
   };
 
   // Generic delete handler
   const handleDelete = async (action: () => Promise<void>) => {
-    if (!window.confirm(t("deleteRecordConfirm"))) return;
+    if (!(await confirm(t("deleteRecordConfirm")))) return;
     try {
       await action();
       await refreshAll();
@@ -146,42 +150,39 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
   }, []);
 
   return (
-    <section className={readOnly ? "modulePanel readOnlyView" : "modulePanel"}>
-      <div className="moduleHeader">
-        <h2>{t("academicStructureTitle")}</h2>
-        <p className="notice">{t("academicStructureSubtitle")}</p>
-      </div>
+    <PageSection readOnly={readOnly}>
+      <PageHeader title={t("academicStructureTitle")} notice={t("academicStructureSubtitle")} />
 
       <div className="tabsContainer">
         <div className="tabList">
-          <button
+          <Button
             type="button"
             className={`tabButton ${activeTab === "programs" ? "active" : ""}`}
             onClick={() => onTabChange?.("programs")}
           >
             {t("programsHeading")}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className={`tabButton ${activeTab === "classes" ? "active" : ""}`}
             onClick={() => onTabChange?.("classes")}
           >
             {t("classesHeading")}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className={`tabButton ${activeTab === "courses" ? "active" : ""}`}
             onClick={() => onTabChange?.("courses")}
           >
             {t("coursesHeading")}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className={`tabButton ${activeTab === "sessions" ? "active" : ""}`}
             onClick={() => onTabChange?.("sessions")}
           >
             {t("sessionsHeading")}
-          </button>
+          </Button>
         </div>
 
         <div className="tabPanel">
@@ -190,25 +191,24 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "programs" && (
             <>
               <h3>{t("programsHeading")}</h3>
-              <button className="primaryAction" type="button" onClick={() => setCreateModal("program")}><Plus size={16} /> {t("addProgramBtn")}</button>
-              {createModal === "program" && <Modal title={t("addProgramBtn")} onClose={() => setCreateModal(null)}><form
-                className="inlineForm"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  await academicsApi.createProgram(programName);
-                  setProgramName("");
-                  setCreateModal(null);
-                  await refreshAll();
-                }}
-              >
-                <label>
-                  {t("programNameLabel")}
-                  <Input required value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder={t("programExample")} />
-                </label>
-                <div className="formActions">
-                  <button className="primaryAction" type="submit"><Plus size={16} /> {t("addProgramBtn")}</button>
-                </div>
-              </form></Modal>}
+              <Button className="primaryAction" type="button" onClick={() => setCreateModal("program")}><Plus size={16} /> {t("addProgramBtn")}</Button>
+              {createModal === "program" && <FormModal
+                            title={t("addProgramBtn")} onClose={() => setCreateModal(null)}
+                            onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            await academicsApi.createProgram(programName);
+                                            setProgramName("");
+                                            setCreateModal(null);
+                                            await refreshAll();
+                                          }}
+                            submitLabel={t("addProgramBtn")}
+                            submitIcon={<Plus size={16} />}
+                          >
+                            <label>
+                                            {t("programNameLabel")}
+                                            <Input required value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder={t("programExample")} />
+                                          </label>
+                          </FormModal>}
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("actionsCol")}</span></div>
                 {programs.length === 0 && <p className="emptyState">{t("noProgramsYet")}</p>}
@@ -227,16 +227,16 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <Input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
-                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
-                          <button className="tableAction" type="button" onClick={() => setEditingProgram(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
+                          <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
+                          <Button className="tableAction" type="button" onClick={() => setEditingProgram(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
                         </span>
                       </form></Modal>
                     ) : (
                       <>
                         <span>{p.name}</span>
                         <span className="actions">
-                          <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingProgram(p)}><Edit2 size={16} /></button>
-                          <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteProgram(p.id))}><Trash2 size={16} /></button>
+                          <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingProgram(p)}><Edit2 size={16} /></Button>
+                          <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteProgram(p.id))}><Trash2 size={16} /></Button>
                         </span>
                       </>
                     )}
@@ -249,38 +249,39 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "classes" && (
             <>
               <h3>{t("classesHeading")}</h3>
-              <button className="primaryAction" type="button" onClick={() => setCreateModal("class")}><Plus size={16} /> {t("addClassBtn")}</button>
-              {createModal === "class" && <Modal title={t("addClassBtn")} onClose={() => setCreateModal(null)}><form
-                className="inlineForm"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!classProgramId) return;
-                  await academicsApi.createClass(classProgramId, className, classPortalEnabled);
-                  setClassName("");
-                  setClassPortalEnabled(true);
-                  setCreateModal(null);
-                  await refreshAll();
-                }}
-              >
-                <label>
-                  {t("programLabel")}
-                  <Select required value={classProgramId} onChange={(e) => setClassProgramId(e.target.value)}>
-                    <option value="">{t("selectEllipsis")}</option>
-                    {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </Select>
-                </label>
-                <label>
-                  {t("classNameLabel")}
-                  <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder={t("classExample")} />
-                </label>
-                <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }} title={t("classPortalEnabledHint") ?? ""}>
-                  <Input type="checkbox" checked={classPortalEnabled} onChange={(e) => setClassPortalEnabled(e.target.checked)} />
-                  {t("classPortalEnabledLabel")}
-                </label>
-                <div className="formActions">
-                  <button className="primaryAction" type="submit"><Plus size={16} /> {t("addClassBtn")}</button>
-                </div>
-              </form></Modal>}
+              <Button className="primaryAction" type="button" onClick={() => setCreateModal("class")}><Plus size={16} /> {t("addClassBtn")}</Button>
+              {createModal === "class" && <FormModal
+                            title={t("addClassBtn")} onClose={() => setCreateModal(null)}
+                            onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            if (!classProgramId) return;
+                                            await academicsApi.createClass(classProgramId, className, classPortalEnabled);
+                                            setClassName("");
+                                            setClassPortalEnabled(true);
+                                            setCreateModal(null);
+                                            await refreshAll();
+                                          }}
+                            submitLabel={t("addClassBtn")}
+                            submitIcon={<Plus size={16} />}
+                          >
+                            <label>
+                                            {t("programLabel")}
+                                            <Select required value={classProgramId} onChange={(e) => setClassProgramId(e.target.value)}>
+                                              <option value="">{t("selectEllipsis")}</option>
+                                              {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                            </Select>
+                                          </label>
+
+                          <label>
+                                            {t("classNameLabel")}
+                                            <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder={t("classExample")} />
+                                          </label>
+
+                          <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }} title={t("classPortalEnabledHint") ?? ""}>
+                                            <Input type="checkbox" checked={classPortalEnabled} onChange={(e) => setClassPortalEnabled(e.target.checked)} />
+                                            {t("classPortalEnabledLabel")}
+                                          </label>
+                          </FormModal>}
               <div className="moduleToolbar">
                 <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={classSearch} onChange={(e) => setClassSearch(e.target.value)} />
                 <Select value={classFilterProgram} onChange={(e) => setClassFilterProgram(e.target.value)}>
@@ -329,8 +330,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           </label>
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
-                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
-                          <button className="tableAction" type="button" onClick={() => setEditingClass(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
+                          <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
+                          <Button className="tableAction" type="button" onClick={() => setEditingClass(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
                         </span>
                       </form></Modal>
                     ) : (
@@ -339,8 +340,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         <span>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
                         <span>{c.default_portal_enabled ? t("yesLabel") : t("noLabel")}</span>
                         <span className="actions">
-                          <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingClass(c)}><Edit2 size={16} /></button>
-                          <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteClass(c.id))}><Trash2 size={16} /></button>
+                          <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingClass(c)}><Edit2 size={16} /></Button>
+                          <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteClass(c.id))}><Trash2 size={16} /></Button>
                         </span>
                       </>
                     )}
@@ -353,25 +354,24 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "courses" && (
             <>
               <h3>{t("coursesHeading")}</h3>
-              <button className="primaryAction" type="button" onClick={() => setCreateModal("course")}><Plus size={16} /> {t("addCourseBtn")}</button>
-              {createModal === "course" && <Modal title={t("addCourseBtn")} onClose={() => setCreateModal(null)}><form
-                className="inlineForm"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  await academicsApi.createCourse(courseName);
-                  setCourseName("");
-                  setCreateModal(null);
-                  await refreshAll();
-                }}
-              >
-                <label>
-                  {t("courseNameLabel")}
-                  <Input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder={t("courseExample")} />
-                </label>
-                <div className="formActions">
-                  <button className="primaryAction" type="submit"><Plus size={16} /> {t("addCourseBtn")}</button>
-                </div>
-              </form></Modal>}
+              <Button className="primaryAction" type="button" onClick={() => setCreateModal("course")}><Plus size={16} /> {t("addCourseBtn")}</Button>
+              {createModal === "course" && <FormModal
+                            title={t("addCourseBtn")} onClose={() => setCreateModal(null)}
+                            onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            await academicsApi.createCourse(courseName);
+                                            setCourseName("");
+                                            setCreateModal(null);
+                                            await refreshAll();
+                                          }}
+                            submitLabel={t("addCourseBtn")}
+                            submitIcon={<Plus size={16} />}
+                          >
+                            <label>
+                                            {t("courseNameLabel")}
+                                            <Input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder={t("courseExample")} />
+                                          </label>
+                          </FormModal>}
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("actionsCol")}</span></div>
                 {allCourses.length === 0 && <p className="emptyState">{t("noCoursesYet")}</p>}
@@ -390,16 +390,16 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <Input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
-                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
-                          <button className="tableAction" type="button" onClick={() => setEditingCourse(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
+                          <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
+                          <Button className="tableAction" type="button" onClick={() => setEditingCourse(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
                         </span>
                       </form></Modal>
                     ) : (
                       <>
                         <span>{c.name}</span>
                         <span className="actions">
-                          <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingCourse(c)}><Edit2 size={16} /></button>
-                          <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteCourse(c.id))}><Trash2 size={16} /></button>
+                          <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingCourse(c)}><Edit2 size={16} /></Button>
+                          <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteCourse(c.id))}><Trash2 size={16} /></Button>
                         </span>
                       </>
                     )}
@@ -412,33 +412,33 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "classes" && (
             <>
               <h3 style={{ marginTop: 24 }}>{t("sectionsCoursesHeading")}</h3>
-              <button className="primaryAction" type="button" onClick={() => setCreateModal("section")}><Plus size={16} /> {t("addSectionBtn")}</button>
-              {createModal === "section" && <Modal title={t("addSectionBtn")} onClose={() => setCreateModal(null)}><form
-                className="inlineForm"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!sectionClassId) return;
-                  await academicsApi.createSection(sectionClassId, sectionName);
-                  setSectionName("");
-                  setCreateModal(null);
-                  await refreshAll();
-                }}
-              >
-                <label>
-                  {t("classLabel")}
-                  <Select required value={sectionClassId} onChange={(e) => setSectionClassId(e.target.value)}>
-                    <option value="">{t("selectEllipsis")}</option>
-                    {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </Select>
-                </label>
-                <label>
-                  {t("sectionNameLabel")}
-                  <Input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder={t("sectionExample")} />
-                </label>
-                <div className="formActions">
-                  <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSectionBtn")}</button>
-                </div>
-              </form></Modal>}
+              <Button className="primaryAction" type="button" onClick={() => setCreateModal("section")}><Plus size={16} /> {t("addSectionBtn")}</Button>
+              {createModal === "section" && <FormModal
+                            title={t("addSectionBtn")} onClose={() => setCreateModal(null)}
+                            onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            if (!sectionClassId) return;
+                                            await academicsApi.createSection(sectionClassId, sectionName);
+                                            setSectionName("");
+                                            setCreateModal(null);
+                                            await refreshAll();
+                                          }}
+                            submitLabel={t("addSectionBtn")}
+                            submitIcon={<Plus size={16} />}
+                          >
+                            <label>
+                                            {t("classLabel")}
+                                            <Select required value={sectionClassId} onChange={(e) => setSectionClassId(e.target.value)}>
+                                              <option value="">{t("selectEllipsis")}</option>
+                                              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                            </Select>
+                                          </label>
+
+                          <label>
+                                            {t("sectionNameLabel")}
+                                            <Input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder={t("sectionExample")} />
+                                          </label>
+                          </FormModal>}
               <div className="moduleToolbar">
                 <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={courseMapSearch} onChange={(e) => setCourseMapSearch(e.target.value)} />
                 <Select value={courseMapFilterClass} onChange={(e) => setCourseMapFilterClass(e.target.value)}>
@@ -465,15 +465,15 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               } catch (err) { handleError(err); }
                             }}>
                               <Input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} style={{ padding: "4px 8px", minHeight: "30px", width: "120px" }} />
-                              <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
-                              <button className="tableAction" type="button" onClick={() => setEditingSection(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
+                              <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
+                              <Button className="tableAction" type="button" onClick={() => setEditingSection(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
                             </form></Modal>
                           ) : (
                             <>
                               <span>{s.name}</span>
                               <span className="actions" style={{ marginLeft: "auto" }}>
-                                <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSection(s)}><Edit2 size={14} /></button>
-                                <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSection(c.id, s.id))}><Trash2 size={14} /></button>
+                                <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSection(s)}><Edit2 size={14} /></Button>
+                                <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSection(c.id, s.id))}><Trash2 size={14} /></Button>
                               </span>
                             </>
                           )}
@@ -488,13 +488,13 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                       >
                         {t("coursesCountLabel", { count: (courses[c.id] ?? []).length })}
                       </span>
-                      <button
+                      <Button
                         className="tableAction"
                         type="button"
                         onClick={() => setCourseMapModalClassId(c.id)}
                       >
                         {t("manageCoursesBtn")}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -505,25 +505,27 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "sessions" && (
             <>
               <h3>{t("sessionsHeading")}</h3>
-              <button className="primaryAction" type="button" onClick={() => setCreateModal("session")}><Plus size={16} /> {t("addSessionBtn")}</button>
-              {createModal === "session" && <Modal title={t("addSessionBtn")} onClose={() => setCreateModal(null)}><form
-                className="inlineForm"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  await academicsApi.createSession(sessionForm);
-                  setSessionForm({ name: "", gregorian_start: "", gregorian_end: "", hijri_span: "" });
-                  setCreateModal(null);
-                  await refreshAll();
-                }}
-              >
-                <label>{t("nameLabel")}<Input required value={sessionForm.name} onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })} placeholder="2026" /></label>
-                <label>{t("startLabel")}<Input required type="date" value={sessionForm.gregorian_start} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_start: e.target.value })} /></label>
-                <label>{t("endLabel")}<Input required type="date" value={sessionForm.gregorian_end} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_end: e.target.value })} /></label>
-                <label>{t("hijriSpanLabel")}<Input required value={sessionForm.hijri_span} onChange={(e) => setSessionForm({ ...sessionForm, hijri_span: e.target.value })} placeholder="1447-1448" /></label>
-                <div className="formActions">
-                  <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSessionBtn")}</button>
-                </div>
-              </form></Modal>}
+              <Button className="primaryAction" type="button" onClick={() => setCreateModal("session")}><Plus size={16} /> {t("addSessionBtn")}</Button>
+              {createModal === "session" && <FormModal
+                            title={t("addSessionBtn")} onClose={() => setCreateModal(null)}
+                            onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            await academicsApi.createSession(sessionForm);
+                                            setSessionForm({ name: "", gregorian_start: "", gregorian_end: "", hijri_span: "" });
+                                            setCreateModal(null);
+                                            await refreshAll();
+                                          }}
+                            submitLabel={t("addSessionBtn")}
+                            submitIcon={<Plus size={16} />}
+                          >
+                            <label>{t("nameLabel")}<Input required value={sessionForm.name} onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })} placeholder="2026" /></label>
+
+                          <label>{t("startLabel")}<Input required type="date" value={sessionForm.gregorian_start} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_start: e.target.value })} /></label>
+
+                          <label>{t("endLabel")}<Input required type="date" value={sessionForm.gregorian_end} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_end: e.target.value })} /></label>
+
+                          <label>{t("hijriSpanLabel")}<Input required value={sessionForm.hijri_span} onChange={(e) => setSessionForm({ ...sessionForm, hijri_span: e.target.value })} placeholder="1447-1448" /></label>
+                          </FormModal>}
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("spanCol")}</span><span>{t("activeCol")}</span><span>{t("actionsCol")}</span></div>
                 {sessions.length === 0 && <p className="emptyState">{t("noSessionsYet")}</p>}
@@ -553,8 +555,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <Input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} />
                         </span>
                         <span className="actions" style={{ gap: "8px" }}>
-                          <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
-                          <button className="tableAction" type="button" onClick={() => setEditingSession(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
+                          <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
+                          <Button className="tableAction" type="button" onClick={() => setEditingSession(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
                         </span>
                       </form></Modal>
                     ) : (
@@ -564,17 +566,17 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         <span>{s.is_active ? <CheckCircle2 size={16} color="var(--leaf)" /> : "—"}</span>
                         <span className="actions" style={{ gap: "8px" }}>
                           {!s.is_active && (
-                            <button className="tableAction" type="button" onClick={async () => { await academicsApi.activateSession(s.id); await refreshAll(); }}>
+                            <Button className="tableAction" type="button" onClick={async () => { await academicsApi.activateSession(s.id); await refreshAll(); }}>
                               {t("activateBtn")}
-                            </button>
+                            </Button>
                           )}
                           {s.is_active && (
-                            <button className="tableAction" type="button" onClick={() => setRolloverSourceSession(s)} style={{ color: "var(--brand-deep)" }}>
+                            <Button className="tableAction" type="button" onClick={() => setRolloverSourceSession(s)} style={{ color: "var(--brand-deep)" }}>
                               Year-End Rollover
-                            </button>
+                            </Button>
                           )}
-                          <button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSession(s)}><Edit2 size={16} /></button>
-                          {!s.is_active && <button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSession(s.id))}><Trash2 size={16} /></button>}
+                          <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSession(s)}><Edit2 size={16} /></Button>
+                          {!s.is_active && <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSession(s.id))}><Trash2 size={16} /></Button>}
                         </span>
                       </>
                     )}
@@ -615,7 +617,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
               } catch (err) { handleError(err); }
             }}
             onUnassign={async (courseId) => {
-              if (!window.confirm(t("deleteRecordConfirm"))) return;
+              if (!(await confirm(t("deleteRecordConfirm")))) return;
               try {
                 await academicsApi.unassignCourseFromClass(cls.id, courseId);
                 await refreshAll();
@@ -625,7 +627,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           />
         );
       })()}
-    </section>
+    </PageSection>
   );
 }
 
@@ -659,7 +661,7 @@ function CourseMappingModal({
       <div className="modalCard" style={{ width: "min(680px, 92vw)" }} onClick={(e) => e.stopPropagation()}>
         <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3>{t("manageCoursesTitle", { class: cls.name })}</h3>
-          <button className="tableAction" type="button" onClick={onClose}><X size={16} /></button>
+          <Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>
         </div>
         <div className="courseMapColumns">
           <div>
@@ -669,9 +671,9 @@ function CourseMappingModal({
               {assignedCourses.map((co) => (
                 <div className="courseMapItem" key={co.id}>
                   <span>{co.name}</span>
-                  <button className="iconBtn" title={t("unassignBtn")} type="button" onClick={() => void onUnassign(co.id)}>
+                  <Button className="iconBtn" title={t("unassignBtn")} type="button" onClick={() => void onUnassign(co.id)}>
                     <Trash2 size={14} />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -683,9 +685,9 @@ function CourseMappingModal({
               {available.map((co) => (
                 <div className="courseMapItem" key={co.id}>
                   <span>{co.name}</span>
-                  <button className="iconBtn" title={t("assignCourseBtn")} type="button" onClick={() => void onAssign(co.id)}>
+                  <Button className="iconBtn" title={t("assignCourseBtn")} type="button" onClick={() => void onAssign(co.id)}>
                     <Plus size={14} />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>

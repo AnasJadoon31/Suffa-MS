@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import { FileDown, Landmark, MessageCircle, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -9,8 +10,10 @@ import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
+import { MetricGrid, MetricCard } from "./ui/Card";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
 
 
 export type FinanceTab = "contributions" | "donations" | "summary";
@@ -44,38 +47,39 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
   }, []);
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2><Landmark size={18} /> {t("finance")}</h2>
-        <p className="notice">{t("descFinance")}</p>
-      </div>
+    <PageSection>
+      <PageHeader
+        title={t("financeTitle")}
+        notice={t("financeSubtitle")}
+      />
       <div className="formActions" style={{ marginBottom: 16 }}>
-        <button className={tab === "contributions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("contributions")}>{t("contributionsTab")}</button>
-        <button className={tab === "donations" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("donations")}>{t("donationsTab")}</button>
-        <button className={tab === "summary" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("summary")}>{t("summaryTab")}</button>
+        <Button className={tab === "contributions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("contributions")}>{t("contributionsTab")}</Button>
+        <Button className={tab === "donations" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("donations")}>{t("donationsTab")}</Button>
+        <Button className={tab === "summary" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("summary")}>{t("summaryTab")}</Button>
       </div>
 
-      {canManage && <button className="primaryAction" type="button" onClick={() => setShowCategory(true)}><Plus size={16} /> {t("addCategoryBtn")}</button>}
+      {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCategory(true)}><Plus size={16} /> {t("addCategoryBtn")}</Button>}
       {canManage && showCategory && (
-        <Modal title={t("addCategoryBtn")} onClose={() => setShowCategory(false)}><form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            if (!categoryName) return;
-            try {
-              await financeApi.createCategory(categoryName);
-              setCategoryName("");
-              setShowCategory(false);
-              await loadCategories();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? t("failedAddCategory"));
-            }
-          }}
-        >
-          <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("tuitionExample")} /></label>
-          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addCategoryBtn")}</button></div>
-        </form></Modal>
+        <FormModal
+                title={t("addCategoryBtn")} onClose={() => setShowCategory(false)}
+                onSubmit={async (e) => {
+                          e.preventDefault();
+                          setError("");
+                          if (!categoryName) return;
+                          try {
+                            await financeApi.createCategory(categoryName);
+                            setCategoryName("");
+                            setShowCategory(false);
+                            await loadCategories();
+                          } catch (err: any) {
+                            setError(err.response?.data?.detail ?? t("failedAddCategory"));
+                          }
+                        }}
+                submitLabel={t("addCategoryBtn")}
+                submitIcon={<Plus size={16} />}
+              >
+                <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("tuitionExample")} /></label>
+              </FormModal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
@@ -88,7 +92,7 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
           {tab === "summary" && <SummaryTab />}
         </>
       )}
-    </section>
+    </PageSection>
   );
 }
 
@@ -151,57 +155,62 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
         <Input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} />
         <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
       </div>
-      {canManage && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("recordPaymentBtn")}</button>}
+      {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("recordPaymentBtn")}</Button>}
       {canManage && showCreate && (
-        <Modal title={t("recordPaymentBtn")} onClose={() => setShowCreate(false)}><form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            const { student_id, category_id, amount, payment_date } = form;
-            if (!student_id || !category_id || !amount || !payment_date) return;
-            try {
-              await financeApi.createPayment({ student_id, category_id, amount: Number(amount), payment_date, note: form.note || undefined });
-              setForm({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
-              setStudentSearch("");
-              setShowCreate(false);
-              await load();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? t("failedRecordPayment"));
-            }
-          }}
-        >
-          <SearchDropdown
-            id="contribution-student"
-            label={t("studentCol")}
-            placeholder={t("studentSearchPlaceholder")}
-            items={matchingStudents}
-            value={studentSearch}
-            getKey={(student) => student.id}
-            getLabel={(student) => student.name}
-            getDescription={(student) => student.admission_number}
-            onQueryChange={(query) => {
-              setStudentSearch(query);
-              setForm({ ...form, student_id: "" });
-            }}
-            onSelect={(student) => {
-              setStudentSearch(`${student.name} (${student.admission_number})`);
-              setForm({ ...form, student_id: student.id });
-            }}
-            emptyLabel={t("noStudentsFound")}
-          />
-          <label>
-            {t("categoryCol")}
-            <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </label>
-          <label>{t("amountCol")}<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
-          <label>{t("dateCol")}<Input required type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></label>
-          <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
-          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordPaymentBtn")}</button></div>
-        </form></Modal>
+        <FormModal
+                title={t("recordPaymentBtn")} onClose={() => setShowCreate(false)}
+                onSubmit={async (e) => {
+                          e.preventDefault();
+                          setError("");
+                          const { student_id, category_id, amount, payment_date } = form;
+                          if (!student_id || !category_id || !amount || !payment_date) return;
+                          try {
+                            await financeApi.createPayment({ student_id, category_id, amount: Number(amount), payment_date, note: form.note || undefined });
+                            setForm({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
+                            setStudentSearch("");
+                            setShowCreate(false);
+                            await load();
+                          } catch (err: any) {
+                            setError(err.response?.data?.detail ?? t("failedRecordPayment"));
+                          }
+                        }}
+                submitLabel={t("recordPaymentBtn")}
+                submitIcon={<Plus size={16} />}
+              >
+                <SearchDropdown
+                          id="contribution-student"
+                          label={t("studentCol")}
+                          placeholder={t("studentSearchPlaceholder")}
+                          items={matchingStudents}
+                          value={studentSearch}
+                          getKey={(student) => student.id}
+                          getLabel={(student) => student.name}
+                          getDescription={(student) => student.admission_number}
+                          onQueryChange={(query) => {
+                            setStudentSearch(query);
+                            setForm({ ...form, student_id: "" });
+                          }}
+                          onSelect={(student) => {
+                            setStudentSearch(`${student.name} (${student.admission_number})`);
+                            setForm({ ...form, student_id: student.id });
+                          }}
+                          emptyLabel={t("noStudentsFound")}
+                        />
+
+              <label>
+                          {t("categoryCol")}
+                          <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+                            <option value="">{t("selectEllipsis")}</option>
+                            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </Select>
+                        </label>
+
+              <label>{t("amountCol")}<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+
+              <label>{t("dateCol")}<Input required type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></label>
+
+              <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+              </FormModal>
       )}
       {!isLoading && error && <ErrorState message={error} />}
       <div className="dataTable">
@@ -216,11 +225,11 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
             <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
             <span>{p.note ?? "—"}</span>
             <span>
-              <button className="tableAction" type="button" onClick={() => void financeApi.downloadPaymentReceipt(p.id)}>
+              <Button className="tableAction" type="button" onClick={() => void financeApi.downloadPaymentReceipt(p.id)}>
                 <FileDown size={14} /> PDF
-              </button>
+              </Button>
               {canManage && (
-                <button
+                <Button
                   className="tableAction"
                   type="button"
                   onClick={async () => {
@@ -233,7 +242,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
                   }}
                 >
                   <MessageCircle size={14} /> WhatsApp
-                </button>
+                </Button>
               )}
             </span>
           </div>
@@ -281,80 +290,87 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
 
   return (
     <>
-      {canManage && <div className="formActions"><button className="primaryAction" type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</button><button className="primaryAction" type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</button></div>}
+      {canManage && <div className="formActions"><Button className="primaryAction" type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</Button><Button className="primaryAction" type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</Button></div>}
       {canManage && createModal === "donor" && (
-        <Modal title={t("addDonorBtn")} onClose={() => setCreateModal(null)}><form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            if (!donorForm.name || !donorForm.contact) return;
-            try {
-              await financeApi.createDonor(donorForm);
-              setDonorForm({ name: "", contact: "" });
-              setCreateModal(null);
-              await load();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? t("failedAddDonor"));
-            }
-          }}
-        >
-          <label>{t("donorNameLabel")}<Input required value={donorForm.name} onChange={(e) => setDonorForm({ ...donorForm, name: e.target.value })} /></label>
-          <label>{t("contactCol")}<Input required value={donorForm.contact} onChange={(e) => setDonorForm({ ...donorForm, contact: e.target.value })} /></label>
-          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addDonorBtn")}</button></div>
-        </form></Modal>
+        <FormModal
+                title={t("addDonorBtn")} onClose={() => setCreateModal(null)}
+                onSubmit={async (e) => {
+                          e.preventDefault();
+                          setError("");
+                          if (!donorForm.name || !donorForm.contact) return;
+                          try {
+                            await financeApi.createDonor(donorForm);
+                            setDonorForm({ name: "", contact: "" });
+                            setCreateModal(null);
+                            await load();
+                          } catch (err: any) {
+                            setError(err.response?.data?.detail ?? t("failedAddDonor"));
+                          }
+                        }}
+                submitLabel={t("addDonorBtn")}
+                submitIcon={<Plus size={16} />}
+              >
+                <label>{t("donorNameLabel")}<Input required value={donorForm.name} onChange={(e) => setDonorForm({ ...donorForm, name: e.target.value })} /></label>
+
+              <label>{t("contactCol")}<Input required value={donorForm.contact} onChange={(e) => setDonorForm({ ...donorForm, contact: e.target.value })} /></label>
+              </FormModal>
       )}
 
       {canManage && createModal === "donation" && (
-        <Modal title={t("recordDonationBtn")} onClose={() => setCreateModal(null)}><form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            const { donor_id, category_id, amount, donation_date } = form;
-            if (!donor_id || !category_id || !amount || !donation_date) return;
-            try {
-              await financeApi.createDonation({ donor_id, category_id, amount: Number(amount), donation_date, note: form.note || undefined });
-              setForm({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
-              setDonorSearch("");
-              setCreateModal(null);
-              await load();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? t("failedRecordPayment"));
-            }
-          }}
-        >
-          <SearchDropdown
-            id="donation-donor"
-            label={t("donorCol")}
-            placeholder={t("donorSearchPlaceholder")}
-            items={matchingDonors}
-            value={donorSearch}
-            getKey={(donor) => donor.id}
-            getLabel={(donor) => donor.name}
-            getDescription={(donor) => donor.contact}
-            onQueryChange={(query) => {
-              setDonorSearch(query);
-              setForm({ ...form, donor_id: "" });
-            }}
-            onSelect={(donor) => {
-              setDonorSearch(`${donor.name} (${donor.contact})`);
-              setForm({ ...form, donor_id: donor.id });
-            }}
-            emptyLabel={t("noDonorsYet")}
-          />
-          <label>
-            {t("categoryCol")}
-            <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </label>
-          <label>{t("amountCol")}<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
-          <label>{t("dateCol")}<Input required type="date" value={form.donation_date} onChange={(e) => setForm({ ...form, donation_date: e.target.value })} /></label>
-          <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
-          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordDonationBtn")}</button></div>
-        </form></Modal>
+        <FormModal
+                title={t("recordDonationBtn")} onClose={() => setCreateModal(null)}
+                onSubmit={async (e) => {
+                          e.preventDefault();
+                          setError("");
+                          const { donor_id, category_id, amount, donation_date } = form;
+                          if (!donor_id || !category_id || !amount || !donation_date) return;
+                          try {
+                            await financeApi.createDonation({ donor_id, category_id, amount: Number(amount), donation_date, note: form.note || undefined });
+                            setForm({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
+                            setDonorSearch("");
+                            setCreateModal(null);
+                            await load();
+                          } catch (err: any) {
+                            setError(err.response?.data?.detail ?? t("failedRecordPayment"));
+                          }
+                        }}
+                submitLabel={t("recordDonationBtn")}
+                submitIcon={<Plus size={16} />}
+              >
+                <SearchDropdown
+                          id="donation-donor"
+                          label={t("donorCol")}
+                          placeholder={t("donorSearchPlaceholder")}
+                          items={matchingDonors}
+                          value={donorSearch}
+                          getKey={(donor) => donor.id}
+                          getLabel={(donor) => donor.name}
+                          getDescription={(donor) => donor.contact}
+                          onQueryChange={(query) => {
+                            setDonorSearch(query);
+                            setForm({ ...form, donor_id: "" });
+                          }}
+                          onSelect={(donor) => {
+                            setDonorSearch(`${donor.name} (${donor.contact})`);
+                            setForm({ ...form, donor_id: donor.id });
+                          }}
+                          emptyLabel={t("noDonorsYet")}
+                        />
+
+              <label>
+                          {t("categoryCol")}
+                          <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+                            <option value="">{t("selectEllipsis")}</option>
+                            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </Select>
+                        </label>
+
+              <label>{t("amountCol")}<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+
+              <label>{t("dateCol")}<Input required type="date" value={form.donation_date} onChange={(e) => setForm({ ...form, donation_date: e.target.value })} /></label>
+
+              <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+              </FormModal>
       )}
       {!isLoading && error && <ErrorState message={error} />}
       <div className="dataTable">
@@ -369,11 +385,11 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
             <span>{d.donation_date}<HijriTag date={d.donation_date} /></span>
             <span>{d.note ?? "—"}</span>
             <span>
-              <button className="tableAction" type="button" onClick={() => void financeApi.downloadDonationReceipt(d.id)}>
+              <Button className="tableAction" type="button" onClick={() => void financeApi.downloadDonationReceipt(d.id)}>
                 <FileDown size={14} /> PDF
-              </button>
+              </Button>
               {canManage && (
-                <button
+                <Button
                   className="tableAction"
                   type="button"
                   onClick={async () => {
@@ -386,7 +402,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
                   }}
                 >
                   <MessageCircle size={14} /> WhatsApp
-                </button>
+                </Button>
               )}
             </span>
           </div>
@@ -425,16 +441,16 @@ function SummaryTab() {
       <div className="inlineForm">
         <label>{t("fromLabel")}<Input type="date" value={range.date_from} onChange={(e) => setRange({ ...range, date_from: e.target.value })} /></label>
         <label>{t("toLabel")}<Input type="date" value={range.date_to} onChange={(e) => setRange({ ...range, date_to: e.target.value })} /></label>
-        <div className="formActions"><button className="secondaryAction" type="button" onClick={load}>{t("refreshBtn")}</button></div>
+        <div className="formActions"><Button className="secondaryAction" type="button" onClick={load}>{t("refreshBtn")}</Button></div>
       </div>
       {isLoading && <LoadingState />}
       {!isLoading && error && <ErrorState message={error} />}
       {!isLoading && !error && summary && (
-        <>
-          <div className="metricsRow" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
-            <div className="metricCard"><span>{t("contributionsTab")}</span><strong>{summary.total_contributions}</strong></div>
-            <div className="metricCard"><span>{t("donationsTab")}</span><strong>{summary.total_donations}</strong></div>
-            <div className="metricCard"><span>{t("totalLabel")}</span><strong>{summary.total}</strong></div>
+        <div className="modulePanel">
+          <div className="metricGrid" style={{ marginBottom: 16 }}>
+            <MetricCard title={t("contributionsTab")} value={summary.total_contributions} />
+            <MetricCard title={t("donationsTab")} value={summary.total_donations} />
+            <MetricCard title={t("totalLabel")} value={summary.total} />
           </div>
           <div className="dataTable">
             <div className="dataRow header"><span>{t("categoryCol")}</span><span>{t("amountCol")}</span></div>
@@ -442,7 +458,7 @@ function SummaryTab() {
               <div className="dataRow" key={name}><span>{name}</span><span>{amount}</span></div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </>
   );

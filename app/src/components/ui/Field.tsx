@@ -35,3 +35,29 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ 
   );
 });
 Textarea.displayName = "Textarea";
+
+type CheckboxProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type">;
+export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(({ className, ...props }, ref) => {
+  return (
+    <input
+      type="checkbox"
+      ref={ref}
+      className={className}
+      {...props}
+    />
+  );
+});
+Checkbox.displayName = "Checkbox";
+
+type RadioProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type">;
+export const Radio = React.forwardRef<HTMLInputElement, RadioProps>(({ className, ...props }, ref) => {
+  return (
+    <input
+      type="radio"
+      ref={ref}
+      className={className}
+      {...props}
+    />
+  );
+});
+Radio.displayName = "Radio";

@@ -1,9 +1,11 @@
+import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { attendanceApi, type StudentAttendanceHistory, type TeacherAttendanceLogEntry, type TeacherAttendanceToday } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { AttendanceCalendar, monthRange, toDateKey, type StudentDayStatus } from "./AttendanceCalendar";
+import { PageSection, PageHeader } from "./ui/Layout";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 
@@ -50,14 +52,14 @@ function MyTeacherAttendance() {
   };
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader"><h2>{t("myAttendance")}</h2><p className="notice">{t("descMyAttendance")}</p></div>
+    <PageSection>
+      <PageHeader title={t("myAttendance")} notice={t("descMyAttendance")} />
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
       {!loading && !readOnly && (
         <div className="formActions">
-          <button className="primaryAction" type="button" disabled={Boolean(today?.check_in)} onClick={() => void check("in")}>{t("timeInLabel")}</button>
-          <button className="secondaryAction" type="button" disabled={!today?.check_in || Boolean(today.check_out)} onClick={() => void check("out")}>{t("timeOutLabel")}</button>
+          <Button className="primaryAction" type="button" disabled={Boolean(today?.check_in)} onClick={() => void check("in")}>{t("timeInLabel")}</Button>
+          <Button className="secondaryAction" type="button" disabled={!today?.check_in || Boolean(today.check_out)} onClick={() => void check("out")}>{t("timeOutLabel")}</Button>
         </div>
       )}
       {!loading && (
@@ -72,7 +74,7 @@ function MyTeacherAttendance() {
           ))}
         </div>
       )}
-    </section>
+    </PageSection>
   );
 }
 
@@ -99,13 +101,11 @@ function MyStudentAttendance() {
   const selectedEntries = (history?.entries ?? []).filter((entry) => entry.attendance_date === selectedDate);
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("myAttendance")}</h2>
-        <p className="notice">
-          {history ? `${history.student.name} · ${history.class_name}${history.student.section_name ? ` / ${history.student.section_name}` : ""} · ${history.session_name}` : t("descMyAttendance")}
-        </p>
-      </div>
+    <PageSection>
+      <PageHeader
+        title={t("myAttendance")}
+        notice={history ? `${history.student.name} · ${history.class_name}${history.student.section_name ? ` / ${history.student.section_name}` : ""} · ${history.session_name}` : t("descMyAttendance")}
+      />
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
       {!loading && !error && history && (
@@ -131,6 +131,6 @@ function MyStudentAttendance() {
           </div>
         </>
       )}
-    </section>
+    </PageSection>
   );
 }

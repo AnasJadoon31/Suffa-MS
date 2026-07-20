@@ -1,6 +1,8 @@
+import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
 import { Download, Edit2, FolderPlus, Plus, Trash2, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDialog } from "../lib/DialogContext";
 
 import {
   academicsApi,
@@ -15,15 +17,18 @@ import {
 import { AudiencePicker } from "./AudiencePicker";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
-import { Input, Select } from "./ui/Field";
+import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 const emptyForm = { category_id: "", title: "", description: "", video_url: "" };
 
 export function ResourcesView() {
   const { t } = useTranslation();
+  const { alert, confirm } = useDialog();
   const { hasPermission, user } = useAuth();
   const readOnly = useSessionReadOnly();
   const canManage = !readOnly && hasPermission("resources.manage");
@@ -107,40 +112,41 @@ export function ResourcesView() {
   }, [classFilter]);
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("resources")}</h2>
-        <p className="notice">{t("descResources")}</p>
-      </div>
+    <PageSection>
+      <PageHeader
+        title={t("resources")}
+        notice={t("descResources")}
+        actions={canManage && (
+          <div style={{ display: "flex", gap: "8px" }}>
+            <Button className="secondaryAction" type="button" onClick={() => setShowCategoryForm(true)}><FolderPlus size={16} /> {t("addCategoryBtn")}</Button>
+            <Button className="primaryAction" type="button" onClick={() => setShowResourceForm(true)}><Plus size={16} /> {t("addResourceBtn")}</Button>
+          </div>
+        )}
+      />
 
-      {canManage && <div className="formActions" style={{ marginBottom: 12 }}>
-        <button className="secondaryAction" type="button" onClick={() => setShowCategoryForm(true)}><FolderPlus size={16} /> {t("addCategoryBtn")}</button>
-        <button className="primaryAction" type="button" onClick={() => setShowResourceForm(true)}><Plus size={16} /> {t("addResourceBtn")}</button>
-      </div>}
+      {canManage && showCategoryForm && <FormModal
+            title={t("addCategoryBtn")} onClose={() => setShowCategoryForm(false)}
+            onSubmit={async (e) => {
+                      e.preventDefault();
+                      setError("");
+                      if (!categoryName) return;
+                      await operationsApi.createResourceCategory(categoryName, categoryIsGlobal);
+                      setCategoryName("");
+                      setShowCategoryForm(false);
+                      await refreshAll();
+                    }}
+            submitLabel={t("addCategoryBtn")}
+            submitIcon={<FolderPlus size={16} />}
+          >
+            <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("resourceCategoryExample")} /></label>
 
-      {canManage && showCategoryForm && <Modal title={t("addCategoryBtn")} onClose={() => setShowCategoryForm(false)}>
-        <form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            if (!categoryName) return;
-            await operationsApi.createResourceCategory(categoryName, categoryIsGlobal);
-            setCategoryName("");
-            setShowCategoryForm(false);
-            await refreshAll();
-          }}
-        >
-          <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("resourceCategoryExample")} /></label>
           {canManageAll && (
-            <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Input type="checkbox" checked={categoryIsGlobal} onChange={(e) => setCategoryIsGlobal(e.target.checked)} />
-              {t("globalLabel")}
-            </label>
-          )}
-          <div className="formActions"><button className="primaryAction" type="submit"><FolderPlus size={16} /> {t("addCategoryBtn")}</button></div>
-        </form>
-      </Modal>}
+                      <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Input type="checkbox" checked={categoryIsGlobal} onChange={(e) => setCategoryIsGlobal(e.target.checked)} />
+                        {t("globalLabel")}
+                      </label>
+                    )}
+          </FormModal>}
 
       <div className="moduleToolbar">
         <div className="searchBox">
@@ -180,177 +186,152 @@ export function ResourcesView() {
         )}
       </div>
 
-      {canManage && showResourceForm && <Modal title={t("addResourceBtn")} onClose={() => setShowResourceForm(false)}>
-        <form
-          className="inlineForm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            setNotice("");
-            if (!form.category_id || !form.title) return;
-            try {
-              let file_key: string | undefined;
-              if (file) {
-                const { object_key, upload_url } = await filesApi.presignUpload({
-                  category: "resources", filename: file.name, content_type: file.type || "application/octet-stream", size_bytes: file.size,
-                });
-                await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
-                file_key = object_key;
-              }
-              await operationsApi.createResource({
-                category_id: form.category_id, title: form.title, description: form.description || undefined,
-                file_key, video_url: form.video_url || undefined, visibility_scope: audience,
-              });
-              setForm({ ...emptyForm, category_id: form.category_id });
-              setFile(null);
-              setShowResourceForm(false);
-              setNotice(t("resourceAdded"));
-              await refreshAll();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? t("failedAddResource"));
-            }
-          }}
-        >
-          <label>
-            {t("categoryCol")}
-            <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </label>
+      {canManage && showResourceForm && <FormModal
+            title={t("addResourceBtn")} onClose={() => setShowResourceForm(false)}
+            onSubmit={async (e) => {
+                      e.preventDefault();
+                      setError("");
+                      setNotice("");
+                      if (!form.category_id || !form.title) return;
+                      try {
+                        let file_key: string | undefined;
+                        if (file) {
+                          const { object_key, upload_url } = await filesApi.presignUpload({
+                            category: "resources", filename: file.name, content_type: file.type || "application/octet-stream", size_bytes: file.size,
+                          });
+                          await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+                          file_key = object_key;
+                        }
+                        await operationsApi.createResource({
+                          category_id: form.category_id, title: form.title, description: form.description || undefined,
+                          file_key, video_url: form.video_url || undefined, visibility_scope: audience,
+                        });
+                        setForm({ ...emptyForm, category_id: form.category_id });
+                        setFile(null);
+                        setShowResourceForm(false);
+                        setNotice(t("resourceAdded"));
+                        await refreshAll();
+                      } catch (err: any) {
+                        setError(err.response?.data?.detail ?? t("failedAddResource"));
+                      }
+                    }}
+            submitLabel={t("addResourceBtn")}
+            submitIcon={<Plus size={16} />}
+          >
+            <label>
+                      {t("categoryCol")}
+                      <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+                        <option value="">{t("selectEllipsis")}</option>
+                        {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </Select>
+                    </label>
+
           <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+
           <label>{t("descriptionLabel")}<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
+
           <label>{t("videoUrlLabel")}<Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder={t("optionalPlaceholder")} /></label>
+
           <label>{t("fileLabel")}<Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
+
           <AudiencePicker value={audience} onChange={setAudience} />
-          <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addResourceBtn")}</button></div>
-        </form>
-      </Modal>}
+          </FormModal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 
-      <div className="dataTable">
-        <div className="dataRow header"><span>{t("titleCol")}</span><span>{t("categoryCol")}</span><span>{t("ownerCol")}</span><span></span></div>
-        {isLoading && <LoadingState />}
-        {!isLoading && loadError && <ErrorState message={loadError} />}
-        {!isLoading && !loadError && resources.length === 0 && <p className="emptyState">{t("noResourcesYet")}</p>}
-        {!isLoading && !loadError && resources.map((r) => (
-          <ResourceRow
-            key={r.id}
-            resource={r}
-            categoryName={categories.find((c) => c.id === r.category_id)?.name ?? "—"}
-            canEdit={canManage}
-            onEdit={() => {
-              setEditing(r);
-              setEditAudience(r.visibility_scope);
-              setEditError("");
-            }}
-            onDelete={async () => {
-              if (!confirm(t("deleteResourceConfirm") ?? "")) return;
-              try {
-                await operationsApi.deleteResource(r.id);
-                await refreshAll();
-              } catch (err: any) {
-                alert(err.response?.data?.detail ?? t("failedDeleteResource"));
-              }
-            }}
-          />
-        ))}
-      </div>
+      <DataTable<ResourceItem>
+        columns={[
+          { header: t("titleCol"), render: (r) => r.title },
+          { header: t("categoryCol"), render: (r) => categories.find((c) => c.id === r.category_id)?.name ?? "—" },
+          { header: t("ownerCol"), render: (r) => r.owner_name ?? "—" },
+          { header: t("actionsCol"), render: (r) => (
+            <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {r.video_url && (
+                <a className="tableAction" href={r.video_url} target="_blank" rel="noreferrer">
+                  <Video size={14} /> {t("watchBtn")}
+                </a>
+              )}
+              {r.file_key && (
+                <Button
+                  className="tableAction"
+                  type="button"
+                  onClick={async () => {
+                    const { url } = await filesApi.presignDownload(r.file_key!);
+                    window.open(url, "_blank", "noreferrer");
+                  }}
+                >
+                  <Download size={14} /> {t("downloadBtn")}
+                </Button>
+              )}
+              {canManage && (
+                <>
+                  <Button className="iconBtn" type="button" title={t("editBtn") ?? ""} onClick={() => {
+                    setEditing(r);
+                    setEditAudience(r.visibility_scope);
+                    setEditError("");
+                  }}><Edit2 size={14} /></Button>
+                  <Button className="iconBtn" type="button" title={t("deleteBtn") ?? ""} onClick={async () => {
+                    if (!(await confirm(t("deleteResourceConfirm") ?? ""))) return;
+                    try {
+                      await operationsApi.deleteResource(r.id);
+                      await refreshAll();
+                    } catch (err: any) {
+                      await alert(err.response?.data?.detail ?? t("failedDeleteResource"));
+                    }
+                  }}><Trash2 size={14} /></Button>
+                </>
+              )}
+            </span>
+          )},
+        ]}
+        data={resources}
+        keyExtractor={(r) => r.id}
+        isLoading={isLoading}
+        error={loadError}
+        emptyMessage={t("noResourcesYet")}
+      />
 
       {editing && (
-        <div
-          style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)",
-            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-          }}
-          onClick={() => setEditing(null)}
+        <Modal
+          title={t("editResourceHeading")}
+          onClose={() => setEditing(null)}
         >
-          <div
-            style={{
-              backgroundColor: "var(--surface)", padding: "2rem", borderRadius: "8px", width: "100%",
-              maxWidth: "600px", maxHeight: "90vh", overflowY: "auto",
+          <form
+            className="inlineForm"
+            style={{ gridTemplateColumns: "1fr", border: "none", padding: 0 }}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!editing) return;
+              setEditError("");
+              try {
+                await operationsApi.updateResource(editing.id, {
+                  category_id: editing.category_id, title: editing.title, description: editing.description ?? undefined,
+                  visibility_scope: editAudience,
+                });
+                setEditing(null);
+                await refreshAll();
+              } catch (err: any) {
+                setEditError(err.response?.data?.detail ?? t("failedUpdateResource"));
+              }
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ marginTop: 0 }}>{t("editResourceHeading")}</h3>
-            <form
-              className="inlineForm"
-              style={{ gridTemplateColumns: "1fr", border: "none", padding: 0 }}
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!editing) return;
-                setEditError("");
-                try {
-                  await operationsApi.updateResource(editing.id, {
-                    category_id: editing.category_id, title: editing.title, description: editing.description ?? undefined,
-                    visibility_scope: editAudience,
-                  });
-                  setEditing(null);
-                  await refreshAll();
-                } catch (err: any) {
-                  setEditError(err.response?.data?.detail ?? t("failedUpdateResource"));
-                }
-              }}
-            >
-              <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
-              <label>
-                {t("categoryCol")}
-                <Select value={editing.category_id} onChange={(e) => setEditing({ ...editing, category_id: e.target.value })}>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
-              </label>
-              <label>{t("descriptionLabel")}<Input value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
-              <AudiencePicker value={editAudience} onChange={setEditAudience} />
-              {editError && <p className="notice" style={{ color: "var(--rose)" }}>{editError}</p>}
-              <div className="formActions" style={{ justifyContent: "flex-end" }}>
-                <button type="button" onClick={() => setEditing(null)}>{t("cancelBtn")}</button>
-                <button className="primaryAction" type="submit">{t("editBtn")}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
+            <label>
+              {t("categoryCol")}
+              <Select value={editing.category_id} onChange={(e) => setEditing({ ...editing, category_id: e.target.value })}>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            </label>
+            <label>{t("descriptionLabel")}<Input value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
+            <AudiencePicker value={editAudience} onChange={setEditAudience} />
+            {editError && <p className="notice" style={{ color: "var(--rose)" }}>{editError}</p>}
+            <div className="formActions" style={{ justifyContent: "flex-end" }}>
+              <Button type="button" onClick={() => setEditing(null)}>{t("cancelBtn")}</Button>
+              <Button className="primaryAction" type="submit">{t("editBtn")}</Button>
+            </div>
+          </form>
+        </Modal>
       )}
-    </section>
-  );
-}
-
-function ResourceRow({
-  resource, categoryName, canEdit, onEdit, onDelete,
-}: Readonly<{
-  resource: ResourceItem; categoryName: string; canEdit: boolean; onEdit: () => void; onDelete: () => void;
-}>) {
-  const { t } = useTranslation();
-  return (
-    <div className="dataRow">
-      <span>{resource.title}</span>
-      <span>{categoryName}</span>
-      <span>{resource.owner_name ?? "—"}</span>
-      <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {resource.video_url && (
-          <a className="tableAction" href={resource.video_url} target="_blank" rel="noreferrer">
-            <Video size={14} /> {t("watchBtn")}
-          </a>
-        )}
-        {resource.file_key && (
-          <button
-            className="tableAction"
-            type="button"
-            onClick={async () => {
-              const { url } = await filesApi.presignDownload(resource.file_key!);
-              window.open(url, "_blank", "noreferrer");
-            }}
-          >
-            <Download size={14} /> {t("downloadBtn")}
-          </button>
-        )}
-        {canEdit && (
-          <>
-            <button className="iconBtn" type="button" title={t("editBtn") ?? ""} onClick={onEdit}><Edit2 size={14} /></button>
-            <button className="iconBtn" type="button" title={t("deleteBtn") ?? ""} onClick={onDelete}><Trash2 size={14} /></button>
-          </>
-        )}
-      </span>
-    </div>
+    </PageSection>
   );
 }

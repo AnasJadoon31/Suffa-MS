@@ -1,4 +1,5 @@
-import { Input, Select } from "./ui/Field";
+import { Button } from "./ui/Button";
+import { Input, Select, Checkbox } from "./ui/Field";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type AcademicSession, type AcademicClass, academicsApi } from "../lib/endpoints";
@@ -89,23 +90,23 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
             <fieldset className="sectionPicker">
               <legend>{t("rolloverCopyLegend")}</legend>
               <label className="checkboxLabel">
-                <input type="checkbox" checked={form.copy_timetable} onChange={(e) => setForm({ ...form, copy_timetable: e.target.checked })} />
+                <Checkbox  checked={form.copy_timetable} onChange={(e) => setForm({ ...form, copy_timetable: e.target.checked })} />
                 {t("copyTimetableLabel")}
               </label>
               <label className="checkboxLabel">
-                <input type="checkbox" checked={form.copy_holidays} onChange={(e) => setForm({ ...form, copy_holidays: e.target.checked })} />
+                <Checkbox  checked={form.copy_holidays} onChange={(e) => setForm({ ...form, copy_holidays: e.target.checked })} />
                 {t("copyHolidaysLabel")}
               </label>
               {form.copy_holidays && (
                 <label className="checkboxLabel">
-                  <input type="checkbox" checked={form.shift_holiday_dates} onChange={(e) => setForm({ ...form, shift_holiday_dates: e.target.checked })} />
+                  <Checkbox  checked={form.shift_holiday_dates} onChange={(e) => setForm({ ...form, shift_holiday_dates: e.target.checked })} />
                   {t("shiftHolidayDatesLabel")}
                 </label>
               )}
             </fieldset>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "16px" }}>
-              <button type="button" className="secondaryAction" onClick={onClose}>{t("cancelBtn")}</button>
-              <button type="submit" className="primaryAction">{t("nextBtn")}</button>
+              <Button type="button" className="secondaryAction" onClick={onClose}>{t("cancelBtn")}</Button>
+              <Button type="submit" className="primaryAction">{t("nextBtn")}</Button>
             </div>
           </form>
         )}
@@ -131,10 +132,10 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
               ))}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "16px" }}>
-              <button type="button" className="secondaryAction" onClick={() => setStep(1)} disabled={loading}>{t("backBtn")}</button>
-              <button type="button" className="primaryAction" onClick={handleSubmit} disabled={loading}>
+              <Button type="button" className="secondaryAction" onClick={() => setStep(1)} disabled={loading}>{t("backBtn")}</Button>
+              <Button type="button" className="primaryAction" onClick={handleSubmit} disabled={loading}>
                 {loading ? t("processingLabel") : t("completeRolloverBtn")}
-              </button>
+              </Button>
             </div>
           </div>
         )}

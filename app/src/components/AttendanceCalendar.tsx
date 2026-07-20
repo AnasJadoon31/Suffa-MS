@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -65,23 +66,23 @@ export function AttendanceCalendar({
   return (
     <div className="attendanceCalendar">
       <div className="attendanceCalendarNav">
-        <button
+        <Button
           className="secondaryAction"
           type="button"
           onClick={() => onMonthChange(addMonths(month, -1))}
           aria-label={t("previousMonth")}
         >
           <ChevronLeft size={17} />
-        </button>
+        </Button>
         <strong>{monthFormatter.format(month)}</strong>
-        <button
+        <Button
           className="secondaryAction"
           type="button"
           onClick={() => onMonthChange(addMonths(month, 1))}
           aria-label={t("nextMonth")}
         >
           <ChevronRight size={17} />
-        </button>
+        </Button>
       </div>
       <div className="attendanceCalendarWeekdays">
         {weekdayLabels.map((label) => (
@@ -110,7 +111,7 @@ export function AttendanceCalendar({
             .join(" ");
 
           return (
-            <button
+            <Button
               className={classNames}
               type="button"
               key={cell.key}
@@ -127,7 +128,7 @@ export function AttendanceCalendar({
                   {stats.present}/{stats.total}
                 </span>
               )}
-            </button>
+            </Button>
           );
         })}
       </div>

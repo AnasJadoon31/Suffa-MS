@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { KeyRound, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,7 +7,8 @@ import { useAuth } from "../lib/AuthContext";
 import { authApi } from "../lib/endpoints";
 import { RoleBadge } from "./Sidebar";
 import { Input, Select } from "./ui/Field";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 /** Personal settings — shared by teacher and student portals (missing entirely
  * before this). Reuses PATCH /auth/me (preferred language) and
@@ -73,11 +75,8 @@ export function ProfileView() {
 
   return (
     <>
-      <section className="modulePanel">
-        <div className="moduleHeader">
-          <h2><UserIcon size={18} /> {t("myProfile")}</h2>
-          <p className="notice">{t("descProfile")}</p>
-        </div>
+      <PageSection>
+        <PageHeader title={t("myProfile")} icon={<UserIcon size={18} />} notice={t("descProfile")} />
         <div className="dataTable">
           <div className="dataRow">
             <span>{t("usernameLabel")}</span>
@@ -88,7 +87,7 @@ export function ProfileView() {
             <span><RoleBadge role={user.role} /></span>
           </div>
         </div>
-        <button className="primaryAction" type="button" onClick={() => setProfileModal("language")}>{t("preferredLanguageLabel")}</button>
+        <Button className="primaryAction" type="button" onClick={() => setProfileModal("language")}>{t("preferredLanguageLabel")}</Button>
         {profileModal === "language" && <Modal title={t("preferredLanguageLabel")} onClose={() => setProfileModal(null)}><form
           className="inlineForm"
           style={{ marginTop: 16 }}
@@ -108,55 +107,55 @@ export function ProfileView() {
         </form></Modal>}
         {languageNotice && <p className="notice">{languageNotice}</p>}
         {languageError && <p className="notice" style={{ color: "var(--rose)" }}>{languageError}</p>}
-      </section>
+      </PageSection>
 
-      <section className="modulePanel">
-        <div className="moduleHeader">
-          <h2><KeyRound size={18} /> {t("changePasswordHeading")}</h2>
-        </div>
-        <button className="primaryAction" type="button" onClick={() => setProfileModal("password")}>{t("changePasswordBtn")}</button>
-        {profileModal === "password" && <Modal title={t("changePasswordHeading")} onClose={() => setProfileModal(null)}><form className="inlineForm" onSubmit={(e) => void changePassword(e)}>
-          <label>
-            {t("currentPasswordLabel")}
-            <Input
-              required
-              type="password"
-              autoComplete="current-password"
-              value={passwordForm.current_password}
-              onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
-            />
-          </label>
-          <label>
-            {t("newPasswordLabel")}
-            <Input
-              required
-              minLength={8}
-              type="password"
-              autoComplete="new-password"
-              value={passwordForm.new_password}
-              onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
-            />
-          </label>
-          <label>
-            {t("confirmPasswordLabel")}
-            <Input
-              required
-              minLength={8}
-              type="password"
-              autoComplete="new-password"
-              value={passwordForm.confirm_password}
-              onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
-            />
-          </label>
-          <div className="formActions">
-            <button className="primaryAction" type="submit" disabled={savingPassword}>
-              {t("changePasswordBtn")}
-            </button>
-          </div>
-        </form></Modal>}
+      <PageSection>
+        <PageHeader title={t("changePasswordHeading")} icon={<KeyRound size={18} />} />
+        <Button className="primaryAction" type="button" onClick={() => setProfileModal("password")}>{t("changePasswordBtn")}</Button>
+        {profileModal === "password" && <FormModal
+                title={t("changePasswordHeading")} onClose={() => setProfileModal(null)}
+                onSubmit={(e) => void changePassword(e)}
+                submitLabel={t("changePasswordBtn")}
+                submitDisabled={savingPassword}
+              >
+                <label>
+                          {t("currentPasswordLabel")}
+                          <Input
+                            required
+                            type="password"
+                            autoComplete="current-password"
+                            value={passwordForm.current_password}
+                            onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+                          />
+                        </label>
+
+              <label>
+                          {t("newPasswordLabel")}
+                          <Input
+                            required
+                            minLength={8}
+                            type="password"
+                            autoComplete="new-password"
+                            value={passwordForm.new_password}
+                            onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                          />
+                        </label>
+
+              <label>
+                          {t("confirmPasswordLabel")}
+                          <Input
+                            required
+                            minLength={8}
+                            type="password"
+                            autoComplete="new-password"
+                            value={passwordForm.confirm_password}
+                            onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                          />
+                        </label>
+              </FormModal>}
         {passwordNotice && <p className="notice">{passwordNotice}</p>}
         {passwordError && <p className="notice" style={{ color: "var(--rose)" }}>{passwordError}</p>}
-      </section>
+      </PageSection>
     </>
   );
 }

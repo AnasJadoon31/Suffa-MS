@@ -1,6 +1,8 @@
+import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Megaphone, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDialog } from "../lib/DialogContext";
 
 import { operationsApi, type Announcement, type Scope } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
@@ -8,7 +10,8 @@ import { RichTextEditor } from "./RichTextEditor";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 
 function toScope(audience: string): Scope {
@@ -27,6 +30,7 @@ const audienceLabelKey: Record<string, string> = { all: "audienceEveryone", teac
 
 export function AnnouncementsView() {
   const { t } = useTranslation();
+  const { confirm, alert } = useDialog();
   const { hasPermission } = useAuth();
   const readOnly = useSessionReadOnly();
   const canPost = !readOnly && hasPermission("announcements.post");
@@ -116,7 +120,7 @@ export function AnnouncementsView() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm(t("deleteAnnouncementConfirm"))) return;
+    if (!(await confirm(t("deleteAnnouncementConfirm")))) return;
     setError("");
     try {
       await operationsApi.deleteAnnouncement(id);
@@ -139,41 +143,45 @@ export function AnnouncementsView() {
   };
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("announcementsHeading")}</h2>
-        <p className="notice">{t("announcementsSubtitle")}</p>
-      </div>
+    <PageSection>
+      <PageHeader title={t("announcementsHeading")} notice={t("announcementsSubtitle")} />
 
-      {canPost && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("postAnnouncementBtn")}</button>}
+      {canPost && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("postAnnouncementBtn")}</Button>}
       {canPost && showCreate && (
-        <Modal title={t("postAnnouncementBtn")} onClose={() => setShowCreate(false)}><form className="inlineForm" onSubmit={handleCreate}>
-          <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-          <label>{t("targetAudienceLabel")}
-            <Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
-              <option value="all">{t("audienceEveryone")}</option>
-              <option value="teachers">{t("teachers")}</option>
-              <option value="students">{t("students")}</option>
-            </Select>
-          </label>
-          <label>{t("announcementCategoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("announcementCategoryPlaceholder") ?? ""} list="announcement-categories" /></label>
-          <label>{t("attachmentLinkLabel")}<Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder={t("optionalPlaceholder")} /></label>
-          <div className="dateFieldGrid">
-            <label>{t("publishAtLabel")}<Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} /></label>
-            <label>{t("expiresAtLabel")}<Input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} /></label>
-          </div>
-          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
-            <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>{t("bodyLabel")}</span>
-            <RichTextEditor
-              value={form.body}
-              onChange={(html) => setForm({ ...form, body: html })}
-              placeholder={t("announcementContentPlaceholder")}
-            />
-          </div>
-          <div className="formActions">
-            <button className="primaryAction" type="submit"><Plus size={16} /> {t("postAnnouncementBtn")}</button>
-          </div>
-        </form></Modal>
+        <FormModal
+                title={t("postAnnouncementBtn")} onClose={() => setShowCreate(false)}
+                onSubmit={handleCreate}
+                submitLabel={t("postAnnouncementBtn")}
+                submitIcon={<Plus size={16} />}
+              >
+                <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+
+              <label>{t("targetAudienceLabel")}
+                          <Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
+                            <option value="all">{t("audienceEveryone")}</option>
+                            <option value="teachers">{t("teachers")}</option>
+                            <option value="students">{t("students")}</option>
+                          </Select>
+                        </label>
+
+              <label>{t("announcementCategoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("announcementCategoryPlaceholder") ?? ""} list="announcement-categories" /></label>
+
+              <label>{t("attachmentLinkLabel")}<Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder={t("optionalPlaceholder")} /></label>
+
+              <div className="dateFieldGrid">
+                          <label>{t("publishAtLabel")}<Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} /></label>
+                          <label>{t("expiresAtLabel")}<Input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} /></label>
+                        </div>
+
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>{t("bodyLabel")}</span>
+                          <RichTextEditor
+                            value={form.body}
+                            onChange={(html) => setForm({ ...form, body: html })}
+                            placeholder={t("announcementContentPlaceholder")}
+                          />
+                        </div>
+              </FormModal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <datalist id="announcement-categories">
@@ -183,9 +191,9 @@ export function AnnouncementsView() {
       <div className="filterBar">
         {canPost && (
           <>
-            <button className={tab === "all" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("all")}>{t("audienceEveryone")}</button>
-            <button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teachers")}>{t("teachers")}</button>
-            <button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("students")}>{t("students")}</button>
+            <Button className={tab === "all" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("all")}>{t("audienceEveryone")}</Button>
+            <Button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teachers")}>{t("teachers")}</Button>
+            <Button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("students")}>{t("students")}</Button>
           </>
         )}
         <Input placeholder={t("searchAnnouncementsPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -233,7 +241,7 @@ export function AnnouncementsView() {
               <small style={{ color: "var(--slate-500)" }}>{new Date(a.created_at).toLocaleString()}</small>
               {canPost && expandedId === a.id && (
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }} onClick={(e) => e.stopPropagation()}>
-                  <button
+                  <Button
                     type="button"
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px 8px", cursor: "pointer" }}
                     onClick={() => {
@@ -251,15 +259,15 @@ export function AnnouncementsView() {
                     title={t("editBtn")}
                   >
                     <Pencil size={14} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px 8px", cursor: "pointer", color: "var(--rose)" }}
                     onClick={() => handleDelete(a.id)}
                     title={t("deleteBtn")}
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -268,42 +276,36 @@ export function AnnouncementsView() {
       </div>
 
       {editId && (
-        <div style={modalOverlayStyle} onClick={() => setEditId(null)}>
-          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0, marginBottom: "1.5rem" }}>{t("editAnnouncementHeading")}</h3>
-            <form className="inlineForm" style={{ gridTemplateColumns: "1fr", gap: "1.25rem", border: "none", padding: 0 }} onSubmit={handleUpdate}>
-              <label>{t("titleLabel")}<Input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></label>
-              <label>{t("targetAudienceLabel")}
-                <Select value={editForm.audience} onChange={(e) => setEditForm({ ...editForm, audience: e.target.value })}>
-                  <option value="all">{t("audienceEveryone")}</option>
-                  <option value="teachers">{t("teachers")}</option>
-                  <option value="students">{t("students")}</option>
-                </Select>
-              </label>
-              <label>{t("announcementCategoryLabel")}<Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} list="announcement-categories" /></label>
-              <label>{t("attachmentLinkLabel")}<Input value={editForm.attachment_link} onChange={(e) => setEditForm({ ...editForm, attachment_link: e.target.value })} /></label>
-              <div className="dateFieldGrid">
-                <label>{t("publishAtLabel")}<Input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} /></label>
-                <label>{t("expiresAtLabel")}<Input type="datetime-local" value={editForm.expires_at} onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })} /></label>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>{t("bodyLabel")}</span>
-                <RichTextEditor
-                  value={editForm.body}
-                  onChange={(html) => setEditForm({ ...editForm, body: html })}
-                />
-              </div>
-
-              {editError && <p className="notice" style={{ color: "var(--rose)" }}>{editError}</p>}
-
-              <div className="formActions" style={{ justifyContent: "flex-end", marginTop: "1rem" }}>
-                <button type="button" onClick={() => setEditId(null)}>{t("cancelBtn")}</button>
-                <button className="primaryAction" type="submit">{t("saveChangesBtn")}</button>
-              </div>
-            </form>
+        <FormModal
+          title={t("editAnnouncementHeading")}
+          onClose={() => setEditId(null)}
+          onSubmit={handleUpdate}
+          submitLabel={t("saveChangesBtn")}
+          error={editError}
+        >
+          <label>{t("titleLabel")}<Input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></label>
+          <label>{t("targetAudienceLabel")}
+            <Select value={editForm.audience} onChange={(e) => setEditForm({ ...editForm, audience: e.target.value })}>
+              <option value="all">{t("audienceEveryone")}</option>
+              <option value="teachers">{t("teachers")}</option>
+              <option value="students">{t("students")}</option>
+            </Select>
+          </label>
+          <label>{t("announcementCategoryLabel")}<Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} list="announcement-categories" /></label>
+          <label>{t("attachmentLinkLabel")}<Input value={editForm.attachment_link} onChange={(e) => setEditForm({ ...editForm, attachment_link: e.target.value })} /></label>
+          <div className="dateFieldGrid">
+            <label>{t("publishAtLabel")}<Input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} /></label>
+            <label>{t("expiresAtLabel")}<Input type="datetime-local" value={editForm.expires_at} onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })} /></label>
           </div>
-        </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>{t("bodyLabel")}</span>
+            <RichTextEditor
+              value={editForm.body}
+              onChange={(html) => setEditForm({ ...editForm, body: html })}
+            />
+          </div>
+        </FormModal>
       )}
-    </section>
+    </PageSection>
   );
 }

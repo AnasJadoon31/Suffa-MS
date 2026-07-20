@@ -1,6 +1,8 @@
+import { Button } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { BookOpen, ClipboardList, FileDown, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDialog } from "../lib/DialogContext";
 
 import {
   academicsApi,
@@ -24,16 +26,19 @@ import {
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { consumePendingClassNav } from "../lib/pendingNav";
-import { Input, Select } from "./ui/Field";
+import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { DataTable } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 export type AssessmentTab = "assignments" | "grading" | "results" | "setup";
 
 export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{ tab?: AssessmentTab; onTabChange?: (tab: AssessmentTab) => void }>) {
   const { t } = useTranslation();
+  const { confirm, alert } = useDialog();
   const { hasPermission, user } = useAuth();
   const isTeacher = user?.role === 'teacher';
   const readOnly = useSessionReadOnly();
@@ -84,24 +89,21 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
   }, []);
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2>{t("assessmentsTitle")}</h2>
-        <p className="notice">{t("assessmentsSubtitle")}</p>
-      </div>
+    <PageSection>
+      <PageHeader title={t("assessmentsTitle")} notice={t("assessmentsSubtitle")} />
       <div className="formActions" style={{ marginBottom: 16 }}>
-        {(isTeacher || hasPermission("assignments.create")) && <button className={tab === "assignments" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("assignments")}>
+        {(isTeacher || hasPermission("assignments.create")) && <Button className={tab === "assignments" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("assignments")}>
           <ClipboardList size={16} /> {t("assignmentsTab")}
-        </button>}
-        {(isTeacher || hasPermission("assessments.marks.enter")) && <button className={tab === "grading" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("grading")}>
+        </Button>}
+        {(isTeacher || hasPermission("assessments.marks.enter")) && <Button className={tab === "grading" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("grading")}>
           <BookOpen size={16} /> {t("gradingTab")}
-        </button>}
-        {(hasPermission("grading.schemes.manage") || hasPermission("assessments.exam_types.manage")) && <button className={tab === "setup" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("setup")}>
+        </Button>}
+        {(hasPermission("grading.schemes.manage") || hasPermission("assessments.exam_types.manage")) && <Button className={tab === "setup" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("setup")}>
           <BookOpen size={16} /> {t("gradingSetupBtn")}
-        </button>}
-        {(isTeacher || hasPermission("assessments.marks.enter")) && <button className={tab === "results" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("results")}>
+        </Button>}
+        {(isTeacher || hasPermission("assessments.marks.enter")) && <Button className={tab === "results" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("results")}>
           <Send size={16} /> {t("resultsTab")}
-        </button>}
+        </Button>}
       </div>
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
@@ -133,7 +135,7 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
           canMessage={!readOnly && hasPermission("messaging.send")}
         />
       )}
-    </section>
+    </PageSection>
   );
 }
 
@@ -248,9 +250,9 @@ function AssignmentsTab({
           {canPublishAll && <option value="teacher">{t("sortByTeacher")}</option>}
         </Select>
         {canCreate && (
-          <button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
+          <Button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
             <Plus size={16} /> {t("createAssignmentBtn")}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -268,32 +270,18 @@ function AssignmentsTab({
       )}
 
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <div className="dataTable">
-        <div className="dataRow header">
-          <span>{t("titleCol")}</span>
-          <span>{t("categoryCol")}</span>
-          <span>{t("classSectionCol")}</span>
-          <span>{t("courseCol")}</span>
-          <span>{t("teacherCol")}</span>
-          <span>{t("dueCol")}</span>
-          <span></span>
-        </div>
-        {assignments.length === 0 && <p className="emptyState">{t("noAssignmentsYet")}</p>}
-        {assignments.map((a, index) => (
-          <Fragment key={a.id}>
-          {filters.sort === "teacher" && (index === 0 || assignments[index - 1].teacher_name !== a.teacher_name) && (
-            <div className="dataRow sectionRow"><strong>{a.teacher_name ?? t("unassignedLabel")}</strong></div>
-          )}
-          <div className="dataRow">
-            <span>{a.title}</span>
-            <span>{a.category ?? "—"}</span>
-            <span>{a.class_name ?? "—"}{a.section_name ? ` / ${a.section_name}` : ""}</span>
-            <span>{a.course_name ?? "—"}</span>
-            <span>{a.teacher_name ?? "—"}</span>
-            <span>{new Date(a.due_date).toLocaleDateString()}</span>
-            <span>
+      <DataTable<Assignment>
+        columns={[
+          { header: t("titleCol"), render: (a) => a.title },
+          { header: t("categoryCol"), render: (a) => a.category ?? "—" },
+          { header: t("classSectionCol"), render: (a) => `${a.class_name ?? "—"}${a.section_name ? ` / ${a.section_name}` : ""}` },
+          { header: t("courseCol"), render: (a) => a.course_name ?? "—" },
+          { header: t("teacherCol"), render: (a) => a.teacher_name ?? "—" },
+          { header: t("dueCol"), render: (a) => new Date(a.due_date).toLocaleDateString() },
+          { header: t("actionsCol"), render: (a) => (
+            <>
               {a.attachment_key && (
-                <button
+                <Button
                   className="tableAction"
                   type="button"
                   onClick={async () => {
@@ -302,21 +290,21 @@ function AssignmentsTab({
                   }}
                 >
                   <FileDown size={14} />
-                </button>
+                </Button>
               )}
-              <button className="tableAction" type="button" onClick={() => openSubmissions(a)}>{t("submissionsBtn")}</button>
+              <Button className="tableAction" type="button" onClick={() => openSubmissions(a)}>{t("submissionsBtn")}</Button>
               {canCreate && (
                 <>
-                  <button className="tableAction" type="button" title={t("editBtn")} onClick={() => setEditing(a)}>
+                  <Button className="tableAction" type="button" title={t("editBtn")} onClick={() => setEditing(a)}>
                     <Pencil size={14} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     className="tableAction"
                     type="button"
                     title={t("deleteBtn")}
                     onClick={async () => {
-                      const wholeBatch = a.batch_id !== null && window.confirm(t("deleteBatchConfirm"));
-                      if (a.batch_id === null && !window.confirm(t("deleteConfirm"))) return;
+                      const wholeBatch = a.batch_id !== null && (await confirm(t("deleteBatchConfirm")));
+                      if (a.batch_id === null && !(await confirm(t("deleteConfirm")))) return;
                       try {
                         await assessmentsApi.deleteAssignment(a.id, wholeBatch);
                         await load();
@@ -326,14 +314,21 @@ function AssignmentsTab({
                     }}
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </Button>
                 </>
               )}
-            </span>
-          </div>
-          </Fragment>
-        ))}
-      </div>
+            </>
+          )},
+        ]}
+        data={assignments}
+        keyExtractor={(a) => a.id}
+        renderBeforeRow={(a, index, arr) => (
+          filters.sort === "teacher" && (index === 0 || arr[index - 1].teacher_name !== a.teacher_name) ? (
+            <div className="dataRow sectionRow"><strong>{a.teacher_name ?? t("unassignedLabel")}</strong></div>
+          ) : null
+        )}
+        emptyMessage={t("noAssignmentsYet")}
+      />
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {editing && (
@@ -348,10 +343,10 @@ function AssignmentsTab({
       )}
 
       {selected && (
-        <div className="modulePanel" style={{ marginTop: 16 }}>
+        <PageSection style={{ marginTop: 16 }}>
           <h3>{t("submissionsHeading", { title: selected.title })}</h3>
           <div className="dataTable">
-            <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("submittedCol")}</span><span>{t("lateCol")}</span><span>{t("markCol")}</span><span></span></div>
+            <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("submittedCol")}</span><span>{t("lateCol")}</span><span>{t("markCol")}</span><span>{t("actionsCol")}</span></div>
             {submissions.length === 0 && <p className="emptyState">{t("noSubmissionsYet")}</p>}
             {submissions.map((s) => (
               <SubmissionRow
@@ -362,7 +357,7 @@ function AssignmentsTab({
               />
             ))}
           </div>
-        </div>
+        </PageSection>
       )}
     </>
   );
@@ -435,8 +430,8 @@ function AssignmentCreateForm({
     >
       {canPublishAll && (
         <label className="checkboxLabel">
-          <input
-            type="checkbox"
+          <Checkbox
+            
             checked={allClasses}
             onChange={(e) => {
               setAllClasses(e.target.checked);
@@ -472,7 +467,7 @@ function AssignmentCreateForm({
           <small className="notice">{t("sectionsHint")}</small>
           {sections.map((s) => (
             <label key={s.id} className="checkboxLabel">
-              <input type="checkbox" checked={sectionIds.includes(s.id)} onChange={() => toggleSection(s.id)} />
+              <Checkbox  checked={sectionIds.includes(s.id)} onChange={() => toggleSection(s.id)} />
               {s.name}
             </label>
           ))}
@@ -500,7 +495,7 @@ function AssignmentCreateForm({
       </label>
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <div className="formActions">
-        <button className="primaryAction" type="submit"><Plus size={16} /> {t("createAssignmentBtn")}</button>
+        <Button className="primaryAction" type="submit"><Plus size={16} /> {t("createAssignmentBtn")}</Button>
       </div>
     </form>
   );
@@ -549,14 +544,14 @@ function AssignmentEditForm({
       <label>{t("dueDateLabel")}<Input required type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
       {assignment.batch_id && (
         <label className="checkboxLabel">
-          <input type="checkbox" checked={form.apply_to_batch} onChange={(e) => setForm({ ...form, apply_to_batch: e.target.checked })} />
+          <Checkbox  checked={form.apply_to_batch} onChange={(e) => setForm({ ...form, apply_to_batch: e.target.checked })} />
           {t("applyToBatchLabel")}
         </label>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <div className="formActions">
-        <button className="primaryAction" type="submit">{t("saveBtn")}</button>
-        <button className="secondaryAction" type="button" onClick={onCancel}>{t("cancelBtn")}</button>
+        <Button className="primaryAction" type="submit">{t("saveBtn")}</Button>
+        <Button className="secondaryAction" type="button" onClick={onCancel}>{t("cancelBtn")}</Button>
       </div>
     </form>
   );
@@ -578,7 +573,7 @@ function SubmissionRow({
         <Input style={{ width: 60 }} value={mark} onChange={(e) => setMark(e.target.value)} />
       </span>
       <span>
-        <button
+        <Button
           className="tableAction"
           type="button"
           onClick={async () => {
@@ -587,8 +582,8 @@ function SubmissionRow({
           }}
         >
           <FileDown size={14} /> {t("downloadBtn")}
-        </button>
-        <button
+        </Button>
+        <Button
           className="tableAction"
           type="button"
           onClick={async () => {
@@ -597,7 +592,7 @@ function SubmissionRow({
           }}
         >
           {t("saveBtn")}
-        </button>
+        </Button>
       </span>
     </div>
   );
@@ -660,14 +655,14 @@ function GradingTab({
       {matrix && (
         <div className="formActions" style={{ marginBottom: 8 }}>
           {matrix.sections.map((s) => (
-            <button
+            <Button
               key={s.section_id}
               type="button"
               className={s.section_id === sectionId ? "primaryAction" : "secondaryAction"}
               onClick={() => setSectionId(s.section_id)}
             >
               {s.section_name}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -792,145 +787,154 @@ function GradingSetup({
   }, []);
 
   return (
-    <div className="modulePanel" style={{ marginBottom: 16 }}>
+    <PageSection style={{ marginBottom: 16 }}>
+      <h3>{t("setupGradingSchemeTitle")}</h3>
       <div className="formActions" style={{ marginBottom: 12 }}>
-        {canCreateScheme && <button className="primaryAction" type="button" onClick={() => {
+        {canCreateScheme && <Button className="primaryAction" type="button" onClick={() => {
           setEditingScheme(null);
           setSchemeForm({ name: "", bands: defaultBands });
           setShowSchemeForm(true);
-        }}><Plus size={16} /> {t("addSchemeBtn")}</button>}
-        {canCreateExamType && <button className="primaryAction" type="button" onClick={() => {
+        }}><Plus size={16} /> {t("addSchemeBtn")}</Button>}
+        {canCreateExamType && <Button className="primaryAction" type="button" onClick={() => {
           setEditingExam(null);
           setExamForm({ course_id: "", name: "", weightage: "", grading_scheme_id: "" });
           setShowExamForm(true);
-        }}><Plus size={16} /> {t("addExamTypeBtn")}</button>}
+        }}><Plus size={16} /> {t("addExamTypeBtn")}</Button>}
       </div>
-      {showSchemeForm && <Modal title={editingScheme ? t("editBtn") : t("addSchemeBtn")} onClose={() => setShowSchemeForm(false)}><form
-        className="inlineForm"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setError("");
-          try {
-            const payload = {
-              name: schemeForm.name,
-              bands: schemeForm.bands.map((band) => ({
-                label: band.label,
-                min_score: Number(band.min_score),
-                max_score: Number(band.max_score),
-              })),
-            };
-            if (editingScheme) await assessmentsApi.updateGradingScheme(editingScheme.id, payload);
-            else await assessmentsApi.createGradingScheme(payload);
-            setSchemeForm({ name: "", bands: defaultBands });
-            setEditingScheme(null);
-            setShowSchemeForm(false);
-            await load();
-          } catch (err: any) {
-            setError(err.response?.data?.detail ?? t("failedCreateScheme"));
-          }
-        }}
-      >
-        <label>{t("schemeNameLabel")}<Input required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} /></label>
-        <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
-          <strong>{t("bandsLabel")}</strong>
-          {schemeForm.bands.map((band, index) => <div className="inlineForm" style={{ margin: 0 }} key={index}>
-            <label>{t("nameLabel")}<Input required value={band.label} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /></label>
-            <label>{t("minimumLabel")}<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: event.target.value } : item) })} /></label>
-            <label>{t("maximumLabel")}<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: event.target.value } : item) })} /></label>
-            <button className="tableAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={14} /></button>
-          </div>)}
-          <button className="secondaryAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: [...schemeForm.bands, { label: "", min_score: "", max_score: "" }] })}><Plus size={14} /> {t("addFieldBtn")}</button>
-        </div>
-        <div className="formActions"><button className="primaryAction" type="submit" disabled={schemeForm.bands.length === 0}><Plus size={16} /> {t("addSchemeBtn")}</button></div>
-      </form></Modal>}
-      <div className="dataTable">
-        <div className="dataRow header"><span>{t("schemeCol")}</span><span>{t("bandsCol")}</span><span>{t("actionsCol")}</span></div>
-        {schemes.map((s) => (
-          <div className="dataRow" key={s.id}>
-            <span>{s.name}</span>
-            <span>{s.bands.map((b) => `${b.label} (${b.min_score}-${b.max_score})`).join(", ")}</span>
+      {showSchemeForm && <FormModal
+            title={editingScheme ? t("editBtn") : t("addSchemeBtn")} onClose={() => setShowSchemeForm(false)}
+            onSubmit={async (e) => {
+                    e.preventDefault();
+                    setError("");
+                    try {
+                      const payload = {
+                        name: schemeForm.name,
+                        bands: schemeForm.bands.map((band) => ({
+                          label: band.label,
+                          min_score: Number(band.min_score),
+                          max_score: Number(band.max_score),
+                        })),
+                      };
+                      if (editingScheme) await assessmentsApi.updateGradingScheme(editingScheme.id, payload);
+                      else await assessmentsApi.createGradingScheme(payload);
+                      setSchemeForm({ name: "", bands: defaultBands });
+                      setEditingScheme(null);
+                      setShowSchemeForm(false);
+                      await load();
+                    } catch (err: any) {
+                      setError(err.response?.data?.detail ?? t("failedCreateScheme"));
+                    }
+                  }}
+            submitLabel={t("addSchemeBtn")}
+            submitIcon={<Plus size={16} />}
+            submitDisabled={schemeForm.bands.length === 0}
+          >
+            <label>{t("schemeNameLabel")}<Input required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} /></label>
+
+          <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
+                    <strong>{t("bandsLabel")}</strong>
+                    {schemeForm.bands.map((band, index) => <div className="inlineForm" style={{ margin: 0 }} key={index}>
+                      <label>{t("nameLabel")}<Input required value={band.label} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /></label>
+                      <label>{t("minimumLabel")}<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: event.target.value } : item) })} /></label>
+                      <label>{t("maximumLabel")}<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: event.target.value } : item) })} /></label>
+                      <Button className="tableAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={14} /></Button>
+                    </div>)}
+                    <Button className="secondaryAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: [...schemeForm.bands, { label: "", min_score: "", max_score: "" }] })}><Plus size={14} /> {t("addFieldBtn")}</Button>
+                  </div>
+          </FormModal>}
+      <DataTable<GradingScheme>
+        columns={[
+          { header: t("schemeCol"), render: (s) => s.name },
+          { header: t("bandsCol"), render: (s) => s.bands.map((b) => `${b.label} (${b.min_score}-${b.max_score})`).join(", ") },
+          { header: t("actionsCol"), render: (s) => (
             <span className="actions">
-              {canCreateScheme && <button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
+              {canCreateScheme && <Button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
                 setEditingScheme(s);
                 setSchemeForm({ name: s.name, bands: s.bands.map((band) => ({ label: band.label, min_score: String(band.min_score), max_score: String(band.max_score) })) });
                 setShowSchemeForm(true);
-              }}><Pencil size={15} /></button>}
-              {canCreateScheme && <button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {
-                if (!window.confirm(t("deleteRecordConfirm"))) return;
+              }}><Pencil size={15} /></Button>}
+              {canCreateScheme && <Button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {
+                if (!(await confirm(t("deleteRecordConfirm")))) return;
                 try { await assessmentsApi.deleteGradingScheme(s.id); await load(); }
                 catch (err: any) { setError(err.response?.data?.detail ?? t("genericError")); }
-              }}><Trash2 size={15} /></button>}
+              }}><Trash2 size={15} /></Button>}
             </span>
-          </div>
-        ))}
-      </div>
+          )},
+        ]}
+        data={schemes}
+        keyExtractor={(s) => s.id}
+      />
 
-      {showExamForm && <Modal title={editingExam ? t("editBtn") : t("addExamTypeBtn")} onClose={() => setShowExamForm(false)}><form
-        className="inlineForm"
-        style={{ marginTop: 16 }}
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setError("");
-          try {
-            const payload = {
-              course_id: examForm.course_id,
-              name: examForm.name,
-              weightage: Number(examForm.weightage),
-              grading_scheme_id: examForm.grading_scheme_id,
-            };
-            if (editingExam) await assessmentsApi.updateExamType(editingExam.id, payload);
-            else await assessmentsApi.createExamType(payload);
-            setExamForm({ course_id: "", name: "", weightage: "", grading_scheme_id: "" });
-            setEditingExam(null);
-            setShowExamForm(false);
-            await load();
-          } catch (err: any) {
-            setError(err.response?.data?.detail ?? t("failedCreateExamType"));
-          }
-        }}
-      >
-        <label>
-          {t("courseLabel")}
-          <Select required value={examForm.course_id} onChange={(e) => setExamForm({ ...examForm, course_id: e.target.value })}>
-            <option value="">{t("selectEllipsis")}</option>
-            {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-        </label>
-        <label>{t("examNameLabel")}<Input required value={examForm.name} onChange={(e) => setExamForm({ ...examForm, name: e.target.value })} placeholder={t("examExample")} /></label>
-        <label>{t("weightageLabel")}<Input required type="number" value={examForm.weightage} onChange={(e) => setExamForm({ ...examForm, weightage: e.target.value })} placeholder="40" /></label>
-        <label>
-          {t("gradingSchemeLabel")}
-          <Select required value={examForm.grading_scheme_id} onChange={(e) => setExamForm({ ...examForm, grading_scheme_id: e.target.value })}>
-            <option value="">{t("selectEllipsis")}</option>
-            {schemes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </Select>
-        </label>
-        <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addExamTypeBtn")}</button></div>
-      </form></Modal>}
-      <div className="dataTable">
-        <div className="dataRow header"><span>{t("courseCol")}</span><span>{t("examCol")}</span><span>{t("weightageCol")}</span><span>{t("actionsCol")}</span></div>
-        {examTypes.map((et) => (
-          <div className="dataRow" key={et.id}>
-            <span>{courses.find((c) => c.id === et.course_id)?.name ?? "—"}</span>
-            <span>{et.name}</span>
-            <span>{et.weightage}%</span>
+      {showExamForm && <FormModal
+            title={editingExam ? t("editBtn") : t("addExamTypeBtn")} onClose={() => setShowExamForm(false)}
+            onSubmit={async (e) => {
+                    e.preventDefault();
+                    setError("");
+                    try {
+                      const payload = {
+                        course_id: examForm.course_id,
+                        name: examForm.name,
+                        weightage: Number(examForm.weightage),
+                        grading_scheme_id: examForm.grading_scheme_id,
+                      };
+                      if (editingExam) await assessmentsApi.updateExamType(editingExam.id, payload);
+                      else await assessmentsApi.createExamType(payload);
+                      setExamForm({ course_id: "", name: "", weightage: "", grading_scheme_id: "" });
+                      setEditingExam(null);
+                      setShowExamForm(false);
+                      await load();
+                    } catch (err: any) {
+                      setError(err.response?.data?.detail ?? t("failedCreateExamType"));
+                    }
+                  }}
+            submitLabel={t("addExamTypeBtn")}
+            submitIcon={<Plus size={16} />}
+          >
+            <label>
+                    {t("courseLabel")}
+                    <Select required value={examForm.course_id} onChange={(e) => setExamForm({ ...examForm, course_id: e.target.value })}>
+                      <option value="">{t("selectEllipsis")}</option>
+                      {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </Select>
+                  </label>
+
+          <label>{t("examNameLabel")}<Input required value={examForm.name} onChange={(e) => setExamForm({ ...examForm, name: e.target.value })} placeholder={t("examExample")} /></label>
+
+          <label>{t("weightageLabel")}<Input required type="number" value={examForm.weightage} onChange={(e) => setExamForm({ ...examForm, weightage: e.target.value })} placeholder="40" /></label>
+
+          <label>
+                    {t("gradingSchemeLabel")}
+                    <Select required value={examForm.grading_scheme_id} onChange={(e) => setExamForm({ ...examForm, grading_scheme_id: e.target.value })}>
+                      <option value="">{t("selectEllipsis")}</option>
+                      {schemes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </Select>
+                  </label>
+          </FormModal>}
+      <DataTable<ExamType>
+        columns={[
+          { header: t("courseCol"), render: (et) => courses.find((c) => c.id === et.course_id)?.name ?? "—" },
+          { header: t("examCol"), render: (et) => et.name },
+          { header: t("weightageCol"), render: (et) => `${et.weightage}%` },
+          { header: t("actionsCol"), render: (et) => (
             <span className="actions">
-              {canCreateExamType && <button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
+              {canCreateExamType && <Button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
                 setEditingExam(et);
                 setExamForm({ course_id: et.course_id, name: et.name, weightage: String(et.weightage), grading_scheme_id: et.grading_scheme_id });
                 setShowExamForm(true);
-              }}><Pencil size={15} /></button>}
-              {canCreateExamType && <button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {
-                if (!window.confirm(t("deleteRecordConfirm"))) return;
+              }}><Pencil size={15} /></Button>}
+              {canCreateExamType && <Button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {
+                if (!(await confirm(t("deleteRecordConfirm")))) return;
                 try { await assessmentsApi.deleteExamType(et.id); await load(); }
                 catch (err: any) { setError(err.response?.data?.detail ?? t("genericError")); }
-              }}><Trash2 size={15} /></button>}
+              }}><Trash2 size={15} /></Button>}
             </span>
-          </div>
-        ))}
-      </div>
+          )},
+        ]}
+        data={examTypes}
+        keyExtractor={(et) => et.id}
+      />
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-    </div>
+    </PageSection>
   );
 }
 
@@ -1010,12 +1014,12 @@ function ResultsTab({
         </Select>
         {matrix && (
           <>
-            <button className="secondaryAction" type="button" onClick={() => void assessmentsApi.exportResults({ class_id: classId }, "csv")}>
+            <Button className="secondaryAction" type="button" onClick={() => void assessmentsApi.exportResults({ class_id: classId }, "csv")}>
               <FileDown size={16} /> CSV
-            </button>
-            <button className="secondaryAction" type="button" onClick={() => void assessmentsApi.exportResults({ class_id: classId }, "pdf")}>
+            </Button>
+            <Button className="secondaryAction" type="button" onClick={() => void assessmentsApi.exportResults({ class_id: classId }, "pdf")}>
               <FileDown size={16} /> PDF
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -1025,7 +1029,7 @@ function ResultsTab({
           <small className="notice">{t("toggleColumnsHint")}</small>
           {uniqueCourses.map((c) => (
             <label key={c.course_id} className="checkboxLabel">
-              <input type="checkbox" checked={!hiddenCourses.has(c.course_id)} onChange={() => toggleCourse(c.course_id)} />
+              <Checkbox  checked={!hiddenCourses.has(c.course_id)} onChange={() => toggleCourse(c.course_id)} />
               {c.course_name}
             </label>
           ))}
@@ -1038,15 +1042,14 @@ function ResultsTab({
       {matrix?.sections.map((section) => {
         const visibleCourses = section.courses.filter((c) => !hiddenCourses.has(c.course_id));
         return (
-          <div className="modulePanel" key={section.section_id} style={{ marginTop: 16 }}>
-            <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3>{section.class_name} / {section.section_name}</h3>
+          <PageSection key={section.section_id} style={{ marginTop: 16 }}>
+            <PageHeader title={`${section.class_name} / ${section.section_name}`}>
               {canPublish && (
-                <button className="primaryAction" type="button" onClick={() => void publishSection(section)}>
+                <Button className="primaryAction" type="button" onClick={() => void publishSection(section)}>
                   <Send size={16} /> {t("publishSectionBtn")}
-                </button>
+                </Button>
               )}
-            </div>
+            </PageHeader>
             <div className="sheetWrap">
               <table className="sheet">
                 <thead>
@@ -1055,7 +1058,7 @@ function ResultsTab({
                     <th>{t("admissionNoCol")}</th>
                     {visibleCourses.map((c) => <th key={c.course_id}>{c.course_name}</th>)}
                     <th>{t("overallLabel")}</th>
-                    <th></th>
+                    <th>{t("actionsCol")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1078,18 +1081,18 @@ function ResultsTab({
                       })}
                       <td><strong>{student.overall_score ?? "—"}</strong></td>
                       <td>
-                        <button
+                        <Button
                           className="tableAction"
                           type="button"
                           title={t("downloadResultCardBtn")}
                           onClick={() => void assessmentsApi.downloadResultCard(student.student_id, matrix.session_id)}
                         >
                           <FileDown size={14} />
-                        </button>
+                        </Button>
                         {canMessage && (
-                          <button className="tableAction" type="button" title={t("sendToParentsBtn")} onClick={() => void sendReport(student.student_id)}>
+                          <Button className="tableAction" type="button" title={t("sendToParentsBtn")} onClick={() => void sendReport(student.student_id)}>
                             <Send size={14} />
-                          </button>
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -1105,7 +1108,7 @@ function ResultsTab({
                 ))}
               </ul>
             </div>
-          </div>
+          </PageSection>
         );
       })}
     </>

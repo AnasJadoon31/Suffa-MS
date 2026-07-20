@@ -1,9 +1,11 @@
+import { Button } from "./ui/Button";
 import { FileDown, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { academicsApi, assessmentsApi, filesApi, type Assignment, type SessionResult } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { PageSection, PageHeader } from "./ui/Layout";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { Input } from "./ui/Field";
@@ -56,16 +58,16 @@ export function MyAssessmentsView() {
   };
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader"><h2>{t("myAssessments")}</h2><p className="notice">{t("descMyAssessments")}</p></div>
+    <PageSection>
+      <PageHeader title={t("myAssessments")} notice={t("descMyAssessments")} />
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
       {!loading && !error && result?.published && (
         <div className="notice">
           {t("overallScoreLabel")}: <strong>{result.overall_score ?? "—"}</strong>
-          <button className="tableAction" type="button" onClick={() => void assessmentsApi.downloadMyResultCard(sessionId)}>
+          <Button className="tableAction" type="button" onClick={() => void assessmentsApi.downloadMyResultCard(sessionId)}>
             <FileDown size={14} /> {t("downloadResultCardBtn")}
-          </button>
+          </Button>
         </div>
       )}
       {!loading && assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
@@ -79,15 +81,15 @@ export function MyAssessmentsView() {
               {submitted.has(assignment.id) ? t("submittedLabel") : (
                 <>
                   <Input type="file" disabled={readOnly} onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
-                  <button className="tableAction" type="button" disabled={readOnly || !files[assignment.id]} onClick={() => void submit(assignment)}>
+                  <Button className="tableAction" type="button" disabled={readOnly || !files[assignment.id]} onClick={() => void submit(assignment)}>
                     <Upload size={14} /> {t("submitBtn")}
-                  </button>
+                  </Button>
                 </>
               )}
             </span>
           </div>
         ))}
       </div>
-    </section>
+    </PageSection>
   );
 }

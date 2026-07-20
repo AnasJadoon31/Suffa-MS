@@ -13,15 +13,19 @@ import { registerSW } from "virtual:pwa-register";
 // deploys instead of serving stale bundles.
 registerSW({ immediate: true });
 
+import { DialogProvider } from "./lib/DialogContext";
+
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <DialogProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </DialogProvider>
       </AuthProvider>
     </QueryClientProvider>
   </React.StrictMode>,

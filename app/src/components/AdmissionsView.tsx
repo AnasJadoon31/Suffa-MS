@@ -1,6 +1,8 @@
+import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
 import { CheckCircle2, ClipboardList, Copy, Edit2, Eye, Plus, Trash2, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDialog } from "../lib/DialogContext";
 
 import {
   academicsApi,
@@ -14,15 +16,18 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
+import { DataTable } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
 export function AdmissionsView({ section = "registrations" }: Readonly<{ section?: Tab }>) {
   const { t } = useTranslation();
+  const { alert, confirm } = useDialog();
   const { hasPermission } = useAuth();
   const canMutate = !useSessionReadOnly();
   const canReview = hasPermission("admissions.manage");
@@ -34,16 +39,17 @@ export function AdmissionsView({ section = "registrations" }: Readonly<{ section
   }, []);
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2><ClipboardList size={18} /> {t("admissions")}</h2>
-        <p className="notice">{t("descAdmissions")}</p>
-      </div>
+    <PageSection>
+      <PageHeader
+        title={t("admissions")}
+        icon={<ClipboardList size={18} />}
+        notice={t("descAdmissions")}
+      />
 
       {section === "registrations" && <RegistrationsTab programs={programs} canReview={canReview} canMutate={canMutate} />}
       {section === "forms" && canReview && <AdmissionFormsTab programs={programs} canMutate={canMutate} />}
       {section === "enquiries" && canViewEnquiries && <EnquiriesTab canMutate={canMutate} />}
-    </section>
+    </PageSection>
   );
 }
 
@@ -93,103 +99,111 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
   return (
     <>
       {canMutate && <div className="formActions" style={{ marginBottom: 12 }}>
-        <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("submitApplicationBtn")}</button>
+        <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("submitApplicationBtn")}</Button>
       </div>}
-      {canMutate && showCreate && <Modal title={t("submitApplicationBtn")} onClose={() => setShowCreate(false)}><form
-        className="inlineForm"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setError("");
-          setNotice("");
-          try {
-            await operationsApi.createAdmission({
-              applicant_name: form.applicant_name,
-              guardian_contact: form.guardian_contact,
-              program_id: form.program_id || undefined,
-              date_of_birth: form.date_of_birth || undefined,
-              notes: form.notes || undefined,
-              extra_data: {
-                guardian_name: form.guardian_name,
-                guardian_relationship: form.guardian_relationship,
-                guardian_cnic: form.guardian_cnic,
-                gender: form.gender,
-                b_form_number: form.b_form_number,
-                address: form.address,
-                previous_school: form.previous_school,
-                previous_class: form.previous_class,
-                medical_notes: form.medical_notes,
-              },
-            });
-            setForm(emptyForm);
-            setShowCreate(false);
-            setNotice(t("applicationSubmitted"));
-            await load();
-          } catch (err: any) {
-            setError(err.response?.data?.detail ?? t("failedSubmitApplication"));
-          }
-        }}
-      >
-        <label>{t("applicantNameLabel")}<Input required value={form.applicant_name} onChange={(e) => setForm({ ...form, applicant_name: e.target.value })} /></label>
-        <label>{t("guardianNameLabel")}<Input required value={form.guardian_name} onChange={(e) => setForm({ ...form, guardian_name: e.target.value })} /></label>
-        <label>{t("relationshipLabel")}<Input required value={form.guardian_relationship} onChange={(e) => setForm({ ...form, guardian_relationship: e.target.value })} /></label>
-        <label>{t("guardianContactLabel")}<Input required value={form.guardian_contact} onChange={(e) => setForm({ ...form, guardian_contact: e.target.value })} /></label>
-        <label>{t("guardianCnicLabel")}<Input value={form.guardian_cnic} onChange={(e) => setForm({ ...form, guardian_cnic: e.target.value })} /></label>
-        <label>
-          {t("programLabel")}
-          <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
-            <option value="">{t("selectEllipsis")}</option>
-            {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
-        </label>
-        <label>{t("dobLabel")}<Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
-        <label>{t("genderLabel")}<Select required value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="">{t("selectEllipsis")}</option><option value="male">{t("maleLabel")}</option><option value="female">{t("femaleLabel")}</option></Select></label>
-        <label>{t("bFormLabel")}<Input required value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
-        <label>{t("addressLabel")}<Input required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-        <label>{t("previousSchoolLabel")}<Input value={form.previous_school} onChange={(e) => setForm({ ...form, previous_school: e.target.value })} /></label>
-        <label>{t("previousClassLabel")}<Input value={form.previous_class} onChange={(e) => setForm({ ...form, previous_class: e.target.value })} /></label>
-        <label>{t("medicalNotesLabel")}<Input value={form.medical_notes} onChange={(e) => setForm({ ...form, medical_notes: e.target.value })} /></label>
-        <label>{t("notesLabel")}<Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
-        <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("submitApplicationBtn")}</button></div>
-      </form></Modal>}
+      {canMutate && showCreate && <FormModal
+            title={t("submitApplicationBtn")} onClose={() => setShowCreate(false)}
+            onSubmit={async (e) => {
+                    e.preventDefault();
+                    setError("");
+                    setNotice("");
+                    try {
+                      await operationsApi.createAdmission({
+                        applicant_name: form.applicant_name,
+                        guardian_contact: form.guardian_contact,
+                        program_id: form.program_id || undefined,
+                        date_of_birth: form.date_of_birth || undefined,
+                        notes: form.notes || undefined,
+                        extra_data: {
+                          guardian_name: form.guardian_name,
+                          guardian_relationship: form.guardian_relationship,
+                          guardian_cnic: form.guardian_cnic,
+                          gender: form.gender,
+                          b_form_number: form.b_form_number,
+                          address: form.address,
+                          previous_school: form.previous_school,
+                          previous_class: form.previous_class,
+                          medical_notes: form.medical_notes,
+                        },
+                      });
+                      setForm(emptyForm);
+                      setShowCreate(false);
+                      setNotice(t("applicationSubmitted"));
+                      await load();
+                    } catch (err: any) {
+                      setError(err.response?.data?.detail ?? t("failedSubmitApplication"));
+                    }
+                  }}
+            submitLabel={t("submitApplicationBtn")}
+            submitIcon={<Plus size={16} />}
+          >
+            <label>{t("applicantNameLabel")}<Input required value={form.applicant_name} onChange={(e) => setForm({ ...form, applicant_name: e.target.value })} /></label>
+
+          <label>{t("guardianNameLabel")}<Input required value={form.guardian_name} onChange={(e) => setForm({ ...form, guardian_name: e.target.value })} /></label>
+
+          <label>{t("relationshipLabel")}<Input required value={form.guardian_relationship} onChange={(e) => setForm({ ...form, guardian_relationship: e.target.value })} /></label>
+
+          <label>{t("guardianContactLabel")}<Input required value={form.guardian_contact} onChange={(e) => setForm({ ...form, guardian_contact: e.target.value })} /></label>
+
+          <label>{t("guardianCnicLabel")}<Input value={form.guardian_cnic} onChange={(e) => setForm({ ...form, guardian_cnic: e.target.value })} /></label>
+
+          <label>
+                    {t("programLabel")}
+                    <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+                      <option value="">{t("selectEllipsis")}</option>
+                      {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </Select>
+                  </label>
+
+          <label>{t("dobLabel")}<Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
+
+          <label>{t("genderLabel")}<Select required value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="">{t("selectEllipsis")}</option><option value="male">{t("maleLabel")}</option><option value="female">{t("femaleLabel")}</option></Select></label>
+
+          <label>{t("bFormLabel")}<Input required value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
+
+          <label>{t("addressLabel")}<Input required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+
+          <label>{t("previousSchoolLabel")}<Input value={form.previous_school} onChange={(e) => setForm({ ...form, previous_school: e.target.value })} /></label>
+
+          <label>{t("previousClassLabel")}<Input value={form.previous_class} onChange={(e) => setForm({ ...form, previous_class: e.target.value })} /></label>
+
+          <label>{t("medicalNotesLabel")}<Input value={form.medical_notes} onChange={(e) => setForm({ ...form, medical_notes: e.target.value })} /></label>
+
+          <label>{t("notesLabel")}<Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
+          </FormModal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 
       {canReview && (
-        <div className="dataTable">
-          <div className="dataRow header">
-            <span>{t("applicantNameLabel")}</span>
-            <span>{t("guardianContactLabel")}</span>
-            <span>{t("programLabel")}</span>
-            <span>{t("sourceCol")}</span>
-            <span>{t("statusCol")}</span>
-            <span></span>
-          </div>
-          {isLoading && <LoadingState />}
-          {!isLoading && loadError && <ErrorState message={loadError} />}
-          {!isLoading && !loadError && applications.length === 0 && <p className="emptyState">{t("noApplicationsYet")}</p>}
-          {!isLoading && !loadError && applications.map((a) => (
-            <div className="dataRow" key={a.id}>
-              <span>{a.applicant_name}</span>
-              <span>{a.guardian_contact}</span>
-              <span>{programs.find((p) => p.id === a.program_id)?.name ?? "—"}</span>
-              <span>{a.form_id ? t("sourcePublicForm") : t("sourceWalkIn")}</span>
-              <span>{a.status}</span>
-              <span>
-                <button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(a)}><Eye size={14} /></button>
+        <DataTable<AdmissionApplication>
+          columns={[
+            { header: t("applicantNameLabel"), render: (a) => a.applicant_name },
+            { header: t("guardianContactLabel"), render: (a) => a.guardian_contact },
+            { header: t("programLabel"), render: (a) => programs.find((p) => p.id === a.program_id)?.name ?? "—" },
+            { header: t("sourceCol"), render: (a) => a.form_id ? t("sourcePublicForm") : t("sourceWalkIn") },
+            { header: t("statusCol"), render: (a) => a.status },
+            { header: t("actionsCol"), render: (a) => (
+              <>
+                <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(a)}><Eye size={14} /></Button>
                 {canMutate && a.status === "pending" && (
                   <>
-                    <button className="tableAction" type="button" onClick={async () => { await operationsApi.setAdmissionStatus(a.id, "accepted"); await load(); }}>
+                    <Button className="tableAction" type="button" onClick={async () => { await operationsApi.setAdmissionStatus(a.id, "accepted"); await load(); }}>
                       <CheckCircle2 size={14} />
-                    </button>
-                    <button className="tableAction" type="button" onClick={async () => { await operationsApi.setAdmissionStatus(a.id, "rejected"); await load(); }}>
+                    </Button>
+                    <Button className="tableAction" type="button" onClick={async () => { await operationsApi.setAdmissionStatus(a.id, "rejected"); await load(); }}>
                       <XCircle size={14} />
-                    </button>
+                    </Button>
                   </>
                 )}
-              </span>
-            </div>
-          ))}
-        </div>
+              </>
+            )},
+          ]}
+          data={applications}
+          keyExtractor={(a) => a.id}
+          isLoading={isLoading}
+          error={loadError}
+          emptyMessage={t("noApplicationsYet")}
+        />
       )}
       {canReview && <PaginationControls state={pagination} total={total} onChange={setPagination} />}
       {detail && <Modal title={detail.applicant_name} onClose={() => setDetail(null)}>
@@ -252,70 +266,64 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
     <>
       <p className="notice">{t("admissionFormsHint")}</p>
       {canMutate && <div className="formActions" style={{ marginBottom: 12 }}>
-        <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</button>
+        <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</Button>
       </div>}
-      {canMutate && showCreate && <Modal title={t("createAdmissionFormBtn")} onClose={() => setShowCreate(false)}><form
-        className="inlineForm"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setError("");
-          const fieldError = validateFormFields(fields);
-          if (fieldError) {
-            setError(t(fieldError));
-            return;
-          }
-          try {
-            await operationsApi.createAdmissionForm({
-              program_id: form.program_id,
-              title: form.title,
-              description: form.description,
-              fields: cleanFormFields(fields),
-            });
-            setForm({ program_id: "", title: "", description: "" });
-            setFields([emptyFormField()]);
-            setShowCreate(false);
-            await load();
-          } catch (err: any) {
-            setError(err.response?.data?.detail ?? t("failedCreateForm"));
-          }
-        }}
-      >
-        <label>
-          {t("programLabel")}
-          <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
-            <option value="">{t("selectEllipsis")}</option>
-            {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
-        </label>
-        <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-        <label>{t("descriptionLabel")}<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-        <FormFieldsEditor fields={fields} onChange={setFields} />
-        <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("createAdmissionFormBtn")}</button></div>
-      </form></Modal>}
+      {canMutate && showCreate && <FormModal
+            title={t("createAdmissionFormBtn")} onClose={() => setShowCreate(false)}
+            onSubmit={async (e) => {
+                    e.preventDefault();
+                    setError("");
+                    const fieldError = validateFormFields(fields);
+                    if (fieldError) {
+                      setError(t(fieldError));
+                      return;
+                    }
+                    try {
+                      await operationsApi.createAdmissionForm({
+                        program_id: form.program_id,
+                        title: form.title,
+                        description: form.description,
+                        fields: cleanFormFields(fields),
+                      });
+                      setForm({ program_id: "", title: "", description: "" });
+                      setFields([emptyFormField()]);
+                      setShowCreate(false);
+                      await load();
+                    } catch (err: any) {
+                      setError(err.response?.data?.detail ?? t("failedCreateForm"));
+                    }
+                  }}
+            submitLabel={t("createAdmissionFormBtn")}
+            submitIcon={<Plus size={16} />}
+          >
+            <label>
+                    {t("programLabel")}
+                    <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+                      <option value="">{t("selectEllipsis")}</option>
+                      {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </Select>
+                  </label>
+
+          <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+
+          <label>{t("descriptionLabel")}<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
+
+          <FormFieldsEditor fields={fields} onChange={setFields} />
+          </FormModal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
-      <div className="dataTable">
-        <div className="dataRow header">
-          <span>{t("titleCol")}</span>
-          <span>{t("programLabel")}</span>
-          <span>{t("fieldsCol")}</span>
-          <span>{t("statusCol")}</span>
-          <span></span>
-        </div>
-        {isLoading && <LoadingState />}
-        {!isLoading && loadError && <ErrorState message={loadError} />}
-        {!isLoading && !loadError && forms.length === 0 && <p className="emptyState">{t("noAdmissionFormsYet")}</p>}
-        {!isLoading && !loadError && forms.map((adm) => (
-          <div className="dataRow" key={adm.id}>
-            <span>{adm.title}</span>
-            <span>{adm.program_name ?? "—"}</span>
-            <span>{adm.fields_definition.length}</span>
-            <span>{adm.is_open ? t("openLabel") : t("closedLabel")}</span>
+      <DataTable<AdmissionForm>
+        columns={[
+          { header: t("titleCol"), render: (adm) => adm.title },
+          { header: t("programLabel"), render: (adm) => adm.program_name ?? "—" },
+          { header: t("fieldsCol"), render: (adm) => adm.fields_definition.length },
+          { header: t("statusCol"), render: (adm) => adm.is_open ? t("openLabel") : t("closedLabel") },
+          { header: t("actionsCol"), render: (adm) => (
             <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="tableAction" type="button" onClick={() => void copyLink(adm)}>
+              <Button className="tableAction" type="button" onClick={() => void copyLink(adm)}>
                 <Copy size={14} /> {copiedId === adm.id ? t("linkCopied") : t("copyPublicLinkBtn")}
-              </button>
-              {canMutate && <button
+              </Button>
+              {canMutate && <Button
                 className="tableAction"
                 type="button"
                 aria-label={`${t("editBtn")} ${adm.title}`}
@@ -326,8 +334,8 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
                 }}
               >
                 <Edit2 size={14} /> {t("editBtn")}
-              </button>}
-              {canMutate && <button
+              </Button>}
+              {canMutate && <Button
                 className="tableAction"
                 type="button"
                 onClick={async () => {
@@ -336,13 +344,13 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
                 }}
               >
                 {adm.is_open ? t("closeFormBtn") : t("reopenFormBtn")}
-              </button>}
-              {canMutate && <button
+              </Button>}
+              {canMutate && <Button
                 className="tableAction danger"
                 type="button"
                 aria-label={t("deleteAdmissionFormBtn")}
                 onClick={async () => {
-                  if (!window.confirm(t("deleteAdmissionFormConfirm"))) return;
+                  if (!(await confirm(t("deleteAdmissionFormConfirm")))) return;
                   try {
                     await operationsApi.deleteAdmissionForm(adm.id);
                     await load();
@@ -352,48 +360,52 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
                 }}
               >
                 <Trash2 size={14} /> {t("deleteBtn")}
-              </button>}
+              </Button>}
             </span>
-          </div>
-        ))}
-      </div>
+          )},
+        ]}
+        data={forms}
+        keyExtractor={(adm) => adm.id}
+        isLoading={isLoading}
+        error={loadError}
+        emptyMessage={t("noAdmissionFormsYet")}
+      />
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
-      {editing && <Modal title={t("editAdmissionFormHeading")} onClose={() => setEditing(null)}>
-        <form
-          className="inlineForm"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setError("");
-            const fieldError = validateFormFields(editFields);
-            if (fieldError) {
-              setError(t(fieldError));
-              return;
-            }
-            try {
-              await operationsApi.updateAdmissionForm(editing.id, {
-                title: editing.title,
-                description: editing.description,
-                fields: cleanFormFields(editFields),
-              });
-              setEditing(null);
-              await load();
-            } catch (err: any) {
-              setError(err.response?.data?.detail ?? t("failedUpdateForm"));
-            }
-          }}
-        >
-          <label>{t("programLabel")}<Input disabled value={editing.program_name ?? ""} /></label>
+      {editing && <FormModal
+            title={t("editAdmissionFormHeading")} onClose={() => setEditing(null)}
+            onSubmit={async (event) => {
+                      event.preventDefault();
+                      setError("");
+                      const fieldError = validateFormFields(editFields);
+                      if (fieldError) {
+                        setError(t(fieldError));
+                        return;
+                      }
+                      try {
+                        await operationsApi.updateAdmissionForm(editing.id, {
+                          title: editing.title,
+                          description: editing.description,
+                          fields: cleanFormFields(editFields),
+                        });
+                        setEditing(null);
+                        await load();
+                      } catch (err: any) {
+                        setError(err.response?.data?.detail ?? t("failedUpdateForm"));
+                      }
+                    }}
+            submitLabel={t("saveBtn")}
+          >
+            <label>{t("programLabel")}<Input disabled value={editing.program_name ?? ""} /></label>
+
           <label>{t("titleLabel")}<Input required value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></label>
+
           <label>{t("descriptionLabel")}<Input value={editing.description} onChange={(event) => setEditing({ ...editing, description: event.target.value })} /></label>
+
           <FormFieldsEditor fields={editFields} onChange={setEditFields} />
+
           {error && <p className="notice notice-warning">{error}</p>}
-          <div className="formActions">
-            <button type="button" onClick={() => setEditing(null)}>{t("cancelBtn")}</button>
-            <button className="primaryAction" type="submit">{t("saveBtn")}</button>
-          </div>
-        </form>
-      </Modal>}
+          </FormModal>}
     </>
   );
 }
@@ -429,33 +441,26 @@ function EnquiriesTab({ canMutate }: Readonly<{ canMutate: boolean }>) {
 
   return (
     <>
-    <div className="dataTable">
-      <div className="dataRow header">
-        <span>{t("nameLabel")}</span>
-        <span>{t("contactCol")}</span>
-        <span>{t("messageCol")}</span>
-        <span>{t("statusCol")}</span>
-        <span></span>
-      </div>
-      {isLoading && <LoadingState />}
-      {!isLoading && loadError && <ErrorState message={loadError} />}
-      {!isLoading && !loadError && enquiries.length === 0 && <p className="emptyState">{t("noEnquiriesYet")}</p>}
-      {!isLoading && !loadError && enquiries.map((e) => (
-        <div className="dataRow" key={e.id}>
-          <span>{e.name}</span>
-          <span>{e.contact}</span>
-          <span>{e.message}</span>
-          <span>{e.status}</span>
-          <span>
-            {canMutate && e.status === "new" && (
-              <button className="tableAction" type="button" onClick={async () => { await operationsApi.setEnquiryStatus(e.id, "reviewed"); await load(); }}>
-                <CheckCircle2 size={14} />
-              </button>
-            )}
-          </span>
-        </div>
-      ))}
-    </div>
+    <DataTable<ContactEnquiry>
+      columns={[
+        { header: t("nameLabel"), render: (e) => e.name },
+        { header: t("contactCol"), render: (e) => e.contact },
+        { header: t("messageCol"), render: (e) => e.message },
+        { header: t("statusCol"), render: (e) => e.status },
+        { header: t("actionsCol"), render: (e) => (
+          canMutate && e.status === "new" ? (
+            <Button className="tableAction" type="button" onClick={async () => { await operationsApi.setEnquiryStatus(e.id, "reviewed"); await load(); }}>
+              <CheckCircle2 size={14} />
+            </Button>
+          ) : null
+        )},
+      ]}
+      data={enquiries}
+      keyExtractor={(e) => e.id}
+      isLoading={isLoading}
+      error={loadError}
+      emptyMessage={t("noEnquiriesYet")}
+    />
     <PaginationControls state={pagination} total={total} onChange={setPagination} />
     </>
   );

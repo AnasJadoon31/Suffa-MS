@@ -1,11 +1,15 @@
+import { Button } from "./ui/Button";
 import { AlertTriangle, CalendarDays, CircleDollarSign, ClipboardCheck, ExternalLink, GraduationCap, LogIn, LogOut, UserRoundCog } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { AttendanceCalendar, toDateKey, type StudentDayStatus } from "./AttendanceCalendar";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { isNavItemAccessible, navItems, type ViewId } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
+import { PageSection, PageHeader } from "./ui/Layout";
+import { MetricGrid, MetricCard } from "./ui/Card";
 
 import {
   type DashboardData,
@@ -44,10 +48,10 @@ function QuickLinks({ onNavigate }: Readonly<{ onNavigate?: (view: ViewId) => vo
       {visible.map((item) => {
         const Icon = item.icon;
         return (
-          <button key={item.id} type="button" className="quickLink" onClick={() => onNavigate(item.id)}>
+          <Button key={item.id} type="button" className="quickLink" onClick={() => onNavigate(item.id)}>
             <Icon size={18} />
             <span>{t(item.labelKey)}</span>
-          </button>
+          </Button>
         );
       })}
     </nav>
@@ -125,34 +129,38 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
 
   return (
     <>
-      <section className="metricGrid" aria-label={t("dashboardSummaryLabel")}>
+      <MetricGrid aria-label={t("dashboardSummaryLabel")}>
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <article className="metricCard" key={card.label}>
-              <Icon size={20} />
-              <span>{card.label}</span>
-              <strong>{card.value}</strong>
-              <small>{card.detail}</small>
-            </article>
+            <MetricCard
+              key={card.label}
+              title={
+                <>
+                  <Icon size={20} /> {card.label}
+                </>
+              }
+              value={card.value}
+              trend={<small>{card.detail}</small>}
+            />
           );
         })}
-      </section>
+      </MetricGrid>
       {data.attendance.missing_sync_teacher_list.length > 0 && (
-        <section className="modulePanel">
-          <div className="moduleHeader"><h2>{t("missingAttendanceSyncHeading")}</h2></div>
+        <PageSection>
+          <PageHeader title={t("missingAttendanceSyncHeading")} />
           <ul>
             {data.attendance.missing_sync_teacher_list.map((teacher) => <li key={teacher.id}>{teacher.name}</li>)}
           </ul>
-        </section>
+        </PageSection>
       )}
       {data.activity.length > 0 && (
-        <section className="modulePanel">
-          <div className="moduleHeader"><h2>{t("recentActivityHeading")}</h2></div>
+        <PageSection>
+          <PageHeader title={t("recentActivityHeading")} />
           <ul>
             {data.activity.map((line) => <li key={line}>{line}</li>)}
           </ul>
-        </section>
+        </PageSection>
       )}
     </>
   );
@@ -199,25 +207,25 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
 
   return (
     <>
-      <section className="metricGrid" aria-label={t("dashboardSummaryLabel")}>
-        <article className="metricCard">
-          <span>{t("myClassesHeading")}</span>
-          <strong>{data.my_classes.length}</strong>
-          <small>{data.my_classes.map((c) => `${c.class_name} · ${c.course_name}`).join(", ") || t("noAssignmentsYet")}</small>
-        </article>
-        <article className="metricCard">
-          <span>{t("pendingSubmissionsHeading")}</span>
-          <strong>{data.pending_submissions}</strong>
-          <small>{t("ungradedAcrossClasses")}</small>
-        </article>
-        <article className="metricCard">
-          <span>{t("todayAttendance")}</span>
-          <strong>{attendance?.check_in ? formatTime(attendance.check_in) : t("notCheckedIn")}</strong>
-          <small>{t("checkedOutAt", { time: formatTime(attendance?.check_out) })}</small>
-        </article>
-      </section>
-      <section className="modulePanel">
-        <div className="moduleHeader"><h2>{t("myClassesHeading")}</h2></div>
+      <MetricGrid aria-label={t("dashboardSummaryLabel")}>
+        <MetricCard
+          title={t("myClassesHeading")}
+          value={data.my_classes.length}
+          trend={<small>{data.my_classes.map((c) => `${c.class_name} · ${c.course_name}`).join(", ") || t("noAssignmentsYet")}</small>}
+        />
+        <MetricCard
+          title={t("pendingSubmissionsHeading")}
+          value={data.pending_submissions}
+          trend={<small>{t("ungradedAcrossClasses")}</small>}
+        />
+        <MetricCard
+          title={t("todayAttendance")}
+          value={attendance?.check_in ? formatTime(attendance.check_in) : t("notCheckedIn")}
+          trend={<small>{t("checkedOutAt", { time: formatTime(attendance?.check_out) })}</small>}
+        />
+      </MetricGrid>
+      <PageSection>
+        <PageHeader title={t("myClassesHeading")} />
         {data.my_classes.length === 0 && <p className="emptyState">{t("noCoursesAssigned")}</p>}
         <div className="dataTable">
           {data.my_classes.map((entry, index) => (
@@ -225,7 +233,7 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
               <span>{entry.class_name}{entry.section_name ? ` / ${entry.section_name}` : ""}</span>
               <span>{entry.course_name}</span>
               <span>
-                <button
+                <Button
                   className="tableAction"
                   type="button"
                   onClick={() => {
@@ -234,8 +242,8 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
                   }}
                 >
                   <ExternalLink size={14} /> {t("openClassListBtn")}
-                </button>
-                <button
+                </Button>
+                <Button
                   className="tableAction"
                   type="button"
                   onClick={() => {
@@ -244,35 +252,35 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
                   }}
                 >
                   <ExternalLink size={14} /> {t("assessments")}
-                </button>
+                </Button>
               </span>
             </div>
           ))}
         </div>
-      </section>
-      <section className="modulePanel">
-        <div className="moduleHeader"><h2>{t("timeInOutHeading")}</h2></div>
+      </PageSection>
+      <PageSection>
+        <PageHeader title={t("timeInOutHeading")} />
         <div className="formActions">
-          <button className="primaryAction" type="button" disabled={readOnly || !!attendance?.check_in} onClick={() => void checkIn()}>
+          <Button className="primaryAction" type="button" disabled={readOnly || !!attendance?.check_in} onClick={() => void checkIn()}>
             <LogIn size={16} /> {t("timeInLabel")}
-          </button>
-          <button className="secondaryAction" type="button" disabled={readOnly || !attendance?.check_in || !!attendance?.check_out} onClick={() => void checkOut()}>
+          </Button>
+          <Button className="secondaryAction" type="button" disabled={readOnly || !attendance?.check_in || !!attendance?.check_out} onClick={() => void checkOut()}>
             <LogOut size={16} /> {t("timeOutLabel")}
-          </button>
+          </Button>
         </div>
         {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      </section>
-      <section className="modulePanel">
-        <div className="moduleHeader"><h2>{t("todaysTimetableHeading")}</h2></div>
+      </PageSection>
+      <PageSection>
+        <PageHeader title={t("todaysTimetableHeading")} />
         {data.today_timetable.length === 0 && <p className="emptyState">{t("noPeriodsToday")}</p>}
         <ul>
           {data.today_timetable.map((slot, i) => (
             <li key={i}>{slot.start_time} – {slot.end_time} ({t("periodLabel", { period: slot.period })})</li>
           ))}
         </ul>
-      </section>
-      <section className="modulePanel">
-        <div className="moduleHeader"><h2>{t("myAttendanceLogHeading")}</h2></div>
+      </PageSection>
+      <PageSection>
+        <PageHeader title={t("myAttendanceLogHeading")} />
         <div className="dataTable">
           <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("statusCol")}</span><span>{t("timeInLabel")}</span><span>{t("timeOutLabel")}</span></div>
           {logs.length === 0 && <p className="emptyState">{t("noTeacherAttendanceLogs")}</p>}
@@ -285,7 +293,7 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
             </div>
           ))}
         </div>
-      </section>
+      </PageSection>
     </>
   );
 }
@@ -320,9 +328,9 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
       ) : (
         <>
           <Input type="file" disabled={readOnly} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <button className="tableAction" type="button" disabled={readOnly || !file} onClick={() => void submit()}>
+          <Button className="tableAction" type="button" disabled={readOnly || !file} onClick={() => void submit()}>
             {t("submitBtn")}
-          </button>
+          </Button>
         </>
       )}
       {error && <span className="notice" style={{ color: "var(--rose)" }}>{error}</span>}
@@ -343,37 +351,41 @@ function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashb
 
   return (
     <>
-      <section className="metricGrid" aria-label={t("dashboardSummaryLabel")}>
-        <article className="metricCard">
-          <span>{t("overallScoreLabel")}</span>
-          <strong>{data.latest_result?.overall_score ?? "—"}</strong>
-          <small>{data.latest_result?.published ? t("publishedLabel") : t("notPublishedLabel")}</small>
+      <MetricGrid aria-label={t("dashboardSummaryLabel")}>
+        <MetricCard
+          title={t("overallScoreLabel")}
+          value={data.latest_result?.overall_score ?? "—"}
+          trend={<small>{data.latest_result?.published ? t("publishedLabel") : t("notPublishedLabel")}</small>}
+        >
           {data.latest_result?.published && (
-            <button
+            <Button
               className="secondaryAction"
               type="button"
               onClick={() => void assessmentsApi.downloadMyResultCard(data.latest_result!.session_id)}
             >
               {t("downloadResultCardBtn")}
-            </button>
+            </Button>
           )}
-        </article>
-        <article className="metricCard">
-          <span>{t("dueAssignmentsHeading")}</span>
-          <strong>{data.due_assignments.length}</strong>
-          <small>{t("notSubmittedLabel")}</small>
-        </article>
-        <article className="metricCard">
-          <CalendarDays size={20} />
-          <span>{t("attendance")}</span>
-          <strong>{counts.present ?? 0} / {Object.keys(statuses).length || "—"}</strong>
-          <small>{t("attendanceSummaryLine", { absent: counts.absent ?? 0, leave: counts.leave ?? 0 })}</small>
-        </article>
-      </section>
+        </MetricCard>
+        <MetricCard
+          title={t("dueAssignmentsHeading")}
+          value={data.due_assignments.length}
+          trend={<small>{t("notSubmittedLabel")}</small>}
+        />
+        <MetricCard
+          title={
+            <>
+              <CalendarDays size={20} /> {t("attendance")}
+            </>
+          }
+          value={`${counts.present ?? 0} / ${Object.keys(statuses).length || "—"}`}
+          trend={<small>{t("attendanceSummaryLine", { absent: counts.absent ?? 0, leave: counts.leave ?? 0 })}</small>}
+        />
+      </MetricGrid>
 
       <div className="dashboardColumns">
-        <section className="modulePanel">
-          <div className="moduleHeader"><h2>{t("myAttendanceHeading")}</h2></div>
+        <PageSection>
+          <PageHeader title={t("myAttendanceHeading")} />
           <AttendanceCalendar
             month={month}
             onMonthChange={setMonth}
@@ -382,44 +394,44 @@ function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashb
             mode="student"
             studentDayStatus={statuses}
           />
-        </section>
+        </PageSection>
 
         <div>
-          <section className="modulePanel">
-            <div className="moduleHeader"><h2>{t("todaysTimetableHeading")}</h2></div>
+          <PageSection>
+            <PageHeader title={t("todaysTimetableHeading")} />
             {data.today_timetable.length === 0 && <p className="emptyState">{t("noPeriodsToday")}</p>}
             <ul>
               {data.today_timetable.map((slot, i) => (
                 <li key={i}>{slot.start_time} – {slot.end_time} ({t("periodLabel", { period: slot.period })})</li>
               ))}
             </ul>
-          </section>
+          </PageSection>
 
-          <section className="modulePanel">
-            <div className="moduleHeader"><h2>{t("dueAssignmentsHeading")}</h2></div>
+          <PageSection>
+            <PageHeader title={t("dueAssignmentsHeading")} />
             {data.due_assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
             <ul>
               {data.due_assignments.map((a) => (
                 <DueAssignmentRow key={a.id} assignment={a} readOnly={readOnly} onSubmitted={() => { /* refreshes next load */ }} />
               ))}
             </ul>
-          </section>
+          </PageSection>
 
-          <section className="modulePanel">
-            <div className="moduleHeader"><h2>{t("announcements")}</h2></div>
+          <PageSection>
+            <PageHeader title={t("announcements")} />
             {data.announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsYet")}</p>}
             <ul>
               {data.announcements.map((a) => <li key={a.id}>{a.title}</li>)}
             </ul>
-          </section>
+          </PageSection>
 
-          <section className="modulePanel">
-            <div className="moduleHeader"><h2>{t("resources")}</h2></div>
+          <PageSection>
+            <PageHeader title={t("resources")} />
             {data.resources.length === 0 && <p className="emptyState">{t("noResourcesShared")}</p>}
             <ul>
               {data.resources.map((r) => <li key={r.id}>{r.title}</li>)}
             </ul>
-          </section>
+          </PageSection>
         </div>
       </div>
     </>

@@ -1,8 +1,9 @@
+import { Button } from "./ui/Button";
 import { Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { FormFieldDefinition } from "../lib/endpoints";
-import { Input, Select } from "./ui/Field";
+import { Input, Select, Checkbox } from "./ui/Field";
 
 const FIELD_TYPES = ["text", "textarea", "radio", "checkbox_group", "dropdown", "label"];
 const OPTION_FIELD_TYPES = new Set(["radio", "checkbox_group", "dropdown"]);
@@ -57,9 +58,9 @@ export function FormFieldsEditor({
           <h4>{t("formFieldsHeading")}</h4>
           <p>{t("formFieldsHint")}</p>
         </div>
-        <button className="secondaryAction" type="button" onClick={() => onChange([...fields, emptyFormField()])}>
+        <Button className="secondaryAction" type="button" onClick={() => onChange([...fields, emptyFormField()])}>
           <Plus size={16} /> {t("addFieldBtn")}
-        </button>
+        </Button>
       </div>
 
       {fields.length === 0 && <p className="emptyState compactEmptyState">{t("noCustomFieldsYet")}</p>}
@@ -97,14 +98,14 @@ export function FormFieldsEditor({
               <Input type="checkbox" checked={field.required} onChange={(event) => updateField(index, { required: event.target.checked })} />
               {t("requiredLabel")}
             </label>
-            <button
+            <Button
               className="iconBtn danger formFieldRemove"
               type="button"
               aria-label={t("removeFieldBtn")}
               onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}
             >
               <Trash2 size={15} />
-            </button>
+            </Button>
           </div>
         ))}
       </div>

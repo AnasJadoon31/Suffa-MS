@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -69,7 +70,7 @@ export function SetPasswordPage() {
                     <Input type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                   </div>
                 </div>
-                <button type="submit" className="login-button">{t("setPasswordBtn")}</button>
+                <Button type="submit" className="login-button">{t("setPasswordBtn")}</Button>
               </form>
             )}
           </div>

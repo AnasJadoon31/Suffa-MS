@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useMemo, useState } from "react";
 import { Input } from "./ui/Field";
 
@@ -54,7 +55,7 @@ export function SearchDropdown<T>({
         <div className="searchDropdownMenu" role="listbox">
           {visibleItems.length === 0 && <span className="searchDropdownEmpty">{emptyLabel}</span>}
           {visibleItems.map((item) => (
-            <button
+            <Button
               className="searchDropdownItem"
               key={getKey(item)}
               type="button"
@@ -66,7 +67,7 @@ export function SearchDropdown<T>({
             >
               <strong>{getLabel(item)}</strong>
               {getDescription && <small>{getDescription(item)}</small>}
-            </button>
+            </Button>
           ))}
         </div>
       )}

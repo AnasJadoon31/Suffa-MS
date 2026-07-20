@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Course, type Scope, type Section } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
-import { Select } from "./ui/Field";
+import { Select, Checkbox } from "./ui/Field";
 
 type Mode = "all" | "teachers" | "students" | "classes" | "sections" | "courses" | "users";
 
@@ -103,8 +103,8 @@ export function AudiencePicker({
         <div className="sectionPicker">
           {classes.map((c) => (
             <label key={c.id} className="checkboxLabel">
-              <input
-                type="checkbox"
+              <Checkbox
+                
                 checked={(value.classes ?? []).includes(c.id)}
                 onChange={() => toggleId("classes", c.id)}
               />
@@ -118,8 +118,8 @@ export function AudiencePicker({
           {classes.flatMap((c) =>
             (sections[c.id] ?? []).map((s) => (
               <label key={s.id} className="checkboxLabel">
-                <input
-                  type="checkbox"
+                <Checkbox
+                  
                   checked={(value.sections ?? []).includes(s.id)}
                   onChange={() => toggleId("sections", s.id)}
                 />
@@ -134,8 +134,8 @@ export function AudiencePicker({
           <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectCoursesHint")}</p>
           {courses.map((co) => (
             <label key={co.id} className="checkboxLabel">
-              <input
-                type="checkbox"
+              <Checkbox
+                
                 checked={(value.courses ?? []).includes(co.id)}
                 onChange={() => toggleId("courses", co.id)}
               />
@@ -149,8 +149,8 @@ export function AudiencePicker({
           <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectUsersHint")}</p>
           {people.map((p) => (
             <label key={p.user_id} className="checkboxLabel">
-              <input
-                type="checkbox"
+              <Checkbox
+                
                 checked={(value.users ?? []).includes(p.user_id)}
                 onChange={() => toggleId("users", p.user_id)}
               />

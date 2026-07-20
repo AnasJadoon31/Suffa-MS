@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Pencil, Settings as SettingsIcon, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -8,6 +9,7 @@ import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal } from "./ui/Modal";
+import { PageSection, PageHeader } from "./ui/Layout";
 
 export function SettingsView() {
   const { t } = useTranslation();
@@ -91,31 +93,28 @@ export function SettingsView() {
   };
 
   return (
-    <section className="modulePanel">
-      <div className="moduleHeader">
-        <h2><SettingsIcon size={18} /> {t("settingsTitle")}</h2>
-        <p className="notice">{t("settingsSubtitle")}</p>
-      </div>
+    <PageSection>
+      <PageHeader title={t("settingsTitle")} icon={<SettingsIcon size={18} />} notice={t("settingsSubtitle")} />
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
       {!isLoading && !loadError && categories.length === 0 && <p className="emptyState">{t("noSettingsYet")}</p>}
       {!isLoading && !loadError && categories.map(([category, items]) => (
-        <div className="modulePanel" key={category} style={{ marginBottom: 16 }}>
+        <PageSection key={category} style={{ marginBottom: 16 }}>
           <h3 className="settingsCategory">{t(`settingsCategory_${category}`, { defaultValue: category })}</h3>
           <div className="settingsList">
             {items.map((item) => (
               <div className="settingsRow" key={item.key}>
                 <span className="settingsLabel">{item.label}</span>
                 <span className="notice">{item.type === "file" ? (draftValue(item) ? t("fileUploadedLabel") : "—") : draftValue(item)}</span>
-                {canManage && <button className="tableAction" type="button" onClick={() => setEditingKey(item.key)}><Pencil size={14} /> {t("editBtn")}</button>}
+                {canManage && <Button className="tableAction" type="button" onClick={() => setEditingKey(item.key)}><Pencil size={14} /> {t("editBtn")}</Button>}
                 {savedKey === item.key && <Check size={16} className="savedTick" />}
                 {editingKey === item.key && <Modal title={item.label} onClose={() => setEditingKey(null)}>
                   {item.type === "file" ? (
                     <label className="secondaryAction">
                       <Upload size={16} /> {t("chooseLogoBtn")}
-                      <input className="visuallyHidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => {
+                      <Input className="visuallyHidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => {
                         const file = event.target.files?.[0];
                         if (file) void uploadFile(item, file).then(() => setEditingKey(null));
                         event.target.value = "";
@@ -123,14 +122,14 @@ export function SettingsView() {
                     </label>
                   ) : <form className="inlineForm" onSubmit={(event) => { event.preventDefault(); void save(item).then(() => setEditingKey(null)); }}>
                     {item.type === "bool" ? <Select value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })}><option value="true">{t("yesLabel")}</option><option value="false">{t("noLabel")}</option></Select> : <Input type={item.type === "int" ? "number" : "text"} value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })} />}
-                    <div className="formActions"><button className="primaryAction" type="submit">{t("saveBtn")}</button></div>
+                    <div className="formActions"><Button className="primaryAction" type="submit">{t("saveBtn")}</Button></div>
                   </form>}
                 </Modal>}
               </div>
             ))}
           </div>
-        </div>
+        </PageSection>
       ))}
-    </section>
+    </PageSection>
   );
 }
