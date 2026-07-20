@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Settings as SettingsIcon, Upload } from "lucide-react";
+import { Check, Pencil, Settings as SettingsIcon, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { filesApi, operationsApi, type TypedSetting } from "../lib/endpoints";
@@ -7,6 +7,7 @@ import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 export function SettingsView() {
   const { t } = useTranslation();
@@ -19,6 +20,7 @@ export function SettingsView() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [editingKey, setEditingKey] = useState<string | null>(null);
 
   const load = async () => setSettings(await operationsApi.settingsCatalog());
   useEffect(() => {
@@ -104,52 +106,27 @@ export function SettingsView() {
           <h3 className="settingsCategory">{t(`settingsCategory_${category}`, { defaultValue: category })}</h3>
           <div className="settingsList">
             {items.map((item) => (
-              <label className="settingsRow" key={item.key}>
+              <div className="settingsRow" key={item.key}>
                 <span className="settingsLabel">{item.label}</span>
-                {item.type === "file" ? (
-                  <div className="settingFileControl">
-                    {draftValue(item) && <span className="notice">{t("fileUploadedLabel")}</span>}
-                    <label className={`secondaryAction${canManage ? "" : " disabled"}`}>
-                      <Upload size={16} /> {t("chooseLogoBtn")}
-                      <input
-                        className="visuallyHidden"
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
-                        disabled={!canManage}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (file) void uploadFile(item, file);
-                          event.target.value = "";
-                        }}
-                      />
-                    </label>
-                  </div>
-                ) : item.type === "bool" ? (
-                  <Select
-                    disabled={!canManage}
-                    value={draftValue(item)}
-                    onChange={(e) => {
-                      setDrafts({ ...drafts, [item.key]: e.target.value });
-                    }}
-                    onBlur={() => void save(item)}
-                  >
-                    <option value="true">{t("yesLabel")}</option>
-                    <option value="false">{t("noLabel")}</option>
-                  </Select>
-                ) : (
-                  <Input
-                    disabled={!canManage}
-                    type={item.type === "int" ? "number" : "text"}
-                    value={draftValue(item)}
-                    onChange={(e) => setDrafts({ ...drafts, [item.key]: e.target.value })}
-                    onBlur={() => void save(item)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                    }}
-                  />
-                )}
+                <span className="notice">{item.type === "file" ? (draftValue(item) ? t("fileUploadedLabel") : "—") : draftValue(item)}</span>
+                {canManage && <button className="tableAction" type="button" onClick={() => setEditingKey(item.key)}><Pencil size={14} /> {t("editBtn")}</button>}
                 {savedKey === item.key && <Check size={16} className="savedTick" />}
-              </label>
+                {editingKey === item.key && <Modal title={item.label} onClose={() => setEditingKey(null)}>
+                  {item.type === "file" ? (
+                    <label className="secondaryAction">
+                      <Upload size={16} /> {t("chooseLogoBtn")}
+                      <input className="visuallyHidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void uploadFile(item, file).then(() => setEditingKey(null));
+                        event.target.value = "";
+                      }} />
+                    </label>
+                  ) : <form className="inlineForm" onSubmit={(event) => { event.preventDefault(); void save(item).then(() => setEditingKey(null)); }}>
+                    {item.type === "bool" ? <Select value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })}><option value="true">{t("yesLabel")}</option><option value="false">{t("noLabel")}</option></Select> : <Input type={item.type === "int" ? "number" : "text"} value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })} />}
+                    <div className="formActions"><button className="primaryAction" type="submit">{t("saveBtn")}</button></div>
+                  </form>}
+                </Modal>}
+              </div>
             ))}
           </div>
         </div>

@@ -36,6 +36,23 @@ function ReportCard({
   );
 }
 
+function ClassSectionSelectors({
+  classes, sections, classId, sectionId, onClassChange, onSectionChange,
+}: Readonly<{
+  classes: AcademicClass[];
+  sections: Section[];
+  classId: string;
+  sectionId: string;
+  onClassChange: (value: string) => void;
+  onSectionChange: (value: string) => void;
+}>) {
+  const { t } = useTranslation();
+  return <>
+    <label>{t("classLabel")}<Select value={classId} onChange={(event) => onClassChange(event.target.value)}><option value="">{t("selectEllipsis")}</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+    <label>{t("sectionLabel")}<Select value={sectionId} onChange={(event) => onSectionChange(event.target.value)} disabled={!classId}><option value="">{t("selectEllipsis")}</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+  </>;
+}
+
 export function ReportsView() {
   const { t } = useTranslation();
   const { hasPermission, user } = useAuth();
@@ -123,20 +140,7 @@ export function ReportsView() {
           run(() => reportingApi.downloadAttendanceReport({ class_id: classId, section_id: sectionId, start_date: startDate, end_date: endDate }, format))
         }
       >
-        <label>
-          {t("classLabel")}
-          <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
-            <option value="">{t("selectEllipsis")}</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-        </label>
-        <label>
-          {t("sectionLabel")}
-          <Select value={sectionId} onChange={(e) => setSectionId(e.target.value)} disabled={!classId}>
-            <option value="">{t("selectEllipsis")}</option>
-            {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
-          </Select>
-        </label>
+        <ClassSectionSelectors classes={classes} sections={sections} classId={classId} sectionId={sectionId} onClassChange={setClassId} onSectionChange={setSectionId} />
       </ReportCard>
 
       {(isTeacher || hasPermission("assessments.marks.enter")) && (
@@ -147,20 +151,7 @@ export function ReportsView() {
             run(() => reportingApi.downloadResultsReport({ class_id: classId, section_id: sectionId, session_id: sessionId }, format))
           }
         >
-          <label>
-            {t("classLabel")}
-            <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
-              <option value="">{t("selectEllipsis")}</option>
-              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </label>
-          <label>
-            {t("sectionLabel")}
-            <Select value={sectionId} onChange={(e) => setSectionId(e.target.value)} disabled={!classId}>
-              <option value="">{t("selectEllipsis")}</option>
-              {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
-            </Select>
-          </label>
+          <ClassSectionSelectors classes={classes} sections={sections} classId={classId} sectionId={sectionId} onClassChange={setClassId} onSectionChange={setSectionId} />
           <label>
             {t("sessionLabel")}
             <Select value={sessionId} onChange={(e) => setSessionId(e.target.value)}>

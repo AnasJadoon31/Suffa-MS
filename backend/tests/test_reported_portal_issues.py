@@ -112,6 +112,11 @@ async def test_teacher_attendance_is_section_scoped(teacher_client, client, seed
     )
     assert assigned_history.status_code == 200, assigned_history.text
 
+    unscoped_student_history = await teacher_client.get(
+        f"/api/v1/attendance/classes/{seed.class_a.id}/students/{seed.students[1].id}/history"
+    )
+    assert unscoped_student_history.status_code == 403
+
     principal = await client.get("/api/v1/attendance/classes")
     principal_class = next(row for row in principal.json() if row["id"] == str(seed.class_a.id))
     assert {section["id"] for section in principal_class["sections"]} == {

@@ -771,7 +771,8 @@ function GradingSetup({
   canCreateExamType,
 }: Readonly<{ courses: Course[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
   const { t } = useTranslation();
-  const defaultBands: GradingScheme["bands"] = [];
+  type EditableBand = { label: string; min_score: string; max_score: string };
+  const defaultBands: EditableBand[] = [];
   const [schemes, setSchemes] = useState<GradingScheme[]>([]);
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
   const [schemeForm, setSchemeForm] = useState({ name: "", bands: defaultBands });
@@ -810,7 +811,14 @@ function GradingSetup({
           e.preventDefault();
           setError("");
           try {
-            const payload = { name: schemeForm.name, bands: schemeForm.bands };
+            const payload = {
+              name: schemeForm.name,
+              bands: schemeForm.bands.map((band) => ({
+                label: band.label,
+                min_score: Number(band.min_score),
+                max_score: Number(band.max_score),
+              })),
+            };
             if (editingScheme) await assessmentsApi.updateGradingScheme(editingScheme.id, payload);
             else await assessmentsApi.createGradingScheme(payload);
             setSchemeForm({ name: "", bands: defaultBands });
@@ -827,11 +835,11 @@ function GradingSetup({
           <strong>{t("bandsLabel")}</strong>
           {schemeForm.bands.map((band, index) => <div className="inlineForm" style={{ margin: 0 }} key={index}>
             <label>{t("nameLabel")}<Input required value={band.label} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /></label>
-            <label>{t("minimumLabel")}<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: Number(event.target.value) } : item) })} /></label>
-            <label>{t("maximumLabel")}<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: Number(event.target.value) } : item) })} /></label>
+            <label>{t("minimumLabel")}<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: event.target.value } : item) })} /></label>
+            <label>{t("maximumLabel")}<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: event.target.value } : item) })} /></label>
             <button className="tableAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={14} /></button>
           </div>)}
-          <button className="secondaryAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: [...schemeForm.bands, { label: "", min_score: 0, max_score: 100 }] })}><Plus size={14} /> {t("addFieldBtn")}</button>
+          <button className="secondaryAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: [...schemeForm.bands, { label: "", min_score: "", max_score: "" }] })}><Plus size={14} /> {t("addFieldBtn")}</button>
         </div>
         <div className="formActions"><button className="primaryAction" type="submit" disabled={schemeForm.bands.length === 0}><Plus size={16} /> {t("addSchemeBtn")}</button></div>
       </form></Modal>}
@@ -844,7 +852,7 @@ function GradingSetup({
             <span className="actions">
               {canCreateScheme && <button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
                 setEditingScheme(s);
-                setSchemeForm({ name: s.name, bands: s.bands.map((band) => ({ ...band })) });
+                setSchemeForm({ name: s.name, bands: s.bands.map((band) => ({ label: band.label, min_score: String(band.min_score), max_score: String(band.max_score) })) });
                 setShowSchemeForm(true);
               }}><Pencil size={15} /></button>}
               {canCreateScheme && <button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {

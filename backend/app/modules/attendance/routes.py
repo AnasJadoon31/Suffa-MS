@@ -853,8 +853,8 @@ async def attendance_student_history(
         await _assert_can_mark_section(
             current_user, session, madrasa.id, active_session.id, class_id, section_id
         )
-    else:
-        await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
+    elif not await _has_global_student_attendance_access(current_user, session):
+        raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SECTION_REQUIRED)
 
     student_stmt = (
         select(StudentProfile.id, StudentProfile.admission_number, StudentProfile.name, Section.id, Section.name)

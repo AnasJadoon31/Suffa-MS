@@ -6,6 +6,7 @@ import { useAuth } from "../lib/AuthContext";
 import { authApi } from "../lib/endpoints";
 import { RoleBadge } from "./Sidebar";
 import { Input, Select } from "./ui/Field";
+import { Modal } from "./ui/Modal";
 
 /** Personal settings — shared by teacher and student portals (missing entirely
  * before this). Reuses PATCH /auth/me (preferred language) and
@@ -22,6 +23,7 @@ export function ProfileView() {
   const [passwordNotice, setPasswordNotice] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  const [profileModal, setProfileModal] = useState<"language" | "password" | null>(null);
 
   const saveLanguage = async (nextLanguage: string) => {
     setLanguage(nextLanguage);
@@ -34,6 +36,7 @@ export function ProfileView() {
       document.documentElement.dir = nextLanguage === "ur" ? "rtl" : "ltr";
       document.documentElement.lang = nextLanguage;
       setLanguageNotice(t("profileLanguageSaved"));
+      setProfileModal(null);
     } catch (err: any) {
       setLanguageError(err.response?.data?.detail ?? t("profileLanguageFailed"));
     } finally {
@@ -58,6 +61,7 @@ export function ProfileView() {
       });
       setPasswordForm({ current_password: "", new_password: "", confirm_password: "" });
       setPasswordNotice(t("profilePasswordChanged"));
+      setProfileModal(null);
     } catch (err: any) {
       setPasswordError(err.response?.data?.detail ?? t("profilePasswordFailed"));
     } finally {
@@ -84,7 +88,8 @@ export function ProfileView() {
             <span><RoleBadge role={user.role} /></span>
           </div>
         </div>
-        <form
+        <button className="primaryAction" type="button" onClick={() => setProfileModal("language")}>{t("preferredLanguageLabel")}</button>
+        {profileModal === "language" && <Modal title={t("preferredLanguageLabel")} onClose={() => setProfileModal(null)}><form
           className="inlineForm"
           style={{ marginTop: 16 }}
           onSubmit={(e) => e.preventDefault()}
@@ -100,7 +105,7 @@ export function ProfileView() {
               <option value="ur">اردو</option>
             </Select>
           </label>
-        </form>
+        </form></Modal>}
         {languageNotice && <p className="notice">{languageNotice}</p>}
         {languageError && <p className="notice" style={{ color: "var(--rose)" }}>{languageError}</p>}
       </section>
@@ -109,7 +114,8 @@ export function ProfileView() {
         <div className="moduleHeader">
           <h2><KeyRound size={18} /> {t("changePasswordHeading")}</h2>
         </div>
-        <form className="inlineForm" onSubmit={(e) => void changePassword(e)}>
+        <button className="primaryAction" type="button" onClick={() => setProfileModal("password")}>{t("changePasswordBtn")}</button>
+        {profileModal === "password" && <Modal title={t("changePasswordHeading")} onClose={() => setProfileModal(null)}><form className="inlineForm" onSubmit={(e) => void changePassword(e)}>
           <label>
             {t("currentPasswordLabel")}
             <Input
@@ -147,7 +153,7 @@ export function ProfileView() {
               {t("changePasswordBtn")}
             </button>
           </div>
-        </form>
+        </form></Modal>}
         {passwordNotice && <p className="notice">{passwordNotice}</p>}
         {passwordError && <p className="notice" style={{ color: "var(--rose)" }}>{passwordError}</p>}
       </section>
