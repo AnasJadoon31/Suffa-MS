@@ -16,21 +16,67 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Existing duplicates need operator review because blindly deleting one
-    # can orphan timetable, assessment, and class-course relationships.
-    duplicates = op.get_bind().exec_driver_sql(
+    bind = op.get_bind()
+    duplicate_groups = bind.exec_driver_sql(
         """
-        SELECT madrasa_id, lower(trim(name)) AS normalized_name, count(*)
+        SELECT
+            madrasa_id,
+            lower(trim(name)) AS normalized_name,
+            array_agg(id ORDER BY created_at, id) AS course_ids
         FROM courses
         GROUP BY madrasa_id, lower(trim(name))
         HAVING count(*) > 1
         """
     ).fetchall()
-    if duplicates:
-        raise RuntimeError(
-            "Duplicate course names must be merged before migration: "
-            + ", ".join(f"{row[0]}:{row[1]} ({row[2]})" for row in duplicates)
+
+    # Legacy installations may already contain duplicates. Keep the oldest
+    # course as the canonical row and repoint every dependent record before
+    # enforcing uniqueness. class_courses needs special handling because it
+    # already has a unique (class_id, course_id) constraint.
+    for _madrasa_id, _normalized_name, course_ids in duplicate_groups:
+        canonical_id, *duplicate_ids = course_ids
+        parameters = {"canonical_id": canonical_id, "duplicate_ids": duplicate_ids}
+
+        bind.execute(
+            sa.text(
+                """
+                WITH ranked_mappings AS (
+                    SELECT
+                        id,
+                        row_number() OVER (
+                            PARTITION BY class_id
+                            ORDER BY CASE WHEN course_id = :canonical_id THEN 0 ELSE 1 END, created_at, id
+                        ) AS position
+                    FROM class_courses
+                    WHERE course_id = :canonical_id OR course_id IN :duplicate_ids
+                )
+                DELETE FROM class_courses AS mapping
+                USING ranked_mappings AS ranked
+                WHERE mapping.id = ranked.id AND ranked.position > 1
+                """
+            ).bindparams(sa.bindparam("duplicate_ids", expanding=True)),
+            parameters,
         )
+        bind.execute(
+            sa.text(
+                "UPDATE class_courses SET course_id = :canonical_id WHERE course_id IN :duplicate_ids"
+            ).bindparams(sa.bindparam("duplicate_ids", expanding=True)),
+            parameters,
+        )
+        for table in ("teacher_assignments", "timetable_slots", "assignments", "exam_types"):
+            bind.execute(
+                sa.text(
+                    f"UPDATE {table} SET course_id = :canonical_id WHERE course_id IN :duplicate_ids"
+                ).bindparams(sa.bindparam("duplicate_ids", expanding=True)),
+                parameters,
+            )
+        bind.execute(
+            sa.text("DELETE FROM courses WHERE id IN :duplicate_ids").bindparams(
+                sa.bindparam("duplicate_ids", expanding=True)
+            ),
+            parameters,
+        )
+
     op.create_index(
         "uq_course_madrasa_normalized_name",
         "courses",
