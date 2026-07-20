@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
+from app.db.migration_lock import run_migrations_with_lock
 from app.db.models import Base
 
 import os
@@ -59,10 +60,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
-
-    with context.begin_transaction():
-        context.run_migrations()
+    run_migrations_with_lock(connection, context, target_metadata)
 
 
 async def run_async_migrations() -> None:

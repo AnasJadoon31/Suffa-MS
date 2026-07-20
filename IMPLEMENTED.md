@@ -724,9 +724,11 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
   class-course, teacher-assignment, timetable, assignment, and exam-type
   references are repointed transactionally. Duplicate class-course mappings
   are collapsed before the normalized unique index is created.
+- Concurrent backend replicas serialize Alembic upgrades with a PostgreSQL
+  advisory lock, so only one startup migrates at a time.
 - Added `test_unique_course_migration.py` to reproduce the production startup
   failure and verify the complete merge path plus index creation. Full backend
-  suite: 148 tests passing.
+  suite: 151 tests passing.
 # 2026-07-13 — Route-based portal isolation
 
 - Replaced persisted in-app view state with real React Router URLs for every portal page.
