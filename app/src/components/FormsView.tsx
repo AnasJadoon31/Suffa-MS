@@ -9,8 +9,7 @@ import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal } from "./ui/Modal";
-
-const FIELD_TYPES = ["text", "textarea", "radio", "checkbox_group", "dropdown", "label"];
+import { cleanFormFields, emptyFormField, FormFieldsEditor } from "./FormFieldsEditor";
 
 export function FormsView() {
   const { t } = useTranslation();
@@ -35,7 +34,7 @@ export function FormsView() {
   const [allowMultiple, setAllowMultiple] = useState(false);
   const [audience, setAudience] = useState<Scope>(user?.role === "teacher" ? { all: false } : { all: true });
   const [fields, setFields] = useState<FormFieldDefinition[]>([
-    { key: "", label: "", type: "text", required: true, options: [] },
+    emptyFormField(),
   ]);
 
   const [editing, setEditing] = useState<FormDef | null>(null);
@@ -92,9 +91,7 @@ export function FormsView() {
           onSubmit={async (e) => {
             e.preventDefault();
             setError("");
-            const cleanFields = fields
-              .filter((f) => f.key && f.label)
-              .map((f) => ({ ...f, options: f.type === "label" || f.type === "text" || f.type === "textarea" ? [] : f.options }));
+            const cleanFields = cleanFormFields(fields);
             if (!formTitle || cleanFields.length === 0) return;
             try {
               await operationsApi.createForm({
@@ -105,7 +102,7 @@ export function FormsView() {
               setFormDescription("");
               setFormCategory("");
               setAllowMultiple(false);
-              setFields([{ key: "", label: "", type: "text", required: true, options: [] }]);
+              setFields([emptyFormField()]);
               setShowCreate(false);
               await load();
             } catch (err: any) {
@@ -123,38 +120,8 @@ export function FormsView() {
           </div>
           <AudiencePicker value={audience} onChange={setAudience} />
 
-          <div style={{ display: "grid", gap: 8 }}>
-            {fields.map((f, i) => (
-              <div key={i} className="inlineForm" style={{ margin: 0 }}>
-                <label>{t("fieldKeyLabel")}<Input required value={f.key} onChange={(e) => updateField(fields, setFields, i, { key: e.target.value })} placeholder="field_key" /></label>
-                <label>{t("fieldLabelLabel")}<Input required value={f.label} onChange={(e) => updateField(fields, setFields, i, { label: e.target.value })} /></label>
-                <label>
-                  {t("fieldTypeLabel")}
-                  <Select value={f.type} onChange={(e) => updateField(fields, setFields, i, { type: e.target.value })}>
-                    {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </Select>
-                </label>
-                {(f.type === "radio" || f.type === "checkbox_group" || f.type === "dropdown") && (
-                  <label>
-                    {t("fieldOptionsLabel")}
-                    <Input value={f.options.join(", ")} onChange={(e) => updateField(fields, setFields, i, { options: e.target.value.split(",").map((o) => o.trim()).filter(Boolean) })} />
-                  </label>
-                )}
-                <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Input type="checkbox" checked={f.required} onChange={(e) => updateField(fields, setFields, i, { required: e.target.checked })} /> {t("requiredLabel")}
-                </label>
-                <div className="formActions">
-                  <button className="tableAction" type="button" onClick={() => setFields(fields.filter((_, idx) => idx !== i))}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <FormFieldsEditor fields={fields} onChange={setFields} />
           <div className="formActions">
-            <button className="secondaryAction" type="button" onClick={() => setFields([...fields, { key: "", label: "", type: "text", required: true, options: [] }])}>
-              <Plus size={16} /> {t("addFieldBtn")}
-            </button>
             <button className="primaryAction" type="submit"><Plus size={16} /> {t("createFormBtn")}</button>
           </div>
         </form>
@@ -318,13 +285,4 @@ export function FormsView() {
       )}
     </section>
   );
-}
-
-function updateField(
-  fields: FormFieldDefinition[],
-  setFields: (f: FormFieldDefinition[]) => void,
-  index: number,
-  patch: Partial<FormFieldDefinition>,
-) {
-  setFields(fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, ClipboardList, Copy, Eye, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardList, Copy, Edit2, Eye, Plus, Trash2, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -8,6 +8,7 @@ import {
   type AdmissionApplication,
   type AdmissionForm,
   type ContactEnquiry,
+  type FormFieldDefinition,
   type Program,
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
@@ -16,6 +17,7 @@ import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal } from "./ui/Modal";
+import { cleanFormFields, emptyFormField, FormFieldsEditor } from "./FormFieldsEditor";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
@@ -208,6 +210,9 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
   const { t } = useTranslation();
   const [forms, setForms] = useState<AdmissionForm[]>([]);
   const [form, setForm] = useState({ program_id: "", title: "", description: "" });
+  const [fields, setFields] = useState<FormFieldDefinition[]>([emptyFormField()]);
+  const [editing, setEditing] = useState<AdmissionForm | null>(null);
+  const [editFields, setEditFields] = useState<FormFieldDefinition[]>([]);
   const [copiedId, setCopiedId] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -259,8 +264,10 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
               program_id: form.program_id,
               title: form.title,
               description: form.description,
+              fields: cleanFormFields(fields),
             });
             setForm({ program_id: "", title: "", description: "" });
+            setFields([emptyFormField()]);
             setShowCreate(false);
             await load();
           } catch (err: any) {
@@ -277,6 +284,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
         </label>
         <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
         <label>{t("descriptionLabel")}<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
+        <FormFieldsEditor fields={fields} onChange={setFields} />
         <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("createAdmissionFormBtn")}</button></div>
       </form></Modal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
@@ -285,6 +293,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
         <div className="dataRow header">
           <span>{t("titleCol")}</span>
           <span>{t("programLabel")}</span>
+          <span>{t("fieldsCol")}</span>
           <span>{t("statusCol")}</span>
           <span></span>
         </div>
@@ -295,11 +304,24 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
           <div className="dataRow" key={adm.id}>
             <span>{adm.title}</span>
             <span>{adm.program_name ?? "—"}</span>
+            <span>{adm.fields_definition.length}</span>
             <span>{adm.is_open ? t("openLabel") : t("closedLabel")}</span>
-            <span>
+            <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="tableAction" type="button" onClick={() => void copyLink(adm)}>
                 <Copy size={14} /> {copiedId === adm.id ? t("linkCopied") : t("copyPublicLinkBtn")}
               </button>
+              {canMutate && <button
+                className="tableAction"
+                type="button"
+                aria-label={`${t("editBtn")} ${adm.title}`}
+                onClick={() => {
+                  setEditing({ ...adm });
+                  setEditFields(adm.fields_definition.map((field) => ({ ...field, options: [...field.options] })));
+                  setError("");
+                }}
+              >
+                <Edit2 size={14} /> {t("editBtn")}
+              </button>}
               {canMutate && <button
                 className="tableAction"
                 type="button"
@@ -331,6 +353,37 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
         ))}
       </div>
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
+
+      {editing && <Modal title={t("editAdmissionFormHeading")} onClose={() => setEditing(null)}>
+        <form
+          className="inlineForm"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setError("");
+            try {
+              await operationsApi.updateAdmissionForm(editing.id, {
+                title: editing.title,
+                description: editing.description,
+                fields: cleanFormFields(editFields),
+              });
+              setEditing(null);
+              await load();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedUpdateForm"));
+            }
+          }}
+        >
+          <label>{t("programLabel")}<Input disabled value={editing.program_name ?? ""} /></label>
+          <label>{t("titleLabel")}<Input required value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></label>
+          <label>{t("descriptionLabel")}<Input value={editing.description} onChange={(event) => setEditing({ ...editing, description: event.target.value })} /></label>
+          <FormFieldsEditor fields={editFields} onChange={setEditFields} />
+          {error && <p className="notice notice-warning">{error}</p>}
+          <div className="formActions">
+            <button type="button" onClick={() => setEditing(null)}>{t("cancelBtn")}</button>
+            <button className="primaryAction" type="submit">{t("saveBtn")}</button>
+          </div>
+        </form>
+      </Modal>}
     </>
   );
 }

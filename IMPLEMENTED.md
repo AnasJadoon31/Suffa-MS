@@ -729,6 +729,17 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
 - Added `test_unique_course_migration.py` to reproduce the production startup
   failure and verify the complete merge path plus index creation. Full backend
   suite: 151 tests passing.
+
+## 2026-07-20 — Public admission form builder
+
+- Public Forms now uses the same custom-field builder as internal Forms while
+  creating a form: admins can add/remove fields, choose field types, configure
+  options, and mark answers required.
+- Existing public forms can be edited without recreating their public link;
+  their title, description, and complete custom-field definition are saved.
+- The public admission page already renders these stored definitions and saves
+  submitted answers with the registration. Added a focused browser workflow
+  covering create/edit payloads and mobile modal rendering.
 # 2026-07-13 — Route-based portal isolation
 
 - Replaced persisted in-app view state with real React Router URLs for every portal page.

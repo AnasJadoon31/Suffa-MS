@@ -227,7 +227,20 @@ async def test_public_contact_and_honeypot(client, seed, db_sessionmaker):
 async def test_public_admission_form_flow(client, seed):
     created = await client.post(
         "/api/v1/operations/admission-forms",
-        json={"program_id": str(seed.program.id), "title": "Hifz admissions", "description": "2026 intake"},
+        json={
+            "program_id": str(seed.program.id),
+            "title": "Hifz admissions",
+            "description": "2026 intake",
+            "fields": [
+                {
+                    "key": "previous_school",
+                    "label": "Previous school",
+                    "type": "textarea",
+                    "required": True,
+                    "options": [],
+                }
+            ],
+        },
     )
     assert created.status_code == 200, created.text
     token = created.json()["public_token"]
@@ -236,6 +249,15 @@ async def test_public_admission_form_flow(client, seed):
     public_form = await client.get(f"/api/v1/public/admission-forms/{token}")
     assert public_form.status_code == 200
     assert public_form.json()["title"] == "Hifz admissions"
+    assert public_form.json()["fields_definition"] == [
+        {
+            "key": "previous_school",
+            "label": "Previous school",
+            "type": "textarea",
+            "required": True,
+            "options": [],
+        }
+    ]
 
     submitted = await client.post(
         f"/api/v1/public/admission-forms/{token}",
@@ -246,7 +268,8 @@ async def test_public_admission_form_flow(client, seed):
     assert submitted.json()["form_id"] == created.json()["id"]
 
     registrations = await client.get("/api/v1/operations/admissions")
-    assert any(a["applicant_name"] == "New Kid" for a in registrations.json())
+    application = next(a for a in registrations.json() if a["applicant_name"] == "New Kid")
+    assert application["extra_data"]["previous_school"] == "None"
 
     closed = await client.put(
         f"/api/v1/operations/admission-forms/{created.json()['id']}", json={"is_open": False}
