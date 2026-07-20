@@ -1,7 +1,8 @@
 from datetime import date, datetime
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 
 # ------------------------------------------------------------------ Scope
@@ -179,19 +180,42 @@ class ResourceRead(BaseModel):
 
 # ------------------------------------------------------------------ Forms
 
+FormFieldText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+FormFieldType = Literal["label", "text", "textarea", "radio", "checkbox_group", "dropdown"]
+OPTION_FIELD_TYPES = {"radio", "checkbox_group", "dropdown"}
+
+
 class FormFieldDefinition(BaseModel):
-    key: str
-    label: str
-    type: str = Field(description="label|text|textarea|radio|checkbox_group|dropdown")
+    key: FormFieldText
+    label: FormFieldText
+    type: FormFieldType
     required: bool = False
-    options: list[str] = []
+    options: list[FormFieldText] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_options(self) -> "FormFieldDefinition":
+        if self.type in OPTION_FIELD_TYPES and not self.options:
+            raise ValueError(f"{self.type} fields require at least one option")
+        if len({option.casefold() for option in self.options}) != len(self.options):
+            raise ValueError("field options must be unique")
+        return self
+
+
+def _validate_unique_field_keys(fields: list[FormFieldDefinition]) -> list[FormFieldDefinition]:
+    keys = [field.key.casefold() for field in fields]
+    if len(set(keys)) != len(keys):
+        raise ValueError("form field keys must be unique")
+    return fields
+
+
+FormFields = Annotated[list[FormFieldDefinition], AfterValidator(_validate_unique_field_keys)]
 
 
 class FormCreate(BaseModel):
     title: str
     description: str = ""
     category: str | None = None
-    fields: list[FormFieldDefinition]
+    fields: FormFields
     visibility_scope: Scope = Scope(all=True)
     open_from: datetime | None = None
     open_until: datetime | None = None
@@ -202,7 +226,7 @@ class FormUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     category: str | None = None
-    fields: list[FormFieldDefinition] | None = None
+    fields: FormFields | None = None
     visibility_scope: Scope | None = None
     open_from: datetime | None = None
     open_until: datetime | None = None
@@ -307,13 +331,13 @@ class AdmissionFormCreate(BaseModel):
     program_id: UUID
     title: str
     description: str = ""
-    fields: list[FormFieldDefinition] = []
+    fields: FormFields = Field(default_factory=list)
 
 
 class AdmissionFormUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
-    fields: list[FormFieldDefinition] | None = None
+    fields: FormFields | None = None
     is_open: bool | None = None
 
 

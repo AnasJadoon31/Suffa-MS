@@ -7,6 +7,7 @@ const viewport = process.env.TEST_VIEWPORT === "mobile"
 let createdPayload;
 let createdForm;
 let updatedPayload;
+let publicSubmission;
 
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ serviceWorkers: "block", viewport });
@@ -62,6 +63,17 @@ await context.route("**/api/v1/**", async (route) => {
     body = createdForm;
   } else if (pathname === "/api/v1/operations/admission-forms") {
     body = createdForm ? [createdForm] : [];
+  } else if (pathname === "/api/v1/public/admission-forms/public-token" && request.method() === "POST") {
+    publicSubmission = request.postDataJSON();
+    body = { id: "application-1", form_id: "form-1", ...publicSubmission };
+  } else if (pathname === "/api/v1/public/admission-forms/public-token") {
+    body = {
+      title: createdForm.title,
+      description: createdForm.description,
+      program_name: createdForm.program_name,
+      fields_definition: createdForm.fields_definition,
+      is_open: true,
+    };
   }
 
   await route.fulfill({
@@ -87,6 +99,17 @@ try {
   await dialog.getByLabel("Key", { exact: true }).fill("previous_school");
   await dialog.getByLabel("Label", { exact: true }).fill("Previous school");
   await dialog.getByLabel(/^Type/).selectOption("textarea");
+  await dialog.getByRole("button", { name: "Add field" }).click();
+  await dialog.getByLabel("Key", { exact: true }).nth(1).fill("previous_school");
+  await dialog.getByLabel("Label", { exact: true }).nth(1).fill("Preferred campus");
+  await dialog.getByLabel(/^Type/).nth(1).selectOption("radio");
+  await dialog.getByRole("button", { name: "Create form" }).click();
+  if (createdPayload) throw new Error("Option-based field was submitted without options");
+  await dialog.getByLabel(/^Options/).fill("North, South");
+  await dialog.getByRole("button", { name: "Create form" }).click();
+  await page.getByText("Each field must have a unique key.").waitFor();
+  if (createdPayload) throw new Error("Duplicate field keys were submitted");
+  await dialog.getByLabel("Key", { exact: true }).nth(1).fill("campus");
   if (process.env.TEST_SCREENSHOT) {
     await dialog.screenshot({ path: process.env.TEST_SCREENSHOT, animations: "disabled" });
   }
@@ -95,13 +118,14 @@ try {
 
   if (JSON.stringify(createdPayload?.fields) !== JSON.stringify([
     { key: "previous_school", label: "Previous school", type: "textarea", required: true, options: [] },
+    { key: "campus", label: "Preferred campus", type: "radio", required: true, options: ["North", "South"] },
   ])) {
     throw new Error(`Admission form fields were not submitted: ${JSON.stringify(createdPayload)}`);
   }
 
   await page.getByRole("button", { name: "Edit 2027 admissions" }).click();
   const editDialog = page.getByRole("dialog", { name: "Edit public form" });
-  await editDialog.getByLabel("Label", { exact: true }).fill("Previous madrasa");
+  await editDialog.getByLabel("Label", { exact: true }).first().fill("Previous madrasa");
   await editDialog.getByRole("button", { name: "Save" }).click();
   await editDialog.waitFor({ state: "hidden" });
 
@@ -109,7 +133,19 @@ try {
     throw new Error(`Admission form fields were not updated: ${JSON.stringify(updatedPayload)}`);
   }
 
-  console.log("admission form builder: create and edit payloads include configured fields");
+  await page.goto(`${baseUrl}/public/admission/public-token`, { waitUntil: "domcontentloaded" });
+  await page.getByLabel("Applicant name").fill("New Applicant");
+  await page.getByLabel("Guardian contact").fill("03001234567");
+  await page.getByLabel("Previous madrasa").fill("Suffa School");
+  await page.getByRole("radio", { name: "North" }).check();
+  await page.getByRole("button", { name: "Submit application" }).click();
+  await page.getByText("Application submitted.").waitFor();
+
+  if (publicSubmission?.extra_data?.campus !== "North") {
+    throw new Error(`Public form did not submit configured answers: ${JSON.stringify(publicSubmission)}`);
+  }
+
+  console.log("admission form builder: create, edit, render, and submit flow passed");
 } finally {
   await context.close();
   await browser.close();

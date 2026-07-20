@@ -9,7 +9,7 @@ import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal } from "./ui/Modal";
-import { cleanFormFields, emptyFormField, FormFieldsEditor } from "./FormFieldsEditor";
+import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
 
 export function FormsView() {
   const { t } = useTranslation();
@@ -91,6 +91,11 @@ export function FormsView() {
           onSubmit={async (e) => {
             e.preventDefault();
             setError("");
+            const fieldError = validateFormFields(fields);
+            if (fieldError) {
+              setError(t(fieldError));
+              return;
+            }
             const cleanFields = cleanFormFields(fields);
             if (!formTitle || cleanFields.length === 0) return;
             try {

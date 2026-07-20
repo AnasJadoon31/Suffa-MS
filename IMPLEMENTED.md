@@ -738,8 +738,11 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
 - Existing public forms can be edited without recreating their public link;
   their title, description, and complete custom-field definition are saved.
 - The public admission page already renders these stored definitions and saves
-  submitted answers with the registration. Added a focused browser workflow
-  covering create/edit payloads and mobile modal rendering.
+  submitted answers with the registration. Radio fields render as radio
+  controls, and required fields/options are enforced by both the browser and
+  the public API. Duplicate keys and choice fields without options are rejected.
+- Added a focused browser workflow covering create, edit, public rendering,
+  submission, validation, and mobile modal rendering.
 # 2026-07-13 — Route-based portal isolation
 
 - Replaced persisted in-app view state with real React Router URLs for every portal page.

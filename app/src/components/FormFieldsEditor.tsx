@@ -26,6 +26,16 @@ export function cleanFormFields(fields: FormFieldDefinition[]): FormFieldDefinit
     }));
 }
 
+export function validateFormFields(fields: FormFieldDefinition[]): "duplicateFieldKeysError" | "fieldOptionsRequiredError" | null {
+  const cleaned = cleanFormFields(fields);
+  const normalizedKeys = cleaned.map((field) => field.key.toLocaleLowerCase());
+  if (new Set(normalizedKeys).size !== normalizedKeys.length) return "duplicateFieldKeysError";
+  if (cleaned.some((field) => OPTION_FIELD_TYPES.has(field.type) && field.options.length === 0)) {
+    return "fieldOptionsRequiredError";
+  }
+  return null;
+}
+
 export function FormFieldsEditor({
   fields,
   onChange,
@@ -75,6 +85,7 @@ export function FormFieldsEditor({
               <label>
                 {t("fieldOptionsLabel")}
                 <Input
+                  required
                   value={field.options.join(", ")}
                   onChange={(event) => updateField(index, {
                     options: event.target.value.split(",").map((option) => option.trim()).filter(Boolean),

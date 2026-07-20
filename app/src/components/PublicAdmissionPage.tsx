@@ -39,6 +39,15 @@ export function PublicAdmissionPage() {
         {definition.is_open && <form className="publicAdmissionForm" onSubmit={async (event) => {
           event.preventDefault();
           setError("");
+          const missingRequired = definition.fields_definition.find((field) => {
+            if (!field.required || field.type === "label") return false;
+            const value = extra[field.key];
+            return value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
+          });
+          if (missingRequired) {
+            setError(t("requiredFieldMissingError", { field: missingRequired.label }));
+            return;
+          }
           try {
             await publicApi.submitAdmission(token, {
               applicant_name: form.applicant_name,
@@ -58,7 +67,8 @@ export function PublicAdmissionPage() {
           {definition.fields_definition.map((field) => {
             if (field.type === "label") return <p key={field.key}>{field.label}</p>;
             if (field.type === "textarea") return <label key={field.key}>{field.label}<textarea required={field.required} value={String(extra[field.key] ?? "")} onChange={(event) => setExtra({ ...extra, [field.key]: event.target.value })} /></label>;
-            if (field.type === "dropdown" || field.type === "radio") return <label key={field.key}>{field.label}<Select required={field.required} value={String(extra[field.key] ?? "")} onChange={(event) => setExtra({ ...extra, [field.key]: event.target.value })}><option value="">{t("selectEllipsis")}</option>{field.options.map((option) => <option key={option} value={option}>{option}</option>)}</Select></label>;
+            if (field.type === "dropdown") return <label key={field.key}>{field.label}<Select required={field.required} value={String(extra[field.key] ?? "")} onChange={(event) => setExtra({ ...extra, [field.key]: event.target.value })}><option value="">{t("selectEllipsis")}</option>{field.options.map((option) => <option key={option} value={option}>{option}</option>)}</Select></label>;
+            if (field.type === "radio") return <fieldset key={field.key}><legend>{field.label}</legend>{field.options.map((option) => <label className="checkboxLabel" key={option}><input type="radio" name={field.key} required={field.required} checked={extra[field.key] === option} onChange={() => setExtra({ ...extra, [field.key]: option })} />{option}</label>)}</fieldset>;
             if (field.type === "checkbox_group") return <fieldset key={field.key}><legend>{field.label}</legend>{field.options.map((option) => {
               const selected = Array.isArray(extra[field.key]) ? extra[field.key] as string[] : [];
               return <label className="checkboxLabel" key={option}><input type="checkbox" checked={selected.includes(option)} onChange={() => setExtra({ ...extra, [field.key]: selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option] })} />{option}</label>;

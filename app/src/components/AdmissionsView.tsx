@@ -17,7 +17,7 @@ import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal } from "./ui/Modal";
-import { cleanFormFields, emptyFormField, FormFieldsEditor } from "./FormFieldsEditor";
+import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
@@ -259,6 +259,11 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
         onSubmit={async (e) => {
           e.preventDefault();
           setError("");
+          const fieldError = validateFormFields(fields);
+          if (fieldError) {
+            setError(t(fieldError));
+            return;
+          }
           try {
             await operationsApi.createAdmissionForm({
               program_id: form.program_id,
@@ -360,6 +365,11 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
           onSubmit={async (event) => {
             event.preventDefault();
             setError("");
+            const fieldError = validateFormFields(editFields);
+            if (fieldError) {
+              setError(t(fieldError));
+              return;
+            }
             try {
               await operationsApi.updateAdmissionForm(editing.id, {
                 title: editing.title,

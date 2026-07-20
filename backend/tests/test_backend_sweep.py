@@ -238,7 +238,21 @@ async def test_public_admission_form_flow(client, seed):
                     "type": "textarea",
                     "required": True,
                     "options": [],
-                }
+                },
+                {
+                    "key": "campus",
+                    "label": "Preferred campus",
+                    "type": "radio",
+                    "required": True,
+                    "options": ["North", "South"],
+                },
+                {
+                    "key": "activities",
+                    "label": "Activities",
+                    "type": "checkbox_group",
+                    "required": True,
+                    "options": ["Hifz", "Sports"],
+                },
             ],
         },
     )
@@ -256,13 +270,49 @@ async def test_public_admission_form_flow(client, seed):
             "type": "textarea",
             "required": True,
             "options": [],
-        }
+        },
+        {
+            "key": "campus",
+            "label": "Preferred campus",
+            "type": "radio",
+            "required": True,
+            "options": ["North", "South"],
+        },
+        {
+            "key": "activities",
+            "label": "Activities",
+            "type": "checkbox_group",
+            "required": True,
+            "options": ["Hifz", "Sports"],
+        },
     ]
+
+    missing_required = await client.post(
+        f"/api/v1/public/admission-forms/{token}",
+        json={"applicant_name": "Missing Answer", "guardian_contact": "+92310"},
+    )
+    assert missing_required.status_code == 422
+    assert "previous_school" in missing_required.json()["detail"]
+
+    invalid_option = await client.post(
+        f"/api/v1/public/admission-forms/{token}",
+        json={
+            "applicant_name": "Invalid Choice",
+            "guardian_contact": "+92310",
+            "extra_data": {
+                "previous_school": "None",
+                "campus": "West",
+                "activities": ["Hifz"],
+            },
+        },
+    )
+    assert invalid_option.status_code == 422
+    assert "campus" in invalid_option.json()["detail"]
 
     submitted = await client.post(
         f"/api/v1/public/admission-forms/{token}",
         json={"applicant_name": "New Kid", "guardian_contact": "+92311", "date_of_birth": "2016-01-05",
-              "extra_data": {"previous_school": "None"}},
+              "extra_data": {"previous_school": "None", "campus": "North", "activities": ["Hifz"]}},
     )
     assert submitted.status_code == 200
     assert submitted.json()["form_id"] == created.json()["id"]
@@ -270,6 +320,7 @@ async def test_public_admission_form_flow(client, seed):
     registrations = await client.get("/api/v1/operations/admissions")
     application = next(a for a in registrations.json() if a["applicant_name"] == "New Kid")
     assert application["extra_data"]["previous_school"] == "None"
+    assert application["extra_data"]["activities"] == ["Hifz"]
 
     closed = await client.put(
         f"/api/v1/operations/admission-forms/{created.json()['id']}", json={"is_open": False}
@@ -280,6 +331,33 @@ async def test_public_admission_form_flow(client, seed):
         json={"applicant_name": "Late Kid", "guardian_contact": "+92312"},
     )
     assert rejected.status_code == 403
+
+
+async def test_admission_form_rejects_invalid_custom_field_definitions(client, seed):
+    missing_options = await client.post(
+        "/api/v1/operations/admission-forms",
+        json={
+            "program_id": str(seed.program.id),
+            "title": "Missing choices",
+            "fields": [
+                {"key": "campus", "label": "Campus", "type": "dropdown", "options": []}
+            ],
+        },
+    )
+    assert missing_options.status_code == 422
+
+    duplicate_keys = await client.post(
+        "/api/v1/operations/admission-forms",
+        json={
+            "program_id": str(seed.program.id),
+            "title": "Duplicate answers",
+            "fields": [
+                {"key": "school", "label": "School", "type": "text"},
+                {"key": " school ", "label": "Previous school", "type": "text"},
+            ],
+        },
+    )
+    assert duplicate_keys.status_code == 422
 
 
 async def test_blog_update_and_delete(client, seed):
