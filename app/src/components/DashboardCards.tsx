@@ -36,7 +36,7 @@ function QuickLinks({ onNavigate }: Readonly<{ onNavigate?: (view: ViewId) => vo
   if (!onNavigate) return null;
   const priorityViews: ViewId[] = ["attendance", "timetable", "announcements", "assessments", "people", "finance"];
   const visible = navItems.filter(
-    (item) => item.id !== "dashboard" && isNavItemAccessible(item, user?.role, hasPermission, hasFeature),
+    (item) => item.id !== "dashboard" && isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment),
   ).sort((a, b) => priorityViews.indexOf(a.id) - priorityViews.indexOf(b.id))
     .filter((item) => priorityViews.includes(item.id));
   return (

@@ -255,7 +255,7 @@ function AssignmentsTab({
       </div>
 
       {showCreate && canCreate && (
-        <AssignmentCreateForm
+        <Modal title={t("createAssignmentBtn")} onClose={() => setShowCreate(false)}><AssignmentCreateForm
           classes={classes}
           courses={courses}
           teacherSlots={teacherSlots}
@@ -264,7 +264,7 @@ function AssignmentsTab({
             setShowCreate(false);
             void load();
           }}
-        />
+        /></Modal>
       )}
 
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
@@ -337,14 +337,14 @@ function AssignmentsTab({
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {editing && (
-        <AssignmentEditForm
+        <Modal title={t("editAssignmentHeading", { title: editing.title })} onClose={() => setEditing(null)}><AssignmentEditForm
           assignment={editing}
           onDone={() => {
             setEditing(null);
             void load();
           }}
           onCancel={() => setEditing(null)}
-        />
+        /></Modal>
       )}
 
       {selected && (
@@ -771,11 +771,7 @@ function GradingSetup({
   canCreateExamType,
 }: Readonly<{ courses: Course[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
   const { t } = useTranslation();
-  const defaultBands = [
-    { label: "Mumtaz", min_score: 90, max_score: 100 },
-    { label: "Jayyid", min_score: 60, max_score: 89.99 },
-    { label: "Rasib", min_score: 0, max_score: 59.99 },
-  ];
+  const defaultBands: GradingScheme["bands"] = [];
   const [schemes, setSchemes] = useState<GradingScheme[]>([]);
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
   const [schemeForm, setSchemeForm] = useState({ name: "", bands: defaultBands });
@@ -831,13 +827,13 @@ function GradingSetup({
           <strong>{t("bandsLabel")}</strong>
           {schemeForm.bands.map((band, index) => <div className="inlineForm" style={{ margin: 0 }} key={index}>
             <label>{t("nameLabel")}<Input required value={band.label} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /></label>
-            <label>Min<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: Number(event.target.value) } : item) })} /></label>
-            <label>Max<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: Number(event.target.value) } : item) })} /></label>
+            <label>{t("minimumLabel")}<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: Number(event.target.value) } : item) })} /></label>
+            <label>{t("maximumLabel")}<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: Number(event.target.value) } : item) })} /></label>
             <button className="tableAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={14} /></button>
           </div>)}
           <button className="secondaryAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: [...schemeForm.bands, { label: "", min_score: 0, max_score: 100 }] })}><Plus size={14} /> {t("addFieldBtn")}</button>
         </div>
-        <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addSchemeBtn")}</button></div>
+        <div className="formActions"><button className="primaryAction" type="submit" disabled={schemeForm.bands.length === 0}><Plus size={16} /> {t("addSchemeBtn")}</button></div>
       </form></Modal>}
       <div className="dataTable">
         <div className="dataRow header"><span>{t("schemeCol")}</span><span>{t("bandsCol")}</span><span>{t("actionsCol")}</span></div>

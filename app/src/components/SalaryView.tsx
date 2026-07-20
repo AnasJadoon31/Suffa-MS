@@ -10,6 +10,7 @@ import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 /** Read-only self-view for teachers without teachers.salary.manage — own
  * salary record + payment history only, no ability to browse other teachers. */
@@ -77,6 +78,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const [notice, setNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [editModal, setEditModal] = useState<"salary" | "payment" | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -163,7 +165,8 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
 
       {teacherId && (
         <>
-          {canWrite && <form
+          {canWrite && <div className="formActions"><button className="primaryAction" type="button" onClick={() => setEditModal("salary")}><Plus size={16} /> {t("saveSalaryBtn")}</button><button className="primaryAction" type="button" onClick={() => setEditModal("payment")}><Plus size={16} /> {t("recordSalaryBtn")}</button></div>}
+          {canWrite && editModal === "salary" && <Modal title={t("saveSalaryBtn")} onClose={() => setEditModal(null)}><form
             className="inlineForm"
             onSubmit={async (e) => {
               e.preventDefault();
@@ -174,6 +177,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
                 const updated = await financeApi.setSalary(teacherId, { amount: Number(salaryForm.amount), effective_from: salaryForm.effective_from });
                 setRecord(updated);
                 setNotice(t("salarySaved"));
+                setEditModal(null);
               } catch (err: any) {
                 setError(err.response?.data?.detail ?? t("failedSaveSalary"));
               }
@@ -182,14 +186,14 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
             <label>{t("monthlyAmountLabel")}<Input required type="number" min={0} value={salaryForm.amount} onChange={(e) => setSalaryForm({ ...salaryForm, amount: e.target.value })} placeholder={record ? String(record.amount) : ""} /></label>
             <label>{t("effectiveFromLabel")}<Input required type="date" value={salaryForm.effective_from} onChange={(e) => setSalaryForm({ ...salaryForm, effective_from: e.target.value })} /></label>
             <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("saveSalaryBtn")}</button></div>
-          </form>}
+          </form></Modal>}
           {record && (
             <p className="notice">{t("currentSalaryLine", { currency: record.currency, amount: record.amount, date: record.effective_from })}</p>
           )}
           {notice && <p className="notice">{notice}</p>}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
-          {canWrite && <form
+          {canWrite && editModal === "payment" && <Modal title={t("recordSalaryBtn")} onClose={() => setEditModal(null)}><form
             className="inlineForm"
             style={{ marginTop: 16 }}
             onSubmit={async (e) => {
@@ -202,6 +206,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
                   amount: Number(amount), payment_date, period_covered, method, note: paymentForm.note || undefined,
                 });
                 setPaymentForm({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
+                setEditModal(null);
                 setPayments(await financeApi.listSalaryPayments(teacherId));
               } catch (err: any) {
                 setError(err.response?.data?.detail ?? t("failedRecordPayment"));
@@ -221,7 +226,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
             </label>
             <label>{t("notesLabel")}<Input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} /></label>
             <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordSalaryBtn")}</button></div>
-          </form>}
+          </form></Modal>}
 
           <div className="dataTable">
             <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span></div>

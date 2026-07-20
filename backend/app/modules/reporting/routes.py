@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.error_codes import ErrorCode
 from app.core.pdf import load_report_branding, render_table_pdf
 from app.core.teaching_scope import taught_pairs, teacher_teaches
 from app.db.core_models import AuditLog
@@ -444,7 +445,7 @@ async def _require_teacher_report_scope(
         return
     teacher = await _teacher_profile(session, current_user)
     if teacher is None or section_id is None:
-        raise HTTPException(status_code=403, detail="Choose one of your assigned sections")
+        raise HTTPException(status_code=403, detail=ErrorCode.REPORT_SECTION_REQUIRED)
     if not await teacher_teaches(
         session,
         madrasa_id=madrasa_id,
@@ -453,7 +454,7 @@ async def _require_teacher_report_scope(
         class_id=class_id,
         section_id=section_id,
     ):
-        raise HTTPException(status_code=403, detail="Report access is not assigned for this section")
+        raise HTTPException(status_code=403, detail=ErrorCode.REPORT_SECTION_NOT_ASSIGNED)
 
 
 @router.get("/reports/attendance")

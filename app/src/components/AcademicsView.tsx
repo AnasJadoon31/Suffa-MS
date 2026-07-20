@@ -16,6 +16,7 @@ import { RolloverWizard } from "./RolloverWizard";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 
 export type AcademicTab = "programs" | "classes" | "courses" | "sessions";
@@ -41,6 +42,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
   const [courseMapModalClassId, setCourseMapModalClassId] = useState<string | null>(null);
   const [sessionForm, setSessionForm] = useState({ name: "", gregorian_start: "", gregorian_end: "", hijri_span: "" });
   const [rolloverSourceSession, setRolloverSourceSession] = useState<AcademicSession | null>(null);
+  const [createModal, setCreateModal] = useState<"program" | "class" | "section" | "course" | "session" | null>(null);
 
   const activeTab = tab;
 
@@ -109,7 +111,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
 
   const handleError = (e: unknown) => {
     if (axios.isAxiosError(e) && e.response?.status === 409) {
-      alert(e.response.data.detail || t("recordInUseError"));
+      alert(e.response.data.detail === "course_name_exists" ? t("courseNameExists") : (e.response.data.detail || t("recordInUseError")));
     } else {
       console.error(e);
       alert(t("genericError"));
@@ -188,12 +190,14 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "programs" && (
             <>
               <h3>{t("programsHeading")}</h3>
-              <form
+              <button className="primaryAction" type="button" onClick={() => setCreateModal("program")}><Plus size={16} /> {t("addProgramBtn")}</button>
+              {createModal === "program" && <Modal title={t("addProgramBtn")} onClose={() => setCreateModal(null)}><form
                 className="inlineForm"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   await academicsApi.createProgram(programName);
                   setProgramName("");
+                  setCreateModal(null);
                   await refreshAll();
                 }}
               >
@@ -204,14 +208,14 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addProgramBtn")}</button>
                 </div>
-              </form>
+              </form></Modal>}
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("actionsCol")}</span></div>
                 {programs.length === 0 && <p className="emptyState">{t("noProgramsYet")}</p>}
                 {programs.map((p) => (
                   <div className="dataRow" key={p.id}>
                     {editingProgram?.id === p.id ? (
-                      <form style={{ display: "contents" }} onSubmit={async (e) => {
+                      <Modal title={t("editBtn")} onClose={() => setEditingProgram(null)}><form className="inlineForm" onSubmit={async (e) => {
                         e.preventDefault();
                         try {
                           await academicsApi.updateProgram(p.id, { name: editingProgram.name });
@@ -226,7 +230,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
                           <button className="tableAction" type="button" onClick={() => setEditingProgram(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
                         </span>
-                      </form>
+                      </form></Modal>
                     ) : (
                       <>
                         <span>{p.name}</span>
@@ -245,7 +249,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "classes" && (
             <>
               <h3>{t("classesHeading")}</h3>
-              <form
+              <button className="primaryAction" type="button" onClick={() => setCreateModal("class")}><Plus size={16} /> {t("addClassBtn")}</button>
+              {createModal === "class" && <Modal title={t("addClassBtn")} onClose={() => setCreateModal(null)}><form
                 className="inlineForm"
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -253,6 +258,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                   await academicsApi.createClass(classProgramId, className, classPortalEnabled);
                   setClassName("");
                   setClassPortalEnabled(true);
+                  setCreateModal(null);
                   await refreshAll();
                 }}
               >
@@ -274,7 +280,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addClassBtn")}</button>
                 </div>
-              </form>
+              </form></Modal>}
               <div className="moduleToolbar">
                 <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={classSearch} onChange={(e) => setClassSearch(e.target.value)} />
                 <Select value={classFilterProgram} onChange={(e) => setClassFilterProgram(e.target.value)}>
@@ -292,7 +298,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 {classesToShow.map((c) => (
                   <div className="dataRow" key={c.id}>
                     {editingClass?.id === c.id ? (
-                      <form style={{ display: "contents" }} onSubmit={async (e) => {
+                      <Modal title={t("editBtn")} onClose={() => setEditingClass(null)}><form className="inlineForm" onSubmit={async (e) => {
                         e.preventDefault();
                         try {
                           await academicsApi.updateClass(c.id, {
@@ -326,7 +332,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
                           <button className="tableAction" type="button" onClick={() => setEditingClass(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
                         </span>
-                      </form>
+                      </form></Modal>
                     ) : (
                       <>
                         <span>{c.name}</span>
@@ -347,12 +353,14 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "courses" && (
             <>
               <h3>{t("coursesHeading")}</h3>
-              <form
+              <button className="primaryAction" type="button" onClick={() => setCreateModal("course")}><Plus size={16} /> {t("addCourseBtn")}</button>
+              {createModal === "course" && <Modal title={t("addCourseBtn")} onClose={() => setCreateModal(null)}><form
                 className="inlineForm"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   await academicsApi.createCourse(courseName);
                   setCourseName("");
+                  setCreateModal(null);
                   await refreshAll();
                 }}
               >
@@ -363,14 +371,14 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addCourseBtn")}</button>
                 </div>
-              </form>
+              </form></Modal>}
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("actionsCol")}</span></div>
                 {allCourses.length === 0 && <p className="emptyState">{t("noCoursesYet")}</p>}
                 {allCourses.map((c) => (
                   <div className="dataRow" key={c.id}>
                     {editingCourse?.id === c.id ? (
-                      <form style={{ display: "contents" }} onSubmit={async (e) => {
+                      <Modal title={t("editBtn")} onClose={() => setEditingCourse(null)}><form className="inlineForm" onSubmit={async (e) => {
                         e.preventDefault();
                         try {
                           await academicsApi.updateCourse(c.id, { name: editingCourse.name });
@@ -385,7 +393,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
                           <button className="tableAction" type="button" onClick={() => setEditingCourse(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
                         </span>
-                      </form>
+                      </form></Modal>
                     ) : (
                       <>
                         <span>{c.name}</span>
@@ -404,13 +412,15 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "classes" && (
             <>
               <h3 style={{ marginTop: 24 }}>{t("sectionsCoursesHeading")}</h3>
-              <form
+              <button className="primaryAction" type="button" onClick={() => setCreateModal("section")}><Plus size={16} /> {t("addSectionBtn")}</button>
+              {createModal === "section" && <Modal title={t("addSectionBtn")} onClose={() => setCreateModal(null)}><form
                 className="inlineForm"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   if (!sectionClassId) return;
                   await academicsApi.createSection(sectionClassId, sectionName);
                   setSectionName("");
+                  setCreateModal(null);
                   await refreshAll();
                 }}
               >
@@ -428,7 +438,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSectionBtn")}</button>
                 </div>
-              </form>
+              </form></Modal>}
               <div className="moduleToolbar">
                 <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={courseMapSearch} onChange={(e) => setCourseMapSearch(e.target.value)} />
                 <Select value={courseMapFilterClass} onChange={(e) => setCourseMapFilterClass(e.target.value)}>
@@ -446,7 +456,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                       {(sections[c.id] ?? []).map((s) => (
                         <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           {editingSection?.id === s.id ? (
-                            <form style={{ display: "flex", gap: "8px", alignItems: "center" }} onSubmit={async (e) => {
+                            <Modal title={t("editBtn")} onClose={() => setEditingSection(null)}><form className="inlineForm" onSubmit={async (e) => {
                               e.preventDefault();
                               try {
                                 await academicsApi.updateSection(c.id, s.id, { name: editingSection.name });
@@ -457,7 +467,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               <Input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} style={{ padding: "4px 8px", minHeight: "30px", width: "120px" }} />
                               <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
                               <button className="tableAction" type="button" onClick={() => setEditingSection(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
-                            </form>
+                            </form></Modal>
                           ) : (
                             <>
                               <span>{s.name}</span>
@@ -495,12 +505,14 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
           {!isLoading && !loadError && activeTab === "sessions" && (
             <>
               <h3>{t("sessionsHeading")}</h3>
-              <form
+              <button className="primaryAction" type="button" onClick={() => setCreateModal("session")}><Plus size={16} /> {t("addSessionBtn")}</button>
+              {createModal === "session" && <Modal title={t("addSessionBtn")} onClose={() => setCreateModal(null)}><form
                 className="inlineForm"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   await academicsApi.createSession(sessionForm);
                   setSessionForm({ name: "", gregorian_start: "", gregorian_end: "", hijri_span: "" });
+                  setCreateModal(null);
                   await refreshAll();
                 }}
               >
@@ -511,14 +523,14 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 <div className="formActions">
                   <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSessionBtn")}</button>
                 </div>
-              </form>
+              </form></Modal>}
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("spanCol")}</span><span>{t("activeCol")}</span><span>{t("actionsCol")}</span></div>
                 {sessions.length === 0 && <p className="emptyState">{t("noSessionsYet")}</p>}
                 {sessions.map((s) => (
                   <div className="dataRow" key={s.id}>
                     {editingSession?.id === s.id ? (
-                      <form style={{ display: "contents" }} onSubmit={async (e) => {
+                      <Modal title={t("editBtn")} onClose={() => setEditingSession(null)}><form className="inlineForm" onSubmit={async (e) => {
                         e.preventDefault();
                         try {
                           await academicsApi.updateSession(s.id, {
@@ -544,7 +556,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</button>
                           <button className="tableAction" type="button" onClick={() => setEditingSession(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</button>
                         </span>
-                      </form>
+                      </form></Modal>
                     ) : (
                       <>
                         <span>{s.name}</span>

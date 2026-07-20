@@ -8,6 +8,7 @@ import { RichTextEditor } from "./RichTextEditor";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 
 function toScope(audience: string): Scope {
@@ -42,6 +43,7 @@ export function AnnouncementsView() {
   const [dates, setDates] = useState({ date_from: "", date_to: "" });
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
 
   const knownCategories = useMemo(
     () => [...new Set(announcements.map((a) => a.category).filter(Boolean))] as string[],
@@ -85,6 +87,7 @@ export function AnnouncementsView() {
         expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : undefined,
       });
       setForm({ title: "", body: "", category: "", attachment_link: "", audience: "all", publish_at: "", expires_at: "" });
+      setShowCreate(false);
       await load();
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedPostAnnouncement"));
@@ -142,8 +145,9 @@ export function AnnouncementsView() {
         <p className="notice">{t("announcementsSubtitle")}</p>
       </div>
 
-      {canPost && (
-        <form className="inlineForm" onSubmit={handleCreate}>
+      {canPost && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("postAnnouncementBtn")}</button>}
+      {canPost && showCreate && (
+        <Modal title={t("postAnnouncementBtn")} onClose={() => setShowCreate(false)}><form className="inlineForm" onSubmit={handleCreate}>
           <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
           <label>{t("targetAudienceLabel")}
             <Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
@@ -169,7 +173,7 @@ export function AnnouncementsView() {
           <div className="formActions">
             <button className="primaryAction" type="submit"><Plus size={16} /> {t("postAnnouncementBtn")}</button>
           </div>
-        </form>
+        </form></Modal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <datalist id="announcement-categories">

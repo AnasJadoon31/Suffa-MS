@@ -94,7 +94,7 @@ class GradeBand(BaseModel):
 
 class GradingSchemeCreate(BaseModel):
     name: str
-    bands: list[GradeBand]
+    bands: list[GradeBand] = Field(min_length=1)
 
 
 class GradingSchemeUpdate(BaseModel):

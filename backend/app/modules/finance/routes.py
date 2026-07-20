@@ -99,14 +99,20 @@ async def _receipt_context(
 async def _receipt_response(
     session: AsyncSession, madrasa: Madrasa, context: dict[str, str], note: str | None
 ) -> Response:
-    pdf_bytes = render_receipt_pdf(
-        **context, note=note, branding=await load_report_branding(session, madrasa)
-    )
+    pdf_bytes = await _receipt_pdf_bytes(session, madrasa, context, note)
     filename = f"receipt-{context['receipt_number'].lower()}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+async def _receipt_pdf_bytes(
+    session: AsyncSession, madrasa: Madrasa, context: dict[str, str], note: str | None
+) -> bytes:
+    return render_receipt_pdf(
+        **context, note=note, branding=await load_report_branding(session, madrasa)
     )
 
 
@@ -249,11 +255,7 @@ async def share_payment_receipt(
     context = await _receipt_context(
         session, madrasa, kind="Contribution", row=payment, payer_name=student.name if student else "—"
     )
-    receipt_pdf = render_receipt_pdf(
-        **context,
-        note=payment.note,
-        branding=await load_report_branding(session, madrasa),
-    )
+    receipt_pdf = await _receipt_pdf_bytes(session, madrasa, context, payment.note)
     return await render_and_dispatch(
         session,
         madrasa=madrasa,
@@ -398,11 +400,7 @@ async def share_donation_receipt(
     if donor is None:
         raise HTTPException(status_code=404, detail="Donor not found")
     context = await _receipt_context(session, madrasa, kind="Donation", row=donation, payer_name=donor.name)
-    receipt_pdf = render_receipt_pdf(
-        **context,
-        note=donation.note,
-        branding=await load_report_branding(session, madrasa),
-    )
+    receipt_pdf = await _receipt_pdf_bytes(session, madrasa, context, donation.note)
     return await render_and_dispatch(
         session,
         madrasa=madrasa,

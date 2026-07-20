@@ -1,5 +1,12 @@
 """Regression checks for the teacher/admin issues reported in Issues.pdf."""
 
+import pytest
+from fastapi import HTTPException
+from sqlalchemy import func, select
+
+from app.core.config import settings
+from app.modules.messaging.models import MessageLog, MessageTemplate
+from app.modules.messaging.routes import render_and_dispatch
 from app.modules.auth.models import UserPermission
 
 
@@ -68,6 +75,10 @@ async def test_walk_in_admission_requires_admissions_permission(teacher_client, 
 
 
 async def test_teacher_attendance_is_section_scoped(teacher_client, client, seed):
+    profile = await teacher_client.get("/api/v1/auth/me")
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["has_teaching_assignment"] is True
+
     choices = await teacher_client.get("/api/v1/attendance/classes")
     assert choices.status_code == 200, choices.text
     assert [row["id"] for row in choices.json()] == [str(seed.class_a.id)]
@@ -90,6 +101,17 @@ async def test_teacher_attendance_is_section_scoped(teacher_client, client, seed
     )
     assert denied.status_code == 403
 
+    unscoped_history = await teacher_client.get(
+        f"/api/v1/attendance/classes/{seed.class_a.id}/history"
+    )
+    assert unscoped_history.status_code == 403
+
+    assigned_history = await teacher_client.get(
+        f"/api/v1/attendance/classes/{seed.class_a.id}/history",
+        params={"section_id": str(seed.sections.a1.id)},
+    )
+    assert assigned_history.status_code == 200, assigned_history.text
+
     principal = await client.get("/api/v1/attendance/classes")
     principal_class = next(row for row in principal.json() if row["id"] == str(seed.class_a.id))
     assert {section["id"] for section in principal_class["sections"]} == {
@@ -103,7 +125,7 @@ async def test_course_names_are_unique_per_madrasa(client):
 
     duplicate = await client.post("/api/v1/academics/courses", json={"name": "  tajWEED  "})
     assert duplicate.status_code == 409
-    assert "already exists" in duplicate.json()["detail"].lower()
+    assert duplicate.json()["detail"] == "course_name_exists"
 
 
 async def test_grading_scheme_and_exam_type_can_be_edited_and_deleted(client, seed):
@@ -144,3 +166,35 @@ async def test_grading_scheme_and_exam_type_can_be_edited_and_deleted(client, se
     assert deleted_exam.status_code == 200, deleted_exam.text
     deleted_scheme = await client.delete(f"/api/v1/assessments/grading-schemes/{scheme_id}")
     assert deleted_scheme.status_code == 200, deleted_scheme.text
+
+
+async def test_whatsapp_pdf_requires_direct_delivery_and_does_not_false_log(
+    db_sessionmaker, seed, monkeypatch,
+):
+    monkeypatch.setattr(settings, "evolution_api_url", "")
+    monkeypatch.setattr(settings, "evolution_api_key", "")
+    monkeypatch.setattr(settings, "evolution_instance", "")
+    async with db_sessionmaker() as db:
+        db.add(MessageTemplate(
+            madrasa_id=seed.madrasa.id,
+            code="test_pdf",
+            name="Test PDF",
+            content={"en": "Report for {name}"},
+        ))
+        await db.commit()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await render_and_dispatch(
+                db,
+                madrasa=seed.madrasa,
+                current_user=seed.principal,
+                template_code="test_pdf",
+                language="en",
+                variables={"name": "Student"},
+                recipient_type="teacher",
+                recipient_id=seed.teacher.id,
+                phone_number=seed.teacher.whatsapp_number,
+                attachment_bytes=b"%PDF-test",
+            )
+        assert exc_info.value.status_code == 503
+        assert await db.scalar(select(func.count()).select_from(MessageLog)) == 0

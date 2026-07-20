@@ -23,6 +23,7 @@ import { LoadingState } from "./ui/AsyncState";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { DelegateModal } from "./DelegateButton";
+import { Modal } from "./ui/Modal";
 
 function SendCredentialsButton({
   subjectType,
@@ -249,7 +250,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
       </div>
 
       {showCreate && canCreate && (
-        <form className="inlineForm" onSubmit={onSubmit}>
+        <Modal title={t("addTeacherBtn")} onClose={() => setShowCreate(false)}><form className="inlineForm" onSubmit={onSubmit}>
           <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
           <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
           <label>{t("whatsappNumberLabel")}<Input value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} /></label>
@@ -261,7 +262,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           <div className="formActions">
             <button className="primaryAction" type="submit"><UserPlus size={16} /> {t("addTeacherBtn")}</button>
           </div>
-        </form>
+        </form></Modal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -296,7 +297,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
       </div>
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
-      {detail && <TeacherDetail teacher={detail} canSalary={canSalary} onClose={() => setDetail(null)} />}
+      {detail && <Modal title={detail.name} onClose={() => setDetail(null)}><TeacherDetail teacher={detail} canSalary={canSalary} onClose={() => setDetail(null)} /></Modal>}
     </>
   );
 }
@@ -519,7 +520,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
       </div>
 
       {showCreate && canCreate && (
-        <form className="inlineForm" onSubmit={onSubmit}>
+        <Modal title={t("addStudentBtn")} onClose={() => setShowCreate(false)}><form className="inlineForm" onSubmit={onSubmit}>
           <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
           <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
           <label>{t("dobLabel")}<Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
@@ -528,7 +529,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           <div className="formActions">
             <button className="primaryAction" type="submit"><UserPlus size={16} /> {t("addStudentBtn")}</button>
           </div>
-        </form>
+        </form></Modal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -565,7 +566,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
       </div>
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
-      {detail && <StudentDetail student={detail} canFinance={canFinance} onClose={() => setDetail(null)} />}
+      {detail && <Modal title={detail.name} onClose={() => setDetail(null)}><StudentDetail student={detail} canFinance={canFinance} onClose={() => setDetail(null)} /></Modal>}
     </>
   );
 }
@@ -681,6 +682,7 @@ function GuardiansTab({
   const [form, setForm] = useState({ name: "", relationship: "", phone_numbers: "", cnic: "", address: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
@@ -725,8 +727,9 @@ function GuardiansTab({
 
   return (
     <>
-      {canCreate && (
-        <form
+      {canCreate && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><UserPlus size={16} /> {t("addGuardianBtn")}</button>}
+      {canCreate && showCreate && (
+        <Modal title={t("addGuardianBtn")} onClose={() => setShowCreate(false)}><form
           className="inlineForm"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -740,6 +743,7 @@ function GuardiansTab({
                 address: form.address || undefined,
               });
               setForm({ name: "", relationship: "", phone_numbers: "", cnic: "", address: "" });
+              setShowCreate(false);
               await load();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedCreateGuardian"));
@@ -752,7 +756,7 @@ function GuardiansTab({
           <label>{t("cnicLabel")}<Input value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} /></label>
           <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><UserPlus size={16} /> {t("addGuardianBtn")}</button></div>
-        </form>
+        </form></Modal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -836,7 +840,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
       </div>
 
       {selected && (
-        <div className="modulePanel detailPanel">
+        <Modal title={selected.name} onClose={() => setSelected(null)}><div className="modulePanel detailPanel">
           <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between" }}>
             <h3>{selected.name}</h3>
             <button className="tableAction" type="button" onClick={() => setSelected(null)}><X size={16} /></button>
@@ -884,7 +888,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
             <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addDonationBtn")}</button></div>
           </form>}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-        </div>
+        </div></Modal>
       )}
     </>
   );

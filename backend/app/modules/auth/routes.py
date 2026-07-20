@@ -24,7 +24,8 @@ from app.db.session import get_session
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
 from app.modules.auth.service import UsernameTakenError, provision_login
 from app.modules.academics.models import AcademicClass, AcademicSession, Madrasa, Section
-from app.modules.operations.models import MadrasaSetting
+from app.modules.operations.models import MadrasaSetting, TimetableSlot
+from app.modules.people.models import TeacherProfile
 from app.modules.auth.schemas import (
     ChangePasswordRequest,
     LoginRequest,
@@ -127,6 +128,19 @@ async def get_me(
             )
         )
     ).all()
+    has_teaching_assignment = False
+    if current_user.role == UserRole.teacher:
+        has_teaching_assignment = await session.scalar(
+            select(TimetableSlot.id)
+            .join(TeacherProfile, TeacherProfile.id == TimetableSlot.teacher_id)
+            .join(AcademicSession, AcademicSession.id == TimetableSlot.session_id)
+            .where(
+                TimetableSlot.madrasa_id == madrasa.id,
+                TeacherProfile.user_id == current_user.id,
+                AcademicSession.is_active.is_(True),
+            )
+            .limit(1)
+        ) is not None
 
     return CurrentUserResponse(
         user=UserRead.model_validate(current_user),
@@ -134,6 +148,7 @@ async def get_me(
         permissions=permissions,
         features=await get_enabled_features(madrasa.id, session),
         branding={key: value for key, value in profile_rows},
+        has_teaching_assignment=has_teaching_assignment,
     )
 
 

@@ -13,6 +13,7 @@ from app.core.dependencies import (
     require_permission,
 )
 from app.core.hijri import to_hijri_string
+from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.auth.models import User, UserRole
@@ -51,6 +52,21 @@ from app.modules.academics.schemas import (
 )
 
 router = APIRouter()
+
+
+async def _assert_course_name_available(
+    session: AsyncSession, madrasa_id: UUID, name: str, *, exclude_id: UUID | None = None
+) -> str:
+    normalized_name = name.strip()
+    stmt = select(Course.id).where(
+        Course.madrasa_id == madrasa_id,
+        func.lower(func.trim(Course.name)) == normalized_name.lower(),
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(Course.id != exclude_id)
+    if await session.scalar(stmt.limit(1)) is not None:
+        raise HTTPException(status_code=409, detail=ErrorCode.COURSE_NAME_EXISTS)
+    return normalized_name
 
 
 @router.get("/today")
@@ -330,15 +346,7 @@ async def create_course(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> CourseRead:
-    name = payload.name.strip()
-    duplicate = await session.scalar(
-        select(Course.id).where(
-            Course.madrasa_id == madrasa.id,
-            func.lower(func.trim(Course.name)) == name.lower(),
-        ).limit(1)
-    )
-    if duplicate is not None:
-        raise HTTPException(status_code=409, detail="A course with this name already exists")
+    name = await _assert_course_name_available(session, madrasa.id, payload.name)
     course = Course(madrasa_id=madrasa.id, name=name)
     session.add(course)
     await session.commit()
@@ -373,16 +381,9 @@ async def update_course(
         raise HTTPException(status_code=404, detail="Course not found")
     
     if payload.name is not None:
-        name = payload.name.strip()
-        duplicate = await session.scalar(
-            select(Course.id).where(
-                Course.madrasa_id == madrasa.id,
-                Course.id != course_id,
-                func.lower(func.trim(Course.name)) == name.lower(),
-            ).limit(1)
+        name = await _assert_course_name_available(
+            session, madrasa.id, payload.name, exclude_id=course_id
         )
-        if duplicate is not None:
-            raise HTTPException(status_code=409, detail="A course with this name already exists")
         course.name = name
         
     await session.commit()

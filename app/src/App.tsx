@@ -86,9 +86,9 @@ function Workspace() {
 
   const navigateToView = (view: ViewId) => {
     const item = navItems.find((candidate) => candidate.id === view);
-    if (!item || !isNavItemAccessible(item, user?.role, hasPermission, hasFeature)) return;
+    if (!item || !isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment)) return;
     setNavOpen(false);
-    navigate(resolveNavItemPath(item, user?.role, hasPermission, hasFeature));
+    navigate(resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment));
   };
 
   useEffect(() => {
@@ -291,7 +291,7 @@ function Workspace() {
               <Route
                 key={route.key}
                 path={route.path}
-                element={isPortalRouteAccessible(route, user?.role, hasPermission, hasFeature) ? renderRoute(route) : <NotFoundView />}
+                element={isPortalRouteAccessible(route, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment) ? renderRoute(route) : <NotFoundView />}
               />
             ))}
             <Route path="*" element={<NotFoundView />} />

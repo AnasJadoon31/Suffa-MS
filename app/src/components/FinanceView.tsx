@@ -10,6 +10,7 @@ import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 
 export type FinanceTab = "contributions" | "donations" | "summary";
@@ -24,6 +25,7 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [showCategory, setShowCategory] = useState(false);
 
   const loadCategories = async () => setCategories(await financeApi.listCategories());
   useEffect(() => {
@@ -53,8 +55,9 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
         <button className={tab === "summary" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("summary")}>{t("summaryTab")}</button>
       </div>
 
-      {canManage && (
-        <form
+      {canManage && <button className="primaryAction" type="button" onClick={() => setShowCategory(true)}><Plus size={16} /> {t("addCategoryBtn")}</button>}
+      {canManage && showCategory && (
+        <Modal title={t("addCategoryBtn")} onClose={() => setShowCategory(false)}><form
           className="inlineForm"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -63,6 +66,7 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
             try {
               await financeApi.createCategory(categoryName);
               setCategoryName("");
+              setShowCategory(false);
               await loadCategories();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedAddCategory"));
@@ -71,7 +75,7 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
         >
           <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("tuitionExample")} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addCategoryBtn")}</button></div>
-        </form>
+        </form></Modal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
@@ -98,6 +102,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
   const [form, setForm] = useState({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
@@ -146,8 +151,9 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
         <Input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} />
         <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
       </div>
-      {canManage && (
-        <form
+      {canManage && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("recordPaymentBtn")}</button>}
+      {canManage && showCreate && (
+        <Modal title={t("recordPaymentBtn")} onClose={() => setShowCreate(false)}><form
           className="inlineForm"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -158,6 +164,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
               await financeApi.createPayment({ student_id, category_id, amount: Number(amount), payment_date, note: form.note || undefined });
               setForm({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
               setStudentSearch("");
+              setShowCreate(false);
               await load();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedRecordPayment"));
@@ -194,7 +201,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
           <label>{t("dateCol")}<Input required type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></label>
           <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordPaymentBtn")}</button></div>
-        </form>
+        </form></Modal>
       )}
       {!isLoading && error && <ErrorState message={error} />}
       <div className="dataTable">
@@ -245,6 +252,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
   const [form, setForm] = useState({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [createModal, setCreateModal] = useState<"donor" | "donation" | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -273,8 +281,9 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
 
   return (
     <>
-      {canManage && (
-        <form
+      {canManage && <div className="formActions"><button className="primaryAction" type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</button><button className="primaryAction" type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</button></div>}
+      {canManage && createModal === "donor" && (
+        <Modal title={t("addDonorBtn")} onClose={() => setCreateModal(null)}><form
           className="inlineForm"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -283,6 +292,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
             try {
               await financeApi.createDonor(donorForm);
               setDonorForm({ name: "", contact: "" });
+              setCreateModal(null);
               await load();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedAddDonor"));
@@ -292,11 +302,11 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
           <label>{t("donorNameLabel")}<Input required value={donorForm.name} onChange={(e) => setDonorForm({ ...donorForm, name: e.target.value })} /></label>
           <label>{t("contactCol")}<Input required value={donorForm.contact} onChange={(e) => setDonorForm({ ...donorForm, contact: e.target.value })} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addDonorBtn")}</button></div>
-        </form>
+        </form></Modal>
       )}
 
-      {canManage && (
-        <form
+      {canManage && createModal === "donation" && (
+        <Modal title={t("recordDonationBtn")} onClose={() => setCreateModal(null)}><form
           className="inlineForm"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -307,6 +317,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
               await financeApi.createDonation({ donor_id, category_id, amount: Number(amount), donation_date, note: form.note || undefined });
               setForm({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
               setDonorSearch("");
+              setCreateModal(null);
               await load();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedRecordPayment"));
@@ -343,7 +354,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
           <label>{t("dateCol")}<Input required type="date" value={form.donation_date} onChange={(e) => setForm({ ...form, donation_date: e.target.value })} /></label>
           <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("recordDonationBtn")}</button></div>
-        </form>
+        </form></Modal>
       )}
       {!isLoading && error && <ErrorState message={error} />}
       <div className="dataTable">

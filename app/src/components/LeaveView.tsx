@@ -9,6 +9,7 @@ import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 
 function resolvePerson(record: Leave, personByUserId: Map<string, { name: string; role: string }>, unknownPerson: string) {
@@ -51,6 +52,7 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
   const typeLabel = (type: string | null | undefined) => type ? t(`leaveType_${type}`, { defaultValue: type }) : t("unknownLabel");
   const statusLabel = (status: string) => t(`leaveStatus_${status}`, { defaultValue: status });
 
@@ -155,7 +157,8 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
         <p className="notice">{canManage ? t("leaveManageSubtitle") : t("leaveSelfSubtitle")}</p>
       </div>
 
-      {canWrite && <form
+      {canWrite && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("requestLeaveBtn")}</button>}
+      {canWrite && showCreate && <Modal title={t("requestLeaveBtn")} onClose={() => setShowCreate(false)}><form
         className="inlineForm"
         onSubmit={async (e) => {
           e.preventDefault();
@@ -174,6 +177,7 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
             setForm({ user_id: "", start_date: "", end_date: "", reason: "" });
             setPersonType("");
             setPersonSearchDraft("");
+            setShowCreate(false);
             await load();
           } catch (err: any) {
             setError(err.response?.data?.detail ?? t("failedSubmitLeave"));
@@ -254,7 +258,7 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
         <div className="formActions">
           <button className="primaryAction" type="submit"><Plus size={16} /> {t("requestLeaveBtn")}</button>
         </div>
-      </form>}
+      </form></Modal>}
 
       {!isLoading && error && <ErrorState message={error} />}
 

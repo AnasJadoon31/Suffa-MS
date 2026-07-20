@@ -49,6 +49,7 @@ class CurrentUserResponse(BaseModel):
     # disabled modules, backend enforces via require_feature.
     features: dict[str, bool] = {}
     branding: dict[str, str] = {}
+    has_teaching_assignment: bool = False
 
 
 class ProvisionUserRequest(BaseModel):

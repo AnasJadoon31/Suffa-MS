@@ -18,6 +18,7 @@ import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 const DAY_KEYS = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
 
@@ -248,6 +249,7 @@ function ListView({
   const [form, setForm] = useState({
     class_id: "", section_id: "", course_id: "", teacher_id: "", day_of_week: "0", start_time: "", end_time: "",
   });
+  const [showCreate, setShowCreate] = useState(false);
 
   const allCourses = useMemo(() => {
     const unique = new Map(Object.values(courses).flat().map((c) => [c.id, c]));
@@ -265,8 +267,9 @@ function ListView({
 
   return (
     <>
-      {canManage && (
-        <form
+      {canManage && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addSlotBtn")}</button>}
+      {canManage && showCreate && (
+        <Modal title={t("addSlotBtn")} onClose={() => setShowCreate(false)}><form
           className="inlineForm"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -280,6 +283,7 @@ function ListView({
                 day_of_week: Number(day_of_week), start_time, end_time,
               });
               setForm({ ...form, start_time: "", end_time: "" });
+              setShowCreate(false);
               onChanged();
             } catch (err: any) {
               onError(err.response?.data?.detail ?? t("failedCreateSlot"));
@@ -331,7 +335,7 @@ function ListView({
           <div className="formActions">
             <button className="primaryAction" type="submit"><Plus size={16} /> {t("addSlotBtn")}</button>
           </div>
-        </form>
+        </form></Modal>
       )}
 
       <div className="filterBar">

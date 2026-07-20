@@ -217,7 +217,7 @@ async def _assert_can_mark_section(
         session, madrasa_id=madrasa_id, teacher_id=teacher_id, session_id=session_id
     ) if teacher_id else []
     if not any(pair.class_id == class_id and pair.section_id == section_id for pair in pairs):
-        raise HTTPException(status_code=403, detail="Attendance access is not assigned for this section")
+        raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SECTION_NOT_ASSIGNED)
 
 
 async def _assert_can_mark_entry(
@@ -378,12 +378,12 @@ async def attendance_class_roster(
     if section_id is not None:
         section = await session.get(Section, section_id)
         if section is None or section.madrasa_id != madrasa.id or section.class_id != class_id:
-            raise HTTPException(status_code=404, detail="Section not found")
+            raise HTTPException(status_code=404, detail=ErrorCode.SECTION_NOT_FOUND)
         await _assert_can_mark_section(
             current_user, session, madrasa.id, active_session.id, class_id, section_id
         )
-    else:
-        await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
+    elif not await _has_global_student_attendance_access(current_user, session):
+        raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SECTION_REQUIRED)
 
     roster_stmt = (
         select(
@@ -799,12 +799,12 @@ async def attendance_class_history(
     if section_id is not None:
         section = await session.get(Section, section_id)
         if section is None or section.madrasa_id != madrasa.id or section.class_id != class_id:
-            raise HTTPException(status_code=404, detail="Section not found")
+            raise HTTPException(status_code=404, detail=ErrorCode.SECTION_NOT_FOUND)
         await _assert_can_mark_section(
             current_user, session, madrasa.id, active_session.id, class_id, section_id
         )
-    else:
-        await _assert_can_mark_class(current_user, session, madrasa.id, active_session.id, class_id)
+    elif not await _has_global_student_attendance_access(current_user, session):
+        raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SECTION_REQUIRED)
 
     effective_start = start_date or active_session.gregorian_start
     effective_end = end_date or active_session.gregorian_end
@@ -849,7 +849,7 @@ async def attendance_student_history(
     if section_id is not None:
         section = await session.get(Section, section_id)
         if section is None or section.madrasa_id != madrasa.id or section.class_id != class_id:
-            raise HTTPException(status_code=404, detail="Section not found")
+            raise HTTPException(status_code=404, detail=ErrorCode.SECTION_NOT_FOUND)
         await _assert_can_mark_section(
             current_user, session, madrasa.id, active_session.id, class_id, section_id
         )

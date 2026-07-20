@@ -8,6 +8,7 @@ import { HijriTag } from "./HijriTag";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 type HolidayForm = {
   name: string;
@@ -32,6 +33,7 @@ export function HolidaysView() {
   const [editForm, setEditForm] = useState<HolidayForm>(EMPTY_FORM);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
@@ -149,8 +151,9 @@ export function HolidaysView() {
         <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
       </div>
 
-      {canManage && (
-        <form
+      {canManage && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addHolidayBtn")}</button>}
+      {canManage && showCreate && (
+        <Modal title={t("addHolidayBtn")} onClose={() => setShowCreate(false)}><form
           className="inlineForm"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -164,6 +167,7 @@ export function HolidaysView() {
                 class_ids: form.class_ids,
               });
               setForm(EMPTY_FORM);
+              setShowCreate(false);
               await load();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedAddHoliday"));
@@ -176,7 +180,7 @@ export function HolidaysView() {
           <label>{t("endLabel")}<Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
           {classes.length > 0 && classPicker(form.class_ids, (class_ids) => setForm({ ...form, class_ids }))}
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("addHolidayBtn")}</button></div>
-        </form>
+        </form></Modal>
       )}
 
       {!isLoading && error && <ErrorState message={error} />}

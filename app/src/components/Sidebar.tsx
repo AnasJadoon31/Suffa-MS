@@ -43,7 +43,7 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
       <nav className="navScroll" aria-label={t("primaryNavigationLabel")}>
         {navGroups.map((group) => {
           const visible = group.items.filter(
-            (item) => isNavItemAccessible(item, user?.role, hasPermission, hasFeature),
+            (item) => isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment),
           );
           if (visible.length === 0) return null;
           return (
@@ -59,7 +59,7 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
                       }}
                       key={item.id}
                       onClick={onNavigate}
-                      to={resolveNavItemPath(item, user?.role, hasPermission, hasFeature)}
+                      to={resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment)}
                     >
                       <Icon size={17} />
                       <span>{t(item.labelKey)}</span>

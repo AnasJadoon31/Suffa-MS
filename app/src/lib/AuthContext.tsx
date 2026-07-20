@@ -10,6 +10,7 @@ export interface User {
   status: string;
   preferred_language: string;
   selected_session_id: string | null;
+  has_teaching_assignment: boolean;
 }
 
 export interface Madrasa {
@@ -56,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.dir = language === "ur" ? "rtl" : "ltr";
       document.documentElement.lang = language;
       setOfflineAccountKey(res.data.madrasa?.id ?? null, res.data.user?.id ?? null);
-      setUser(res.data.user);
+      setUser({ ...res.data.user, has_teaching_assignment: res.data.has_teaching_assignment ?? false });
       const branding = res.data.branding ?? {};
       let logoUrl: string | undefined;
       if (branding["madrasa.logo_file_id"]) {
@@ -146,13 +147,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ? { selected_session_id: sessionId }
       : { clear_selected_session: true };
     const res = await api.patch("/api/v1/auth/me", payload);
-    setUser(res.data.user);
+    setUser({ ...res.data.user, has_teaching_assignment: res.data.has_teaching_assignment ?? false });
     setAcademicSessionId(res.data.user?.selected_session_id ?? null);
   };
 
   const updateProfile = async (payload: { preferred_language?: string }) => {
     const res = await api.patch("/api/v1/auth/me", payload);
-    setUser(res.data.user);
+    setUser({ ...res.data.user, has_teaching_assignment: res.data.has_teaching_assignment ?? false });
     setAcademicSessionId(res.data.user?.selected_session_id ?? null);
   };
 

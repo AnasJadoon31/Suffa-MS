@@ -351,7 +351,7 @@ def require_permission(code: str):
         session: AsyncSession = Depends(get_session),
     ) -> User:
         if not await user_has_permission(current_user, code, session):
-            raise HTTPException(status_code=403, detail=f"Missing permission: {code}")
+            raise HTTPException(status_code=403, detail=ErrorCode.PERMISSION_REQUIRED)
         return current_user
 
     return permission_checker
@@ -366,7 +366,7 @@ def require_permission_grant(code: str):
         session: AsyncSession = Depends(get_session),
     ) -> User:
         if not await user_has_permission_grant(current_user, code, session):
-            raise HTTPException(status_code=403, detail=f"Missing permission: {code}")
+            raise HTTPException(status_code=403, detail=ErrorCode.PERMISSION_REQUIRED)
         return current_user
 
     return permission_checker

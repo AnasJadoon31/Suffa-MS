@@ -218,7 +218,7 @@ export function FormsView() {
       </div>
 
       {selected && (
-        <div className="modulePanel" style={{ marginTop: 16 }}>
+        <Modal title={selected.title} onClose={() => setSelected(null)}><div className="modulePanel" style={{ marginTop: 16 }}>
           <h3>{selected.title}</h3>
           {notice && <p className="notice">{notice}</p>}
           <form
@@ -265,7 +265,7 @@ export function FormsView() {
               ))}
             </div>
           )}
-        </div>
+        </div></Modal>
       )}
 
       {editing && (

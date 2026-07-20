@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, require_permission
 from app.core.config import settings
+from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.academics.models import AcademicClass, AcademicSession, Course, Enrollment, Madrasa
@@ -73,21 +74,10 @@ async def render_and_dispatch(
     message = render_variables(content, variables)
     number = normalise_phone_number(phone_number)
 
-    session.add(
-        MessageLog(
-            madrasa_id=madrasa.id,
-            template_code=template_code,
-            recipient_number=number,
-            recipient_type=recipient_type,
-            recipient_id=recipient_id,
-            dispatched_at=datetime.now(UTC),
-            sent_by_id=current_user.id,
-            content_sent=message,
-        )
-    )
-    await session.commit()
-
-    if attachment_bytes is not None and settings.evolution_api_url and settings.evolution_api_key and settings.evolution_instance:
+    result = WhatsAppLinkResponse(normalised_number=number, url=f"https://wa.me/{number}?text={quote(message)}")
+    if attachment_bytes is not None:
+        if not (settings.evolution_api_url and settings.evolution_api_key and settings.evolution_instance):
+            raise HTTPException(status_code=503, detail=ErrorCode.WHATSAPP_DELIVERY_NOT_CONFIGURED)
         endpoint = f"{settings.evolution_api_url.rstrip('/')}/message/sendMedia/{settings.evolution_instance}"
         payload = {
             "number": number,
@@ -104,10 +94,23 @@ async def render_and_dispatch(
                 json=payload,
             )
         if response.is_error:
-            raise HTTPException(status_code=502, detail=f"WhatsApp media delivery failed: {response.text}")
-        return WhatsAppLinkResponse(normalised_number=number, direct_sent=True)
+            raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_MEDIA_DELIVERY_FAILED)
+        result = WhatsAppLinkResponse(normalised_number=number, direct_sent=True)
 
-    return WhatsAppLinkResponse(normalised_number=number, url=f"https://wa.me/{number}?text={quote(message)}")
+    session.add(
+        MessageLog(
+            madrasa_id=madrasa.id,
+            template_code=template_code,
+            recipient_number=number,
+            recipient_type=recipient_type,
+            recipient_id=recipient_id,
+            dispatched_at=datetime.now(UTC),
+            sent_by_id=current_user.id,
+            content_sent=message,
+        )
+    )
+    await session.commit()
+    return result
 
 
 @router.post("/whatsapp-link", response_model=WhatsAppLinkResponse)

@@ -65,7 +65,7 @@ export function PublicAdmissionPage() {
             })}</fieldset>;
             return <label key={field.key}>{field.label}<Input required={field.required} value={String(extra[field.key] ?? "")} onChange={(event) => setExtra({ ...extra, [field.key]: event.target.value })} /></label>;
           })}
-          <label className="visuallyHidden">Website<Input tabIndex={-1} autoComplete="off" value={form.website} onChange={(event) => setForm({ ...form, website: event.target.value })} /></label>
+          <label className="visuallyHidden">{t("websiteLabel")}<Input tabIndex={-1} autoComplete="off" value={form.website} onChange={(event) => setForm({ ...form, website: event.target.value })} /></label>
           {error && <p className="notice notice-warning">{error}</p>}
           <button className="primaryAction" type="submit">{t("submitApplicationBtn")}</button>
         </form>}

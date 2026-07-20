@@ -8,6 +8,7 @@ import { RichTextEditor } from "./RichTextEditor";
 import { Input } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { Modal } from "./ui/Modal";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -25,6 +26,7 @@ export function BlogView() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
 
   const load = async () => setPosts(await operationsApi.listBlogPosts());
   useEffect(() => {
@@ -54,8 +56,9 @@ export function BlogView() {
         <p className="notice">{t("descBlog")}</p>
       </div>
 
-      {canManage && !editing && (
-        <form
+      {canManage && !editing && <button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("saveDraftBtn")}</button>}
+      {canManage && !editing && showCreate && (
+        <Modal title={t("saveDraftBtn")} onClose={() => setShowCreate(false)}><form
           className="inlineForm"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -64,6 +67,7 @@ export function BlogView() {
             try {
               await operationsApi.createBlogPost(form);
               setForm({ title: "", body: "" });
+              setShowCreate(false);
               await load();
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedCreatePost"));
@@ -80,11 +84,11 @@ export function BlogView() {
             />
           </div>
           <div className="formActions"><button className="primaryAction" type="submit"><Plus size={16} /> {t("saveDraftBtn")}</button></div>
-        </form>
+        </form></Modal>
       )}
 
       {canManage && editing && (
-        <form
+        <Modal title={t("editPostHeading", { title: editing.title })} onClose={() => setEditing(null)}><form
           className="inlineForm"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -107,7 +111,7 @@ export function BlogView() {
             <button className="primaryAction" type="submit">{t("saveBtn")}</button>
             <button className="secondaryAction" type="button" onClick={() => setEditing(null)}><X size={14} /> {t("cancelBtn")}</button>
           </div>
-        </form>
+        </form></Modal>
       )}
 
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}

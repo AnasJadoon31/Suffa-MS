@@ -707,7 +707,7 @@ async def update_grading_scheme(
 ) -> GradingSchemeRead:
     scheme = await session.get(GradingScheme, scheme_id)
     if scheme is None or scheme.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Grading scheme not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.GRADING_SCHEME_NOT_FOUND)
     if payload.name is not None:
         scheme.name = payload.name
     if payload.bands is not None:
@@ -726,9 +726,9 @@ async def delete_grading_scheme(
 ) -> dict[str, str]:
     scheme = await session.get(GradingScheme, scheme_id)
     if scheme is None or scheme.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Grading scheme not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.GRADING_SCHEME_NOT_FOUND)
     if await session.scalar(select(ExamType.id).where(ExamType.grading_scheme_id == scheme_id).limit(1)):
-        raise HTTPException(status_code=409, detail="Cannot delete a grading scheme used by an exam type")
+        raise HTTPException(status_code=409, detail=ErrorCode.GRADING_SCHEME_IN_USE)
     await session.delete(scheme)
     await session.commit()
     return {"status": "deleted"}
@@ -753,7 +753,7 @@ async def create_exam_type(
     await _require_course_scope(session, current_user, madrasa.id, payload.course_id)
     scheme = await session.get(GradingScheme, payload.grading_scheme_id)
     if scheme is None or scheme.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Grading scheme not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.GRADING_SCHEME_NOT_FOUND)
 
     exam_type = ExamType(
         madrasa_id=madrasa.id,
@@ -795,13 +795,13 @@ async def update_exam_type(
 ) -> ExamTypeRead:
     exam_type = await session.get(ExamType, exam_type_id)
     if exam_type is None or exam_type.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Exam type not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.EXAM_TYPE_NOT_FOUND)
     target_course_id = payload.course_id or exam_type.course_id
     await _require_course_scope(session, current_user, madrasa.id, target_course_id)
     if payload.grading_scheme_id is not None:
         scheme = await session.get(GradingScheme, payload.grading_scheme_id)
         if scheme is None or scheme.madrasa_id != madrasa.id:
-            raise HTTPException(status_code=404, detail="Grading scheme not found")
+            raise HTTPException(status_code=404, detail=ErrorCode.GRADING_SCHEME_NOT_FOUND)
         exam_type.grading_scheme_id = payload.grading_scheme_id
     if payload.course_id is not None:
         exam_type.course_id = payload.course_id
@@ -823,10 +823,10 @@ async def delete_exam_type(
 ) -> dict[str, str]:
     exam_type = await session.get(ExamType, exam_type_id)
     if exam_type is None or exam_type.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Exam type not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.EXAM_TYPE_NOT_FOUND)
     await _require_course_scope(session, current_user, madrasa.id, exam_type.course_id)
     if await session.scalar(select(Mark.id).where(Mark.exam_type_id == exam_type_id).limit(1)):
-        raise HTTPException(status_code=409, detail="Cannot delete an exam type that already has marks")
+        raise HTTPException(status_code=409, detail=ErrorCode.EXAM_TYPE_HAS_MARKS)
     await session.delete(exam_type)
     await session.commit()
     return {"status": "deleted"}

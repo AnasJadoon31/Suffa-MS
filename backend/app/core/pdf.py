@@ -23,6 +23,20 @@ class ReportBranding:
     logo_bytes: bytes | None = None
 
 
+def _branding_header(branding: ReportBranding, styles, *, name_style: str = "Heading1") -> list:
+    elements = []
+    if branding.logo_bytes:
+        logo = ReportImage(io.BytesIO(branding.logo_bytes), width=54, height=54, kind="proportional")
+        logo.hAlign = "CENTER"
+        elements.append(logo)
+    elements.append(Paragraph(escape(branding.name), styles[name_style]))
+    contact = " · ".join(filter(None, [branding.address, branding.phone, branding.email, branding.website]))
+    if contact:
+        elements.append(Paragraph(escape(contact), styles["Normal"]))
+    elements.append(Spacer(1, 10))
+    return elements
+
+
 async def load_report_branding(session, madrasa) -> ReportBranding:
     from sqlalchemy import select
 
@@ -126,15 +140,7 @@ def render_table_pdf(
 
     elements = []
     if branding:
-        if branding.logo_bytes:
-            logo = ReportImage(io.BytesIO(branding.logo_bytes), width=54, height=54, kind="proportional")
-            logo.hAlign = "CENTER"
-            elements.append(logo)
-        elements.append(Paragraph(escape(branding.name), styles["Heading1"]))
-        contact = " · ".join(filter(None, [branding.address, branding.phone, branding.email, branding.website]))
-        if contact:
-            elements.append(Paragraph(escape(contact), styles["Normal"]))
-        elements.append(Spacer(1, 10))
+        elements.extend(_branding_header(branding, styles))
     elements.extend([
         Paragraph(escape(title), styles["Title"]),
         Paragraph(escape(subtitle), styles["Normal"]),
@@ -202,13 +208,11 @@ def render_receipt_pdf(
     urdu_title_style = ParagraphStyle("urduTitle", fontName=URDU_FONT_BOLD, fontSize=15, alignment=2, leading=22)
 
     elements = []
-    if branding and branding.logo_bytes:
-        logo = ReportImage(io.BytesIO(branding.logo_bytes), width=54, height=54, kind="proportional")
-        logo.hAlign = "CENTER"
-        elements.append(logo)
+    if branding:
+        elements.extend(_branding_header(branding, styles, name_style="Title"))
+    else:
+        elements.append(Paragraph(escape(madrasa_name), styles["Title"]))
     elements.extend([
-        Paragraph(escape(branding.name if branding else madrasa_name), styles["Title"]),
-        *([Paragraph(escape(" · ".join(filter(None, [branding.address, branding.phone, branding.email, branding.website]))), styles["Normal"])] if branding and any([branding.address, branding.phone, branding.email, branding.website]) else []),
         Paragraph(f"{receipt_kind} Receipt", styles["Heading2"]),
         Paragraph(f'<font name="{URDU_FONT_BOLD}">{shape_urdu("رسید")}</font>', urdu_title_style),
         Spacer(1, 12),
@@ -266,15 +270,7 @@ def render_result_card_pdf(
 
     elements = []
     if branding:
-        if branding.logo_bytes:
-            logo = ReportImage(io.BytesIO(branding.logo_bytes), width=54, height=54, kind="proportional")
-            logo.hAlign = "CENTER"
-            elements.append(logo)
-        elements.append(Paragraph(escape(branding.name), styles["Heading1"]))
-        contact = " · ".join(filter(None, [branding.address, branding.phone, branding.email, branding.website]))
-        if contact:
-            elements.append(Paragraph(escape(contact), styles["Normal"]))
-        elements.append(Spacer(1, 10))
+        elements.extend(_branding_header(branding, styles))
     elements.extend([
         Paragraph("Result Card", styles["Title"]),
         Paragraph(f'<font name="{URDU_FONT_BOLD}">{shape_urdu("نتائج کارڈ")}</font>', urdu_title_style),

@@ -699,7 +699,9 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
 - Added case-insensitive per-madrasa course-name uniqueness (API validation,
   database index, and migration), plus grading scheme/exam type edit/delete
   APIs and a row-based modal grading editor.
-- Moved the reported create/edit workflows into reusable modals, relocated the
+- Moved admin/teacher create/edit workflows into reusable modals (academics,
+  people, assessments, timetable, holidays, leave, blog, announcements,
+  finance, salary, admissions, resources, and forms), relocated the
   People class filter, removed walk-in admissions from People, and expanded
   admissions with guardian, identity, address, prior-school, and medical data.
 - Added a real public admission page instead of exposing the JSON API URL.
@@ -710,7 +712,7 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
   and receipts, with the existing text-link flow retained when direct delivery
   is not configured.
 - Added targeted regressions in `test_reported_portal_issues.py`. Validation:
-  146 backend tests pass, Python compile succeeds, Alembic has one head, and the
+  147 backend tests pass, Python compile succeeds, Alembic has one head, and the
   frontend TypeScript/Vite production build succeeds.
 # 2026-07-13 — Route-based portal isolation
 

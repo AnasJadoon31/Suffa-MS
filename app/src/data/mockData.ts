@@ -186,11 +186,14 @@ export function isPortalRouteAccessible(
   userRole: string | null | undefined,
   hasPermission: (permission: string) => boolean,
   hasFeature: (feature: string) => boolean,
+  hasTeachingAssignment = false,
 ): boolean {
   const hasRequiredPermission =
     (!route.permission || hasPermission(route.permission)) &&
     (!route.permissionsAny || route.permissionsAny.some(hasPermission));
-  const permissionAllowed = hasRequiredPermission || (route.implicitTeacher === true && userRole === "teacher");
+  const permissionAllowed = hasRequiredPermission || (
+    route.implicitTeacher === true && userRole === "teacher" && hasTeachingAssignment
+  );
   return Boolean(
     userRole &&
     permissionAllowed &&
@@ -204,9 +207,10 @@ export function isNavItemAccessible(
   userRole: string | null | undefined,
   hasPermission: (permission: string) => boolean,
   hasFeature: (feature: string) => boolean,
+  hasTeachingAssignment = false,
 ): boolean {
   return portalRoutes.some(
-    (route) => route.view === item.id && isPortalRouteAccessible(route, userRole, hasPermission, hasFeature),
+    (route) => route.view === item.id && isPortalRouteAccessible(route, userRole, hasPermission, hasFeature, hasTeachingAssignment),
   );
 }
 
@@ -215,9 +219,10 @@ export function resolveNavItemPath(
   userRole: string | null | undefined,
   hasPermission: (permission: string) => boolean,
   hasFeature: (feature: string) => boolean,
+  hasTeachingAssignment = false,
 ): string {
   return portalRoutes.find(
-    (route) => route.view === item.id && isPortalRouteAccessible(route, userRole, hasPermission, hasFeature),
+    (route) => route.view === item.id && isPortalRouteAccessible(route, userRole, hasPermission, hasFeature, hasTeachingAssignment),
   )?.path ?? "/dashboard";
 }
 
