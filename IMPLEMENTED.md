@@ -21,8 +21,11 @@ Running log of completed work (newest first). Design rationale lives in
 - Result-card PDFs now use madrasa branding and the requesting user's English/Urdu
   language; fixed Urdu font registration and browser download filename exposure.
 - Shared buttons now lock and show a loader for promise-backed actions, critical
-  mutations return their promises to that control, public-form/leave filtering uses
-  the shared inline filter, and mobile topbar/table/Urdu spacing is PWA-safe.
+  mutations and downloads return their promises to that control, primary filter bars
+  use the shared inline filter, and mobile topbar/table/Urdu spacing is PWA-safe.
+- The final review also tenant-scoped assignment-limit and grading lookups, made
+  class-wide assignments count toward every section's active cap, and unified the
+  assignment contribution and grading-scheme selection used by result endpoints.
 - Regression coverage added for label-derived form keys, section assignment caps,
   assignment-result inclusion, Urdu PDF rendering, and deletion that preserves
   applications.

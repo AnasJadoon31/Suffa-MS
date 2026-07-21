@@ -303,6 +303,7 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(assignment.submitted ?? false);
+  const [submittedFileKey, setSubmittedFileKey] = useState(assignment.file_key ?? null);
 
   const submit = async () => {
     if (!file) return;
@@ -314,6 +315,7 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
       await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
       await assessmentsApi.submitAssignment(assignment.id, object_key);
       setSubmitted(true);
+      setSubmittedFileKey(object_key);
       onSubmitted();
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedSubmitAssignment"));
@@ -338,12 +340,12 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
             {assignment.mark !== undefined && assignment.mark !== null && assignment.max_marks && (
               <span className="badge success">{assignment.mark} / {assignment.max_marks}</span>
             )}
-            {assignment.file_key && (
+            {submittedFileKey && (
               <Button
                 className="tableAction"
                 type="button"
                 onClick={async () => {
-                  const { url } = await filesApi.presignDownload(assignment.file_key!);
+                  const { url } = await filesApi.presignDownload(submittedFileKey);
                   window.open(url, "_blank", "noreferrer");
                 }}
               >
@@ -388,7 +390,7 @@ function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashb
             <Button
               className="secondaryAction"
               type="button"
-              onClick={() => void assessmentsApi.downloadMyResultCard(data.latest_result!.session_id)}
+              onClick={() => assessmentsApi.downloadMyResultCard(data.latest_result!.session_id)}
             >
               {t("downloadResultCardBtn")}
             </Button>

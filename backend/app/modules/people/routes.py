@@ -5,6 +5,7 @@ from sqlalchemy import func, select, exc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission
+from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
 from app.modules.academics.models import Madrasa
@@ -322,7 +323,7 @@ async def update_student(
         await session.commit()
     except exc.IntegrityError as e:
         await session.rollback()
-        raise HTTPException(status_code=409, detail="Admission number already in use or unique constraint violation") from e
+        raise HTTPException(status_code=409, detail=ErrorCode.ADMISSION_NUMBER_EXISTS) from e
     await session.refresh(student)
     return StudentRead.model_validate(student)
 

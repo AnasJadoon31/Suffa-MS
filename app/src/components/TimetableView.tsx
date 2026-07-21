@@ -23,6 +23,7 @@ import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter } from "./ui/InlineFilter";
 
 const DAY_KEYS = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
 
@@ -101,7 +102,7 @@ export function TimetableView({ mode = "grid", onModeChange }: Readonly<{ mode?:
           </Button>
         )}
         {canManage && (
-          <Button className="secondaryAction" type="button" onClick={() => void operationsApi.exportTimetablePdf()}>
+          <Button className="secondaryAction" type="button" onClick={() => operationsApi.exportTimetablePdf()}>
             <FileDown size={16} /> {t("exportTimetablePdfBtn")}
           </Button>
         )}
@@ -172,16 +173,10 @@ function GridView({
 
   return (
     <section className="timetableGridSection">
-      <div className="filterBar">
-        <Select value={classId} onChange={(e) => { setClassId(e.target.value); setSectionId(""); }}>
-          <option value="">{t("chooseClassEllipsis")}</option>
-          {pickableClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        <Select value={sectionId} onChange={(e) => setSectionId(e.target.value)} disabled={!classId}>
-          <option value="">{t("allSections")}</option>
-          {pickableSections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </Select>
-      </div>
+      <InlineFilter filters={[
+        { key: "class", type: "select", value: classId, placeholder: t("chooseClassEllipsis"), options: pickableClasses.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => { setClassId(value); setSectionId(""); } },
+        { key: "section", type: "select", value: sectionId, placeholder: t("allSections"), disabled: !classId, options: pickableSections.map((s) => ({ value: s.id, label: s.name })), onChange: setSectionId },
+      ]} />
 
       {!classId || !sectionId ? (
         <p className="emptyState">{t("pickClassSectionPrompt")}</p>
@@ -345,28 +340,13 @@ function ListView({
               </FormModal>
       )}
 
-      <div className="filterBar">
-        <Select value={filters.class_id} onChange={(e) => setFilters({ ...filters, class_id: e.target.value, section_id: "" })}>
-          <option value="">{t("allClasses")}</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        <Select value={filters.section_id} onChange={(e) => setFilters({ ...filters, section_id: e.target.value })} disabled={!filters.class_id}>
-          <option value="">{t("allSections")}</option>
-          {(sections[filters.class_id] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </Select>
-        <Select value={filters.course_id} onChange={(e) => setFilters({ ...filters, course_id: e.target.value })}>
-          <option value="">{t("allCourses")}</option>
-          {allCourses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        <Select value={filters.teacher_id} onChange={(e) => setFilters({ ...filters, teacher_id: e.target.value })}>
-          <option value="">{t("allTeachers")}</option>
-          {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
-        </Select>
-        <Select value={filters.day} onChange={(e) => setFilters({ ...filters, day: e.target.value })}>
-          <option value="">{t("allDays")}</option>
-          {DAY_KEYS.map((d, i) => <option key={d} value={i}>{t(d)}</option>)}
-        </Select>
-      </div>
+      <InlineFilter filters={[
+        { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value, section_id: "" }) },
+        { key: "section", type: "select", value: filters.section_id, placeholder: t("allSections"), disabled: !filters.class_id, options: (sections[filters.class_id] ?? []).map((s) => ({ value: s.id, label: s.name })), onChange: (value) => setFilters({ ...filters, section_id: value }) },
+        { key: "course", type: "select", value: filters.course_id, placeholder: t("allCourses"), options: allCourses.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, course_id: value }) },
+        { key: "teacher", type: "select", value: filters.teacher_id, placeholder: t("allTeachers"), options: teachers.map((teacher) => ({ value: teacher.id, label: teacher.name })), onChange: (value) => setFilters({ ...filters, teacher_id: value }) },
+        { key: "day", type: "select", value: filters.day, placeholder: t("allDays"), options: DAY_KEYS.map((day, index) => ({ value: String(index), label: t(day) })), onChange: (value) => setFilters({ ...filters, day: value }) },
+      ]} />
 
       <DataTable<TimetableSlot>
         columns={[

@@ -153,7 +153,7 @@ export function FormsView() {
           { header: t("fieldsCol"), render: (f) => f.fields_definition.length },
           { header: t("actionsCol"), render: (f) => (
             <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Button className="tableAction" type="button" onClick={() => void openForm(f)}>{t("openBtn")}</Button>
+              <Button className="tableAction" type="button" onClick={() => openForm(f)}>{t("openBtn")}</Button>
               {canEditForm(f) && (
                 <>
                   <Button

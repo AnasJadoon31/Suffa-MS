@@ -24,3 +24,4 @@ class ErrorCode(StrEnum):
     SECTION_NOT_FOUND = "section_not_found"
     REPORT_SECTION_REQUIRED = "report_section_required"
     REPORT_SECTION_NOT_ASSIGNED = "report_section_not_assigned"
+    ADMISSION_NUMBER_EXISTS = "admission_number_exists"

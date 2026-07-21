@@ -102,7 +102,7 @@ export function PlatformView() {
               { header: t("slugLabel"), render: (m) => m.slug },
               { header: t("createdCol"), render: (m) => new Date(m.created_at).toLocaleDateString() },
               { header: t("actionsCol"), render: (m) => (
-                <Button className="tableAction" type="button" onClick={() => void openMadrasa(m)}>
+                <Button className="tableAction" type="button" onClick={() => openMadrasa(m)}>
                   <ToggleLeft size={14} /> {t("featuresBtn")}
                 </Button>
               )},

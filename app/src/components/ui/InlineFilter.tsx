@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Select } from "./Field";
+import { Input, Select } from "./Field";
 import { Button } from "./Button";
 import { FilterBar } from "./Layout";
 
@@ -9,6 +9,14 @@ export type InlineFilterConfig = {
   key: string;
   type: "select";
   options: FilterOption[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+} | {
+  key: string;
+  type: "input";
+  inputType?: "text" | "search" | "date";
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -38,6 +46,17 @@ export function InlineFilter({ filters, children, className = "" }: { filters: I
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </Select>
+          );
+        } else if (filter.type === "input") {
+          return (
+            <Input
+              key={filter.key}
+              type={filter.inputType ?? "text"}
+              value={filter.value}
+              placeholder={filter.placeholder}
+              disabled={filter.disabled}
+              onChange={(event) => filter.onChange(event.target.value)}
+            />
           );
         } else if (filter.type === "tab") {
           return filter.options.map(opt => (

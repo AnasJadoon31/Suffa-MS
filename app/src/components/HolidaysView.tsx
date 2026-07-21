@@ -13,6 +13,7 @@ import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter } from "./ui/InlineFilter";
 
 type HolidayForm = {
   name: string;
@@ -144,18 +145,12 @@ export function HolidaysView() {
         notice={t("descHolidays")}
       />
 
-      <div className="filterBar">
-        <Select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
-          <option value="">{t("allCategories")}</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </Select>
-        <Select value={filters.class_id} onChange={(e) => setFilters({ ...filters, class_id: e.target.value })}>
-          <option value="">{t("allClasses")}</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        <Input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} />
-        <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
-      </div>
+      <InlineFilter filters={[
+        { key: "category", type: "select", value: filters.category, placeholder: t("allCategories"), options: categories.map((category) => ({ value: category, label: category })), onChange: (value) => setFilters({ ...filters, category: value }) },
+        { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
+        { key: "date-from", type: "input", inputType: "date", value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
+        { key: "date-to", type: "input", inputType: "date", value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
+      ]} />
 
       {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addHolidayBtn")}</Button>}
       {canManage && showCreate && (

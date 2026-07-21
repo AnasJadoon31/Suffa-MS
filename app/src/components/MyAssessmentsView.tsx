@@ -79,7 +79,7 @@ export function MyAssessmentsView() {
               </span>
             ))}
           </div>
-          <Button className="tableAction" type="button" onClick={() => void assessmentsApi.downloadMyResultCard(sessionId)}>
+          <Button className="tableAction" type="button" onClick={() => assessmentsApi.downloadMyResultCard(sessionId)}>
             <FileDown size={14} /> {t("downloadResultCardBtn")}
           </Button>
         </div>

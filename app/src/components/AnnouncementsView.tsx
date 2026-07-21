@@ -12,6 +12,7 @@ import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter } from "./ui/InlineFilter";
 
 
 function toScope(audience: string): Scope {
@@ -188,22 +189,17 @@ export function AnnouncementsView() {
         {knownCategories.map((c) => <option key={c} value={c} />)}
       </datalist>
 
-      <div className="filterBar">
-        {canPost && (
-          <>
-            <Button className={tab === "all" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("all")}>{t("audienceEveryone")}</Button>
-            <Button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teachers")}>{t("teachers")}</Button>
-            <Button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("students")}>{t("students")}</Button>
-          </>
-        )}
-        <Input placeholder={t("searchAnnouncementsPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} />
-        <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-          <option value="">{t("allCategories")}</option>
-          {knownCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </Select>
-        <Input type="date" value={dates.date_from} onChange={(e) => setDates({ ...dates, date_from: e.target.value })} />
-        <Input type="date" value={dates.date_to} onChange={(e) => setDates({ ...dates, date_to: e.target.value })} />
-      </div>
+      <InlineFilter filters={[
+        ...(canPost ? [{ key: "audience", type: "tab" as const, value: tab, options: [
+          { value: "all", label: t("audienceEveryone") },
+          { value: "teachers", label: t("teachers") },
+          { value: "students", label: t("students") },
+        ], onChange: (value: string) => setTab(value as typeof tab) }] : []),
+        { key: "search", type: "input", inputType: "search", value: search, placeholder: t("searchAnnouncementsPlaceholder"), onChange: setSearch },
+        { key: "category", type: "select", value: categoryFilter, placeholder: t("allCategories"), options: knownCategories.map((category) => ({ value: category, label: category })), onChange: setCategoryFilter },
+        { key: "date-from", type: "input", inputType: "date", value: dates.date_from, onChange: (value) => setDates({ ...dates, date_from: value }) },
+        { key: "date-to", type: "input", inputType: "date", value: dates.date_to, onChange: (value) => setDates({ ...dates, date_to: value }) },
+      ]} />
 
       <div className="roster">
         {isLoading && <LoadingState />}

@@ -244,6 +244,10 @@ async def test_assignment_limit_applies_per_section_to_active_assignments(client
         "/api/v1/assessments/assignments",
         json=payload(seed.sections.a1.id, "Alif two"),
     )
+    class_wide = await client.post(
+        "/api/v1/assessments/assignments",
+        json={**payload(seed.sections.a1.id, "Whole class"), "section_ids": []},
+    )
     other_section = await client.post(
         "/api/v1/assessments/assignments",
         json=payload(seed.sections.a2.id, "Bay one"),
@@ -252,6 +256,7 @@ async def test_assignment_limit_applies_per_section_to_active_assignments(client
     assert first.status_code == 200, first.text
     assert blocked.status_code == 400
     assert "limit" in blocked.json()["detail"].lower()
+    assert class_wide.status_code == 400
     assert other_section.status_code == 200, other_section.text
 
 

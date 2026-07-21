@@ -242,6 +242,7 @@ async def _require_student_course_scope(
 
 async def _enforce_assignment_limit(
     session: AsyncSession,
+    madrasa_id: UUID,
     targets: list[tuple[UUID, UUID | None]],
 ) -> None:
     """Apply the class-configured cap independently to each target section.
@@ -253,7 +254,14 @@ async def _enforce_assignment_limit(
     if not targets:
         return
     class_ids = list({class_id for class_id, _ in targets})
-    classes = (await session.execute(select(AcademicClass).where(AcademicClass.id.in_(class_ids)))).scalars().all()
+    classes = (
+        await session.execute(
+            select(AcademicClass).where(
+                AcademicClass.madrasa_id == madrasa_id,
+                AcademicClass.id.in_(class_ids),
+            )
+        )
+    ).scalars().all()
     class_limits = {c.id: c.assignment_limit for c in classes if c.assignment_limit is not None}
     if not class_limits:
         return
@@ -263,21 +271,39 @@ async def _enforce_assignment_limit(
         limit = class_limits.get(class_id)
         if limit is None:
             continue
-        scope_filter = Assignment.section_id == section_id if section_id is not None else Assignment.section_id.is_(None)
-        count = await session.scalar(
-            select(func.count(Assignment.id)).where(
-                Assignment.class_id == class_id,
-                scope_filter,
-                Assignment.due_date >= now,
+        section_ids = [section_id]
+        if section_id is None:
+            section_ids = list(
+                (
+                    await session.execute(
+                        select(Section.id).where(
+                            Section.madrasa_id == madrasa_id,
+                            Section.class_id == class_id,
+                        )
+                    )
+                ).scalars().all()
+            ) or [None]
+        for target_section_id in section_ids:
+            scope_filter = (
+                Assignment.section_id.is_(None)
+                if target_section_id is None
+                else or_(Assignment.section_id.is_(None), Assignment.section_id == target_section_id)
             )
-        )
-        if (count or 0) >= limit:
-            class_name = next((c.name for c in classes if c.id == class_id), "Class")
-            scope_name = "class-wide" if section_id is None else "this section"
-            raise HTTPException(
-                status_code=400,
-                detail=f"Active assignment limit ({limit}) reached for {scope_name} in '{class_name}'",
+            count = await session.scalar(
+                select(func.count(Assignment.id)).where(
+                    Assignment.madrasa_id == madrasa_id,
+                    Assignment.class_id == class_id,
+                    scope_filter,
+                    Assignment.due_date >= now,
+                )
             )
+            if (count or 0) >= limit:
+                class_name = next((c.name for c in classes if c.id == class_id), "Class")
+                scope_name = "class-wide" if target_section_id is None else "this section"
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Active assignment limit ({limit}) reached for {scope_name} in '{class_name}'",
+                )
 
 @router.post("/assignments", response_model=list[AssignmentRead])
 async def create_assignment(
@@ -307,7 +333,7 @@ async def create_assignment(
         ).scalars().all()
         if not class_ids:
             raise HTTPException(status_code=400, detail="No classes have this course mapped")
-        await _enforce_assignment_limit(session, [(class_id, None) for class_id in class_ids])
+        await _enforce_assignment_limit(session, madrasa.id, [(class_id, None) for class_id in class_ids])
 
         batch_id = uuid4() if len(class_ids) > 1 else None
         created: list[Assignment] = []
@@ -362,6 +388,7 @@ async def create_assignment(
 
     await _enforce_assignment_limit(
         session,
+        madrasa.id,
         [(payload.class_id, section_id) for section_id in section_ids],
     )
 
@@ -993,34 +1020,76 @@ async def list_marks(
 
 # ----------------------------------------------------------------------- Results
 
-async def _compute_course_result(session: AsyncSession, madrasa_id: UUID, student_id: UUID, course_id: UUID) -> CourseResult:
+def _assignment_totals(
+    assignments: list[Assignment],
+    submissions: dict[UUID, Submission],
+    student_id: UUID,
+) -> tuple[float, float, int]:
+    weighted_sum = 0.0
+    total_weight = 0.0
+    count = 0
+    for assignment in assignments:
+        if assignment.target_student_ids and str(student_id) not in assignment.target_student_ids:
+            continue
+        submission = submissions.get(assignment.id)
+        if submission is None or submission.mark is None:
+            continue
+        weighted_sum += (submission.mark / assignment.max_marks) * 100.0 * assignment.weightage
+        total_weight += assignment.weightage
+        count += 1
+    return weighted_sum, total_weight, count
+
+
+def _result_scheme_for_class(
+    exam_types: list[ExamType],
+    schemes: dict[UUID, GradingScheme],
+    class_id: UUID,
+) -> GradingScheme | None:
+    """Choose one stable scheme, preferring a class-specific setup."""
+    ordered = sorted(
+        exam_types,
+        key=lambda exam_type: (
+            exam_type.class_id != class_id,
+            exam_type.name.casefold(),
+            str(exam_type.id),
+        ),
+    )
+    return schemes.get(ordered[0].grading_scheme_id) if ordered else None
+
+
+async def _compute_course_result(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    student_id: UUID,
+    course_id: UUID,
+    class_id: UUID,
+    section_id: UUID | None,
+) -> CourseResult:
     exam_types = (
-        await session.execute(select(ExamType).where(ExamType.course_id == course_id, ExamType.madrasa_id == madrasa_id))
+        await session.execute(
+            select(ExamType).where(
+                ExamType.course_id == course_id,
+                ExamType.madrasa_id == madrasa_id,
+                or_(ExamType.class_id.is_(None), ExamType.class_id == class_id),
+            )
+        )
     ).scalars().all()
     schemes = {
         scheme.id: scheme
         for scheme in (
             await session.execute(
                 select(GradingScheme).where(
+                    GradingScheme.madrasa_id == madrasa_id,
                     GradingScheme.id.in_([exam_type.grading_scheme_id for exam_type in exam_types])
                 )
             )
         ).scalars().all()
     } if exam_types else {}
-    include_assignments = any(scheme.include_assignments for scheme in schemes.values())
-    assignments_exist = None
-    if include_assignments:
-        assignments_exist = (
-            await session.execute(select(Assignment).where(Assignment.course_id == course_id, Assignment.madrasa_id == madrasa_id, Assignment.weightage.is_not(None)))
-        ).scalars().first()
-    
-    if not exam_types and not assignments_exist:
-        return CourseResult(course_id=course_id, raw_score=None, band=None, exam_count=0)
-
+    result_scheme = _result_scheme_for_class(exam_types, schemes, class_id)
+    include_assignments = bool(result_scheme and result_scheme.include_assignments)
     total_weight = 0.0
     weighted_sum = 0.0
     count = 0
-    last_scheme_id = None
     
     # 1. Include Exams
     for exam_type in exam_types:
@@ -1034,52 +1103,45 @@ async def _compute_course_result(session: AsyncSession, madrasa_id: UUID, studen
         weighted_sum += mark.score * exam_type.weightage
         total_weight += exam_type.weightage
         count += 1
-        last_scheme_id = exam_type.grading_scheme_id
 
     # 2. Include Assignments with weightage
-    assignments = (
+    assignments: list[Assignment] = list((
         await session.execute(
             select(Assignment).where(
-                Assignment.course_id == course_id, 
+                Assignment.course_id == course_id,
                 Assignment.madrasa_id == madrasa_id,
+                Assignment.class_id == class_id,
+                or_(Assignment.section_id.is_(None), Assignment.section_id == section_id),
                 Assignment.weightage.is_not(None),
                 Assignment.max_marks.is_not(None),
                 Assignment.max_marks > 0
             )
         )
-    ).scalars().all() if include_assignments else []
-    
-    for assignment in assignments:
-        submission = (
+    ).scalars().all()) if include_assignments else []
+    submissions: dict[UUID, Submission] = {}
+    if assignments:
+        submission_rows = (
             await session.execute(
                 select(Submission).where(
-                    Submission.assignment_id == assignment.id, 
+                    Submission.assignment_id.in_([assignment.id for assignment in assignments]),
                     Submission.student_id == student_id,
-                    Submission.mark.is_not(None)
+                    Submission.mark.is_not(None),
                 )
             )
-        ).scalar_one_or_none()
-        
-        if submission is None or submission.mark is None:
-            continue
-            
-        # Normalize the assignment score to 100 before applying weightage
-        # (Assuming exam scores are out of 100 or they are already raw percentage)
-        # Actually, wait, if mark.score in exams is percentage, we should convert assignment mark to percentage:
-        normalized_score = (submission.mark / assignment.max_marks) * 100.0
-        weighted_sum += normalized_score * assignment.weightage
-        total_weight += assignment.weightage
-        count += 1
+        ).scalars().all()
+        submissions = {submission.assignment_id: submission for submission in submission_rows}
+    assignment_sum, assignment_weight, assignment_count = _assignment_totals(
+        assignments, submissions, student_id
+    )
+    weighted_sum += assignment_sum
+    total_weight += assignment_weight
+    count += assignment_count
 
     if total_weight == 0:
         return CourseResult(course_id=course_id, raw_score=None, band=None, exam_count=0)
 
     raw_score = weighted_sum / total_weight
-    band = None
-    if last_scheme_id is not None:
-        scheme = await session.get(GradingScheme, last_scheme_id)
-        if scheme is not None:
-            band = _band_for_score(scheme.bands, raw_score)
+    band = _band_for_score(result_scheme.bands, raw_score) if result_scheme is not None else None
     return CourseResult(course_id=course_id, raw_score=round(raw_score, 2), band=band, exam_count=count)
 
 
@@ -1094,7 +1156,26 @@ async def get_course_result(
     student = await session.get(StudentProfile, student_id)
     if student is None or student.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Student not found")
-    return await _compute_course_result(session, madrasa.id, student_id, course_id)
+    active_session_id = await _active_session_id(session, madrasa.id)
+    enrollment = (
+        await session.execute(
+            select(Enrollment).where(
+                Enrollment.madrasa_id == madrasa.id,
+                Enrollment.session_id == active_session_id,
+                Enrollment.student_id == student_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if enrollment is None:
+        raise HTTPException(status_code=404, detail=ErrorCode.STUDENT_NOT_ENROLLED)
+    return await _compute_course_result(
+        session,
+        madrasa.id,
+        student_id,
+        course_id,
+        enrollment.class_id,
+        enrollment.section_id,
+    )
 
 
 @router.get("/results/session", response_model=SessionResult)
@@ -1155,7 +1236,21 @@ async def _build_session_result(session: AsyncSession, madrasa_id: UUID, student
             ).scalars().all()
         ]
 
-    course_results = [await _compute_course_result(session, madrasa_id, student_id, course_id) for course_id in course_ids]
+    course_results = (
+        [
+            await _compute_course_result(
+                session,
+                madrasa_id,
+                student_id,
+                course_id,
+                enrollment.class_id,
+                enrollment.section_id,
+            )
+            for course_id in course_ids
+        ]
+        if enrollment is not None
+        else []
+    )
     scored = [r.raw_score for r in course_results if r.raw_score is not None]
     overall = round(sum(scored) / len(scored), 2) if scored else None
 
@@ -1396,7 +1491,14 @@ async def _section_matrix(
 
     async def _scheme(scheme_id: UUID) -> GradingScheme | None:
         if scheme_id not in scheme_cache:
-            scheme_cache[scheme_id] = await session.get(GradingScheme, scheme_id)
+            scheme_cache[scheme_id] = (
+                await session.execute(
+                    select(GradingScheme).where(
+                        GradingScheme.id == scheme_id,
+                        GradingScheme.madrasa_id == madrasa_id,
+                    )
+                )
+            ).scalar_one_or_none()
         return scheme_cache[scheme_id]
 
     assignments_by_course: dict[UUID, list[Assignment]] = {course.id: [] for course in course_rows}
@@ -1444,25 +1546,29 @@ async def _section_matrix(
             ]
             weighted_sum = 0.0
             total_weight = 0.0
-            last_scheme_id = None
             for et in exam_types:
                 score = marks.get((student.id, et.id))
                 if score is None:
                     continue
                 weighted_sum += score * et.weightage
                 total_weight += et.weightage
-                last_scheme_id = et.grading_scheme_id
-            result_scheme_id = last_scheme_id or (exam_types[0].grading_scheme_id if exam_types else None)
-            result_scheme = await _scheme(result_scheme_id) if result_scheme_id is not None else None
+            applicable_schemes = {
+                et.grading_scheme_id: scheme
+                for et in exam_types
+                if (scheme := await _scheme(et.grading_scheme_id)) is not None
+            }
+            result_scheme = _result_scheme_for_class(exam_types, applicable_schemes, section.class_id)
             if result_scheme is not None and result_scheme.include_assignments:
-                for assignment in assignments_by_course[course.id]:
-                    if assignment.target_student_ids and str(student.id) not in assignment.target_student_ids:
-                        continue
-                    submission = submissions_by_student_assignment.get((student.id, assignment.id))
-                    if submission is None or submission.mark is None:
-                        continue
-                    weighted_sum += (submission.mark / assignment.max_marks) * 100.0 * assignment.weightage
-                    total_weight += assignment.weightage
+                assignment_submissions = {
+                    assignment.id: submissions_by_student_assignment[(student.id, assignment.id)]
+                    for assignment in assignments_by_course[course.id]
+                    if (student.id, assignment.id) in submissions_by_student_assignment
+                }
+                assignment_sum, assignment_weight, _ = _assignment_totals(
+                    assignments_by_course[course.id], assignment_submissions, student.id
+                )
+                weighted_sum += assignment_sum
+                total_weight += assignment_weight
             raw_score = round(weighted_sum / total_weight, 2) if total_weight else None
             band = None
             if raw_score is not None and result_scheme is not None:

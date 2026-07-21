@@ -33,6 +33,7 @@ import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, ty
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter } from "./ui/InlineFilter";
 
 export type AssessmentTab = "assignments" | "grading" | "results" | "setup";
 
@@ -221,41 +222,25 @@ function AssignmentsTab({
 
   return (
     <>
-      <div className="filterBar">
-        <Select value={filters.class_id} onChange={(e) => updateFilters({ ...filters, class_id: e.target.value, section_id: "" })}>
-          <option value="">{t("allClasses")}</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        <Select value={filters.section_id} onChange={(e) => updateFilters({ ...filters, section_id: e.target.value })} disabled={!filters.class_id}>
-          <option value="">{t("allSections")}</option>
-          {filterSections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </Select>
-        <Select value={filters.course_id} onChange={(e) => updateFilters({ ...filters, course_id: e.target.value })}>
-          <option value="">{t("allCourses")}</option>
-          {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        <Select value={filters.category} onChange={(e) => updateFilters({ ...filters, category: e.target.value })}>
-          <option value="">{t("allCategories")}</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </Select>
-        {canPublishAll && (
-          <Select value={filters.created_by_id} onChange={(e) => updateFilters({ ...filters, created_by_id: e.target.value })}>
-            <option value="">{t("allTeachers")}</option>
-            {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
-          </Select>
-        )}
-        <Select value={filters.sort} onChange={(e) => updateFilters({ ...filters, sort: e.target.value })}>
-          <option value="due_date">{t("sortByDueDate")}</option>
-          <option value="created_at">{t("sortByNewest")}</option>
-          <option value="title">{t("sortByTitle")}</option>
-          {canPublishAll && <option value="teacher">{t("sortByTeacher")}</option>}
-        </Select>
+      <InlineFilter filters={[
+        { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => updateFilters({ ...filters, class_id: value, section_id: "" }) },
+        { key: "section", type: "select", value: filters.section_id, placeholder: t("allSections"), disabled: !filters.class_id, options: filterSections.map((s) => ({ value: s.id, label: s.name })), onChange: (value) => updateFilters({ ...filters, section_id: value }) },
+        { key: "course", type: "select", value: filters.course_id, placeholder: t("allCourses"), options: courses.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => updateFilters({ ...filters, course_id: value }) },
+        { key: "category", type: "select", value: filters.category, placeholder: t("allCategories"), options: categories.map((c) => ({ value: c, label: c })), onChange: (value) => updateFilters({ ...filters, category: value }) },
+        ...(canPublishAll ? [{ key: "teacher", type: "select" as const, value: filters.created_by_id, placeholder: t("allTeachers"), options: teachers.map((teacher) => ({ value: teacher.id, label: teacher.name })), onChange: (value: string) => updateFilters({ ...filters, created_by_id: value }) }] : []),
+        { key: "sort", type: "select", value: filters.sort, options: [
+          { value: "due_date", label: t("sortByDueDate") },
+          { value: "created_at", label: t("sortByNewest") },
+          { value: "title", label: t("sortByTitle") },
+          ...(canPublishAll ? [{ value: "teacher", label: t("sortByTeacher") }] : []),
+        ], onChange: (value) => updateFilters({ ...filters, sort: value }) },
+      ]}>
         {canCreate && (
           <Button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
             <Plus size={16} /> {t("createAssignmentBtn")}
           </Button>
         )}
-      </div>
+      </InlineFilter>
 
       {showCreate && canCreate && (
         <AssignmentCreateForm
@@ -660,17 +645,10 @@ function GradingTab({
 
   return (
     <>
-      <div className="filterBar">
-        <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
-          <option value="">{t("chooseClassEllipsis")}</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        {matrix && section && (
-          <Select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-            {section.courses.map((c) => <option key={c.course_id} value={c.course_id}>{c.course_name}</option>)}
-          </Select>
-        )}
-      </div>
+      <InlineFilter filters={[
+        { key: "class", type: "select", value: classId, placeholder: t("chooseClassEllipsis"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: setClassId },
+        ...(matrix && section ? [{ key: "course", type: "select" as const, value: courseId, options: section.courses.map((c) => ({ value: c.course_id, label: c.course_name })), onChange: setCourseId }] : []),
+      ]} />
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
       {matrix && (
@@ -784,7 +762,7 @@ function MarkCell({
         }}
       />
       {value !== (initial?.toString() ?? "") && (
-        <Button className="iconBtn" onClick={() => save()} disabled={saving} type="button" title={t("saveBtn", "Save")}>
+        <Button className="iconBtn" onClick={() => save()} disabled={saving} type="button" title={t("saveBtn")}>
           <Save size={14} />
         </Button>
       )}
@@ -810,6 +788,9 @@ function GradingSetup({
   const [showSchemeForm, setShowSchemeForm] = useState(false);
   const [showExamForm, setShowExamForm] = useState(false);
   const [error, setError] = useState("");
+  const [limitClassId, setLimitClassId] = useState("");
+  const [assignmentLimit, setAssignmentLimit] = useState("");
+  const [classLimits, setClassLimits] = useState<Record<string, number | null>>({});
 
   const load = async () => {
     setSchemes(await assessmentsApi.listGradingSchemes());
@@ -818,6 +799,9 @@ function GradingSetup({
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    setClassLimits(Object.fromEntries(classes.map((item) => [item.id, item.assignment_limit ?? null])));
+  }, [classes]);
 
   return (
     <PageSection style={{ marginBottom: 16 }}>
@@ -834,6 +818,43 @@ function GradingSetup({
           setShowExamForm(true);
         }}><Plus size={16} /> {t("addExamTypeBtn")}</Button>}
       </div>
+      {canCreateScheme && (
+        <div className="formActions" style={{ marginBottom: 12 }}>
+          <Select value={limitClassId} onChange={(event) => {
+            const classId = event.target.value;
+            setLimitClassId(classId);
+            setAssignmentLimit(String(classLimits[classId] ?? ""));
+          }}>
+            <option value="">{t("chooseClassEllipsis")}</option>
+            {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </Select>
+          <Input
+            type="number"
+            min="1"
+            value={assignmentLimit}
+            onChange={(event) => setAssignmentLimit(event.target.value)}
+            placeholder={t("assignmentLimitExample")}
+            aria-label={t("assignmentLimitLabel")}
+          />
+          <Button
+            className="secondaryAction"
+            type="button"
+            disabled={!limitClassId}
+            onClick={async () => {
+              await academicsApi.updateClass(limitClassId, {
+                assignment_limit: assignmentLimit ? Number(assignmentLimit) : null,
+              });
+              setClassLimits((current) => ({
+                ...current,
+                [limitClassId]: assignmentLimit ? Number(assignmentLimit) : null,
+              }));
+            }}
+          >
+            <Save size={16} /> {t("saveBtn")}
+          </Button>
+          <small className="notice">{t("assignmentLimitLabel")}</small>
+        </div>
+      )}
       {showSchemeForm && <FormModal
             title={editingScheme ? t("editBtn") : t("addSchemeBtn")} onClose={() => setShowSchemeForm(false)}
             onSubmit={async (e) => {
@@ -859,7 +880,7 @@ function GradingSetup({
                       setError(err.response?.data?.detail ?? t("failedCreateScheme"));
                     }
                   }}
-            submitLabel={editingScheme ? t("saveBtn", "Save") : t("addSchemeBtn")}
+            submitLabel={editingScheme ? t("saveBtn") : t("addSchemeBtn")}
             submitIcon={editingScheme ? <Pencil size={16} /> : <Plus size={16} />}
             submitDisabled={schemeForm.bands.length === 0}
           >
@@ -927,7 +948,7 @@ function GradingSetup({
                       setError(err.response?.data?.detail ?? t("failedCreateExamType"));
                     }
                   }}
-            submitLabel={editingExam ? t("saveBtn", "Save") : t("addExamTypeBtn")}
+            submitLabel={editingExam ? t("saveBtn") : t("addExamTypeBtn")}
             submitIcon={editingExam ? <Pencil size={16} /> : <Plus size={16} />}
           >
             <label>
@@ -1056,22 +1077,20 @@ function ResultsTab({
 
   return (
     <>
-      <div className="filterBar">
-        <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
-          <option value="">{t("chooseClassEllipsis")}</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
+      <InlineFilter filters={[
+        { key: "class", type: "select", value: classId, placeholder: t("chooseClassEllipsis"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: setClassId },
+      ]}>
         {matrix && (
           <>
-            <Button className="secondaryAction" type="button" onClick={() => void assessmentsApi.exportResults({ class_id: classId }, "csv")}>
+            <Button className="secondaryAction" type="button" onClick={() => assessmentsApi.exportResults({ class_id: classId }, "csv")}>
               <FileDown size={16} /> CSV
             </Button>
-            <Button className="secondaryAction" type="button" onClick={() => void assessmentsApi.exportResults({ class_id: classId }, "pdf")}>
+            <Button className="secondaryAction" type="button" onClick={() => assessmentsApi.exportResults({ class_id: classId }, "pdf")}>
               <FileDown size={16} /> PDF
             </Button>
           </>
         )}
-      </div>
+      </InlineFilter>
 
       {matrix && uniqueCourses.length > 0 && (
         <div className="formActions" style={{ marginBottom: 8, flexWrap: "wrap" }}>
@@ -1134,7 +1153,7 @@ function ResultsTab({
                           className="tableAction"
                           type="button"
                           title={t("downloadResultCardBtn")}
-                          onClick={() => void assessmentsApi.downloadResultCard(student.student_id, matrix.session_id)}
+                          onClick={() => assessmentsApi.downloadResultCard(student.student_id, matrix.session_id)}
                         >
                           <FileDown size={14} />
                         </Button>

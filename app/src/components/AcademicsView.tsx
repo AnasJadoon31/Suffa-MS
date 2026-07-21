@@ -40,7 +40,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
   const [className, setClassName] = useState("");
   const [classProgramId, setClassProgramId] = useState("");
   const [classPortalEnabled, setClassPortalEnabled] = useState(true);
-  const [classAssignmentLimit, setClassAssignmentLimit] = useState("");
   const [sectionClassId, setSectionClassId] = useState("");
   const [sectionName, setSectionName] = useState("");
   const [courseName, setCourseName] = useState("");
@@ -255,10 +254,9 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                             onSubmit={async (e) => {
                                             e.preventDefault();
                                             if (!classProgramId) return;
-                                            await academicsApi.createClass(classProgramId, className, classPortalEnabled, classAssignmentLimit ? Number(classAssignmentLimit) : null);
+                                            await academicsApi.createClass(classProgramId, className, classPortalEnabled);
                                             setClassName("");
                                             setClassPortalEnabled(true);
-                                            setClassAssignmentLimit("");
                                             setCreateModal(null);
                                             await refreshAll();
                                           }}
@@ -283,10 +281,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                                             {t("classPortalEnabledLabel")}
                                           </label>
 
-                          <label>
-                                            {t("assignmentLimitLabel", "Assignment Limit (Optional)")}
-                                            <Input type="number" min="1" value={classAssignmentLimit} onChange={(e) => setClassAssignmentLimit(e.target.value)} placeholder={t("assignmentLimitExample", "e.g. 5")} />
-                                          </label>
                           </FormModal>}
               <div className="moduleToolbar">
                 <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={classSearch} onChange={(e) => setClassSearch(e.target.value)} />
@@ -300,7 +294,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 </Select>
               </div>
               <div className="dataTable">
-                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span><span>{t("portalCol")}</span><span>{t("assignmentLimitShortLabel")}</span><span>{t("actionsCol")}</span></div>
+                <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span><span>{t("portalCol")}</span><span>{t("actionsCol")}</span></div>
                 {classesToShow.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
                 {classesToShow.map((c) => (
                   <div className="dataRow" key={c.id}>
@@ -316,7 +310,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               name: editingClass.name,
                               program_id: editingClass.program_id,
                               default_portal_enabled: editingClass.default_portal_enabled,
-                              assignment_limit: editingClass.assignment_limit,
                             });
                             setEditingClass(null);
                             await refreshAll();
@@ -341,22 +334,11 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           />
                           {t("classPortalEnabledLabel")}
                         </label>
-                        <label>
-                          {t("assignmentLimitLabel", "Assignment Limit (Optional)")}
-                          <Input
-                            type="number"
-                            min="1"
-                            value={editingClass.assignment_limit ?? ""}
-                            onChange={(e) => setEditingClass({ ...editingClass, assignment_limit: e.target.value ? Number(e.target.value) : null })}
-                            placeholder={t("assignmentLimitExample", "e.g. 5")}
-                          />
-                        </label>
                       </FormModal>
                     )}
                         <span>{c.name}</span>
                         <span>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
                         <span>{c.default_portal_enabled ? t("yesLabel") : t("noLabel")}</span>
-                        <span>{c.assignment_limit ?? t("noLimitLabel")}</span>
                         <span className="actions">
                           <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingClass(c)}><Edit2 size={16} /></Button>
                           <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteClass(c.id))}><Trash2 size={16} /></Button>
@@ -692,7 +674,7 @@ function CourseMappingModal({
               {assignedCourses.map((co) => (
                 <div className="courseMapItem" key={co.id}>
                   <span>{co.name}</span>
-                  <Button className="iconBtn" title={t("unassignBtn")} type="button" onClick={() => void onUnassign(co.id)}>
+                  <Button className="iconBtn" title={t("unassignBtn")} type="button" onClick={() => onUnassign(co.id)}>
                     <Trash2 size={14} />
                   </Button>
                 </div>
@@ -706,7 +688,7 @@ function CourseMappingModal({
               {available.map((co) => (
                 <div className="courseMapItem" key={co.id}>
                   <span>{co.name}</span>
-                  <Button className="iconBtn" title={t("assignCourseBtn")} type="button" onClick={() => void onAssign(co.id)}>
+                  <Button className="iconBtn" title={t("assignCourseBtn")} type="button" onClick={() => onAssign(co.id)}>
                     <Plus size={14} />
                   </Button>
                 </div>

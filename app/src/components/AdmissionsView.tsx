@@ -370,7 +370,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
           { header: t("statusCol"), render: (adm) => adm.is_open ? t("openLabel") : t("closedLabel") },
           { header: t("actionsCol"), render: (adm) => (
             <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Button className="tableAction" type="button" onClick={() => void copyLink(adm)}>
+              <Button className="tableAction" type="button" onClick={() => copyLink(adm)}>
                 <Copy size={14} /> {copiedId === adm.id ? t("linkCopied") : t("copyPublicLinkBtn")}
               </Button>
               {canMutate && <Button

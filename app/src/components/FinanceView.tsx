@@ -12,6 +12,7 @@ import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter } from "./ui/InlineFilter";
 import { MetricGrid, MetricCard } from "./ui/Card";
 import { useSessionReadOnly } from "./SessionSwitcher";
 
@@ -143,18 +144,12 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
 
   return (
     <>
-      <div className="filterBar">
-        <Select value={filters.class_id} onChange={(e) => setFilters({ ...filters, class_id: e.target.value })}>
-          <option value="">{t("allClasses")}</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        <Select value={filters.category_id} onChange={(e) => setFilters({ ...filters, category_id: e.target.value })}>
-          <option value="">{t("allCategories")}</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        <Input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} />
-        <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
-      </div>
+      <InlineFilter filters={[
+        { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
+        { key: "category", type: "select", value: filters.category_id, placeholder: t("allCategories"), options: categories.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
+        { key: "date-from", type: "input", inputType: "date", value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
+        { key: "date-to", type: "input", inputType: "date", value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
+      ]} />
       {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("recordPaymentBtn")}</Button>}
       {canManage && showCreate && (
         <FormModal
@@ -225,7 +220,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
             <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
             <span>{p.note ?? "—"}</span>
             <span>
-              <Button className="tableAction" type="button" onClick={() => void financeApi.downloadPaymentReceipt(p.id)}>
+              <Button className="tableAction" type="button" onClick={() => financeApi.downloadPaymentReceipt(p.id)}>
                 <FileDown size={14} /> PDF
               </Button>
               {canManage && (
@@ -385,7 +380,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
             <span>{d.donation_date}<HijriTag date={d.donation_date} /></span>
             <span>{d.note ?? "—"}</span>
             <span>
-              <Button className="tableAction" type="button" onClick={() => void financeApi.downloadDonationReceipt(d.id)}>
+              <Button className="tableAction" type="button" onClick={() => financeApi.downloadDonationReceipt(d.id)}>
                 <FileDown size={14} /> PDF
               </Button>
               {canManage && (

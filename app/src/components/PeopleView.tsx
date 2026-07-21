@@ -320,7 +320,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
         <FormModal
           title={t("editTeacherBtn", "Edit Teacher")} onClose={() => setEditingTeacher(null)}
           onSubmit={onEditSubmit}
-          submitLabel={t("saveBtn", "Save")}
+          submitLabel={t("saveBtn")}
           submitIcon={<Edit2 size={16} />}
         >
           <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
@@ -512,7 +512,7 @@ function TeacherDetail({
         <FormModal
           title={t("editTeacher", "Edit Teacher")}
           onClose={() => setShowEdit(false)}
-          submitLabel={t("saveBtn", "Save")}
+          submitLabel={t("saveBtn")}
           submitIcon={<Pencil size={16} />}
           onSubmit={async (e) => {
             e.preventDefault();
@@ -713,7 +713,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
         <FormModal
           title={t("editStudentBtn", "Edit Student")} onClose={() => setEditingStudent(null)}
           onSubmit={onEditSubmit}
-          submitLabel={t("saveBtn", "Save")}
+          submitLabel={t("saveBtn")}
           submitIcon={<Edit2 size={16} />}
         >
           <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
@@ -937,7 +937,7 @@ function StudentDetail({
         <FormModal
           title={t("editStudent", "Edit Student")}
           onClose={() => setShowEdit(false)}
-          submitLabel={t("saveBtn", "Save")}
+          submitLabel={t("saveBtn")}
           submitIcon={<Pencil size={16} />}
           onSubmit={async (e) => {
             e.preventDefault();
@@ -1350,7 +1350,7 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
                 <div>
                   <strong>{s.name}</strong> <span style={{ color: "var(--slate-500)", fontSize: "0.85rem" }}>({s.admission_number})</span>
                 </div>
-                <Button className="tableAction" type="button" onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn", "Unlink")}>
+                <Button className="tableAction" type="button" onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn")}>
                   <X size={14} />
                 </Button>
               </div>
@@ -1364,7 +1364,7 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
         <FormModal
           title={t("editGuardian", "Edit Guardian")}
           onClose={() => setShowEdit(false)}
-          submitLabel={t("saveBtn", "Save")}
+          submitLabel={t("saveBtn")}
           submitIcon={<Pencil size={16} />}
           onSubmit={async (e) => {
             e.preventDefault();
@@ -1435,7 +1435,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
           { header: t("nameLabel"), render: (d) => d.name },
           { header: t("contactCol"), render: (d) => d.contact },
           { header: t("actionsCol"), render: (d) => (
-            <Button className="tableAction" type="button" onClick={() => void openDonor(d)}>
+            <Button className="tableAction" type="button" onClick={() => openDonor(d)}>
               <Eye size={14} /> {t("viewBtn")}
             </Button>
           )},
@@ -1522,7 +1522,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
             <FormModal
               title={t("editDonor", "Edit Donor")}
               onClose={() => setShowEdit(false)}
-              submitLabel={t("saveBtn", "Save")}
+              submitLabel={t("saveBtn")}
               submitIcon={<Pencil size={16} />}
               onSubmit={async (e) => {
                 e.preventDefault();
