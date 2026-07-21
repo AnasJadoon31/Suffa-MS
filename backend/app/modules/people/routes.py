@@ -318,7 +318,11 @@ async def update_student(
     student = await _get_or_404(session, StudentProfile, student_id, madrasa.id)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(student, field, value)
-    await session.commit()
+    try:
+        await session.commit()
+    except exc.IntegrityError as e:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Admission number already in use or unique constraint violation") from e
     await session.refresh(student)
     return StudentRead.model_validate(student)
 

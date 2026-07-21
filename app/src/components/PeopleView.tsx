@@ -793,6 +793,7 @@ function StudentDetail({
   const [feeForm, setFeeForm] = useState({ category_id: "", amount: "", payment_date: "" });
   const [showFeeModal, setShowFeeModal] = useState(false);
   const [error, setError] = useState("");
+  const [selectedGuardian, setSelectedGuardian] = useState<Guardian | null>(null);
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -842,13 +843,18 @@ function StudentDetail({
 
       <h4>{t("guardians")}</h4>
       <div className="dataTable">
-        <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("relationshipLabel")}</span><span>{t("phoneCol")}</span></div>
+        <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("relationshipLabel")}</span><span>{t("phoneCol")}</span><span></span></div>
         {guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
         {guardians.map((g) => (
           <div className="dataRow" key={g.id}>
             <span>{g.name}</span>
             <span>{g.relationship}</span>
             <span>{g.phone_numbers}</span>
+            <span>
+              <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setSelectedGuardian(g)}>
+                <Eye size={14} />
+              </Button>
+            </span>
           </div>
         ))}
       </div>
@@ -916,6 +922,13 @@ function StudentDetail({
         <AssignClassModal
           student={student}
           onClose={() => setShowEnrollModal(false)}
+        />
+      )}
+      {selectedGuardian && (
+        <GuardianDetail
+          guardian={selectedGuardian}
+          onClose={() => setSelectedGuardian(null)}
+          onUpdate={() => { setSelectedGuardian(null); void load(); }}
         />
       )}
       </div>

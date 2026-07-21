@@ -71,6 +71,7 @@ class StudentCreate(BaseModel):
 class StudentUpdate(BaseModel):
     name: str | None = None
     date_of_birth: date | None = None
+    admission_number: str | None = None
     portal_enabled: bool | None = None
     notes: str | None = None
     b_form_number: str | None = None
