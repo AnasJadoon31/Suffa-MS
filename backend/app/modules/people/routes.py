@@ -15,6 +15,7 @@ from app.modules.people.schemas import (
     GuardianCreate,
     GuardianCredentialsRequest,
     GuardianRead,
+    GuardianUpdate,
     StudentCreate,
     StudentProvisionedRead,
     StudentRead,
@@ -379,6 +380,26 @@ async def create_guardian(
             raise HTTPException(status_code=404, detail=f"Student {student_id} not found")
         session.add(StudentGuardian(student_id=student_id, guardian_id=guardian.id))
 
+    await session.commit()
+    await session.refresh(guardian)
+    return GuardianRead.model_validate(guardian)
+
+
+@router.put("/guardians/{guardian_id}", response_model=GuardianRead)
+async def update_guardian(
+    guardian_id: UUID,
+    payload: GuardianUpdate,
+    current_user: User = Depends(require_permission("students.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> GuardianRead:
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+    if payload.name is not None: guardian.name = payload.name
+    if payload.relationship is not None: guardian.relationship = payload.relationship
+    if payload.phone_numbers is not None: guardian.phone_numbers = payload.phone_numbers
+    if payload.cnic is not None: guardian.cnic = payload.cnic
+    if payload.address is not None: guardian.address = payload.address
+    if payload.preferred_language is not None: guardian.preferred_language = payload.preferred_language
     await session.commit()
     await session.refresh(guardian)
     return GuardianRead.model_validate(guardian)

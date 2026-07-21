@@ -1,8 +1,9 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import { Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X, Edit2 } from "lucide-react";
+import { Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X, Edit2, Pencil, UserMinus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { useDialog } from "../lib/DialogContext";
 import { useAuth } from "../lib/AuthContext";
 import {
   attendanceApi,
@@ -380,7 +381,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
       />
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
-      {detail && <Modal title={detail.name} onClose={() => setDetail(null)}><TeacherDetail teacher={detail} canSalary={canSalary} onClose={() => setDetail(null)} /></Modal>}
+      {detail && <TeacherDetail teacher={detail} canSalary={canSalary} onClose={() => setDetail(null)} onUpdate={() => { setDetail(null); void load(); }} />}
     </>
   );
 }
@@ -389,7 +390,8 @@ function TeacherDetail({
   teacher,
   canSalary,
   onClose,
-}: Readonly<{ teacher: Teacher; canSalary: boolean; onClose: () => void }>) {
+  onUpdate,
+}: Readonly<{ teacher: Teacher; canSalary: boolean; onClose: () => void; onUpdate: () => void }>) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [payments, setPayments] = useState<SalaryPayment[]>([]);
@@ -397,6 +399,13 @@ function TeacherDetail({
   const [showPayModal, setShowPayModal] = useState(false);
   const [error, setError] = useState("");
   const [showDelegate, setShowDelegate] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: teacher.name, whatsapp_number: teacher.whatsapp_number, qualifications: teacher.qualifications ?? "",
+    join_date: teacher.join_date ?? "", cnic: teacher.cnic ?? "", address: teacher.address ?? "", emergency_contact: teacher.emergency_contact ?? ""
+  });
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission("teachers.edit");
 
   const load = async () => {
     if (!canSalary) return;
@@ -412,20 +421,26 @@ function TeacherDetail({
   }, [teacher.id]);
 
   return (
-    <div className="detailPanel">
-      <PageHeader
-        title={`${teacher.name} · ${teacher.employee_code}`}
-        actions={
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            {user?.role === "principal" && (
-              <Button className="secondaryAction" type="button" onClick={() => setShowDelegate(true)}>
-                <ShieldCheck size={16} /> {t("delegateBtn")}
-              </Button>
-            )}
-          </div>
-        }
-      />
-      <dl className="detailGrid">
+    <Modal
+      title={`${teacher.name} · ${teacher.employee_code}`}
+      onClose={onClose}
+      actions={
+        <>
+          {canEdit && (
+            <Button className="secondaryAction" type="button" onClick={() => setShowEdit(true)}>
+              <Pencil size={16} /> {t("edit", "Edit")}
+            </Button>
+          )}
+          {user?.role === "principal" && (
+            <Button className="secondaryAction" type="button" onClick={() => setShowDelegate(true)}>
+              <ShieldCheck size={16} /> {t("delegateBtn")}
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="detailPanel" style={{ padding: "1.5rem" }}>
+        <dl className="detailGrid">
         <dt>{t("whatsappCol")}</dt><dd>{teacher.whatsapp_number || "—"}</dd>
         <dt>{t("qualificationsLabel")}</dt><dd>{teacher.qualifications ?? "—"}</dd>
         <dt>{t("joinDateLabel")}</dt><dd>{teacher.join_date ?? "—"}</dd>
@@ -492,7 +507,43 @@ function TeacherDetail({
           )}
         </>
       )}
-    </div>
+      </div>
+      {showEdit && (
+        <FormModal
+          title={t("editTeacher", "Edit Teacher")}
+          onClose={() => setShowEdit(false)}
+          submitLabel={t("saveBtn", "Save")}
+          submitIcon={<Pencil size={16} />}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            try {
+              await peopleApi.updateTeacher(teacher.id, {
+                name: editForm.name,
+                whatsapp_number: editForm.whatsapp_number,
+                qualifications: editForm.qualifications || undefined,
+                join_date: editForm.join_date || undefined,
+                cnic: editForm.cnic || undefined,
+                address: editForm.address || undefined,
+                emergency_contact: editForm.emergency_contact || undefined,
+              });
+              setShowEdit(false);
+              onUpdate();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedToUpdate", "Failed to update"));
+            }
+          }}
+        >
+          <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
+          <label>{t("whatsappCol")}<Input required value={editForm.whatsapp_number} onChange={(e) => setEditForm({ ...editForm, whatsapp_number: e.target.value })} /></label>
+          <label>{t("qualificationsLabel")}<Input value={editForm.qualifications} onChange={(e) => setEditForm({ ...editForm, qualifications: e.target.value })} /></label>
+          <label>{t("joinDateLabel")}<Input type="date" value={editForm.join_date} onChange={(e) => setEditForm({ ...editForm, join_date: e.target.value })} /></label>
+          <label>{t("cnicLabel")}<Input value={editForm.cnic} onChange={(e) => setEditForm({ ...editForm, cnic: e.target.value })} placeholder="12345-1234567-1" /></label>
+          <label>{t("addressCol")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
+          <label>{t("emergencyContactCol")}<Input value={editForm.emergency_contact} onChange={(e) => setEditForm({ ...editForm, emergency_contact: e.target.value })} /></label>
+        </FormModal>
+      )}
+    </Modal>
   );
 }
 
@@ -724,7 +775,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
         />
       )}
 
-      {detail && <Modal title={detail.name} onClose={() => setDetail(null)}><StudentDetail student={detail} canFinance={canFinance} onClose={() => setDetail(null)} /></Modal>}
+      {detail && <StudentDetail student={detail} canFinance={canFinance} onClose={() => setDetail(null)} onUpdate={() => { setDetail(null); void load(); }} />}
     </>
   );
 }
@@ -733,7 +784,8 @@ function StudentDetail({
   student,
   canFinance,
   onClose,
-}: Readonly<{ student: Student; canFinance: boolean; onClose: () => void }>) {
+  onUpdate,
+}: Readonly<{ student: Student; canFinance: boolean; onClose: () => void; onUpdate: () => void }>) {
   const { t } = useTranslation();
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -743,6 +795,14 @@ function StudentDetail({
   const [error, setError] = useState("");
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: student.name, date_of_birth: student.date_of_birth, admission_number: student.admission_number ?? "",
+    portal_enabled: student.portal_enabled,
+    b_form_number: student.b_form_number ?? "", address: student.address ?? ""
+  });
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission("students.edit");
 
   const load = async () => {
     void peopleApi.studentGuardians(student.id).then(setGuardians).catch(() => setGuardians([]));
@@ -757,18 +817,24 @@ function StudentDetail({
   }, [student.id]);
 
   return (
-    <div className="detailPanel">
-      <PageHeader
-        title={`${student.name} · ${student.username || student.admission_number}${student.current_class ? ` · ${student.current_class}` : ""}`}
-        actions={
-          <>
-            <Button className="secondaryAction" onClick={() => setShowEnrollModal(true)}>
-              {t("assignClassBtn", "Assign Class")}
+    <Modal
+      title={`${student.name} · ${student.username || student.admission_number}${student.current_class ? ` · ${student.current_class}` : ""}`}
+      onClose={onClose}
+      actions={
+        <>
+          {canEdit && (
+            <Button className="secondaryAction" onClick={() => setShowEdit(true)}>
+              <Pencil size={16} /> {t("edit", "Edit")}
             </Button>
-          </>
-        }
-      />
-      <dl className="detailGrid">
+          )}
+          <Button className="secondaryAction" onClick={() => setShowEnrollModal(true)}>
+            {t("assignClassBtn", "Assign Class")}
+          </Button>
+        </>
+      }
+    >
+      <div className="detailPanel" style={{ padding: "1.5rem" }}>
+        <dl className="detailGrid">
         <dt>{t("dobCol")}</dt><dd>{student.date_of_birth}</dd>
         <dt>{t("portalCol")}</dt><dd>{student.portal_enabled ? t("enabledLabel") : t("disabledLabel")}</dd>
         <dt>{t("statusCol")}</dt><dd>{student.status}</dd>
@@ -852,7 +918,41 @@ function StudentDetail({
           onClose={() => setShowEnrollModal(false)}
         />
       )}
-    </div>
+      </div>
+      
+      {showEdit && (
+        <FormModal
+          title={t("editStudent", "Edit Student")}
+          onClose={() => setShowEdit(false)}
+          submitLabel={t("saveBtn", "Save")}
+          submitIcon={<Pencil size={16} />}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            try {
+              await peopleApi.updateStudent(student.id, {
+                name: editForm.name,
+                date_of_birth: editForm.date_of_birth,
+                admission_number: editForm.admission_number || undefined,
+                portal_enabled: editForm.portal_enabled,
+                b_form_number: editForm.b_form_number || undefined,
+                address: editForm.address || undefined,
+              });
+              setShowEdit(false);
+              onUpdate();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedToUpdate", "Failed to update"));
+            }
+          }}
+        >
+          <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
+          <label>{t("dobCol")}<Input type="date" required value={editForm.date_of_birth} onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })} /></label>
+          <label>{t("admissionNumberCol")}<Input value={editForm.admission_number} onChange={(e) => setEditForm({ ...editForm, admission_number: e.target.value })} /></label>
+          <label>{t("bFormNumberCol")}<Input value={editForm.b_form_number} onChange={(e) => setEditForm({ ...editForm, b_form_number: e.target.value })} placeholder="12345-1234567-1" /></label>
+          <label>{t("addressCol")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
+        </FormModal>
+      )}
+    </Modal>
   );
 }
 
@@ -952,6 +1052,9 @@ function GuardiansTab({
   const { t } = useTranslation();
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [form, setForm] = useState({ name: "", relationship: "", phone_numbers: "", cnic: "", address: "" });
+  const [search, setSearch] = useState("");
+  const [students, setStudents] = useState<Student[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -972,6 +1075,16 @@ function GuardiansTab({
       setError(err.response?.data?.detail ?? t("failedLoadGuardians"));
     } finally {
       setIsLoading(false);
+    }
+  };
+  const searchStudents = async (query: string) => {
+    setSearch(query);
+    if (query.length < 2) return setStudents([]);
+    try {
+      const res = await peopleApi.listStudentsPage({ search: query, limit: 5, offset: 0 });
+      setStudents(res.items);
+    } catch {
+      setStudents([]);
     }
   };
   useEffect(() => {
@@ -1014,8 +1127,12 @@ function GuardiansTab({
                               phone_numbers: form.phone_numbers,
                               cnic: form.cnic || undefined,
                               address: form.address || undefined,
+                              student_ids: selectedStudent ? [selectedStudent.id] : [],
                             });
                             setForm({ name: "", relationship: "", phone_numbers: "", cnic: "", address: "" });
+                            setSelectedStudent(null);
+                            setSearch("");
+                            setStudents([]);
                             setShowCreate(false);
                             await load();
                           } catch (err: any) {
@@ -1031,10 +1148,35 @@ function GuardiansTab({
 
               <label>{t("phoneCol")}<Input required value={form.phone_numbers} onChange={(e) => setForm({ ...form, phone_numbers: e.target.value })} /></label>
 
-              <label>{t("cnicLabel")}<Input value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} /></label>
+              <label>{t("cnicLabel")}<Input value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} placeholder="12345-1234567-1" /></label>
 
-              <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-              </FormModal>
+              <label>{t("addressCol")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+              
+              <div style={{ marginTop: "1rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
+                <label style={{ marginBottom: "0.5rem", display: "block", fontWeight: 500 }}>
+                  {t("linkStudentLabel", "Link Student (Optional)")}
+                </label>
+                {selectedStudent ? (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem", border: "1px solid var(--border)", borderRadius: "4px" }}>
+                    <span>{selectedStudent.name} ({selectedStudent.username || selectedStudent.admission_number})</span>
+                    <Button className="iconBtn danger" type="button" onClick={() => setSelectedStudent(null)}><UserMinus size={14} /></Button>
+                  </div>
+                ) : (
+                  <>
+                    <Input placeholder={t("searchStudents", "Search students...")} value={search} onChange={(e) => searchStudents(e.target.value)} />
+                    {students.length > 0 && (
+                      <div className="searchResults" style={{ marginTop: "0.5rem", border: "1px solid var(--border)", borderRadius: "4px", maxHeight: "150px", overflowY: "auto" }}>
+                        {students.map((s) => (
+                          <div key={s.id} style={{ padding: "0.5rem", cursor: "pointer", borderBottom: "1px solid var(--border)" }} onClick={() => { setSelectedStudent(s); setStudents([]); setSearch(""); }}>
+                            {s.name} ({s.username || s.admission_number})
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </FormModal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -1065,20 +1207,26 @@ function GuardiansTab({
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {detail && (
-        <Modal title={detail.name} onClose={() => setDetail(null)}>
-          <GuardianDetail guardian={detail} onClose={() => setDetail(null)} />
-        </Modal>
+        <GuardianDetail guardian={detail} onClose={() => setDetail(null)} onUpdate={() => { setDetail(null); void load(); }} />
       )}
     </>
   );
 }
 
-function GuardianDetail({ guardian, onClose }: Readonly<{ guardian: Guardian; onClose: () => void }>) {
+function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Guardian; onClose: () => void; onUpdate: () => void }>) {
   const { t } = useTranslation();
+  const { confirm: confirmDialog } = useDialog();
   const [students, setStudents] = useState<Student[]>([]);
   const [linkedStudents, setLinkedStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: guardian.name, relationship: guardian.relationship, phone_numbers: guardian.phone_numbers,
+    cnic: guardian.cnic ?? "", address: guardian.address ?? ""
+  });
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission("students.edit");
 
   const loadLinked = async () => {
     try {
@@ -1118,7 +1266,7 @@ function GuardianDetail({ guardian, onClose }: Readonly<{ guardian: Guardian; on
   };
 
   const unlinkStudent = async (studentId: string) => {
-    if (!window.confirm(t("confirmUnlink", "Are you sure you want to unlink this student?"))) return;
+    if (!(await confirmDialog(t("confirmUnlink", "Are you sure you want to unlink this student?")))) return;
     setError("");
     try {
       await peopleApi.unlinkStudentFromGuardian(guardian.id, studentId);
@@ -1129,8 +1277,18 @@ function GuardianDetail({ guardian, onClose }: Readonly<{ guardian: Guardian; on
   };
 
   return (
-    <div className="detailPanel">
-      <PageHeader title={guardian.name} />
+    <Modal 
+      title={guardian.name} 
+      onClose={onClose}
+      actions={
+        canEdit ? (
+          <Button className="secondaryAction" onClick={() => setShowEdit(true)}>
+            <Pencil size={16} /> {t("edit", "Edit")}
+          </Button>
+        ) : null
+      }
+    >
+      <div className="detailPanel" style={{ padding: "1.5rem" }}>
       <div className="infoGrid">
         <div className="infoGroup">
           <label>{t("relationshipLabel")}</label>
@@ -1187,7 +1345,40 @@ function GuardianDetail({ guardian, onClose }: Readonly<{ guardian: Guardian; on
           )}
         </div>
       </div>
-    </div>
+      </div>
+      
+      {showEdit && (
+        <FormModal
+          title={t("editGuardian", "Edit Guardian")}
+          onClose={() => setShowEdit(false)}
+          submitLabel={t("saveBtn", "Save")}
+          submitIcon={<Pencil size={16} />}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            try {
+              await peopleApi.updateGuardian(guardian.id, {
+                name: editForm.name,
+                relationship: editForm.relationship,
+                phone_numbers: editForm.phone_numbers,
+                cnic: editForm.cnic || undefined,
+                address: editForm.address || undefined,
+              });
+              setShowEdit(false);
+              onUpdate();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedToUpdate", "Failed to update"));
+            }
+          }}
+        >
+          <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
+          <label>{t("relationshipLabel")}<Input required value={editForm.relationship} onChange={(e) => setEditForm({ ...editForm, relationship: e.target.value })} /></label>
+          <label>{t("phoneCol")}<Input required value={editForm.phone_numbers} onChange={(e) => setEditForm({ ...editForm, phone_numbers: e.target.value })} /></label>
+          <label>{t("cnicLabel")}<Input value={editForm.cnic} onChange={(e) => setEditForm({ ...editForm, cnic: e.target.value })} placeholder="12345-1234567-1" /></label>
+          <label>{t("addressCol")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
+        </FormModal>
+      )}
+    </Modal>
   );
 }
 
@@ -1203,6 +1394,8 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const [showDonationModal, setShowDonationModal] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", contact: "" });
 
   useEffect(() => {
     void Promise.all([
@@ -1217,6 +1410,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
 
   const openDonor = async (donor: Donor) => {
     setSelected(donor);
+    setEditForm({ name: donor.name, contact: donor.contact });
     setDonations(await financeApi.listDonations(donor.id));
   };
 
@@ -1240,7 +1434,17 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
       />
 
       {selected && (
-        <Modal title={selected.name} onClose={() => setSelected(null)}>
+        <Modal 
+          title={selected.name} 
+          onClose={() => setSelected(null)}
+          actions={
+            canWrite ? (
+              <Button className="secondaryAction" onClick={() => setShowEdit(true)}>
+                <Pencil size={16} /> {t("edit", "Edit")}
+              </Button>
+            ) : null
+          }
+        >
           <div className="detailPanel">
             <h4>{t("donationHistoryHeading")}</h4>
           <div className="dataTable">
@@ -1300,6 +1504,33 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
           )}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
           </div>
+          
+          {showEdit && (
+            <FormModal
+              title={t("editDonor", "Edit Donor")}
+              onClose={() => setShowEdit(false)}
+              submitLabel={t("saveBtn", "Save")}
+              submitIcon={<Pencil size={16} />}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setError("");
+                try {
+                  await financeApi.updateDonor(selected.id, editForm);
+                  setShowEdit(false);
+                  setSelected(null);
+                  setIsLoading(true);
+                  const newDonors = await financeApi.listDonors();
+                  setDonors(newDonors);
+                  setIsLoading(false);
+                } catch (err: any) {
+                  setError(err.response?.data?.detail ?? t("failedToUpdate", "Failed to update"));
+                }
+              }}
+            >
+              <label>{t("donorNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
+              <label>{t("contactCol")}<Input required value={editForm.contact} onChange={(e) => setEditForm({ ...editForm, contact: e.target.value })} /></label>
+            </FormModal>
+          )}
         </Modal>
       )}
     </>

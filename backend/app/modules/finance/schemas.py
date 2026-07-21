@@ -42,6 +42,11 @@ class DonorCreate(BaseModel):
     contact: str
 
 
+class DonorUpdate(BaseModel):
+    name: str | None = None
+    contact: str | None = None
+
+
 class DonorRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID

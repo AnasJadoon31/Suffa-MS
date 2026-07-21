@@ -91,7 +91,7 @@ export function FormsView() {
       </div>}
 
       {canCreate && showCreate && <FormModal
-            title={t("createFormBtn")} onClose={() => setShowCreate(false)}
+            title={t("createFormBtn")} onClose={() => setShowCreate(false)} maxWidth={800}
             onSubmit={async (e) => {
                       e.preventDefault();
                       setError("");
@@ -196,6 +196,7 @@ export function FormsView() {
       {selected && (
         <FormModal
           title={selected.title}
+          maxWidth={800}
           onClose={() => setSelected(null)}
           submitLabel={t("submitResponseBtn")}
           submitIcon={<Send size={16} />}

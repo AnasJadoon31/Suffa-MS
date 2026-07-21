@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -459,16 +459,16 @@ async def export_timetable(
     )
 
 
-@router.get("/admission-forms", response_model=PaginatedResponse[AdmissionFormRead])
+@router.get("/admission-forms", response_model=list[AdmissionFormRead])
 async def list_admission_forms(
+    response: Response,
     category: str | None = None,
     program_id: UUID | None = None,
-    pagination: PaginationParams = Depends(),
+    limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(0, ge=0),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
-) -> PaginatedResponse[AdmissionFormRead]:
-    from app.modules.academics.models import Program
-
+) -> list[AdmissionFormRead]:
     query = select(AdmissionForm).where(AdmissionForm.madrasa_id == madrasa.id)
     if category:
         query = query.where(AdmissionForm.category == category)
@@ -476,6 +476,8 @@ async def list_admission_forms(
         query = query.where(AdmissionForm.program_id == program_id)
         
     query = query.order_by(AdmissionForm.created_at.desc())
+    
+    return await paginate_scalars(session, query, limit=limit, offset=offset, response=response)
 
 
 @router.delete("/timetable/{slot_id}")
@@ -1261,6 +1263,7 @@ async def delete_form(
     is_admin = await _form_admin(current_user, session)
     if form.created_by_id != current_user.id and not is_admin:
         raise HTTPException(status_code=403, detail="Not your form")
+    await session.execute(delete(FormResponse).where(FormResponse.form_id == form.id))
     await session.delete(form)
     await session.commit()
     return {"status": "deleted"}

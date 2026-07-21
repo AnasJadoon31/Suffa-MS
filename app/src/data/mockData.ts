@@ -162,7 +162,7 @@ export const portalRoutes: readonly PortalRoute[] = [
   { key: "assessmentResults", path: "/assessments/results", view: "assessments", permission: "assessments.marks.enter", feature: "assessments", implicitTeacher: true },
   { key: "myAssessments", path: "/my-assessments", view: "my_assessments", feature: "assessments", roles: ["student"] },
   { key: "resources", path: "/resources", view: "resources", feature: "resources" },
-  { key: "forms", path: "/forms", view: "forms", feature: "forms" },
+  { key: "forms", path: "/forms", view: "forms", feature: "forms", roles: ["principal", "teacher", "student"] },
   { key: "peopleStudents", path: "/people/students", view: "people", permission: "students.view" },
   { key: "peopleTeachers", path: "/people/teachers", view: "people", permission: "teachers.view" },
   { key: "peopleGuardians", path: "/people/guardians", view: "people", permission: "students.view" },

@@ -109,6 +109,14 @@ class GuardianCreate(BaseModel):
     preferred_language: str = "ur"
     student_ids: list[UUID] = []
 
+class GuardianUpdate(BaseModel):
+    name: str | None = None
+    relationship: str | None = None
+    phone_numbers: str | None = None
+    cnic: str | None = None
+    address: str | None = None
+    preferred_language: str | None = None
+
 
 class GuardianRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)

@@ -3,14 +3,17 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./Button";
 
-export function Modal({ title, onClose, maxWidth, children }: Readonly<{ title: string; onClose: () => void; maxWidth?: number | string; children: ReactNode }>) {
+export function Modal({ title, onClose, maxWidth, actions, children }: Readonly<{ title: string | ReactNode; onClose: () => void; maxWidth?: number | string; actions?: ReactNode; children: ReactNode }>) {
   const { t } = useTranslation();
   return (
-    <div className="modalOverlay" role="dialog" aria-modal="true" aria-label={title} onMouseDown={onClose}>
+    <div className="modalOverlay" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined} onMouseDown={onClose}>
       <div className="modalCard" style={maxWidth ? { width: "100%", maxWidth } : {}} onMouseDown={(event) => event.stopPropagation()}>
         <div className="moduleHeader modalHeader">
           <h3>{title}</h3>
-          <Button className="tableAction" type="button" aria-label={t("closeBtn")} onClick={onClose}><X size={16} /></Button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {actions}
+            <Button className="tableAction" type="button" aria-label={t("closeBtn")} onClick={onClose}><X size={16} /></Button>
+          </div>
         </div>
         {children}
       </div>

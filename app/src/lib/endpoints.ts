@@ -156,6 +156,8 @@ export const peopleApi = {
     name: string; relationship: string; phone_numbers: string; student_ids?: string[]; cnic?: string; address?: string;
   }) =>
     api.post<Guardian>("/api/v1/people/guardians", payload).then((r) => r.data),
+  updateGuardian: (id: string, payload: Partial<Omit<Guardian, "id" | "user_id" | "created_at">>) =>
+    api.put<Guardian>(`/api/v1/people/guardians/${id}`, payload).then((r) => r.data),
   guardianCredentialsLink: (id: string, customUsername?: string) =>
     api.post<{ set_password_url: string; username: string }>(`/api/v1/people/guardians/${id}/credentials-link`, { username: customUsername }).then((r) => r.data),
   linkStudentToGuardian: (guardianId: string, studentId: string) =>
@@ -707,6 +709,7 @@ export const financeApi = {
 
   listDonors: () => getAllPages<Donor>("/api/v1/finance/donors"),
   createDonor: (payload: { name: string; contact: string }) => api.post<Donor>("/api/v1/finance/donors", payload).then((r) => r.data),
+  updateDonor: (id: string, payload: Partial<Omit<Donor, "id">>) => api.put<Donor>(`/api/v1/finance/donors/${id}`, payload).then((r) => r.data),
   listDonations: (donorId?: string) =>
     getAllPages<Donation>("/api/v1/finance/donations", { donor_id: donorId }),
   createDonation: (payload: {

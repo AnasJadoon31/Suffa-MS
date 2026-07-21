@@ -20,6 +20,7 @@ from app.modules.finance.schemas import (
     DonationRead,
     DonorCreate,
     DonorRead,
+    DonorUpdate,
     FinanceSummary,
     PaymentCategoryCreate,
     PaymentCategoryRead,
@@ -289,6 +290,24 @@ async def create_donor(
 ) -> DonorRead:
     donor = Donor(madrasa_id=madrasa.id, name=payload.name, contact=payload.contact)
     session.add(donor)
+    await session.commit()
+    await session.refresh(donor)
+    return DonorRead.model_validate(donor)
+
+
+@router.put("/donors/{donor_id}", response_model=DonorRead)
+async def update_donor(
+    donor_id: UUID,
+    payload: DonorUpdate,
+    current_user: User = Depends(require_permission("finance.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> DonorRead:
+    donor = await session.get(Donor, donor_id)
+    if donor is None or donor.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Donor not found")
+    if payload.name is not None: donor.name = payload.name
+    if payload.contact is not None: donor.contact = payload.contact
     await session.commit()
     await session.refresh(donor)
     return DonorRead.model_validate(donor)
