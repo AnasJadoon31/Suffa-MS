@@ -299,7 +299,7 @@ async def create_donor(
 async def update_donor(
     donor_id: UUID,
     payload: DonorUpdate,
-    current_user: User = Depends(require_permission("finance.edit")),
+    current_user: User = Depends(require_permission("finance.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> DonorRead:
