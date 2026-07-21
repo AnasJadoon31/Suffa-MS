@@ -68,6 +68,10 @@ class AssignmentRead(BaseModel):
     section_name: str | None = None
     course_name: str | None = None
     teacher_name: str | None = None
+    submission_file_key: str | None = None
+    submission_mark: float | None = None
+    submission_feedback: str | None = None
+    submitted_at: datetime | None = None
 
 
 class SubmissionCreate(BaseModel):
@@ -101,11 +105,13 @@ class GradeBand(BaseModel):
 class GradingSchemeCreate(BaseModel):
     name: str
     bands: list[GradeBand] = Field(min_length=1)
+    include_assignments: bool = False
 
 
 class GradingSchemeUpdate(BaseModel):
     name: str | None = None
     bands: list[GradeBand] | None = None
+    include_assignments: bool | None = None
 
 
 class GradingSchemeRead(BaseModel):
@@ -113,6 +119,7 @@ class GradingSchemeRead(BaseModel):
     id: UUID
     name: str
     bands: list
+    include_assignments: bool = False
 
 
 class ExamTypeCreate(BaseModel):

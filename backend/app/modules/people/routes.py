@@ -533,9 +533,12 @@ async def list_student_guardians(
 @router.get("/guardians/{guardian_id}/students", response_model=list[StudentRead])
 async def list_guardian_students(
     guardian_id: UUID,
+    response: Response,
     current_user: User = Depends(require_permission("students.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[StudentRead]:
     # Need to verify the guardian belongs to the madrasa
     guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
@@ -546,8 +549,13 @@ async def list_guardian_students(
         .where(StudentGuardian.guardian_id == guardian_id)
         .where(StudentProfile.madrasa_id == madrasa.id)
     )
-    result = await session.execute(stmt)
-    rows = result.scalars().all()
+    rows = await paginate_scalars(
+        session,
+        stmt.order_by(StudentProfile.name),
+        limit=limit,
+        offset=offset,
+        response=response,
+    )
     return [StudentRead.model_validate(row) for row in rows]
 
 async def _get_or_404(session: AsyncSession, model, record_id: UUID, madrasa_id: UUID):

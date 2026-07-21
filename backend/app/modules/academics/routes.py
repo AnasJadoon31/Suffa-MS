@@ -206,6 +206,8 @@ async def update_class(
         academic_class.program_id = payload.program_id
     if payload.default_portal_enabled is not None:
         academic_class.default_portal_enabled = payload.default_portal_enabled
+    if "assignment_limit" in payload.model_fields_set:
+        academic_class.assignment_limit = payload.assignment_limit
         
     await session.commit()
     await session.refresh(academic_class)

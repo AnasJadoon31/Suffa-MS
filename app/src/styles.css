@@ -1076,7 +1076,9 @@ button:disabled {
   gap: 1px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   background: var(--line);
 }
 
@@ -2331,16 +2333,19 @@ input[type="radio"] {
   }
 }
 
-.iconButton {
-  width: 44px;
-  height: 44px;
+@media (pointer: coarse) {
+  .iconButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .primaryAction,
+  .secondaryAction,
+  .iconTextButton {
+    min-height: 44px;
+  }
 }
 
-.primaryAction,
-.secondaryAction,
-.iconTextButton {
-  min-height: 44px;
-}
 
 .metricGrid {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -2444,8 +2449,18 @@ input[type="radio"] {
 
   .topbar-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     width: 100%;
+  }
+
+  .topbar-actions > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .topbar-actions .iconTextButton {
+    padding-inline: 10px;
+    white-space: nowrap;
   }
 
   .dateChip {

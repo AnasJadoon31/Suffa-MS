@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 
 from app.core.config import settings
+from app.core.pdf import render_result_card_pdf
 from app.modules.messaging.models import MessageLog, MessageTemplate
 from app.modules.messaging.routes import render_and_dispatch
 from app.modules.auth.models import UserPermission
@@ -203,3 +204,80 @@ async def test_whatsapp_pdf_requires_direct_delivery_and_does_not_false_log(
             )
         assert exc_info.value.status_code == 503
         assert await db.scalar(select(func.count()).select_from(MessageLog)) == 0
+
+
+async def test_form_label_becomes_internal_key_when_key_is_omitted(client):
+    response = await client.post(
+        "/api/v1/operations/forms",
+        json={
+            "title": "Label keyed form",
+            "fields": [{"label": "Parent comments", "type": "textarea"}],
+            "visibility_scope": {"all": True},
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["fields_definition"][0]["key"] == "Parent comments"
+
+
+async def test_assignment_limit_applies_per_section_to_active_assignments(client, seed):
+    configured = await client.put(
+        f"/api/v1/academics/classes/{seed.class_a.id}",
+        json={"assignment_limit": 1},
+    )
+    assert configured.status_code == 200, configured.text
+
+    def payload(section_id, title):
+        return {
+            "class_id": str(seed.class_a.id),
+            "course_id": str(seed.course.id),
+            "section_ids": [str(section_id)],
+            "title": title,
+            "instructions": "Complete the exercise",
+            "due_date": "2099-07-01T00:00:00Z",
+        }
+
+    first = await client.post(
+        "/api/v1/assessments/assignments",
+        json=payload(seed.sections.a1.id, "Alif one"),
+    )
+    blocked = await client.post(
+        "/api/v1/assessments/assignments",
+        json=payload(seed.sections.a1.id, "Alif two"),
+    )
+    other_section = await client.post(
+        "/api/v1/assessments/assignments",
+        json=payload(seed.sections.a2.id, "Bay one"),
+    )
+
+    assert first.status_code == 200, first.text
+    assert blocked.status_code == 400
+    assert "limit" in blocked.json()["detail"].lower()
+    assert other_section.status_code == 200, other_section.text
+
+
+async def test_grading_scheme_can_toggle_assignment_marks(client):
+    response = await client.post(
+        "/api/v1/assessments/grading-schemes",
+        json={
+            "name": "Assignments included",
+            "include_assignments": True,
+            "bands": [{"label": "Complete", "min_score": 0, "max_score": 100}],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["include_assignments"] is True
+
+
+def test_result_card_renders_in_selected_urdu_language():
+    pdf = render_result_card_pdf(
+        student_name="Student",
+        admission_number="ADM-1",
+        session_name="2026",
+        gregorian_date="2026-07-21",
+        hijri_date="6 Safar 1448 AH",
+        course_rows=[["Quran", "90", "A"]],
+        overall_score="90",
+        published=True,
+        language="ur",
+    )
+    assert pdf.startswith(b"%PDF")

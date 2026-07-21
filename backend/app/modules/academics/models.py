@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, ForeignKey, Index, String, UniqueConstraint, func, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, SlugMixin, TenantMixin, TimestampMixin
@@ -35,6 +35,7 @@ class AcademicClass(Base, IdMixin, TenantMixin, TimestampMixin):
     program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id"))
     name: Mapped[str] = mapped_column(String(160))
     default_portal_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    assignment_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Section(Base, IdMixin, TenantMixin, TimestampMixin):

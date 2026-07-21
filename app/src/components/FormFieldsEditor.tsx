@@ -21,8 +21,10 @@ export function cleanFormFields(fields: FormFieldDefinition[]): FormFieldDefinit
     .filter((field) => field.label.trim())
     .map((field) => ({
       ...field,
-      key: field.key.trim() || field.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''),
       label: field.label.trim(),
+      // The label is the stable response key. Users should never have to
+      // invent or maintain a second, technical field_key value.
+      key: field.label.trim(),
       options: OPTION_FIELD_TYPES.has(field.type) ? field.options : [],
     }));
 }

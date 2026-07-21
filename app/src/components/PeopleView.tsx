@@ -59,7 +59,7 @@ function SendCredentialsButton({
 
   return (
     <>
-      <Button className="secondaryAction" type="button" disabled={readOnly} onClick={() => void send()}>
+      <Button className="secondaryAction" type="button" disabled={readOnly} onClick={() => send()}>
         {t("sendCredentialsBtn")}
       </Button>
       {error && <span className="notice" style={{ color: "var(--rose)" }}>{error}</span>}
@@ -102,7 +102,7 @@ function ReissueCredentialsButton({
   };
 
   return (
-    <Button className="tableAction" type="button" disabled={readOnly} title={t("loginLinkTitle")} onClick={() => void reissue()}>
+    <Button className="tableAction" type="button" disabled={readOnly} title={t("loginLinkTitle")} onClick={() => reissue()}>
       <KeyRound size={14} /> {state === "copied" ? t("linkCopied") : state === "error" ? t("failedLabel") : t("loginLinkBtn")}
     </Button>
   );
@@ -1205,7 +1205,7 @@ function GuardiansTab({
                 <Eye size={14} />
               </Button>
               {canSendCredentials && (
-                <Button className="tableAction" type="button" onClick={() => void provisionLogin(g)}>
+                <Button className="tableAction" type="button" onClick={() => provisionLogin(g)}>
                   <KeyRound size={14} /> {t("loginLinkBtn")}
                 </Button>
               )}
@@ -1350,7 +1350,7 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
                 <div>
                   <strong>{s.name}</strong> <span style={{ color: "var(--slate-500)", fontSize: "0.85rem" }}>({s.admission_number})</span>
                 </div>
-                <Button className="tableAction" type="button" onClick={() => void unlinkStudent(s.id)} title={t("unlinkBtn", "Unlink")}>
+                <Button className="tableAction" type="button" onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn", "Unlink")}>
                   <X size={14} />
                 </Button>
               </div>

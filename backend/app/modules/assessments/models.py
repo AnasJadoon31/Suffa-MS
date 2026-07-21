@@ -47,6 +47,7 @@ class GradingScheme(Base, IdMixin, TenantMixin, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(160))
     bands: Mapped[list] = mapped_column(PortableJSONB)
+    include_assignments: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class ExamType(Base, IdMixin, TenantMixin, TimestampMixin):

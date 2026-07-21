@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProgramCreate(BaseModel):
@@ -24,12 +24,14 @@ class AcademicClassRead(BaseModel):
     program_id: UUID
     name: str
     default_portal_enabled: bool
+    assignment_limit: int | None = Field(default=None, ge=1)
 
 
 class AcademicClassUpdate(BaseModel):
     program_id: UUID | None = None
     name: str | None = None
     default_portal_enabled: bool | None = None
+    assignment_limit: int | None = Field(default=None, ge=1)
 
 
 class SectionRead(BaseModel):
@@ -112,6 +114,7 @@ class AcademicClassCreate(BaseModel):
     program_id: UUID
     name: str
     default_portal_enabled: bool = True
+    assignment_limit: int | None = Field(default=None, ge=1)
 
 
 class SectionCreate(BaseModel):

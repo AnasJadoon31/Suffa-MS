@@ -58,8 +58,8 @@ function MyTeacherAttendance() {
       {!loading && error && <ErrorState message={error} />}
       {!loading && !readOnly && (
         <div className="formActions">
-          <Button className="primaryAction" type="button" disabled={Boolean(today?.check_in)} onClick={() => void check("in")}>{t("timeInLabel")}</Button>
-          <Button className="secondaryAction" type="button" disabled={!today?.check_in || Boolean(today.check_out)} onClick={() => void check("out")}>{t("timeOutLabel")}</Button>
+          <Button className="primaryAction" type="button" disabled={Boolean(today?.check_in)} onClick={() => check("in")}>{t("timeInLabel")}</Button>
+          <Button className="secondaryAction" type="button" disabled={!today?.check_in || Boolean(today.check_out)} onClick={() => check("out")}>{t("timeOutLabel")}</Button>
         </div>
       )}
       {!loading && (

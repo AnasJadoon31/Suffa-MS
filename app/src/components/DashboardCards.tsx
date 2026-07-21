@@ -261,10 +261,10 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
       <PageSection>
         <PageHeader title={t("timeInOutHeading")} />
         <div className="formActions">
-          <Button className="primaryAction" type="button" disabled={readOnly || !!attendance?.check_in} onClick={() => void checkIn()}>
+          <Button className="primaryAction" type="button" disabled={readOnly || !!attendance?.check_in} onClick={() => checkIn()}>
             <LogIn size={16} /> {t("timeInLabel")}
           </Button>
-          <Button className="secondaryAction" type="button" disabled={readOnly || !attendance?.check_in || !!attendance?.check_out} onClick={() => void checkOut()}>
+          <Button className="secondaryAction" type="button" disabled={readOnly || !attendance?.check_in || !!attendance?.check_out} onClick={() => checkOut()}>
             <LogOut size={16} /> {t("timeOutLabel")}
           </Button>
         </div>
@@ -354,7 +354,7 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
         ) : (
           <>
             <Input type="file" disabled={readOnly} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            <Button className="primaryAction" type="button" disabled={readOnly || !file} onClick={() => void submit()}>
+            <Button className="primaryAction" type="button" disabled={readOnly || !file} onClick={() => submit()}>
               {t("submitBtn")}
             </Button>
           </>

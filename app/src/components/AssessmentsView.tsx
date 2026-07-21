@@ -1,6 +1,6 @@
 import { Button } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { BookOpen, ClipboardList, FileDown, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { BookOpen, ClipboardList, FileDown, Pencil, Plus, Send, Trash2, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
 
@@ -751,6 +751,7 @@ function MarkCell({
   initial,
   onSaved,
 }: Readonly<{ examTypeId: string; studentId: string; initial: number | null; onSaved: () => void }>) {
+  const { t } = useTranslation();
   const [value, setValue] = useState(initial?.toString() ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -768,16 +769,26 @@ function MarkCell({
   };
 
   return (
-    <Input
-      className="markInput"
-      value={value}
-      disabled={saving}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => void save()}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-    />
+    <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+      <Input
+        className="markInput"
+        style={{ width: "4rem" }}
+        value={value}
+        disabled={saving}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            (e.target as HTMLInputElement).blur();
+            void save();
+          }
+        }}
+      />
+      {value !== (initial?.toString() ?? "") && (
+        <Button className="iconBtn" onClick={() => save()} disabled={saving} type="button" title={t("saveBtn", "Save")}>
+          <Save size={14} />
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -792,7 +803,7 @@ function GradingSetup({
   const defaultBands: EditableBand[] = [];
   const [schemes, setSchemes] = useState<GradingScheme[]>([]);
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
-  const [schemeForm, setSchemeForm] = useState({ name: "", bands: defaultBands });
+  const [schemeForm, setSchemeForm] = useState({ name: "", bands: defaultBands, include_assignments: false });
   const [examForm, setExamForm] = useState({ course_id: "", class_id: "", name: "", weightage: "", grading_scheme_id: "" });
   const [editingScheme, setEditingScheme] = useState<GradingScheme | null>(null);
   const [editingExam, setEditingExam] = useState<ExamType | null>(null);
@@ -814,7 +825,7 @@ function GradingSetup({
       <div className="formActions" style={{ marginBottom: 12 }}>
         {canCreateScheme && <Button className="primaryAction" type="button" onClick={() => {
           setEditingScheme(null);
-          setSchemeForm({ name: "", bands: defaultBands });
+          setSchemeForm({ name: "", bands: defaultBands, include_assignments: false });
           setShowSchemeForm(true);
         }}><Plus size={16} /> {t("addSchemeBtn")}</Button>}
         {canCreateExamType && <Button className="primaryAction" type="button" onClick={() => {
@@ -836,10 +847,11 @@ function GradingSetup({
                           min_score: Number(band.min_score),
                           max_score: Number(band.max_score),
                         })),
+                        include_assignments: schemeForm.include_assignments,
                       };
                       if (editingScheme) await assessmentsApi.updateGradingScheme(editingScheme.id, payload);
                       else await assessmentsApi.createGradingScheme(payload);
-                      setSchemeForm({ name: "", bands: defaultBands });
+                      setSchemeForm({ name: "", bands: defaultBands, include_assignments: false });
                       setEditingScheme(null);
                       setShowSchemeForm(false);
                       await load();
@@ -852,6 +864,10 @@ function GradingSetup({
             submitDisabled={schemeForm.bands.length === 0}
           >
             <label>{t("schemeNameLabel")}<Input required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} /></label>
+            <label className="checkboxLabel">
+              <Checkbox checked={schemeForm.include_assignments} onChange={(e) => setSchemeForm({ ...schemeForm, include_assignments: e.target.checked })} />
+              {t("includeAssignmentsInResultsLabel")}
+            </label>
 
           <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
                     <strong>{t("bandsLabel")}</strong>
@@ -868,11 +884,12 @@ function GradingSetup({
         columns={[
           { header: t("schemeCol"), render: (s) => s.name },
           { header: t("bandsCol"), render: (s) => s.bands.map((b) => `${b.label} (${b.min_score}-${b.max_score})`).join(", ") },
+          { header: t("assignmentsCol"), render: (s) => s.include_assignments ? t("includedLabel") : t("excludedLabel") },
           { header: t("actionsCol"), render: (s) => (
             <span className="actions">
               {canCreateScheme && <Button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
                 setEditingScheme(s);
-                setSchemeForm({ name: s.name, bands: s.bands.map((band) => ({ label: band.label, min_score: String(band.min_score), max_score: String(band.max_score) })) });
+                setSchemeForm({ name: s.name, bands: s.bands.map((band) => ({ label: band.label, min_score: String(band.min_score), max_score: String(band.max_score) })), include_assignments: s.include_assignments });
                 setShowSchemeForm(true);
               }}><Pencil size={15} /></Button>}
               {canCreateScheme && <Button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {
@@ -1077,7 +1094,7 @@ function ResultsTab({
           <PageSection key={section.section_id} style={{ marginTop: 16 }}>
             <PageHeader title={`${section.class_name} / ${section.section_name}`}>
               {canPublish && (
-                <Button className="primaryAction" type="button" onClick={() => void publishSection(section)}>
+                <Button className="primaryAction" type="button" onClick={() => publishSection(section)}>
                   <Send size={16} /> {t("publishSectionBtn")}
                 </Button>
               )}
@@ -1122,7 +1139,7 @@ function ResultsTab({
                           <FileDown size={14} />
                         </Button>
                         {canMessage && (
-                          <Button className="tableAction" type="button" title={t("sendToParentsBtn")} onClick={() => void sendReport(student.student_id)}>
+                          <Button className="tableAction" type="button" title={t("sendToParentsBtn")} onClick={() => sendReport(student.student_id)}>
                             <Send size={14} />
                           </Button>
                         )}

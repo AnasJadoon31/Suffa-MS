@@ -496,8 +496,8 @@ function ImportView({ onDone }: Readonly<{ onDone: () => void }>) {
       />
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <div className="formActions">
-        <Button className="secondaryAction" type="button" onClick={() => void run(true)}>{t("dryRunBtn")}</Button>
-        <Button className="primaryAction" type="button" disabled={!allOk} onClick={() => void run(false)}>
+        <Button className="secondaryAction" type="button" onClick={() => run(true)}>{t("dryRunBtn")}</Button>
+        <Button className="primaryAction" type="button" disabled={!allOk} onClick={() => run(false)}>
           <Upload size={16} /> {t("importCommitBtn")}
         </Button>
       </div>

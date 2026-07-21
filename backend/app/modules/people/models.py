@@ -3,7 +3,7 @@ from datetime import date
 from uuid import UUID
 
 from sqlalchemy import Boolean, Date, ForeignKey, String, Text, select
-from sqlalchemy.orm import Mapped, mapped_column, column_property
+from sqlalchemy.orm import Mapped, column_property, declared_attr, mapped_column
 
 from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
 from app.modules.auth.models import User
@@ -44,17 +44,27 @@ class StudentProfile(Base, IdMixin, TenantMixin, TimestampMixin):
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     photo_file_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("file_objects.id"), nullable=True)
 
-    username: Mapped[Optional[str]] = column_property(
-        select(User.username).where(User.id == user_id).correlate_except(User).scalar_subquery()
-    )
-    current_class: Mapped[Optional[str]] = column_property(
-        select(AcademicClass.name)
-        .select_from(Enrollment)
-        .join(AcademicClass, Enrollment.class_id == AcademicClass.id)
-        .where(Enrollment.student_id == id)
-        .correlate_except(Enrollment, AcademicClass)
-        .scalar_subquery()
-    )
+    @declared_attr
+    def username(cls) -> Mapped[Optional[str]]:
+        return column_property(
+            select(User.username)
+            .where(User.id == cls.user_id)
+            .correlate_except(User)
+            .scalar_subquery()
+        )
+
+    @declared_attr
+    def current_class(cls) -> Mapped[Optional[str]]:
+        return column_property(
+            select(AcademicClass.name)
+            .select_from(Enrollment)
+            .join(AcademicClass, Enrollment.class_id == AcademicClass.id)
+            .where(Enrollment.student_id == cls.id)
+            .order_by(Enrollment.created_at.desc())
+            .limit(1)
+            .correlate_except(Enrollment, AcademicClass)
+            .scalar_subquery()
+        )
 
 
 class Guardian(Base, IdMixin, TenantMixin, TimestampMixin):

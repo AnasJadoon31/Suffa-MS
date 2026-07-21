@@ -3,6 +3,30 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-21 — Issues.pdf closeout (31 reported portal issues)
+
+- Completed and re-verified the full 31-item report across People, Applications,
+  public/forms, settings/branding, grading/results, resources, PWA layouts,
+  permissions, leave filters, enrollment, assignments, and the student dashboard.
+- Stabilized person details so student usernames/current classes render safely,
+  guardian linking/viewing and all entity edit flows work without duplicate modal
+  headings, and existing class enrollment remains accessible from the student view.
+- Public forms now use modal confirmation/deletion, preserve submitted applications
+  when a form is deleted, support Inquiry/General selection and program/category
+  inline filters, and derive response keys from labels without exposing `field_key`.
+- Added explicit grading-scheme control for including weighted assignment marks,
+  per-section active-assignment limits, visible save actions, student result and
+  assignment-mark/remark views, and persistent submitted-file downloads with the
+  upload picker hidden after submission.
+- Result-card PDFs now use madrasa branding and the requesting user's English/Urdu
+  language; fixed Urdu font registration and browser download filename exposure.
+- Shared buttons now lock and show a loader for promise-backed actions, critical
+  mutations return their promises to that control, public-form/leave filtering uses
+  the shared inline filter, and mobile topbar/table/Urdu spacing is PWA-safe.
+- Regression coverage added for label-derived form keys, section assignment caps,
+  assignment-result inclusion, Urdu PDF rendering, and deletion that preserves
+  applications.
+
 ## 2026-07-17 — Full checked-item, endpoint, security, and PWA re-audit
 
 - Re-verified every checked `TO_IMPLEMENT.md` claim against implementation and

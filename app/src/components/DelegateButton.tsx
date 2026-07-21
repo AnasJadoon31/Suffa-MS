@@ -200,7 +200,7 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
             {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
             {notice && <p className="notice">{notice}</p>}
             <div className="formActions">
-              <Button className="primaryAction" type="button" onClick={() => void save()}>{t("saveBtn")}</Button>
+              <Button className="primaryAction" type="button" onClick={() => save()}>{t("saveBtn")}</Button>
               <Button className="secondaryAction" type="button" onClick={onClose}>{t("cancelBtn")}</Button>
             </div>
           </>

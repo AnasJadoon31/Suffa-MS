@@ -572,7 +572,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               {lockedEntries.map((entry) => (
                 <li key={entry.idempotency_key}>
                   {entry.attendance_date} - {roster?.students.find((student) => student.id === entry.subject_id)?.name ?? t("unknownPersonLabel")}
-                  <Button type="button" onClick={() => void handleOverride(entry)}>
+                  <Button type="button" onClick={() => handleOverride(entry)}>
                     {t("override")}
                   </Button>
                 </li>
@@ -724,7 +724,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                   <Button
                     className="primaryAction"
                     type="button"
-                    onClick={() => void saveAttendance()}
+                    onClick={() => saveAttendance()}
                     disabled={readOnly || !sessionId || !hasUnsavedMarks || markedCount === 0 || isSavingAttendance}
                   >
                     <Save size={18} />
@@ -733,7 +733,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                   <Button
                     className="secondaryAction"
                     type="button"
-                    onClick={() => void sync()}
+                    onClick={() => sync()}
                     disabled={readOnly || isSyncing || entries.length === 0}
                   >
                     <CloudUpload size={18} />

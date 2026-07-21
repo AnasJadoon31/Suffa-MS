@@ -30,7 +30,7 @@ async def test_admission_form_can_be_deleted_when_it_has_no_responses(client, se
     assert response.json() == {"status": "deleted"}
 
 
-async def test_admission_form_with_applications_must_be_closed_not_deleted(client, seed):
+async def test_admission_form_with_applications_can_be_deleted_without_losing_applications(client, seed):
     created = await client.post(
         "/api/v1/operations/admission-forms",
         json={"program_id": str(seed.program.id), "title": "Active form"},
@@ -46,5 +46,9 @@ async def test_admission_form_with_applications_must_be_closed_not_deleted(clien
         f"/api/v1/operations/admission-forms/{created.json()['id']}"
     )
 
-    assert response.status_code == 409
-    assert "close" in response.json()["detail"].lower()
+    assert response.status_code == 200
+    applications = await client.get("/api/v1/operations/admissions")
+    assert applications.status_code == 200
+    saved = next(row for row in applications.json() if row["id"] == submitted.json()["id"])
+    assert saved["applicant_name"] == "Applicant"
+    assert saved["form_id"] is None

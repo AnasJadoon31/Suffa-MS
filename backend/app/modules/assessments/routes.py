@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import Response
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -240,6 +240,45 @@ async def _require_student_course_scope(
 
 # ------------------------------------------------------------------- Assignments
 
+async def _enforce_assignment_limit(
+    session: AsyncSession,
+    targets: list[tuple[UUID, UUID | None]],
+) -> None:
+    """Apply the class-configured cap independently to each target section.
+
+    Only assignments whose due date has not passed count toward the cap. A
+    whole-class assignment uses the class-wide bucket; section assignments do
+    not block teachers working in another section of the same class.
+    """
+    if not targets:
+        return
+    class_ids = list({class_id for class_id, _ in targets})
+    classes = (await session.execute(select(AcademicClass).where(AcademicClass.id.in_(class_ids)))).scalars().all()
+    class_limits = {c.id: c.assignment_limit for c in classes if c.assignment_limit is not None}
+    if not class_limits:
+        return
+
+    now = datetime.now(UTC)
+    for class_id, section_id in targets:
+        limit = class_limits.get(class_id)
+        if limit is None:
+            continue
+        scope_filter = Assignment.section_id == section_id if section_id is not None else Assignment.section_id.is_(None)
+        count = await session.scalar(
+            select(func.count(Assignment.id)).where(
+                Assignment.class_id == class_id,
+                scope_filter,
+                Assignment.due_date >= now,
+            )
+        )
+        if (count or 0) >= limit:
+            class_name = next((c.name for c in classes if c.id == class_id), "Class")
+            scope_name = "class-wide" if section_id is None else "this section"
+            raise HTTPException(
+                status_code=400,
+                detail=f"Active assignment limit ({limit}) reached for {scope_name} in '{class_name}'",
+            )
+
 @router.post("/assignments", response_model=list[AssignmentRead])
 async def create_assignment(
     payload: AssignmentCreate,
@@ -268,6 +307,8 @@ async def create_assignment(
         ).scalars().all()
         if not class_ids:
             raise HTTPException(status_code=400, detail="No classes have this course mapped")
+        await _enforce_assignment_limit(session, [(class_id, None) for class_id in class_ids])
+
         batch_id = uuid4() if len(class_ids) > 1 else None
         created: list[Assignment] = []
         for class_id in class_ids:
@@ -281,6 +322,8 @@ async def create_assignment(
                 instructions=payload.instructions,
                 attachment_key=payload.attachment_key,
                 due_date=payload.due_date,
+                max_marks=payload.max_marks,
+                weightage=payload.weightage,
                 target_student_ids=[str(sid) for sid in payload.target_student_ids] or None,
                 created_by_id=teacher.id if teacher else None,
                 batch_id=batch_id,
@@ -295,7 +338,6 @@ async def create_assignment(
     await _require_class_course_scope(
         session, current_user, madrasa.id, payload.class_id, payload.course_id, bypass_permission="assignments.create_any"
     )
-
     section_ids: list[UUID | None] = list(dict.fromkeys(payload.section_ids)) or [None]
     for section_id in section_ids:
         if section_id is None:
@@ -318,6 +360,11 @@ async def create_assignment(
                 ):
                     raise HTTPException(status_code=403, detail="Not assigned to one of the targeted sections")
 
+    await _enforce_assignment_limit(
+        session,
+        [(payload.class_id, section_id) for section_id in section_ids],
+    )
+
     batch_id = uuid4() if len(section_ids) > 1 else None
     created: list[Assignment] = []
     for section_id in section_ids:
@@ -331,6 +378,8 @@ async def create_assignment(
             instructions=payload.instructions,
             attachment_key=payload.attachment_key,
             due_date=payload.due_date,
+            max_marks=payload.max_marks,
+            weightage=payload.weightage,
             target_student_ids=[str(sid) for sid in payload.target_student_ids] or None,
             created_by_id=teacher.id if teacher else None,
             batch_id=batch_id,
@@ -343,20 +392,41 @@ async def create_assignment(
     return await _assignment_reads(session, madrasa.id, created)
 
 
-async def _assignment_reads(session: AsyncSession, madrasa_id: UUID, rows: list[Assignment]) -> list[AssignmentRead]:
+async def _assignment_reads(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    rows: list[Assignment],
+    student_id: UUID | None = None,
+) -> list[AssignmentRead]:
     """Attach display names (class/section/course/teacher) to assignment rows."""
     class_names = dict((await session.execute(select(AcademicClass.id, AcademicClass.name).where(AcademicClass.madrasa_id == madrasa_id))).all())
     section_names = dict((await session.execute(select(Section.id, Section.name).where(Section.madrasa_id == madrasa_id))).all())
     course_names = dict((await session.execute(select(Course.id, Course.name).where(Course.madrasa_id == madrasa_id))).all())
     teacher_names = dict((await session.execute(select(TeacherProfile.id, TeacherProfile.name).where(TeacherProfile.madrasa_id == madrasa_id))).all())
+    submissions: dict[UUID, Submission] = {}
+    if student_id is not None and rows:
+        submission_rows = (
+            await session.execute(
+                select(Submission).where(
+                    Submission.student_id == student_id,
+                    Submission.assignment_id.in_([row.id for row in rows]),
+                )
+            )
+        ).scalars().all()
+        submissions = {submission.assignment_id: submission for submission in submission_rows}
     reads = []
     for row in rows:
         data = AssignmentRead.model_validate(row).model_dump()
+        submission = submissions.get(row.id)
         data.update(
             class_name=class_names.get(row.class_id),
             section_name=section_names.get(row.section_id) if row.section_id else None,
             course_name=course_names.get(row.course_id),
             teacher_name=teacher_names.get(row.created_by_id) if row.created_by_id else None,
+            submission_file_key=submission.file_key if submission else None,
+            submission_mark=submission.mark if submission else None,
+            submission_feedback=submission.feedback if submission else None,
+            submitted_at=submission.submitted_at if submission else None,
         )
         reads.append(AssignmentRead(**data))
     return reads
@@ -451,7 +521,12 @@ async def list_assignments(
         # JSONB), so it's applied to the already-paginated page.
         rows = [row for row in rows if not row.target_student_ids or str(student.id) in row.target_student_ids]
 
-    return await _assignment_reads(session, madrasa.id, list(rows))
+    return await _assignment_reads(
+        session,
+        madrasa.id,
+        list(rows),
+        student_id=student.id if student is not None else None,
+    )
 
 
 @router.get("/assignments/{assignment_id}", response_model=AssignmentRead)
@@ -674,7 +749,12 @@ async def create_grading_scheme(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> GradingSchemeRead:
-    scheme = GradingScheme(madrasa_id=madrasa.id, name=payload.name, bands=[b.model_dump() for b in payload.bands])
+    scheme = GradingScheme(
+        madrasa_id=madrasa.id,
+        name=payload.name,
+        bands=[b.model_dump() for b in payload.bands],
+        include_assignments=payload.include_assignments,
+    )
     session.add(scheme)
     await session.commit()
     await session.refresh(scheme)
@@ -712,6 +792,8 @@ async def update_grading_scheme(
         scheme.name = payload.name
     if payload.bands is not None:
         scheme.bands = [band.model_dump() for band in payload.bands]
+    if payload.include_assignments is not None:
+        scheme.include_assignments = payload.include_assignments
     await session.commit()
     await session.refresh(scheme)
     return GradingSchemeRead.model_validate(scheme)
@@ -915,9 +997,22 @@ async def _compute_course_result(session: AsyncSession, madrasa_id: UUID, studen
     exam_types = (
         await session.execute(select(ExamType).where(ExamType.course_id == course_id, ExamType.madrasa_id == madrasa_id))
     ).scalars().all()
-    assignments_exist = (
-        await session.execute(select(Assignment).where(Assignment.course_id == course_id, Assignment.madrasa_id == madrasa_id, Assignment.weightage.is_not(None)))
-    ).scalars().first()
+    schemes = {
+        scheme.id: scheme
+        for scheme in (
+            await session.execute(
+                select(GradingScheme).where(
+                    GradingScheme.id.in_([exam_type.grading_scheme_id for exam_type in exam_types])
+                )
+            )
+        ).scalars().all()
+    } if exam_types else {}
+    include_assignments = any(scheme.include_assignments for scheme in schemes.values())
+    assignments_exist = None
+    if include_assignments:
+        assignments_exist = (
+            await session.execute(select(Assignment).where(Assignment.course_id == course_id, Assignment.madrasa_id == madrasa_id, Assignment.weightage.is_not(None)))
+        ).scalars().first()
     
     if not exam_types and not assignments_exist:
         return CourseResult(course_id=course_id, raw_score=None, band=None, exam_count=0)
@@ -952,7 +1047,7 @@ async def _compute_course_result(session: AsyncSession, madrasa_id: UUID, studen
                 Assignment.max_marks > 0
             )
         )
-    ).scalars().all()
+    ).scalars().all() if include_assignments else []
     
     for assignment in assignments:
         submission = (
@@ -1112,7 +1207,13 @@ async def publish_results(
     return {"published": published_count, "session_id": payload.session_id}
 
 
-async def _render_result_card(session: AsyncSession, madrasa_id: UUID, student: StudentProfile, session_id: UUID) -> bytes:
+async def _render_result_card(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    student: StudentProfile,
+    session_id: UUID,
+    language: str,
+) -> bytes:
     result = await _build_session_result(session, madrasa_id, student.id, session_id)
     academic_session = await session.get(AcademicSession, session_id)
 
@@ -1144,6 +1245,7 @@ async def _render_result_card(session: AsyncSession, madrasa_id: UUID, student: 
         overall_score=f"{result.overall_score:g}" if result.overall_score is not None else "—",
         published=result.published,
         branding=await load_report_branding(session, madrasa) if madrasa else None,
+        language=language,
     )
 
 
@@ -1167,7 +1269,7 @@ async def get_my_result_card(
     if published is None:
         raise HTTPException(status_code=403, detail="Results have not been published yet")
 
-    pdf_bytes = await _render_result_card(session, madrasa.id, student, session_id)
+    pdf_bytes = await _render_result_card(session, madrasa.id, student, session_id, current_user.preferred_language)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -1187,7 +1289,7 @@ async def get_result_card(
     if student is None or student.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    pdf_bytes = await _render_result_card(session, madrasa.id, student, session_id)
+    pdf_bytes = await _render_result_card(session, madrasa.id, student, session_id, current_user.preferred_language)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -1297,6 +1399,39 @@ async def _section_matrix(
             scheme_cache[scheme_id] = await session.get(GradingScheme, scheme_id)
         return scheme_cache[scheme_id]
 
+    assignments_by_course: dict[UUID, list[Assignment]] = {course.id: [] for course in course_rows}
+    submissions_by_student_assignment: dict[tuple[UUID, UUID], Submission] = {}
+    if course_rows and students:
+        assignment_rows = (
+            await session.execute(
+                select(Assignment).where(
+                    Assignment.madrasa_id == madrasa_id,
+                    Assignment.class_id == section.class_id,
+                    or_(Assignment.section_id.is_(None), Assignment.section_id == section.id),
+                    Assignment.course_id.in_([course.id for course in course_rows]),
+                    Assignment.weightage.is_not(None),
+                    Assignment.max_marks.is_not(None),
+                    Assignment.max_marks > 0,
+                )
+            )
+        ).scalars().all()
+        for assignment in assignment_rows:
+            assignments_by_course[assignment.course_id].append(assignment)
+        if assignment_rows:
+            submission_rows = (
+                await session.execute(
+                    select(Submission).where(
+                        Submission.assignment_id.in_([assignment.id for assignment in assignment_rows]),
+                        Submission.student_id.in_([student.id for student in students]),
+                        Submission.mark.is_not(None),
+                    )
+                )
+            ).scalars().all()
+            submissions_by_student_assignment = {
+                (submission.student_id, submission.assignment_id): submission
+                for submission in submission_rows
+            }
+
     student_rows: list[MatrixStudentRow] = []
     for student in students:
         cells: list[MatrixCourseCell] = []
@@ -1317,12 +1452,21 @@ async def _section_matrix(
                 weighted_sum += score * et.weightage
                 total_weight += et.weightage
                 last_scheme_id = et.grading_scheme_id
+            result_scheme_id = last_scheme_id or (exam_types[0].grading_scheme_id if exam_types else None)
+            result_scheme = await _scheme(result_scheme_id) if result_scheme_id is not None else None
+            if result_scheme is not None and result_scheme.include_assignments:
+                for assignment in assignments_by_course[course.id]:
+                    if assignment.target_student_ids and str(student.id) not in assignment.target_student_ids:
+                        continue
+                    submission = submissions_by_student_assignment.get((student.id, assignment.id))
+                    if submission is None or submission.mark is None:
+                        continue
+                    weighted_sum += (submission.mark / assignment.max_marks) * 100.0 * assignment.weightage
+                    total_weight += assignment.weightage
             raw_score = round(weighted_sum / total_weight, 2) if total_weight else None
             band = None
-            if raw_score is not None and last_scheme_id is not None:
-                scheme = await _scheme(last_scheme_id)
-                if scheme is not None:
-                    band = _band_for_score(scheme.bands, raw_score)
+            if raw_score is not None and result_scheme is not None:
+                band = _band_for_score(result_scheme.bands, raw_score)
             if raw_score is not None:
                 scored.append(raw_score)
             cells.append(MatrixCourseCell(course_id=course.id, raw_score=raw_score, band=band, marks=cell_marks))

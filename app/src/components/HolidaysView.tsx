@@ -223,7 +223,7 @@ export function HolidaysView() {
           { header: t("appliesToCol"), render: (holiday) => classNames(holiday.class_ids) },
           ...(canManage ? [{ header: t("actionsCol"), render: (holiday: Holiday) => editingId === holiday.id ? (
             <>
-              <Button className="tableAction" type="button" onClick={() => void saveHoliday(holiday.id)}>
+              <Button className="tableAction" type="button" onClick={() => saveHoliday(holiday.id)}>
                 <Save size={14} /> {t("saveBtn")}
               </Button>
               <Button className="tableAction" type="button" onClick={cancelEditing}>
@@ -235,7 +235,7 @@ export function HolidaysView() {
               <Button className="tableAction" type="button" onClick={() => startEditing(holiday)}>
                 <Pencil size={14} /> {t("editBtn")}
               </Button>
-              <Button className="tableAction" type="button" onClick={() => void deleteHoliday(holiday)}>
+              <Button className="tableAction" type="button" onClick={() => deleteHoliday(holiday)}>
                 <Trash2 size={14} /> {t("deleteBtn")}
               </Button>
             </>

@@ -22,6 +22,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
+import { InlineFilter } from "./ui/InlineFilter";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
@@ -274,17 +275,27 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
     <>
       <p className="notice">{t("admissionFormsHint")}</p>
       
-      <div className="moduleToolbar">
-        <Select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPagination({ ...pagination, page: 0 }); }}>
-          <option value="">{t("allCategories")}</option>
-          <option value="General">General</option>
-          <option value="Inquiry">Inquiry</option>
-        </Select>
-        <Select value={programFilter} onChange={(e) => { setProgramFilter(e.target.value); setPagination({ ...pagination, page: 0 }); }}>
-          <option value="">{t("allPrograms")}</option>
-          {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </Select>
-      </div>
+      <InlineFilter filters={[
+        {
+          key: "category",
+          type: "select",
+          value: categoryFilter,
+          placeholder: t("allCategories"),
+          options: [
+            { value: "General", label: t("generalFormLabel") },
+            { value: "Inquiry", label: t("inquiryFormLabel") },
+          ],
+          onChange: (value) => { setCategoryFilter(value); setPagination({ ...pagination, page: 0 }); },
+        },
+        {
+          key: "program",
+          type: "select",
+          value: programFilter,
+          placeholder: t("allPrograms"),
+          options: programs.map((program) => ({ value: program.id, label: program.name })),
+          onChange: (value) => { setProgramFilter(value); setPagination({ ...pagination, page: 0 }); },
+        },
+      ]} />
 
       {canMutate && <div className="formActions" style={{ marginBottom: 12 }}>
         <Button className="primaryAction" type="button" onClick={() => setShowTypeSelection(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</Button>
@@ -294,10 +305,10 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
         <Modal title={t("selectFormType")} onClose={() => setShowTypeSelection(false)}>
           <div style={{ display: "flex", gap: "1rem", padding: "1rem" }}>
             <Button className="primaryAction" onClick={() => { setForm({ ...form, category: "General" }); setShowTypeSelection(false); setShowCreate(true); }}>
-              General Form
+              {t("generalFormLabel")}
             </Button>
             <Button className="primaryAction" onClick={() => { setForm({ ...form, category: "Inquiry" }); setShowTypeSelection(false); setShowCreate(true); }}>
-              Inquiry Form
+              {t("inquiryFormLabel")}
             </Button>
           </div>
         </Modal>

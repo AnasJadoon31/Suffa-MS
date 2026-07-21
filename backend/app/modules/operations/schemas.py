@@ -186,7 +186,7 @@ OPTION_FIELD_TYPES = {"radio", "checkbox_group", "dropdown"}
 
 
 class FormFieldDefinition(BaseModel):
-    key: FormFieldText
+    key: FormFieldText | None = None
     label: FormFieldText
     type: FormFieldType
     required: bool = False
@@ -194,6 +194,8 @@ class FormFieldDefinition(BaseModel):
 
     @model_validator(mode="after")
     def validate_options(self) -> "FormFieldDefinition":
+        if not self.key:
+            self.key = self.label
         if self.type in OPTION_FIELD_TYPES and not self.options:
             raise ValueError(f"{self.type} fields require at least one option")
         if len({option.casefold() for option in self.options}) != len(self.options):
@@ -202,7 +204,7 @@ class FormFieldDefinition(BaseModel):
 
 
 def _validate_unique_field_keys(fields: list[FormFieldDefinition]) -> list[FormFieldDefinition]:
-    keys = [field.key.casefold() for field in fields]
+    keys = [(field.key or field.label).casefold() for field in fields]
     if len(set(keys)) != len(keys):
         raise ValueError("form field keys must be unique")
     return fields

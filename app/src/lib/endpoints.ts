@@ -3,7 +3,7 @@ import { api, getAllPages, getPage } from "./api";
 // ---------------------------------------------------------------- Academics
 
 export interface Program { id: string; name: string; created_at: string }
-export interface AcademicClass { id: string; program_id: string; name: string; default_portal_enabled: boolean }
+export interface AcademicClass { id: string; program_id: string; name: string; default_portal_enabled: boolean; assignment_limit?: number | null }
 export interface Section { id: string; class_id: string; name: string }
 export interface Course { id: string; name: string }
 export interface AcademicSession {
@@ -19,9 +19,9 @@ export const academicsApi = {
   deleteProgram: (id: string) => api.delete(`/api/v1/academics/programs/${id}`).then((r) => r.data),
 
   listClasses: () => getAllPages<AcademicClass>("/api/v1/academics/classes"),
-  createClass: (program_id: string, name: string, default_portal_enabled = true) =>
-    api.post<AcademicClass>("/api/v1/academics/classes", { program_id, name, default_portal_enabled }).then((r) => r.data),
-  updateClass: (id: string, payload: { program_id?: string; name?: string; default_portal_enabled?: boolean }) =>
+  createClass: (program_id: string, name: string, default_portal_enabled = true, assignment_limit?: number | null) =>
+    api.post<AcademicClass>("/api/v1/academics/classes", { program_id, name, default_portal_enabled, assignment_limit }).then((r) => r.data),
+  updateClass: (id: string, payload: { program_id?: string; name?: string; default_portal_enabled?: boolean; assignment_limit?: number | null }) =>
     api.put<AcademicClass>(`/api/v1/academics/classes/${id}`, payload).then((r) => r.data),
   deleteClass: (id: string) => api.delete(`/api/v1/academics/classes/${id}`).then((r) => r.data),
 
@@ -165,7 +165,7 @@ export const peopleApi = {
   unlinkStudentFromGuardian: (guardianId: string, studentId: string) =>
     api.delete(`/api/v1/people/guardians/${guardianId}/students/${studentId}`).then((r) => r.data),
   getGuardianStudents: (guardianId: string) =>
-    api.get<Student[]>(`/api/v1/people/guardians/${guardianId}/students`).then((r) => r.data),
+    getAllPages<Student>(`/api/v1/people/guardians/${guardianId}/students`),
   studentGuardians: (studentId: string) =>
     getAllPages<Guardian>(`/api/v1/people/students/${studentId}/guardians`),
 
@@ -312,6 +312,8 @@ export interface Assignment {
   target_student_ids: string[] | null;
   created_by_id: string | null; batch_id: string | null; created_at: string;
   class_name: string | null; section_name: string | null; course_name: string | null; teacher_name: string | null;
+  submission_file_key?: string | null; submission_mark?: number | null;
+  submission_feedback?: string | null; submitted_at?: string | null;
 }
 
 // ---------------------------------------------------- Results matrix (§5)
@@ -333,7 +335,7 @@ export interface Submission {
   id: string; assignment_id: string; student_id: string; submitted_at: string; file_key: string;
   mark: number | null; feedback: string | null; is_late: boolean; student_name: string | null;
 }
-export interface GradingScheme { id: string; name: string; bands: { label: string; min_score: number; max_score: number }[] }
+export interface GradingScheme { id: string; name: string; bands: { label: string; min_score: number; max_score: number }[]; include_assignments: boolean }
 export interface ExamType { id: string; course_id: string; class_id: string | null; name: string; weightage: number; grading_scheme_id: string }
 export interface CourseResult { course_id: string; raw_score: number | null; band: string | null; exam_count: number }
 export interface SessionResult {
@@ -371,9 +373,9 @@ export const assessmentsApi = {
     api.put<Submission>(`/api/v1/assessments/submissions/${submissionId}/grade`, payload).then((r) => r.data),
 
   listGradingSchemes: () => getAllPages<GradingScheme>("/api/v1/assessments/grading-schemes"),
-  createGradingScheme: (payload: { name: string; bands: GradingScheme["bands"] }) =>
+  createGradingScheme: (payload: { name: string; bands: GradingScheme["bands"]; include_assignments?: boolean }) =>
     api.post<GradingScheme>("/api/v1/assessments/grading-schemes", payload).then((r) => r.data),
-  updateGradingScheme: (id: string, payload: { name?: string; bands?: GradingScheme["bands"] }) =>
+  updateGradingScheme: (id: string, payload: { name?: string; bands?: GradingScheme["bands"]; include_assignments?: boolean }) =>
     api.put<GradingScheme>(`/api/v1/assessments/grading-schemes/${id}`, payload).then((r) => r.data),
   deleteGradingScheme: (id: string) => api.delete(`/api/v1/assessments/grading-schemes/${id}`).then((r) => r.data),
 

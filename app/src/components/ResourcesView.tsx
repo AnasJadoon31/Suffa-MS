@@ -130,7 +130,7 @@ export function ResourcesView() {
                       e.preventDefault();
                       setError("");
                       if (!categoryName) return;
-                      await operationsApi.createResourceCategory(categoryName, categoryIsGlobal);
+                      await operationsApi.createResourceCategory(categoryName, canManageAll ? categoryIsGlobal : false);
                       setCategoryName("");
                       setShowCategoryForm(false);
                       await refreshAll();
