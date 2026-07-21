@@ -256,7 +256,7 @@ class FormResponseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     form_id: UUID
-    student_id: UUID
+    student_id: UUID | None = None
     student_name: str | None = None
     submitted_by_id: UUID
     response_data: dict
@@ -328,14 +328,16 @@ class BlogPostRead(BaseModel):
 # -------------------------------------------------------------- Admissions
 
 class AdmissionFormCreate(BaseModel):
-    program_id: UUID
+    program_id: UUID | None = None
     title: str
+    category: str = "General"
     description: str = ""
     fields: FormFields = Field(default_factory=list)
 
 
 class AdmissionFormUpdate(BaseModel):
     title: str | None = None
+    category: str | None = None
     description: str | None = None
     fields: FormFields | None = None
     is_open: bool | None = None
@@ -344,8 +346,9 @@ class AdmissionFormUpdate(BaseModel):
 class AdmissionFormRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
-    program_id: UUID
+    program_id: UUID | None = None
     title: str
+    category: str
     description: str
     fields_definition: list
     public_token: str

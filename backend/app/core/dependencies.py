@@ -372,6 +372,23 @@ def require_permission_grant(code: str):
     return permission_checker
 
 
+def require_teacher_or_permission(code: str):
+    """Require either a teacher role or a specific permission grant."""
+    registry.require_known(code)
+
+    async def permission_checker(
+        current_user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(get_session),
+    ) -> User:
+        if current_user.role == UserRole.teacher:
+            return current_user
+        if not await user_has_permission_grant(current_user, code, session):
+            raise HTTPException(status_code=403, detail=ErrorCode.PERMISSION_REQUIRED)
+        return current_user
+
+    return permission_checker
+
+
 async def require_mapped_permission(
     key: str,
     permission_map: dict[str, str],

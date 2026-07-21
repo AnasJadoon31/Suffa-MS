@@ -14,6 +14,7 @@ from app.core.dependencies import (
     require_active_session,
     require_permission,
     require_permission_grant,
+    require_teacher_or_permission,
     user_has_permission,
 )
 from app.core.error_codes import ErrorCode
@@ -456,6 +457,25 @@ async def export_timetable(
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="timetable.pdf"'},
     )
+
+
+@router.get("/admission-forms", response_model=PaginatedResponse[AdmissionFormRead])
+async def list_admission_forms(
+    category: str | None = None,
+    program_id: UUID | None = None,
+    pagination: PaginationParams = Depends(),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> PaginatedResponse[AdmissionFormRead]:
+    from app.modules.academics.models import Program
+
+    query = select(AdmissionForm).where(AdmissionForm.madrasa_id == madrasa.id)
+    if category:
+        query = query.where(AdmissionForm.category == category)
+    if program_id:
+        query = query.where(AdmissionForm.program_id == program_id)
+        
+    query = query.order_by(AdmissionForm.created_at.desc())
 
 
 @router.delete("/timetable/{slot_id}")
@@ -961,7 +981,7 @@ def _category_read(row: ResourceCategory, current_user_id: UUID) -> ResourceCate
 @router.post("/resource-categories", response_model=ResourceCategoryRead)
 async def create_resource_category(
     payload: ResourceCategoryCreate,
-    current_user: User = Depends(require_permission_grant("resources.manage")),
+    current_user: User = Depends(require_teacher_or_permission("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> ResourceCategoryRead:
@@ -1000,7 +1020,7 @@ async def list_resource_categories(
 @router.delete("/resource-categories/{category_id}")
 async def delete_resource_category(
     category_id: UUID,
-    current_user: User = Depends(require_permission_grant("resources.manage")),
+    current_user: User = Depends(require_teacher_or_permission("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
@@ -1039,7 +1059,7 @@ async def _resource_read(session: AsyncSession, resource: Resource) -> ResourceR
 @router.post("/resources", response_model=ResourceRead)
 async def create_resource(
     payload: ResourceCreate,
-    current_user: User = Depends(require_permission_grant("resources.manage")),
+    current_user: User = Depends(require_teacher_or_permission("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> ResourceRead:
@@ -1070,7 +1090,7 @@ async def create_resource(
 async def update_resource(
     resource_id: UUID,
     payload: ResourceUpdate,
-    current_user: User = Depends(require_permission_grant("resources.manage")),
+    current_user: User = Depends(require_teacher_or_permission("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> ResourceRead:
@@ -1102,7 +1122,7 @@ async def update_resource(
 @router.delete("/resources/{resource_id}")
 async def delete_resource(
     resource_id: UUID,
-    current_user: User = Depends(require_permission_grant("resources.manage")),
+    current_user: User = Depends(require_teacher_or_permission("resources.manage")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
@@ -1208,6 +1228,8 @@ async def update_form(
         raise HTTPException(status_code=403, detail="Not your form")
     if payload.title is not None:
         form.title = payload.title
+    if payload.category is not None:
+        form.category = payload.category
     if payload.description is not None:
         form.description = payload.description
     if payload.category is not None:
@@ -1303,20 +1325,27 @@ async def submit_form_response(
     student = (
         await session.execute(select(StudentProfile).where(StudentProfile.user_id == current_user.id))
     ).scalar_one_or_none()
-    if student is None:
-        raise HTTPException(status_code=403, detail="Only portal students can submit form responses")
+    
+    if student is None and not form.visibility_scope.get("all", False):
+        raise HTTPException(status_code=403, detail="Only portal students can submit this form")
+
+    student_id = student.id if student else None
 
     if not form.allow_multiple:
-        existing = await session.execute(
-            select(FormResponse).where(FormResponse.form_id == form_id, FormResponse.student_id == student.id)
-        )
+        existing_query = select(FormResponse).where(FormResponse.form_id == form_id)
+        if student_id:
+            existing_query = existing_query.where(FormResponse.student_id == student_id)
+        else:
+            existing_query = existing_query.where(FormResponse.submitted_by_id == current_user.id)
+            
+        existing = await session.execute(existing_query)
         if existing.scalar_one_or_none() is not None:
             raise HTTPException(status_code=409, detail="You have already submitted this form")
 
     response = FormResponse(
         madrasa_id=madrasa.id,
         form_id=form_id,
-        student_id=student.id,
+        student_id=student_id,
         submitted_by_id=current_user.id,
         response_data=payload.response_data,
     )
@@ -1596,13 +1625,16 @@ async def create_admission_form(
     from app.modules.academics.models import Program
     import secrets as _secrets
 
-    program = await session.get(Program, payload.program_id)
-    if program is None or program.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Program not found")
+    if payload.program_id:
+        program = await session.get(Program, payload.program_id)
+        if program is None or program.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Program not found")
+
     form = AdmissionForm(
         madrasa_id=madrasa.id,
         program_id=payload.program_id,
         title=payload.title,
+        category=payload.category,
         description=payload.description,
         fields_definition=[field.model_dump() for field in payload.fields],
         public_token=_secrets.token_urlsafe(24),

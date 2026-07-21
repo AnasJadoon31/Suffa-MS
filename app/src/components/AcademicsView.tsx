@@ -297,7 +297,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 {classesToShow.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
                 {classesToShow.map((c) => (
                   <div className="dataRow" key={c.id}>
-                    {editingClass?.id === c.id ? (
                     {editingClass?.id === c.id && (
                       <FormModal
                         title={t("editBtn")}
@@ -375,7 +374,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 {allCourses.length === 0 && <p className="emptyState">{t("noCoursesYet")}</p>}
                 {allCourses.map((c) => (
                   <div className="dataRow" key={c.id}>
-                    {editingCourse?.id === c.id ? (
                     {editingCourse?.id === c.id && (
                       <FormModal
                         title={t("editBtn")}
@@ -453,7 +451,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {(sections[c.id] ?? []).map((s) => (
                         <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          {editingSection?.id === s.id ? (
                           {editingSection?.id === s.id && (
                             <FormModal
                               title={t("editBtn")}
@@ -533,7 +530,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 {sessions.length === 0 && <p className="emptyState">{t("noSessionsYet")}</p>}
                 {sessions.map((s) => (
                   <div className="dataRow" key={s.id}>
-                    {editingSession?.id === s.id ? (
                     {editingSession?.id === s.id && (
                       <FormModal
                         title={t("editBtn")}

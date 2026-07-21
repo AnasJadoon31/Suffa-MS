@@ -8,7 +8,7 @@ import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
-import { Modal } from "./ui/Modal";
+import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 
 export function SettingsView() {
@@ -110,19 +110,29 @@ export function SettingsView() {
                 <span className="notice">{item.type === "file" ? (draftValue(item) ? t("fileUploadedLabel") : "—") : draftValue(item)}</span>
                 {canManage && <Button className="tableAction" type="button" onClick={() => setEditingKey(item.key)}><Pencil size={14} /> {t("editBtn")}</Button>}
                 {savedKey === item.key && <Check size={16} className="savedTick" />}
-                      }} />
-                    </label>
+                {editingKey === item.key && (
+                  item.type === "file" ? (
+                    <Modal title={item.label} onClose={() => setEditingKey(null)}>
+                      <label className="secondaryAction">
+                        <Upload size={16} /> {t("chooseLogoBtn")}
+                        <Input className="visuallyHidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) void uploadFile(item, file).then(() => setEditingKey(null));
+                          event.target.value = "";
+                        }} />
+                      </label>
                     </Modal>
                   ) : (
                     <FormModal
                       title={t("editBtn") + " " + item.key}
                       onClose={() => setEditingKey(null)}
                       submitLabel={t("saveBtn")}
-                      onSubmit={(event) => { event.preventDefault(); void save(item).then(() => setEditingKey(null)); }}
+                      onSubmit={(event: React.FormEvent) => { event.preventDefault(); void save(item).then(() => setEditingKey(null)); }}
                     >
                       {item.type === "bool" ? <Select value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })}><option value="true">{t("yesLabel")}</option><option value="false">{t("noLabel")}</option></Select> : <Input type={item.type === "int" ? "number" : "text"} value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })} />}
                     </FormModal>
-                  )}
+                  )
+                )}
               </div>
             ))}
           </div>

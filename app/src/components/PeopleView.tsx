@@ -17,6 +17,11 @@ import {
   type SalaryPayment,
   type Student,
   type Teacher,
+  academicsApi,
+  type AcademicSession,
+  type Program,
+  type AcademicClass,
+  type Section,
 } from "../lib/endpoints";
 import { SearchDropdown } from "./SearchDropdown";
 import { Input, Select } from "./ui/Field";
@@ -602,13 +607,32 @@ function StudentDetail({
   const [showFeeModal, setShowFeeModal] = useState(false);
   const [error, setError] = useState("");
 
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [sessions, setSessions] = useState<AcademicSession[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [classes, setClasses] = useState<AcademicClass[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [enrollForm, setEnrollForm] = useState({ session_id: "", program_id: "", class_id: "", section_id: "" });
+  const [enrollError, setEnrollError] = useState("");
+
   const load = async () => {
     void peopleApi.studentGuardians(student.id).then(setGuardians).catch(() => setGuardians([]));
     if (canFinance) {
       void financeApi.listPayments({ student_id: student.id }).then(setPayments).catch(() => setPayments([]));
       void financeApi.listCategories().then(setCategories).catch(() => setCategories([]));
     }
+    void academicsApi.listSessions().then(setSessions).catch(() => setSessions([]));
+    void academicsApi.listPrograms().then(setPrograms).catch(() => setPrograms([]));
+    void academicsApi.listClasses().then(setClasses).catch(() => setClasses([]));
   };
+  
+  useEffect(() => {
+    if (enrollForm.class_id) {
+      void academicsApi.listSections(enrollForm.class_id).then(setSections).catch(() => setSections([]));
+    } else {
+      setSections([]);
+    }
+  }, [enrollForm.class_id]);
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -618,7 +642,14 @@ function StudentDetail({
     <div className="detailPanel">
       <PageHeader
         title={`${student.name} · ${student.admission_number}`}
-        actions={<Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>}
+        actions={
+          <>
+            <Button className="secondaryAction" onClick={() => setShowEnrollModal(true)}>
+              {t("assignClassBtn", "Assign Class")}
+            </Button>
+            <Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>
+          </>
+        }
       />
       <dl className="detailGrid">
         <dt>{t("dobCol")}</dt><dd>{student.date_of_birth}</dd>
@@ -652,7 +683,6 @@ function StudentDetail({
                 <span>{categories.find((c) => c.id === p.category_id)?.name ?? "—"}</span>
               </div>
             ))}
-          </div>
           </div>
           <div className="formActions" style={{ marginTop: "1rem" }}>
             <Button className="primaryAction" type="button" onClick={() => setShowFeeModal(true)}>
@@ -697,6 +727,61 @@ function StudentDetail({
             </FormModal>
           )}
         </>
+      )}
+      
+      {showEnrollModal && (
+        <FormModal
+          title={t("assignClassBtn", "Assign Class")}
+          onClose={() => setShowEnrollModal(false)}
+          submitLabel={t("saveBtn")}
+          error={enrollError}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setEnrollError("");
+            try {
+              await academicsApi.enrollStudent({
+                student_id: student.id,
+                session_id: enrollForm.session_id,
+                program_id: enrollForm.program_id,
+                class_id: enrollForm.class_id,
+                section_id: enrollForm.section_id,
+              });
+              setEnrollForm({ session_id: "", program_id: "", class_id: "", section_id: "" });
+              setShowEnrollModal(false);
+            } catch (err: any) {
+              setEnrollError(err.response?.data?.detail ?? t("failedToEnroll", "Failed to enroll student"));
+            }
+          }}
+        >
+          <label>
+            {t("sessionLabel", "Session")}
+            <Select required value={enrollForm.session_id} onChange={(e) => setEnrollForm({ ...enrollForm, session_id: e.target.value })}>
+              <option value="">{t("selectEllipsis")}</option>
+              {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </Select>
+          </label>
+          <label>
+            {t("programLabel")}
+            <Select required value={enrollForm.program_id} onChange={(e) => setEnrollForm({ ...enrollForm, program_id: e.target.value, class_id: "", section_id: "" })}>
+              <option value="">{t("selectEllipsis")}</option>
+              {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </Select>
+          </label>
+          <label>
+            {t("classLabel")}
+            <Select required value={enrollForm.class_id} onChange={(e) => setEnrollForm({ ...enrollForm, class_id: e.target.value, section_id: "" })}>
+              <option value="">{t("selectEllipsis")}</option>
+              {classes.filter(c => !enrollForm.program_id || c.program_id === enrollForm.program_id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </label>
+          <label>
+            {t("sectionLabel", "Section")}
+            <Select required value={enrollForm.section_id} onChange={(e) => setEnrollForm({ ...enrollForm, section_id: e.target.value })}>
+              <option value="">{t("selectEllipsis")}</option>
+              {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </Select>
+          </label>
+        </FormModal>
       )}
     </div>
   );

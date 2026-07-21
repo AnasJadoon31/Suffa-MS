@@ -31,7 +31,7 @@ export function ResourcesView() {
   const { alert, confirm } = useDialog();
   const { hasPermission, user } = useAuth();
   const readOnly = useSessionReadOnly();
-  const canManage = !readOnly && hasPermission("resources.manage");
+  const canManage = !readOnly && (user?.role === "teacher" || hasPermission("resources.manage"));
   const canManageAll = hasPermission("resources.manage_all");
   const [categories, setCategories] = useState<ResourceCategory[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);

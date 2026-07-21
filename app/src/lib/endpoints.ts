@@ -500,7 +500,7 @@ export interface TypedSetting { key: string; category: string; type: string; lab
 export interface AdmissionForm {
   id: string; program_id: string; title: string; description: string;
   fields_definition: FormFieldDefinition[]; public_token: string; is_open: boolean;
-  created_at: string; program_name: string | null;
+  created_at: string; program_name: string | null; category?: string;
 }
 
 export const operationsApi = {
@@ -591,8 +591,8 @@ export const operationsApi = {
   listAdmissions: () => getAllPages<AdmissionApplication>("/api/v1/operations/admissions"),
   listAdmissionsPage: (params: { limit: number; offset: number }) => getPage<AdmissionApplication>("/api/v1/operations/admissions", params),
   listAdmissionForms: () => getAllPages<AdmissionForm>("/api/v1/operations/admission-forms"),
-  listAdmissionFormsPage: (params: { limit: number; offset: number }) => getPage<AdmissionForm>("/api/v1/operations/admission-forms", params),
-  createAdmissionForm: (payload: { program_id: string; title: string; description?: string; fields?: FormFieldDefinition[] }) =>
+  listAdmissionFormsPage: (params: { limit: number; offset: number; category?: string; program_id?: string }) => getPage<AdmissionForm>("/api/v1/operations/admission-forms", params),
+  createAdmissionForm: (payload: { program_id?: string; title: string; category?: string; description?: string; fields?: FormFieldDefinition[] }) =>
     api.post<AdmissionForm>("/api/v1/operations/admission-forms", payload).then((r) => r.data),
   updateAdmissionForm: (id: string, payload: { title?: string; description?: string; fields?: FormFieldDefinition[]; is_open?: boolean }) =>
     api.put<AdmissionForm>(`/api/v1/operations/admission-forms/${id}`, payload).then((r) => r.data),

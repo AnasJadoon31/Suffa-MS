@@ -93,7 +93,7 @@ class FormResponse(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "form_responses"
 
     form_id: Mapped[UUID] = mapped_column(ForeignKey("forms.id"), index=True)
-    student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"), index=True)
+    student_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("student_profiles.id"), index=True, nullable=True)
     submitted_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     response_data: Mapped[dict] = mapped_column(PortableJSONB)
 
@@ -129,8 +129,9 @@ class AdmissionForm(Base, IdMixin, TenantMixin, TimestampMixin):
 
     __tablename__ = "admission_forms"
 
-    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id"), index=True)
+    program_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("programs.id"), index=True, nullable=True)
     title: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(60), default="General")
     description: Mapped[str] = mapped_column(Text, default="")
     # Extra questions beyond the built-in applicant fields; same field shape
     # as Form.fields_definition.

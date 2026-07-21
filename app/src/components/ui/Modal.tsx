@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./Button";
 
-export function Modal({ title, onClose, children }: Readonly<{ title: string; onClose: () => void; children: ReactNode }>) {
+export function Modal({ title, onClose, maxWidth, children }: Readonly<{ title: string; onClose: () => void; maxWidth?: number | string; children: ReactNode }>) {
   const { t } = useTranslation();
   return (
     <div className="modalOverlay" role="dialog" aria-modal="true" aria-label={title} onMouseDown={onClose}>
-      <div className="modalCard" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="modalCard" style={maxWidth ? { width: "100%", maxWidth } : {}} onMouseDown={(event) => event.stopPropagation()}>
         <div className="moduleHeader modalHeader">
           <h3>{title}</h3>
           <Button className="tableAction" type="button" aria-label={t("closeBtn")} onClick={onClose}><X size={16} /></Button>
@@ -26,6 +26,7 @@ export function FormModal({
   submitIcon,
   submitDisabled,
   error,
+  maxWidth,
   children
 }: Readonly<{
   title: string;
@@ -35,10 +36,11 @@ export function FormModal({
   submitIcon?: ReactNode;
   submitDisabled?: boolean;
   error?: string | null;
+  maxWidth?: number | string;
   children: ReactNode;
 }>) {
   return (
-    <Modal title={title} onClose={onClose}>
+    <Modal title={title} onClose={onClose} maxWidth={maxWidth}>
       <form className="inlineForm" onSubmit={onSubmit}>
         {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
         {children}

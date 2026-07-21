@@ -246,6 +246,7 @@ export function FormsView() {
         <FormModal
           title={t("editFormHeading")}
           onClose={() => setEditing(null)}
+          maxWidth={800}
           submitLabel={t("editBtn")}
           error={editError}
           onSubmit={async (e) => {

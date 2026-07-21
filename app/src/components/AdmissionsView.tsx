@@ -223,7 +223,7 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
 function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program[]; canMutate: boolean }>) {
   const { t } = useTranslation();
   const [forms, setForms] = useState<AdmissionForm[]>([]);
-  const [form, setForm] = useState({ program_id: "", title: "", description: "" });
+  const [form, setForm] = useState({ program_id: "", title: "", description: "", category: "General" });
   const [fields, setFields] = useState<FormFieldDefinition[]>([emptyFormField()]);
   const [editing, setEditing] = useState<AdmissionForm | null>(null);
   const [editFields, setEditFields] = useState<FormFieldDefinition[]>([]);
@@ -232,13 +232,20 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [programFilter, setProgramFilter] = useState("");
   const [total, setTotal] = useState(0);
+  const [showTypeSelection, setShowTypeSelection] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
     try {
-      const result = await operationsApi.listAdmissionFormsPage(pageParams(pagination));
+      const result = await operationsApi.listAdmissionFormsPage({ 
+        ...pageParams(pagination),
+        category: categoryFilter || undefined,
+        program_id: programFilter || undefined,
+      });
       if (recoverEmptyPage(result, pagination, setPagination)) return;
       setForms(result.items);
       setTotal(result.total);
@@ -252,7 +259,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination]);
+  }, [pagination, categoryFilter, programFilter]);
 
   const publicUrl = (token: string) => `${window.location.origin}/public/admission/${token}`;
 
@@ -265,9 +272,36 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
   return (
     <>
       <p className="notice">{t("admissionFormsHint")}</p>
+      
+      <div className="moduleToolbar">
+        <Select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPagination({ ...pagination, page: 0 }); }}>
+          <option value="">{t("allCategories")}</option>
+          <option value="General">General</option>
+          <option value="Inquiry">Inquiry</option>
+        </Select>
+        <Select value={programFilter} onChange={(e) => { setProgramFilter(e.target.value); setPagination({ ...pagination, page: 0 }); }}>
+          <option value="">{t("allPrograms")}</option>
+          {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </Select>
+      </div>
+
       {canMutate && <div className="formActions" style={{ marginBottom: 12 }}>
-        <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</Button>
+        <Button className="primaryAction" type="button" onClick={() => setShowTypeSelection(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</Button>
       </div>}
+      
+      {showTypeSelection && (
+        <Modal title={t("selectFormType")} onClose={() => setShowTypeSelection(false)}>
+          <div style={{ display: "flex", gap: "1rem", padding: "1rem" }}>
+            <Button className="primaryAction" onClick={() => { setForm({ ...form, category: "General" }); setShowTypeSelection(false); setShowCreate(true); }}>
+              General Form
+            </Button>
+            <Button className="primaryAction" onClick={() => { setForm({ ...form, category: "Inquiry" }); setShowTypeSelection(false); setShowCreate(true); }}>
+              Inquiry Form
+            </Button>
+          </div>
+        </Modal>
+      )}
+
       {canMutate && showCreate && <FormModal
             title={t("createAdmissionFormBtn")} onClose={() => setShowCreate(false)}
             onSubmit={async (e) => {
@@ -280,12 +314,13 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
                     }
                     try {
                       await operationsApi.createAdmissionForm({
-                        program_id: form.program_id,
+                        program_id: form.program_id || undefined,
                         title: form.title,
+                        category: form.category,
                         description: form.description,
                         fields: cleanFormFields(fields),
                       });
-                      setForm({ program_id: "", title: "", description: "" });
+                      setForm({ program_id: "", title: "", description: "", category: "General" });
                       setFields([emptyFormField()]);
                       setShowCreate(false);
                       await load();
@@ -296,13 +331,15 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
             submitLabel={t("createAdmissionFormBtn")}
             submitIcon={<Plus size={16} />}
           >
-            <label>
-                    {t("programLabel")}
-                    <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
-                      <option value="">{t("selectEllipsis")}</option>
-                      {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </Select>
-                  </label>
+            {form.category === "General" && (
+              <label>
+                {t("programLabel")}
+                <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+                  <option value="">{t("selectEllipsis")}</option>
+                  {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
+              </label>
+            )}
 
           <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
 
@@ -315,6 +352,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
       <DataTable<AdmissionForm>
         columns={[
           { header: t("titleCol"), render: (adm) => adm.title },
+          { header: t("categoryFilterLabel"), render: (adm) => adm.category ?? "General" },
           { header: t("programLabel"), render: (adm) => adm.program_name ?? "—" },
           { header: t("fieldsCol"), render: (adm) => adm.fields_definition.length },
           { header: t("statusCol"), render: (adm) => adm.is_open ? t("openLabel") : t("closedLabel") },
@@ -373,7 +411,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {editing && <FormModal
-            title={t("editAdmissionFormHeading")} onClose={() => setEditing(null)}
+            title={t("editAdmissionFormHeading")} onClose={() => setEditing(null)} maxWidth={800}
             onSubmit={async (event) => {
                       event.preventDefault();
                       setError("");
@@ -396,7 +434,9 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
                     }}
             submitLabel={t("saveBtn")}
           >
-            <label>{t("programLabel")}<Input disabled value={editing.program_name ?? ""} /></label>
+            {editing.category === "General" && (
+              <label>{t("programLabel")}<Input disabled value={editing.program_name ?? ""} /></label>
+            )}
 
           <label>{t("titleLabel")}<Input required value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></label>
 

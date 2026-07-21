@@ -24,7 +24,7 @@ export function RoleBadge({ role }: Readonly<{ role: string }>) {
 }
 
 export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const activeView = portalRoutes.find((route) => route.path === location.pathname)?.view;
   const { hasPermission, hasFeature, user, madrasa, logout } = useAuth();
