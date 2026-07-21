@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import func, select
+from sqlalchemy import func, select, exc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission
