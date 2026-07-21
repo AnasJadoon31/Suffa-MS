@@ -21,6 +21,7 @@ class ErrorCode(StrEnum):
     EXAM_TYPE_HAS_MARKS = "exam_type_has_marks"
     ATTENDANCE_SECTION_NOT_ASSIGNED = "attendance_section_not_assigned"
     ATTENDANCE_SECTION_REQUIRED = "attendance_section_required"
+    ATTENDANCE_SLOT_NOT_ASSIGNED = "attendance_slot_not_assigned"
     SECTION_NOT_FOUND = "section_not_found"
     REPORT_SECTION_REQUIRED = "report_section_required"
     REPORT_SECTION_NOT_ASSIGNED = "report_section_not_assigned"

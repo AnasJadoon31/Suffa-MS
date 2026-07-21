@@ -12,6 +12,36 @@ reporting}`), SQLAlchemy + Alembic, React/Vite SPA in `app/` (portal) and `web/`
 (marketing site), i18next, existing `UserPermission` + `PermissionRegistry`
 permission system, roles `principal | teacher | student`.
 
+## 2026-07-22 approved issue-resolution architecture
+
+The current implementation follows the domain definitions in `CONTEXT.md` and
+the three binding decisions in ADR-001 through ADR-003:
+
+- Attendance identity is student + session + date + timetable period. New
+  student marks require a paired course/slot; nullable legacy records remain
+  readable as explicitly labelled general attendance. Offline idempotency uses
+  the same period identity.
+- Application acceptance is one row-locked, idempotent conversion transaction.
+  It provisions Student and Guardian accounts/profiles, their link, enrollment,
+  immutable admission snapshot, conversion link, and durable administrator
+  notification. Reversing the application status preserves those People rows.
+- Grading configuration is an atomic course default or class override aggregate:
+  weighted components total 100%, assignments form one optional pool, and grade
+  bands must be complete and non-overlapping.
+
+Shared presentation contracts are equally explicit: `InlineFilter` is the sole
+filter toolbar; `Modal` owns rounded clipping with an independently scrolling
+body; form stack/grid classes own spacing; PDF endpoints derive language from
+the authenticated user. `TO_IMPLEMENT.md` is the requirement/evidence matrix,
+while only evidence-backed completions may be copied to `IMPLEMENTED.md`.
+
+Implementation outcome: `CURRENT-01..20` now satisfy their API/browser/render
+evidence rows and are recorded in `IMPLEMENTED.md`. The older `PDF-*` set is
+tracked independently because several of its strict live-role and deployment
+qualification gates cannot be replaced by mocked UI journeys or SQLite tests.
+This distinction is intentional: implemented behavior and release-environment
+proof are separate V-Model checkpoints.
+
 ---
 
 ## §1 Super-admin tier & per-madrasa feature flags

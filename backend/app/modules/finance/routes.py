@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -205,7 +205,11 @@ async def list_payments(
             await session.execute(
                 select(Enrollment.student_id)
                 .join(AcademicSession, AcademicSession.id == Enrollment.session_id)
-                .where(Enrollment.class_id == class_id, AcademicSession.is_active.is_(True))
+                .where(
+                    Enrollment.class_id == class_id,
+                    Enrollment.ended_on.is_(None),
+                    AcademicSession.is_active.is_(True),
+                )
             )
         ).scalars().all()
         if not class_student_ids:
@@ -321,8 +325,12 @@ async def list_donors(
     session: AsyncSession = Depends(get_session),
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
+    q: str | None = Query(default=None, max_length=160),
 ) -> list[DonorRead]:
     stmt = select(Donor).where(Donor.madrasa_id == madrasa.id)
+    if q and q.strip():
+        needle = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Donor.name.ilike(needle), Donor.contact.ilike(needle)))
     rows = await paginate_scalars(session, stmt.order_by(Donor.name), limit=limit, offset=offset, response=response)
     return [DonorRead.model_validate(row) for row in rows]
 

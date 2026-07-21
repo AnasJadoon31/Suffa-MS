@@ -1,6 +1,27 @@
 import logging
 import logging.config
+import json
 import sys
+from datetime import UTC, datetime
+
+
+class JsonFormatter(logging.Formatter):
+    """One-line structured logs suitable for Coolify/container ingestion."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        for field in ("event", "method", "path", "status_code", "duration_ms", "exception_type"):
+            value = getattr(record, field, None)
+            if value is not None:
+                payload[field] = value
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
 
 def setup_logging():
@@ -8,9 +29,7 @@ def setup_logging():
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
-            "standard": {
-                "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-            },
+            "standard": {"()": "app.core.logging.JsonFormatter"},
         },
         "handlers": {
             "default": {

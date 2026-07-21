@@ -433,11 +433,12 @@ function SummaryTab() {
 
   return (
     <>
-      <div className="moduleToolbar">
-        <label>{t("fromLabel")}<Input type="date" value={range.date_from} onChange={(e) => setRange({ ...range, date_from: e.target.value })} /></label>
-        <label>{t("toLabel")}<Input type="date" value={range.date_to} onChange={(e) => setRange({ ...range, date_to: e.target.value })} /></label>
-        <div className="formActions"><Button className="secondaryAction" type="button" onClick={load}>{t("refreshBtn")}</Button></div>
-      </div>
+      <InlineFilter filters={[
+        { key: "summary-from", type: "input", inputType: "date", label: t("fromLabel"), value: range.date_from, onChange: (value) => setRange({ ...range, date_from: value }) },
+        { key: "summary-to", type: "input", inputType: "date", label: t("toLabel"), value: range.date_to, onChange: (value) => setRange({ ...range, date_to: value }) },
+      ]}>
+        <Button className="secondaryAction" type="button" onClick={load}>{t("refreshBtn")}</Button>
+      </InlineFilter>
       {isLoading && <LoadingState />}
       {!isLoading && error && <ErrorState message={error} />}
       {!isLoading && !error && summary && (

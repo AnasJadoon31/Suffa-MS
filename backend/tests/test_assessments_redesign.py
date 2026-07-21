@@ -1,12 +1,13 @@
 """§5 assessments redesign: multi-section publish, batch edit/delete,
 category filters, results matrix + export."""
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
 
 from sqlalchemy import select
 
-from app.modules.assessments.models import Assignment, ExamType, GradingScheme, Mark
+from app.modules.assessments.models import Assignment, ExamType, GradingScheme, Mark, Submission
 from app.modules.auth.models import User
 from app.modules.operations.models import TimetableSlot
 from app.modules.academics.models import Enrollment
@@ -216,6 +217,173 @@ async def test_publish_all_classes_rejects_section_ids(client, seed):
         },
     )
     assert response.status_code == 422
+
+
+async def test_grading_plan_is_saved_atomically_and_rejects_invalid_total(client, seed):
+    created = await client.put(
+        "/api/v1/assessments/grading-plan",
+        json={
+            "course_id": str(seed.course.id),
+            "class_id": str(seed.class_a.id),
+            "name": "Class 1 Nazra",
+            "assignment_weightage": 30,
+            "components": [{"name": "Final recitation", "weightage": 70}],
+            "bands": [
+                {"label": "Needs support", "min_score": 0, "max_score": 59.99},
+                {"label": "Pass", "min_score": 60, "max_score": 100},
+            ],
+        },
+    )
+    assert created.status_code == 200, created.text
+    plan = created.json()
+    assert plan["assignment_weightage"] == 30
+    assert plan["components"][0]["name"] == "Final recitation"
+
+    invalid = await client.put(
+        "/api/v1/assessments/grading-plan",
+        json={
+            **{key: value for key, value in plan.items() if key in {
+                "course_id", "class_id", "name", "bands", "assignment_weightage"
+            }},
+            "components": [{"name": "Changed despite failure", "weightage": 60}],
+        },
+    )
+    assert invalid.status_code == 422
+
+    fetched = await client.get(
+        "/api/v1/assessments/grading-plan",
+        params={"course_id": str(seed.course.id), "class_id": str(seed.class_a.id)},
+    )
+    assert fetched.status_code == 200, fetched.text
+    assert fetched.json()["components"][0]["name"] == "Final recitation"
+
+
+async def test_grading_plan_reads_legacy_scheme_without_recreating_components(client, seed):
+    scheme = await client.post(
+        "/api/v1/assessments/grading-schemes",
+        json={
+            "name": "Legacy",
+            "bands": [{"label": "Complete", "min_score": 0, "max_score": 100}],
+        },
+    )
+    exam = await client.post(
+        "/api/v1/assessments/exam-types",
+        json={
+            "course_id": str(seed.course.id),
+            "class_id": str(seed.class_a.id),
+            "name": "Legacy oral",
+            "weightage": 100,
+            "grading_scheme_id": scheme.json()["id"],
+        },
+    )
+
+    response = await client.get(
+        "/api/v1/assessments/grading-plan",
+        params={"course_id": str(seed.course.id), "class_id": str(seed.class_a.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["components"] == [
+        {"id": exam.json()["id"], "name": "Legacy oral", "weightage": 100.0}
+    ]
+
+
+async def test_class_grading_plan_replaces_course_default_in_results(client, seed):
+    base = {
+        "course_id": str(seed.course.id),
+        "name": "Nazra plan",
+        "assignment_weightage": 0,
+        "bands": [{"label": "Score", "min_score": 0, "max_score": 100}],
+    }
+    default = await client.put(
+        "/api/v1/assessments/grading-plan",
+        json={**base, "components": [{"name": "Default exam", "weightage": 100}]},
+    )
+    override = await client.put(
+        "/api/v1/assessments/grading-plan",
+        json={
+            **base,
+            "class_id": str(seed.class_a.id),
+            "components": [{"name": "Class exam", "weightage": 100}],
+        },
+    )
+    assert default.status_code == override.status_code == 200
+    for exam_id, score in (
+        (default.json()["components"][0]["id"], 20),
+        (override.json()["components"][0]["id"], 80),
+    ):
+        marked = await client.put(
+            "/api/v1/assessments/marks",
+            json={"exam_type_id": exam_id, "student_id": str(seed.students[0].id), "score": score},
+        )
+        assert marked.status_code == 200, marked.text
+
+    result = await client.get(
+        "/api/v1/assessments/results/course",
+        params={"student_id": str(seed.students[0].id), "course_id": str(seed.course.id)},
+    )
+    assert result.status_code == 200, result.text
+    assert result.json()["raw_score"] == 80
+
+
+async def test_grading_plan_normalizes_unweighted_assignments_into_one_pool(
+    client, seed, db_sessionmaker,
+):
+    plan = await client.put(
+        "/api/v1/assessments/grading-plan",
+        json={
+            "course_id": str(seed.course.id),
+            "class_id": str(seed.class_a.id),
+            "name": "Pooled assignments",
+            "assignment_weightage": 30,
+            "components": [{"name": "Exam", "weightage": 70}],
+            "bands": [{"label": "Score", "min_score": 0, "max_score": 100}],
+        },
+    )
+    exam_type_id = plan.json()["components"][0]["id"]
+    mark = await client.put(
+        "/api/v1/assessments/marks",
+        json={"exam_type_id": exam_type_id, "student_id": str(seed.students[0].id), "score": 80},
+    )
+    assert mark.status_code == 200, mark.text
+
+    assignment_ids = []
+    for title in ("Sabaq 1", "Sabaq 2"):
+        response = await client.post(
+            "/api/v1/assessments/assignments",
+            json={
+                "class_id": str(seed.class_a.id),
+                "section_ids": [str(seed.sections.a1.id)],
+                "course_id": str(seed.course.id),
+                "title": title,
+                "instructions": "Recite",
+                "due_date": "2099-01-01T00:00:00Z",
+                "max_marks": 100,
+            },
+        )
+        assert response.status_code == 200, response.text
+        assignment_ids.append(UUID(response.json()[0]["id"]))
+
+    async with db_sessionmaker() as db:
+        db.add_all([
+            Submission(
+                assignment_id=assignment_ids[0], student_id=seed.students[0].id,
+                submitted_at=datetime.now(UTC), file_key="one.pdf", mark=100,
+            ),
+            Submission(
+                assignment_id=assignment_ids[1], student_id=seed.students[0].id,
+                submitted_at=datetime.now(UTC), file_key="two.pdf", mark=0,
+            ),
+        ])
+        await db.commit()
+
+    result = await client.get(
+        "/api/v1/assessments/results/course",
+        params={"student_id": str(seed.students[0].id), "course_id": str(seed.course.id)},
+    )
+    assert result.status_code == 200, result.text
+    # Exam 80% × 70 plus assignment average 50% × 30 = 71%.
+    assert result.json()["raw_score"] == 71
 
 
 async def test_category_filter(client, seed):

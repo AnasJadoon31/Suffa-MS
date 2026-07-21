@@ -59,6 +59,7 @@ async def get_viewer_context(db: AsyncSession, user: User, madrasa_id: UUID) -> 
                     select(Enrollment).where(
                         Enrollment.student_id == profile.id,
                         Enrollment.session_id == active_session_id,
+                        Enrollment.ended_on.is_(None),
                     )
                 )
             ).scalar_one_or_none()

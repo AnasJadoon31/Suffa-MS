@@ -52,17 +52,29 @@ def create_app() -> FastAPI:
     async def log_requests(request, call_next):
         logger = logging.getLogger("app.request")
         start_time = time.time()
-        logger.info(f"STARTED {request.method} {request.url.path}")
+        logger.info("request started", extra={
+            "event": "http.request.started", "method": request.method, "path": request.url.path,
+        })
         
         try:
             response = await call_next(request)
             process_time = time.time() - start_time
-            logger.info(f"COMPLETED {request.method} {request.url.path} - {response.status_code} - {process_time:.4f}s")
+            logger.info("request completed", extra={
+                "event": "http.request.completed", "method": request.method,
+                "path": request.url.path, "status_code": response.status_code,
+                "duration_ms": round(process_time * 1000, 2),
+            })
             return response
         except Exception as e:
             process_time = time.time() - start_time
             logger.error(
-                f"{request.method} {request.url.path} - 500 - {process_time:.4f}s - {type(e).__name__}: {str(e)}",
+                "request failed",
+                extra={
+                    "event": "http.request.failed", "method": request.method,
+                    "path": request.url.path, "status_code": 500,
+                    "duration_ms": round(process_time * 1000, 2),
+                    "exception_type": type(e).__name__,
+                },
                 exc_info=True,
             )
             # Return (not re-raise) so the response still passes through

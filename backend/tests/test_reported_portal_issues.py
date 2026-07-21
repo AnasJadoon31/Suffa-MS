@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.pdf import render_result_card_pdf
 from app.modules.messaging.models import MessageLog, MessageTemplate
 from app.modules.messaging.routes import render_and_dispatch
-from app.modules.auth.models import UserPermission
+from app.modules.auth.models import User, UserPermission
 
 
 async def _grant_scoped(db_sessionmaker, seed, code: str, class_id) -> None:
@@ -123,6 +123,49 @@ async def test_teacher_attendance_is_section_scoped(teacher_client, client, seed
     assert {section["id"] for section in principal_class["sections"]} == {
         str(seed.sections.a1.id), str(seed.sections.a2.id)
     }
+
+
+async def test_assigned_teacher_dashboard_loads_through_public_route(teacher_client, seed):
+    response = await teacher_client.get("/api/v1/reporting/dashboard")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["role"] == "teacher"
+    assert payload["my_classes"] == [
+        {
+            "class_id": str(seed.class_a.id),
+            "course_id": str(seed.course.id),
+            "section_id": str(seed.sections.a1.id),
+            "class_name": "Class 1",
+            "course_name": "Nazra",
+            "section_name": "Alif",
+        }
+    ]
+
+
+async def test_teacher_report_scope_matches_timetable_assignment(teacher_client, seed):
+    assigned = await teacher_client.get(
+        "/api/v1/reporting/reports/attendance",
+        params={
+            "class_id": str(seed.class_a.id),
+            "section_id": str(seed.sections.a1.id),
+            "start_date": "2024-04-01",
+            "end_date": "2024-04-30",
+        },
+    )
+    assert assigned.status_code == 200, assigned.text
+
+    outside_scope = await teacher_client.get(
+        "/api/v1/reporting/reports/attendance",
+        params={
+            "class_id": str(seed.class_a.id),
+            "section_id": str(seed.sections.a2.id),
+            "start_date": "2024-04-01",
+            "end_date": "2024-04-30",
+        },
+    )
+    assert outside_scope.status_code == 403
+    assert outside_scope.json()["detail"] == "report_section_not_assigned"
 
 
 async def test_course_names_are_unique_per_madrasa(client):
@@ -286,3 +329,38 @@ def test_result_card_renders_in_selected_urdu_language():
         language="ur",
     )
     assert pdf.startswith(b"%PDF")
+
+
+async def test_attendance_pdf_uses_authenticated_users_saved_language(
+    client, seed, db_sessionmaker, monkeypatch,
+):
+    async with db_sessionmaker() as db:
+        principal = await db.get(User, seed.principal.id)
+        principal.preferred_language = "ur"
+        await db.commit()
+
+    captured = {}
+
+    def capture_pdf(title, subtitle, headers, rows, branding, *, language="en"):
+        captured.update(title=title, subtitle=subtitle, headers=headers, language=language)
+        return b"%PDF-localized"
+
+    monkeypatch.setattr("app.modules.reporting.routes.render_table_pdf", capture_pdf)
+    response = await client.get(
+        "/api/v1/reporting/reports/attendance",
+        params={
+            "class_id": str(seed.class_a.id),
+            "section_id": str(seed.sections.a1.id),
+            "start_date": "2024-04-01",
+            "end_date": "2024-04-30",
+            "format": "pdf",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert captured == {
+        "title": "حاضری کا خلاصہ",
+        "subtitle": "2024-04-01 تا 2024-04-30",
+        "headers": ["داخلہ نمبر", "نام", "حاضر", "غیر حاضر", "رخصت", "تعطیلات"],
+        "language": "ur",
+    }

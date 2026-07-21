@@ -33,6 +33,9 @@ from app.modules.assessments.schemas import (
     GradingSchemeCreate,
     GradingSchemeRead,
     GradingSchemeUpdate,
+    GradingPlanRead,
+    GradingPlanWrite,
+    GradingPlanComponent,
     MarkRead,
     MarkUpsert,
     MatrixCourse,
@@ -108,6 +111,7 @@ async def _require_student_assignment_access(
                 Enrollment.session_id == active_session_id,
                 Enrollment.student_id == student.id,
                 Enrollment.class_id == assignment.class_id,
+                Enrollment.ended_on.is_(None),
             )
         )
     ).scalar_one_or_none()
@@ -218,6 +222,7 @@ async def _require_student_course_scope(
                 Enrollment.madrasa_id == madrasa_id,
                 Enrollment.session_id == active_session_id,
                 Enrollment.student_id == student_id,
+                Enrollment.ended_on.is_(None),
             )
         )
     ).scalar_one_or_none()
@@ -521,6 +526,7 @@ async def list_assignments(
                     select(Enrollment).where(
                         Enrollment.student_id == student.id,
                         Enrollment.session_id == active_session_id,
+                        Enrollment.ended_on.is_(None),
                     )
                 )
             ).scalar_one_or_none()
@@ -768,6 +774,219 @@ async def _get_assignment_or_404(session: AsyncSession, assignment_id: UUID, mad
 
 
 # --------------------------------------------------------------- Grading schemes
+
+
+def _grading_plan_read(scheme: GradingScheme, components: list[ExamType]) -> GradingPlanRead:
+    return GradingPlanRead(
+        id=scheme.id,
+        course_id=scheme.course_id or components[0].course_id,
+        class_id=scheme.class_id if scheme.course_id is not None else components[0].class_id,
+        name=scheme.name,
+        bands=scheme.bands,
+        assignment_weightage=scheme.assignment_weightage or 0,
+        components=[
+            GradingPlanComponent(id=component.id, name=component.name, weightage=component.weightage)
+            for component in sorted(components, key=lambda row: (row.name.casefold(), str(row.id)))
+        ],
+    )
+
+
+async def _scoped_grading_plan(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    course_id: UUID,
+    class_id: UUID | None,
+    *,
+    inherit_default: bool,
+) -> tuple[GradingScheme, list[ExamType]] | None:
+    scope_clause = GradingScheme.class_id == class_id if class_id is not None else GradingScheme.class_id.is_(None)
+    scheme = (
+        await session.execute(
+            select(GradingScheme).where(
+                GradingScheme.madrasa_id == madrasa_id,
+                GradingScheme.course_id == course_id,
+                scope_clause,
+            ).order_by(GradingScheme.created_at.desc())
+        )
+    ).scalars().first()
+    if scheme is None and class_id is not None and inherit_default:
+        scheme = (
+            await session.execute(
+                select(GradingScheme).where(
+                    GradingScheme.madrasa_id == madrasa_id,
+                    GradingScheme.course_id == course_id,
+                    GradingScheme.class_id.is_(None),
+                ).order_by(GradingScheme.created_at.desc())
+            )
+        ).scalars().first()
+    if scheme is None:
+        # Compatibility for schemes created before aggregate plans owned
+        # their scope. Resolve them through the existing exam types, with a
+        # class override preferred over the course default.
+        exact_scope = ExamType.class_id == class_id if class_id is not None else ExamType.class_id.is_(None)
+        legacy_component = (
+            await session.execute(
+                select(ExamType).where(
+                    ExamType.madrasa_id == madrasa_id,
+                    ExamType.course_id == course_id,
+                    exact_scope,
+                ).order_by(ExamType.name, ExamType.id)
+            )
+        ).scalars().first()
+        if legacy_component is None and class_id is not None and inherit_default:
+            legacy_component = (
+                await session.execute(
+                    select(ExamType).where(
+                        ExamType.madrasa_id == madrasa_id,
+                        ExamType.course_id == course_id,
+                        ExamType.class_id.is_(None),
+                    ).order_by(ExamType.name, ExamType.id)
+                )
+            ).scalars().first()
+        if legacy_component is not None:
+            scheme = await session.get(GradingScheme, legacy_component.grading_scheme_id)
+            class_id = legacy_component.class_id
+    if scheme is None:
+        return None
+    components = list((await session.execute(
+        select(ExamType).where(
+            ExamType.madrasa_id == madrasa_id,
+            ExamType.grading_scheme_id == scheme.id,
+            ExamType.course_id == course_id,
+            ExamType.class_id == class_id if class_id is not None else ExamType.class_id.is_(None),
+        )
+    )).scalars().all())
+    return scheme, components
+
+
+@router.get("/grading-plan", response_model=GradingPlanRead)
+async def get_grading_plan(
+    course_id: UUID,
+    class_id: UUID | None = None,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> GradingPlanRead:
+    plan = await _scoped_grading_plan(
+        session, madrasa.id, course_id, class_id, inherit_default=True
+    )
+    if plan is None:
+        raise HTTPException(status_code=404, detail=ErrorCode.GRADING_SCHEME_NOT_FOUND)
+    return _grading_plan_read(*plan)
+
+
+@router.put("/grading-plan", response_model=GradingPlanRead)
+async def put_grading_plan(
+    payload: GradingPlanWrite,
+    current_user: User = Depends(require_permission("grading.schemes.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> GradingPlanRead:
+    # Serialize writes for this logical aggregate. A row lock cannot protect a
+    # scope that does not exist yet; the partial unique indexes are the final
+    # invariant and this transaction lock avoids concurrent insert conflicts.
+    if session.bind is not None and session.bind.dialect.name == "postgresql":
+        scope_key = (
+            madrasa.id.int ^ payload.course_id.int ^ (payload.class_id.int if payload.class_id else 0)
+        ) % (2**63 - 1)
+        await session.execute(select(func.pg_advisory_xact_lock(scope_key)))
+    course = await session.get(Course, payload.course_id)
+    if course is None or course.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if payload.class_id is not None:
+        academic_class = await session.get(AcademicClass, payload.class_id)
+        if academic_class is None or academic_class.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Class not found")
+        mapped = await session.scalar(select(ClassCourse.id).where(
+            ClassCourse.madrasa_id == madrasa.id,
+            ClassCourse.class_id == payload.class_id,
+            ClassCourse.course_id == payload.course_id,
+        ))
+        if mapped is None:
+            raise HTTPException(status_code=422, detail="Course is not assigned to this class")
+
+    existing = await _scoped_grading_plan(
+        session, madrasa.id, payload.course_id, payload.class_id, inherit_default=False
+    )
+    if existing is None:
+        scheme = GradingScheme(
+            madrasa_id=madrasa.id,
+            course_id=payload.course_id,
+            class_id=payload.class_id,
+            name=payload.name.strip(),
+            bands=[band.model_dump() for band in payload.bands],
+            include_assignments=payload.assignment_weightage > 0,
+            assignment_weightage=payload.assignment_weightage,
+        )
+        session.add(scheme)
+        await session.flush()
+        existing_components: list[ExamType] = []
+    else:
+        scheme, existing_components = existing
+        if scheme.course_id is None:
+            other_scope_component = await session.scalar(
+                select(ExamType.id).where(
+                    ExamType.grading_scheme_id == scheme.id,
+                    ~ExamType.id.in_([component.id for component in existing_components]),
+                ).limit(1)
+            )
+            if other_scope_component is not None:
+                scheme = GradingScheme(
+                    madrasa_id=madrasa.id,
+                    course_id=payload.course_id,
+                    class_id=payload.class_id,
+                    name=payload.name.strip(),
+                    bands=[band.model_dump() for band in payload.bands],
+                    include_assignments=payload.assignment_weightage > 0,
+                    assignment_weightage=payload.assignment_weightage,
+                )
+                session.add(scheme)
+                await session.flush()
+                for component in existing_components:
+                    component.grading_scheme_id = scheme.id
+            else:
+                scheme.course_id = payload.course_id
+                scheme.class_id = payload.class_id
+        scheme.name = payload.name.strip()
+        scheme.bands = [band.model_dump() for band in payload.bands]
+        scheme.include_assignments = payload.assignment_weightage > 0
+        scheme.assignment_weightage = payload.assignment_weightage
+
+    existing_by_id = {component.id: component for component in existing_components}
+    retained_ids: set[UUID] = set()
+    result_components: list[ExamType] = []
+    for component_payload in payload.components:
+        component = existing_by_id.get(component_payload.id) if component_payload.id else None
+        if component_payload.id is not None and component is None:
+            raise HTTPException(status_code=404, detail=ErrorCode.EXAM_TYPE_NOT_FOUND)
+        if component is None:
+            component = ExamType(
+                madrasa_id=madrasa.id,
+                course_id=payload.course_id,
+                class_id=payload.class_id,
+                grading_scheme_id=scheme.id,
+                name=component_payload.name.strip(),
+                weightage=component_payload.weightage,
+            )
+            session.add(component)
+        else:
+            retained_ids.add(component.id)
+            component.name = component_payload.name.strip()
+            component.weightage = component_payload.weightage
+        result_components.append(component)
+
+    for component in existing_components:
+        if component.id in retained_ids:
+            continue
+        if await session.scalar(select(Mark.id).where(Mark.exam_type_id == component.id).limit(1)):
+            raise HTTPException(status_code=409, detail=ErrorCode.EXAM_TYPE_HAS_MARKS)
+        await session.delete(component)
+
+    await session.commit()
+    await session.refresh(scheme)
+    for component in result_components:
+        await session.refresh(component)
+    return _grading_plan_read(scheme, result_components)
 
 @router.post("/grading-schemes", response_model=GradingSchemeRead)
 async def create_grading_scheme(
@@ -1024,19 +1243,31 @@ def _assignment_totals(
     assignments: list[Assignment],
     submissions: dict[UUID, Submission],
     student_id: UUID,
+    pool_weightage: float | None = None,
 ) -> tuple[float, float, int]:
     weighted_sum = 0.0
     total_weight = 0.0
     count = 0
+    percentages: list[float] = []
     for assignment in assignments:
         if assignment.target_student_ids and str(student_id) not in assignment.target_student_ids:
             continue
         submission = submissions.get(assignment.id)
         if submission is None or submission.mark is None:
             continue
-        weighted_sum += (submission.mark / assignment.max_marks) * 100.0 * assignment.weightage
-        total_weight += assignment.weightage
+        percentage = (submission.mark / assignment.max_marks) * 100.0
+        percentages.append(percentage)
+        if pool_weightage is None:
+            if assignment.weightage is None:
+                continue
+            weighted_sum += percentage * assignment.weightage
+            total_weight += assignment.weightage
         count += 1
+    if pool_weightage is not None and count:
+        # Aggregate plans treat all graded assignments as one normalized
+        # component instead of making the result depend on assignment count.
+        average_percentage = sum(percentages) / count
+        return average_percentage * pool_weightage, pool_weightage, count
     return weighted_sum, total_weight, count
 
 
@@ -1057,6 +1288,31 @@ def _result_scheme_for_class(
     return schemes.get(ordered[0].grading_scheme_id) if ordered else None
 
 
+async def _exam_types_for_result_scope(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    course_id: UUID,
+    class_id: UUID,
+) -> list[ExamType]:
+    """A class plan replaces the course default; the two never accumulate."""
+    class_components = list((await session.execute(
+        select(ExamType).where(
+            ExamType.madrasa_id == madrasa_id,
+            ExamType.course_id == course_id,
+            ExamType.class_id == class_id,
+        )
+    )).scalars().all())
+    if class_components:
+        return class_components
+    return list((await session.execute(
+        select(ExamType).where(
+            ExamType.madrasa_id == madrasa_id,
+            ExamType.course_id == course_id,
+            ExamType.class_id.is_(None),
+        )
+    )).scalars().all())
+
+
 async def _compute_course_result(
     session: AsyncSession,
     madrasa_id: UUID,
@@ -1065,15 +1321,9 @@ async def _compute_course_result(
     class_id: UUID,
     section_id: UUID | None,
 ) -> CourseResult:
-    exam_types = (
-        await session.execute(
-            select(ExamType).where(
-                ExamType.course_id == course_id,
-                ExamType.madrasa_id == madrasa_id,
-                or_(ExamType.class_id.is_(None), ExamType.class_id == class_id),
-            )
-        )
-    ).scalars().all()
+    exam_types = await _exam_types_for_result_scope(
+        session, madrasa_id, course_id, class_id,
+    )
     schemes = {
         scheme.id: scheme
         for scheme in (
@@ -1112,7 +1362,6 @@ async def _compute_course_result(
                 Assignment.madrasa_id == madrasa_id,
                 Assignment.class_id == class_id,
                 or_(Assignment.section_id.is_(None), Assignment.section_id == section_id),
-                Assignment.weightage.is_not(None),
                 Assignment.max_marks.is_not(None),
                 Assignment.max_marks > 0
             )
@@ -1131,7 +1380,8 @@ async def _compute_course_result(
         ).scalars().all()
         submissions = {submission.assignment_id: submission for submission in submission_rows}
     assignment_sum, assignment_weight, assignment_count = _assignment_totals(
-        assignments, submissions, student_id
+        assignments, submissions, student_id,
+        result_scheme.assignment_weightage if result_scheme is not None else None,
     )
     weighted_sum += assignment_sum
     total_weight += assignment_weight
@@ -1163,6 +1413,7 @@ async def get_course_result(
                 Enrollment.madrasa_id == madrasa.id,
                 Enrollment.session_id == active_session_id,
                 Enrollment.student_id == student_id,
+                Enrollment.ended_on.is_(None),
             )
         )
     ).scalar_one_or_none()
@@ -1219,6 +1470,7 @@ async def _build_session_result(session: AsyncSession, madrasa_id: UUID, student
                 Enrollment.student_id == student_id,
                 Enrollment.session_id == session_id,
                 Enrollment.madrasa_id == madrasa_id,
+                Enrollment.ended_on.is_(None),
             )
             .order_by(Enrollment.created_at.desc())
         )
@@ -1438,15 +1690,9 @@ async def _section_matrix(
 
     exam_types_by_course: dict[UUID, list[ExamType]] = {}
     for course in course_rows:
-        exam_types_by_course[course.id] = (
-            await session.execute(
-                select(ExamType).where(
-                    ExamType.course_id == course.id,
-                    ExamType.madrasa_id == madrasa_id,
-                    or_(ExamType.class_id == None, ExamType.class_id == section.class_id)
-                )
-            )
-        ).scalars().all()
+        exam_types_by_course[course.id] = await _exam_types_for_result_scope(
+            session, madrasa_id, course.id, section.class_id,
+        )
 
     teacher_names = await _teacher_names_by_section_course(session, madrasa_id, active_session_id, section.class_id)
     matrix_courses = [
@@ -1469,6 +1715,7 @@ async def _section_matrix(
             .where(
                 Enrollment.section_id == section.id,
                 Enrollment.session_id == active_session_id,
+                Enrollment.ended_on.is_(None),
             )
             .order_by(StudentProfile.name)
         )
@@ -1511,7 +1758,6 @@ async def _section_matrix(
                     Assignment.class_id == section.class_id,
                     or_(Assignment.section_id.is_(None), Assignment.section_id == section.id),
                     Assignment.course_id.in_([course.id for course in course_rows]),
-                    Assignment.weightage.is_not(None),
                     Assignment.max_marks.is_not(None),
                     Assignment.max_marks > 0,
                 )
@@ -1565,7 +1811,8 @@ async def _section_matrix(
                     if (student.id, assignment.id) in submissions_by_student_assignment
                 }
                 assignment_sum, assignment_weight, _ = _assignment_totals(
-                    assignments_by_course[course.id], assignment_submissions, student.id
+                    assignments_by_course[course.id], assignment_submissions, student.id,
+                    result_scheme.assignment_weightage,
                 )
                 weighted_sum += assignment_sum
                 total_weight += assignment_weight
@@ -1706,9 +1953,10 @@ async def export_results(
 
     if format == "pdf":
         # One PDF per export; sections stacked as header rows inside the table.
-        headers = ["Student", "Adm #"]
+        is_urdu = current_user.preferred_language == "ur"
+        headers = ["طالب علم", "داخلہ نمبر"] if is_urdu else ["Student", "Adm #"]
         first = matrices[0]
-        headers += [c.course_name for c in first.courses] + ["Overall"]
+        headers += [c.course_name for c in first.courses] + (["مجموعی نتیجہ"] if is_urdu else ["Overall"])
         rows: list[list[str]] = []
         for matrix in matrices:
             rows.append([f"— {matrix.class_name} / {matrix.section_name} —"] + [""] * (len(headers) - 1))
@@ -1718,12 +1966,15 @@ async def export_results(
                     + [f"{c.raw_score} ({c.band})" if c.raw_score is not None else "—" for c in student.courses]
                     + [str(student.overall_score) if student.overall_score is not None else "—"]
                 )
-            rows.append(["Course teachers:"] + [""] * (len(headers) - 1))
+            rows.append(["مضامین کے اساتذہ:" if is_urdu else "Course teachers:"] + [""] * (len(headers) - 1))
             for course in matrix.courses:
                 rows.append([course.course_name, course.teacher_name or "—"] + [""] * (len(headers) - 2))
         pdf_bytes = render_table_pdf(
-            "Results", f"{madrasa.name} — session results", headers, rows,
+            "نتائج" if is_urdu else "Results",
+            f"{madrasa.name} — " + ("تعلیمی دور کے نتائج" if is_urdu else "session results"),
+            headers, rows,
             await load_report_branding(session, madrasa),
+            language=current_user.preferred_language,
         )
         return Response(
             content=pdf_bytes,

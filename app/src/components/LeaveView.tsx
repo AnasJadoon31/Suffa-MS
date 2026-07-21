@@ -293,36 +293,28 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
                 { value: "approved", label: t("leaveStatus_approved") },
                 { value: "rejected", label: t("leaveStatus_rejected") }
               ]
-            }
+            },
+            ...(tab === "student" ? [{
+              key: "class", type: "select" as const, value: filters.class_id, placeholder: t("allClasses"),
+              options: classes.map((academicClass) => ({ value: academicClass.id, label: academicClass.name })),
+              onChange: (value: string) => setFilters({ ...filters, class_id: value }),
+            }] : []),
+            { key: "date-from", type: "input", inputType: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
+            { key: "date-to", type: "input", inputType: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
           ]}
-        >
-          {tab === "student" && (
-            <Select value={filters.class_id} onChange={(e) => setFilters({ ...filters, class_id: e.target.value })}>
-              <option value="">{t("allClasses")}</option>
-              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          )}
-          <Input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} />
-          <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
-        </InlineFilter>
+        />
       )}
 
       <form
-        className="moduleToolbar"
         onSubmit={(e) => {
           e.preventDefault();
           setSearchQuery(searchDraft);
         }}
       >
-        <label className="searchBox">
-          {t("searchLeaveLabel")}
-          <Input
-            placeholder={t("searchLeavePlaceholder")}
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-          />
-        </label>
-        <div className="formActions">
+        <InlineFilter filters={[{
+          key: "leave-search", type: "input", inputType: "search", label: t("searchLeaveLabel"),
+          placeholder: t("searchLeavePlaceholder"), value: searchDraft, onChange: setSearchDraft,
+        }]}>
           {searchQuery && (
             <Button
               className="secondaryAction"
@@ -335,7 +327,7 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
               {t("clearBtn")}
             </Button>
           )}
-        </div>
+        </InlineFilter>
       </form>
 
       <DataTable<Leave>

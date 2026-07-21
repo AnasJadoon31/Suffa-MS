@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, ForeignKey, Index, String, UniqueConstraint, func, Integer
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, String, UniqueConstraint, func, Integer, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, SlugMixin, TenantMixin, TimestampMixin
@@ -76,7 +76,14 @@ class AcademicSession(Base, IdMixin, TenantMixin, TimestampMixin):
 class Enrollment(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "enrollments"
     __table_args__ = (
-        UniqueConstraint("student_id", "session_id", name="uq_enrollment_student_session"),
+        Index(
+            "uq_enrollment_active_student_session",
+            "student_id", "session_id",
+            unique=True,
+            postgresql_where=text("ended_on IS NULL"),
+            sqlite_where=text("ended_on IS NULL"),
+        ),
+        CheckConstraint("ended_on IS NULL OR ended_on >= started_on", name="ck_enrollment_dates"),
     )
 
     student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"), index=True)
@@ -84,6 +91,12 @@ class Enrollment(Base, IdMixin, TenantMixin, TimestampMixin):
     program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id"))
     class_id: Mapped[UUID] = mapped_column(ForeignKey("classes.id"))
     section_id: Mapped[UUID] = mapped_column(ForeignKey("sections.id"))
+    started_on: Mapped[date] = mapped_column(Date, default=date.today)
+    ended_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    @property
+    def is_active(self) -> bool:
+        return self.ended_on is None
 
 
 class TeacherAssignment(Base, IdMixin, TenantMixin, TimestampMixin):

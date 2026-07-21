@@ -1139,7 +1139,36 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--line);
 }
+
+.modalHeader h3 { margin: 0; }
+
+.modalHeaderActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.modalBody {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.formStack,
+.inlineForm {
+  display: grid;
+  gap: 18px;
+  padding: 20px 24px 24px;
+}
+
+.formStack > *,
+.inlineForm > * { min-width: 0; }
 
 .publicFormPage {
   min-height: 100vh;
@@ -1214,6 +1243,35 @@ button:disabled {
   gap: 10px;
 }
 
+.formFieldOptions {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.formFieldOptions legend { padding-inline: 4px; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
+.formFieldOptionRow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center; }
+.choiceField { display: grid; gap: 10px; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.choiceField legend, .formSectionLabel { color: var(--ink); font-weight: 750; }
+.modalChoiceGrid { display: flex; flex-wrap: wrap; gap: 12px; padding: 20px 24px 24px; }
+.formGridTwo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.formGridTwo label { display: grid; gap: 6px; }
+.adminNotifications { display: grid; gap: 8px; margin-bottom: 16px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--brand-light); }
+.adminNotifications h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.95rem; }
+.adminNotifications button { display: grid; gap: 3px; padding: 10px 12px; text-align: start; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); cursor: pointer; }
+.adminNotifications span { color: var(--muted); font-size: 0.84rem; }
+
+.responseDetails { display: grid; gap: 0; margin: 0; padding: 20px 24px 24px; }
+.responseDetailRow, .responseDetails > dt, .responseDetails > dd { padding-block: 10px; }
+.responseDetailRow { display: grid; grid-template-columns: minmax(130px, 0.35fr) 1fr; gap: 16px; border-top: 1px solid var(--line); }
+.responseDetailRow dt, .responseDetails > dt { color: var(--muted); font-weight: 700; }
+.responseDetailRow dd, .responseDetails > dd { margin: 0; overflow-wrap: anywhere; }
+
 .formFieldCard {
   position: relative;
   display: grid;
@@ -1255,6 +1313,7 @@ button:disabled {
 }
 
 @media (max-width: 640px) {
+  .formGridTwo { grid-template-columns: 1fr; }
   .formFieldsHeader {
     align-items: stretch;
     flex-direction: column;
@@ -1905,6 +1964,39 @@ html[dir="rtl"] .navGroupLabel {
   margin-bottom: 16px;
 }
 
+.inlineFilter {
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-block: 2px 6px;
+  scrollbar-width: thin;
+}
+
+.inlineFilterField {
+  display: grid;
+  flex: 1 1 180px;
+  min-width: 150px;
+  max-width: 320px;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.inlineFilterField .mms-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.inlineFilterTabs,
+.inlineFilterActions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .filterBar select,
 .filterBar input {
   min-width: 140px;
@@ -2061,6 +2153,25 @@ input[type="radio"] {
   overflow-x: auto;
 }
 
+.gradingSetupLayout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); gap: 18px; align-items: start; }
+.gradingPlanCard, .assignmentPolicyCard { margin: 0; }
+.gradingPlanHeader, .sectionTitleRow { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.gradingPlanHeader h3, .sectionTitleRow h4, .sectionTitleRow p { margin: 0; }
+.weightTotal { flex: 0 0 auto; padding: 8px 12px; border-radius: 999px; font-weight: 800; }
+.weightTotal.valid { background: #dcfce7; color: #166534; }
+.weightTotal.invalid { background: #fee2e2; color: #991b1b; }
+.gradingPlanName { display: grid; gap: 6px; margin-bottom: 18px; color: var(--muted); font-weight: 700; }
+.gradingBuilderSection { display: grid; gap: 14px; padding-block: 18px; border-top: 1px solid var(--line); }
+.gradingRows { display: grid; gap: 10px; }
+.gradingRow { display: grid; grid-template-columns: minmax(180px, 1fr) 150px auto; gap: 10px; align-items: end; }
+.gradingBandRow { display: grid; grid-template-columns: minmax(130px, 1fr) 120px 120px auto; gap: 10px; align-items: end; }
+.gradingRow label, .gradingBandRow label, .assignmentPolicyCard label { display: grid; gap: 6px; color: var(--muted); font-size: 0.84rem; font-weight: 700; }
+.assignmentPoolRow { padding: 12px; border: 1px dashed var(--brand); border-radius: var(--radius-sm); background: var(--brand-light); }
+.gradingPreview { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); font-weight: 700; }
+.assignmentPolicyCard { display: grid; gap: 14px; }
+@media (max-width: 900px) { .gradingSetupLayout { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .gradingRow, .gradingBandRow { grid-template-columns: 1fr; } .gradingPlanHeader, .sectionTitleRow { align-items: stretch; flex-direction: column; } }
+
 /* --------------------------------------------------------- Person detail */
 
 .detailPanel {
@@ -2079,6 +2190,28 @@ input[type="radio"] {
 .detailGrid dt { color: var(--muted, #64748b); }
 .detailGrid dd { margin: 0; }
 
+.statusHistoryList { display: grid; gap: 8px; margin: 0; padding-inline-start: 22px; }
+.statusHistoryList li { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.statusHistoryList span { color: var(--muted); font-size: .85rem; }
+
+.detailGridRow { display: contents; }
+.detailSection { margin-block: 20px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.detailSection h4 { margin: 0 0 14px; }
+.personHero { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.personHero > div { display: grid; gap: 5px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.personHero span { color: var(--muted); font-size: 0.78rem; font-weight: 700; }
+.personHero strong { overflow-wrap: anywhere; font-size: 1rem; }
+.guardianIdentityCard { display: grid; gap: 18px; }
+.linkedPersonCard { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); }
+.linkedPersonCard > div { display: grid; gap: 3px; }
+.linkedPersonCard span { color: var(--muted); font-size: 0.84rem; }
+
+@media (max-width: 640px) {
+  .personHero { grid-template-columns: 1fr; }
+  .detailGrid { grid-template-columns: 1fr; gap: 3px; }
+  .detailGrid dd { margin-bottom: 10px; }
+}
+
 /* ------------------------------------------------------- Delegation modal */
 
 .modalOverlay {
@@ -2089,15 +2222,35 @@ input[type="radio"] {
   align-items: center;
   justify-content: center;
   z-index: 50;
+  padding: 20px;
 }
 
 .modalCard {
+  display: flex;
+  flex-direction: column;
   background: var(--surface, #fff);
-  border-radius: 12px;
-  padding: 20px;
-  width: min(560px, 92vw);
-  max-height: 85vh;
-  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 0;
+  width: min(720px, 100%);
+  max-height: min(88vh, 920px);
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+}
+
+.modalBody > .detailPanel {
+  margin: 0;
+  border: 0;
+  padding: 24px !important;
+}
+
+@media (max-width: 640px) {
+  .modalOverlay { align-items: flex-end; padding: 8px; }
+  .modalCard { width: 100%; max-height: 94vh; border-radius: 16px; }
+  .modalHeader { padding: 16px; }
+  .formStack, .inlineForm { gap: 16px; padding: 18px 16px 20px; }
+  .inlineFilter { overflow-x: auto; }
+  .inlineFilterField { flex-basis: 160px; min-width: 160px; }
 }
 
 .delegateList {

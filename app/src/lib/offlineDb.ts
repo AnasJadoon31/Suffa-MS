@@ -14,6 +14,8 @@ export type OutboxEntry = Readonly<{
   idempotency_key: string;
   check_in?: string;
   check_out?: string;
+  course_id?: string;
+  timetable_slot_id?: string;
 }>;
 
 export type RefCacheEntry = Readonly<{
@@ -41,6 +43,12 @@ class MmsOfflineDb extends Dexie {
     // rows have no account_key and are intentionally ignored.
     this.version(3).stores({
       outbox: "++id, account_key, [account_key+idempotency_key], subject_type, subject_id, attendance_date, idempotency_key",
+      refCache: "key"
+    });
+    // v4 keeps the period scope on every new student-attendance write while
+    // retaining legacy queued rows for safe replay.
+    this.version(4).stores({
+      outbox: "++id, account_key, [account_key+idempotency_key], subject_type, subject_id, attendance_date, course_id, timetable_slot_id, idempotency_key",
       refCache: "key"
     });
   }

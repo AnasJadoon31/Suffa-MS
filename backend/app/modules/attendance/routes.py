@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, time
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -37,7 +37,7 @@ from app.modules.attendance.schemas import (
     TeacherAttendanceLogEntry,
     TeacherAttendanceTodayResponse,
 )
-from app.modules.operations.models import Holiday, Leave
+from app.modules.operations.models import Holiday, Leave, TimetableSlot
 from app.modules.people.models import StudentProfile, TeacherProfile
 
 router = APIRouter()
@@ -128,7 +128,12 @@ def build_record(entry: AttendanceEntry, madrasa_id: UUID, marked_by_id: UUID, o
         overridden=overridden,
     )
     if entry.subject_type == "student":
-        return StudentAttendance(student_id=entry.subject_id, **common)
+        return StudentAttendance(
+            student_id=entry.subject_id,
+            course_id=entry.course_id,
+            timetable_slot_id=entry.timetable_slot_id,
+            **common,
+        )
     return TeacherAttendance(
         teacher_id=entry.subject_id,
         check_in=entry.check_in,
@@ -234,21 +239,40 @@ async def _assert_can_mark_entry(
             return
         raise HTTPException(status_code=403, detail="Missing permission: teachers.attendance.manage")
 
-    if await _has_global_student_attendance_access(current_user, session):
-        return
-
     enrollment_scope = (
         await session.execute(
             select(Enrollment.class_id, Enrollment.section_id).where(
                 Enrollment.madrasa_id == madrasa_id,
                 Enrollment.student_id == entry.subject_id,
                 Enrollment.session_id == entry.session_id,
+                Enrollment.ended_on.is_(None),
             )
         )
     ).one_or_none()
     if enrollment_scope is None:
         raise HTTPException(status_code=403, detail="Student is not enrolled in this session")
     class_id, section_id = enrollment_scope
+
+    slot = None
+    if entry.timetable_slot_id is not None:
+        slot = await session.get(TimetableSlot, entry.timetable_slot_id)
+        if (
+            slot is None
+            or slot.madrasa_id != madrasa_id
+            or slot.session_id != entry.session_id
+            or slot.class_id != class_id
+            or slot.section_id != section_id
+            or slot.course_id != entry.course_id
+            or slot.day_of_week != entry.attendance_date.weekday()
+        ):
+            raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SLOT_NOT_ASSIGNED)
+
+    if await _has_global_student_attendance_access(current_user, session):
+        return
+    if slot is not None:
+        teacher_id = await _current_teacher_id(current_user, session, madrasa_id)
+        if teacher_id is None or slot.teacher_id != teacher_id:
+            raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SLOT_NOT_ASSIGNED)
     await _assert_can_mark_section(
         current_user, session, madrasa_id, entry.session_id, class_id, section_id
     )
@@ -314,6 +338,7 @@ async def attendance_classes(
                 Enrollment.session_id == active_session.id,
                 Enrollment.class_id.in_(class_ids),
                 Enrollment.section_id.in_(visible_section_ids),
+                Enrollment.ended_on.is_(None),
                 StudentProfile.status == "active",
             )
             .group_by(Enrollment.section_id)
@@ -331,7 +356,7 @@ async def attendance_classes(
         )
 
     course_stmt = (
-        select(ClassCourse.class_id, Course.name)
+        select(ClassCourse.class_id, Course.id, Course.name)
         .join(Course, Course.id == ClassCourse.course_id)
         .where(
             ClassCourse.madrasa_id == madrasa.id,
@@ -342,14 +367,17 @@ async def attendance_classes(
         course_stmt = course_stmt.where(ClassCourse.course_id.in_(assigned_course_ids))
     course_rows = (await session.execute(course_stmt.order_by(Course.name))).all()
     course_names: defaultdict[UUID, list[str]] = defaultdict(list)
-    for class_id, course_name in course_rows:
+    courses: defaultdict[UUID, list[dict[str, object]]] = defaultdict(list)
+    for class_id, course_id, course_name in course_rows:
         course_names[class_id].append(course_name)
+        courses[class_id].append({"id": course_id, "name": course_name})
 
     return paginate_sequence([
         AttendanceClassRead(
             id=class_id,
             name=class_name,
             course_names=course_names[class_id],
+            courses=courses[class_id],
             student_count=sum(section.student_count for section in sections_by_class[class_id]),
             sections=sections_by_class[class_id],
         )
@@ -361,6 +389,8 @@ async def attendance_classes(
 async def attendance_class_roster(
     class_id: UUID,
     section_id: UUID | None = None,
+    course_id: UUID | None = None,
+    timetable_slot_id: UUID | None = None,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -375,6 +405,8 @@ async def attendance_class_roster(
         raise HTTPException(status_code=404, detail="Class not found")
 
     section = None
+    if (course_id is None) != (timetable_slot_id is None):
+        raise HTTPException(status_code=422, detail="course_id and timetable_slot_id must be provided together")
     if section_id is not None:
         section = await session.get(Section, section_id)
         if section is None or section.madrasa_id != madrasa.id or section.class_id != class_id:
@@ -384,6 +416,33 @@ async def attendance_class_roster(
         )
     elif not await _has_global_student_attendance_access(current_user, session):
         raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SECTION_REQUIRED)
+
+    course = None
+    timetable_slot = None
+    if timetable_slot_id is not None:
+        timetable_slot = await session.get(TimetableSlot, timetable_slot_id)
+        if (
+            timetable_slot is None
+            or timetable_slot.madrasa_id != madrasa.id
+            or timetable_slot.session_id != active_session.id
+            or timetable_slot.class_id != class_id
+            or timetable_slot.course_id != course_id
+            or (section_id is not None and timetable_slot.section_id != section_id)
+        ):
+            raise HTTPException(status_code=404, detail="Attendance timetable slot not found")
+        course = await session.get(Course, course_id)
+        if course is None or course.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Course not found")
+        if section_id is None:
+            section_id = timetable_slot.section_id
+            section = await session.get(Section, section_id)
+        await _assert_can_mark_section(
+            current_user, session, madrasa.id, active_session.id, class_id, timetable_slot.section_id
+        )
+        if not await _has_global_student_attendance_access(current_user, session):
+            teacher_id = await _current_teacher_id(current_user, session, madrasa.id)
+            if teacher_id is None or timetable_slot.teacher_id != teacher_id:
+                raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SLOT_NOT_ASSIGNED)
 
     roster_stmt = (
         select(
@@ -399,6 +458,7 @@ async def attendance_class_roster(
                 Enrollment.madrasa_id == madrasa.id,
                 Enrollment.session_id == active_session.id,
                 Enrollment.class_id == class_id,
+                Enrollment.ended_on.is_(None),
                 StudentProfile.status == "active",
             )
             .order_by(Section.name, StudentProfile.name)
@@ -420,6 +480,14 @@ async def attendance_class_roster(
         class_name=academic_class.name,
         section_id=section_id,
         section_name=section.name if section is not None else None,
+        course={"id": course.id, "name": course.name} if course is not None else None,
+        timetable_slot={
+            "id": timetable_slot.id,
+            "period": timetable_slot.period,
+            "day_of_week": timetable_slot.day_of_week,
+            "start_time": timetable_slot.start_time,
+            "end_time": timetable_slot.end_time,
+        } if timetable_slot is not None else None,
         students=[
             AttendanceRosterStudent(
                 id=student_id,
@@ -449,6 +517,13 @@ def _history_entry_from_row(row) -> AttendanceLogEntry:
         marker_role,
         marker_display_name,
         overridden,
+        course_id,
+        course_name,
+        timetable_slot_id,
+        slot_period,
+        slot_day_of_week,
+        slot_start_time,
+        slot_end_time,
     ) = row
     synced_at = updated_at or created_at
     return AttendanceLogEntry(
@@ -467,6 +542,15 @@ def _history_entry_from_row(row) -> AttendanceLogEntry:
             role=str(marker_role.value if hasattr(marker_role, "value") else marker_role),
         ),
         overridden=overridden,
+        course={"id": course_id, "name": course_name} if course_id is not None else None,
+        timetable_slot={
+            "id": timetable_slot_id,
+            "period": slot_period,
+            "day_of_week": slot_day_of_week,
+            "start_time": slot_start_time,
+            "end_time": slot_end_time,
+        } if timetable_slot_id is not None else None,
+        legacy_general=timetable_slot_id is None,
     )
 
 
@@ -477,6 +561,7 @@ async def _approved_leave_history_entries(
     student_ids: set[UUID],
     start_date: date,
     end_date: date,
+    enrollment_windows: dict[UUID, list[tuple[date, date]]] | None = None,
 ) -> list[AttendanceLogEntry]:
     if not student_ids:
         return []
@@ -525,6 +610,11 @@ async def _approved_leave_history_entries(
         role,
     ) in rows:
         for day in _iter_days(max(leave_start, start_date), min(leave_end, end_date)):
+            if enrollment_windows is not None and not any(
+                window_start <= day <= window_end
+                for window_start, window_end in enrollment_windows.get(student_id, [])
+            ):
+                continue
             day_key = (student_id, day)
             if day_key in seen_days:
                 continue
@@ -695,6 +785,7 @@ async def _class_history_entries(
     student_id: UUID | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
+    course_id: UUID | None = None,
 ) -> list[AttendanceLogEntry]:
     stmt = (
         select(
@@ -712,6 +803,13 @@ async def _class_history_entries(
             User.role,
             TeacherProfile.name,
             StudentAttendance.overridden,
+            Course.id,
+            Course.name,
+            TimetableSlot.id,
+            TimetableSlot.period,
+            TimetableSlot.day_of_week,
+            TimetableSlot.start_time,
+            TimetableSlot.end_time,
         )
         .select_from(StudentAttendance)
         .join(StudentProfile, StudentProfile.id == StudentAttendance.student_id)
@@ -725,10 +823,17 @@ async def _class_history_entries(
         )
         .join(User, User.id == StudentAttendance.marked_by_id)
         .outerjoin(TeacherProfile, TeacherProfile.user_id == User.id)
+        .outerjoin(Course, Course.id == StudentAttendance.course_id)
+        .outerjoin(TimetableSlot, TimetableSlot.id == StudentAttendance.timetable_slot_id)
         .where(
             StudentAttendance.madrasa_id == madrasa_id,
             StudentAttendance.session_id == session_id,
             Enrollment.class_id == class_id,
+            Enrollment.started_on <= StudentAttendance.attendance_date,
+            or_(
+                Enrollment.ended_on.is_(None),
+                Enrollment.ended_on >= StudentAttendance.attendance_date,
+            ),
         )
     )
     if student_id is not None:
@@ -739,6 +844,8 @@ async def _class_history_entries(
         stmt = stmt.where(StudentAttendance.attendance_date >= start_date)
     if end_date is not None:
         stmt = stmt.where(StudentAttendance.attendance_date <= end_date)
+    if course_id is not None:
+        stmt = stmt.where(StudentAttendance.course_id == course_id)
     rows = (
         await session.execute(
             stmt.order_by(StudentAttendance.attendance_date.desc(), StudentProfile.name)
@@ -749,23 +856,28 @@ async def _class_history_entries(
     if start_date is None or end_date is None:
         return manual_entries
 
+    enrollment_stmt = select(
+        Enrollment.student_id,
+        Enrollment.started_on,
+        Enrollment.ended_on,
+    ).where(
+        Enrollment.madrasa_id == madrasa_id,
+        Enrollment.session_id == session_id,
+        Enrollment.class_id == class_id,
+        Enrollment.started_on <= end_date,
+        or_(Enrollment.ended_on.is_(None), Enrollment.ended_on >= start_date),
+    )
+    if section_id is not None:
+        enrollment_stmt = enrollment_stmt.where(Enrollment.section_id == section_id)
     if student_id is not None:
-        student_ids = {student_id}
-    else:
-        student_stmt = (
-            select(StudentProfile.id)
-            .join(Enrollment, Enrollment.student_id == StudentProfile.id)
-            .where(
-                Enrollment.madrasa_id == madrasa_id,
-                Enrollment.session_id == session_id,
-                Enrollment.class_id == class_id,
-                StudentProfile.status == "active",
-            )
+        enrollment_stmt = enrollment_stmt.where(Enrollment.student_id == student_id)
+    enrollment_rows = (await session.execute(enrollment_stmt)).all()
+    enrollment_windows: dict[UUID, list[tuple[date, date]]] = defaultdict(list)
+    for enrolled_student_id, enrolled_start, enrolled_end in enrollment_rows:
+        enrollment_windows[enrolled_student_id].append(
+            (max(enrolled_start, start_date), min(enrolled_end or end_date, end_date))
         )
-        if section_id is not None:
-            student_stmt = student_stmt.where(Enrollment.section_id == section_id)
-        student_id_rows = (await session.execute(student_stmt)).all()
-        student_ids = {row[0] for row in student_id_rows}
+    student_ids = set(enrollment_windows)
 
     approved_leave_entries = await _approved_leave_history_entries(
         session,
@@ -773,6 +885,7 @@ async def _class_history_entries(
         student_ids=student_ids,
         start_date=start_date,
         end_date=end_date,
+        enrollment_windows=enrollment_windows,
     )
     return _merge_approved_leave_entries(manual_entries, approved_leave_entries)
 
@@ -783,6 +896,7 @@ async def attendance_class_history(
     section_id: UUID | None = None,
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
+    course_id: UUID | None = None,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -816,6 +930,7 @@ async def attendance_class_history(
         section_id=section_id,
         start_date=effective_start,
         end_date=effective_end,
+        course_id=course_id,
     )
     return ClassAttendanceHistoryResponse(
         session_id=active_session.id,
@@ -833,6 +948,7 @@ async def attendance_student_history(
     section_id: UUID | None = None,
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
+    course_id: UUID | None = None,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -856,6 +972,8 @@ async def attendance_student_history(
     elif not await _has_global_student_attendance_access(current_user, session):
         raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SECTION_REQUIRED)
 
+    effective_start = start_date or active_session.gregorian_start
+    effective_end = end_date or active_session.gregorian_end
     student_stmt = (
         select(StudentProfile.id, StudentProfile.admission_number, StudentProfile.name, Section.id, Section.name)
         .join(Enrollment, Enrollment.student_id == StudentProfile.id)
@@ -865,6 +983,8 @@ async def attendance_student_history(
             Enrollment.session_id == active_session.id,
             Enrollment.class_id == class_id,
             StudentProfile.id == student_id,
+            Enrollment.started_on <= effective_end,
+            or_(Enrollment.ended_on.is_(None), Enrollment.ended_on >= effective_start),
             StudentProfile.status == "active",
         )
     )
@@ -874,8 +994,6 @@ async def attendance_student_history(
     if student_row is None:
         raise HTTPException(status_code=404, detail="Student not found in this class")
 
-    effective_start = start_date or active_session.gregorian_start
-    effective_end = end_date or active_session.gregorian_end
     entries = await _class_history_entries(
         session,
         madrasa_id=madrasa.id,
@@ -885,6 +1003,7 @@ async def attendance_student_history(
         student_id=student_id,
         start_date=effective_start,
         end_date=effective_end,
+        course_id=course_id,
     )
     return StudentAttendanceHistoryResponse(
         session_id=active_session.id,
@@ -906,6 +1025,7 @@ async def attendance_student_history(
 async def my_student_attendance_history(
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
+    course_id: UUID | None = None,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     context_session: AcademicSession = Depends(get_context_session),
@@ -930,6 +1050,7 @@ async def my_student_attendance_history(
                 Enrollment.madrasa_id == madrasa.id,
                 Enrollment.session_id == context_session.id,
                 Enrollment.student_id == student.id,
+                Enrollment.ended_on.is_(None),
             )
         )
     ).scalar_one_or_none()
@@ -954,6 +1075,7 @@ async def my_student_attendance_history(
         student_id=student.id,
         start_date=start_date or context_session.gregorian_start,
         end_date=end_date or context_session.gregorian_end,
+        course_id=course_id,
     )
     return StudentAttendanceHistoryResponse(
         session_id=context_session.id,
@@ -1237,17 +1359,16 @@ async def sync_attendance(
             await session.execute(select(model).where(model.idempotency_key == entry.idempotency_key))
         ).scalar_one_or_none()
         if existing is None:
-            # One row per (subject, session, day) — a re-mark of the same day is a
-            # correction of the existing row, never a second insert.
-            existing = (
-                await session.execute(
-                    select(model).where(
-                        subject_col == entry.subject_id,
-                        model.session_id == entry.session_id,
-                        model.attendance_date == entry.attendance_date,
-                    )
-                )
-            ).scalar_one_or_none()
+            identity = [
+                subject_col == entry.subject_id,
+                model.session_id == entry.session_id,
+                model.attendance_date == entry.attendance_date,
+            ]
+            if entry.subject_type == "student":
+                # Period records correct only the same scheduled period. A
+                # null slot remains the backwards-compatible general day.
+                identity.append(StudentAttendance.timetable_slot_id == entry.timetable_slot_id)
+            existing = (await session.execute(select(model).where(*identity))).scalar_one_or_none()
 
         if existing is not None:
             if not _entry_changes_record(existing, entry):
@@ -1319,15 +1440,14 @@ async def override_locked_attendance(
     stmt = select(model).where(model.idempotency_key == entry.idempotency_key)
     existing = (await session.execute(stmt)).scalar_one_or_none()
     if existing is None:
-        existing = (
-            await session.execute(
-                select(model).where(
-                    subject_col == entry.subject_id,
-                    model.session_id == entry.session_id,
-                    model.attendance_date == entry.attendance_date,
-                )
-            )
-        ).scalar_one_or_none()
+        identity = [
+            subject_col == entry.subject_id,
+            model.session_id == entry.session_id,
+            model.attendance_date == entry.attendance_date,
+        ]
+        if entry.subject_type == "student":
+            identity.append(StudentAttendance.timetable_slot_id == entry.timetable_slot_id)
+        existing = (await session.execute(select(model).where(*identity))).scalar_one_or_none()
 
     if existing:
         old_values = {"status": str(existing.status.value), "attendance_date": str(existing.attendance_date)}
@@ -1380,32 +1500,66 @@ async def attendance_summary(
     subject_id: UUID,
     start_date: date = Query(...),
     end_date: date = Query(...),
+    course_id: UUID | None = None,
     current_user: User = Depends(require_permission("attendance.take")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> AttendanceSummary:
-    return await compute_attendance_summary(session, madrasa.id, subject_type, subject_id, start_date, end_date)
+    return await compute_attendance_summary(
+        session, madrasa.id, subject_type, subject_id, start_date, end_date, course_id=course_id
+    )
 
 
 async def compute_attendance_summary(
-    session: AsyncSession, madrasa_id: UUID, subject_type: str, subject_id: UUID, start_date: date, end_date: date
+    session: AsyncSession,
+    madrasa_id: UUID,
+    subject_type: str,
+    subject_id: UUID,
+    start_date: date,
+    end_date: date,
+    *,
+    course_id: UUID | None = None,
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
 ) -> AttendanceSummary:
     if subject_type not in ("student", "teacher"):
         raise HTTPException(status_code=400, detail="subject_type must be student or teacher")
     model = StudentAttendance if subject_type == "student" else TeacherAttendance
     subject_col = model.student_id if subject_type == "student" else model.teacher_id
 
-    rows = (
-        await session.execute(
-            select(model.attendance_date, model.status).where(
-                model.madrasa_id == madrasa_id,
-                subject_col == subject_id,
-                model.attendance_date >= start_date,
-                model.attendance_date <= end_date,
-            )
-        )
-    ).all()
-    by_date = {row[0]: row[1] for row in rows}
+    if subject_type == "teacher" and course_id is not None:
+        raise HTTPException(status_code=400, detail="course_id is only valid for student attendance")
+    attendance_stmt = select(model.attendance_date, model.status).where(
+        model.madrasa_id == madrasa_id,
+        subject_col == subject_id,
+        model.attendance_date >= start_date,
+        model.attendance_date <= end_date,
+    )
+    if course_id is not None:
+        course = await session.get(Course, course_id)
+        if course is None or course.madrasa_id != madrasa_id:
+            raise HTTPException(status_code=404, detail="Course not found")
+        attendance_stmt = attendance_stmt.where(StudentAttendance.course_id == course_id)
+    if subject_type == "student" and class_id is not None:
+        attendance_stmt = attendance_stmt.join(
+            Enrollment,
+            and_(
+                Enrollment.madrasa_id == madrasa_id,
+                Enrollment.student_id == StudentAttendance.student_id,
+                Enrollment.session_id == StudentAttendance.session_id,
+                Enrollment.started_on <= StudentAttendance.attendance_date,
+                or_(
+                    Enrollment.ended_on.is_(None),
+                    Enrollment.ended_on >= StudentAttendance.attendance_date,
+                ),
+            ),
+        ).where(Enrollment.class_id == class_id)
+        if section_id is not None:
+            attendance_stmt = attendance_stmt.where(Enrollment.section_id == section_id)
+    rows = (await session.execute(attendance_stmt)).all()
+    by_date: defaultdict[date, list[AttendanceStatus]] = defaultdict(list)
+    for attendance_day, attendance_status in rows:
+        by_date[attendance_day].append(attendance_status)
 
     if subject_type == "student":
         subject_user_id = (
@@ -1431,14 +1585,15 @@ async def compute_attendance_summary(
 
     # Class-scoped holidays (B4-c) only count for students of those classes;
     # teachers and madrasa-wide holidays always count.
-    subject_class_id = None
-    if subject_type == "student":
+    subject_class_id = class_id
+    if subject_type == "student" and subject_class_id is None:
         subject_class_id = (
             await session.execute(
                 select(Enrollment.class_id)
                 .join(AcademicSession, AcademicSession.id == Enrollment.session_id)
                 .where(
                     Enrollment.student_id == subject_id,
+                    Enrollment.ended_on.is_(None),
                     AcademicSession.is_active.is_(True),
                 )
             )
@@ -1491,21 +1646,23 @@ async def compute_attendance_summary(
     days: list[AttendanceDayBreakdown] = []
     current = start_date
     while current <= end_date:
-        status_value = by_date.get(current)
+        status_values = by_date.get(current, [])
         if is_holiday(current):
             excluded_days += 1
             days.append(AttendanceDayBreakdown(attendance_date=current, excluded_reason="holiday"))
         elif has_approved_leave(current):
             counts["leave"] += 1
             days.append(AttendanceDayBreakdown(attendance_date=current, status=AttendanceStatus.leave))
-        elif status_value is not None:
-            counts[str(status_value.value if isinstance(status_value, AttendanceStatus) else status_value)] += 1
-            days.append(AttendanceDayBreakdown(attendance_date=current, status=status_value))
+        elif status_values:
+            for status_value in status_values:
+                counts[str(status_value.value if isinstance(status_value, AttendanceStatus) else status_value)] += 1
+                days.append(AttendanceDayBreakdown(attendance_date=current, status=status_value))
         current = date.fromordinal(current.toordinal() + 1)
 
     return AttendanceSummary(
         subject_id=subject_id,
         subject_type=subject_type,
+        course_id=course_id,
         present=counts["present"],
         absent=counts["absent"],
         leave=counts["leave"],

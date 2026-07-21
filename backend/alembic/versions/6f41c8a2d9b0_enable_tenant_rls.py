@@ -6,7 +6,7 @@ Revises: 53c210d0f427
 
 from collections.abc import Sequence
 
-from alembic import op
+from alembic import context, op
 
 revision: str = "6f41c8a2d9b0"
 down_revision: str | None = "53c210d0f427"
@@ -54,6 +54,36 @@ INDIRECT_POLICIES = {
     """,
 }
 
+# Alembic's offline MockConnection cannot query information_schema. This is
+# the exact set of direct-tenant tables present at this revision; online mode
+# still discovers them to protect installations with compatible extensions.
+DIRECT_TABLES_AT_REVISION = [
+    "academic_sessions", "admission_applications", "admission_forms", "announcements",
+    "assignments", "attendance_corrections", "audit_logs", "blog_posts", "classes",
+    "contact_enquiries", "courses", "donations", "donors", "enrollments", "exam_types",
+    "file_objects", "forms", "grading_schemes", "guardians", "holidays", "leaves",
+    "madrasa_features", "madrasa_settings", "message_logs", "message_templates",
+    "payment_categories", "payments", "programs", "resource_categories", "resources",
+    "result_publications", "salary_payments", "salary_records", "sections",
+    "student_attendance", "student_profiles", "teacher_assignments", "teacher_attendance",
+    "teacher_profiles", "timetable_slots",
+]
+
+
+def _direct_tables() -> list[str]:
+    if context.is_offline_mode():
+        return DIRECT_TABLES_AT_REVISION
+    return op.get_bind().exec_driver_sql(
+        """
+        SELECT table_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND column_name = 'madrasa_id'
+          AND table_name <> 'users'
+        ORDER BY table_name
+        """
+    ).scalars().all()
+
 
 def _enable_policy(table: str, expression: str) -> None:
     op.execute(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY')
@@ -66,35 +96,14 @@ def _enable_policy(table: str, expression: str) -> None:
 
 
 def upgrade() -> None:
-    connection = op.get_bind()
-    direct_tables = connection.exec_driver_sql(
-        """
-        SELECT table_name
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND column_name = 'madrasa_id'
-          AND table_name <> 'users'
-        ORDER BY table_name
-        """
-    ).scalars().all()
-    for table in direct_tables:
+    for table in _direct_tables():
         _enable_policy(table, DIRECT_POLICY)
     for table, expression in INDIRECT_POLICIES.items():
         _enable_policy(table, expression)
 
 
 def downgrade() -> None:
-    connection = op.get_bind()
-    direct_tables = connection.exec_driver_sql(
-        """
-        SELECT table_name
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND column_name = 'madrasa_id'
-          AND table_name <> 'users'
-        """
-    ).scalars().all()
-    for table in [*direct_tables, *INDIRECT_POLICIES]:
+    for table in [*_direct_tables(), *INDIRECT_POLICIES]:
         op.execute(f'DROP POLICY IF EXISTS tenant_isolation ON "{table}"')
         op.execute(f'ALTER TABLE "{table}" NO FORCE ROW LEVEL SECURITY')
         op.execute(f'ALTER TABLE "{table}" DISABLE ROW LEVEL SECURITY')

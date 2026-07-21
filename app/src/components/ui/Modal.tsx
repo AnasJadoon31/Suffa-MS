@@ -10,12 +10,12 @@ export function Modal({ title, onClose, maxWidth, actions, children }: Readonly<
       <div className="modalCard" style={maxWidth ? { width: "100%", maxWidth } : {}} onMouseDown={(event) => event.stopPropagation()}>
         <div className="moduleHeader modalHeader">
           <h3>{title}</h3>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <div className="modalHeaderActions">
             {actions}
             <Button className="tableAction" type="button" aria-label={t("closeBtn")} onClick={onClose}><X size={16} /></Button>
           </div>
         </div>
-        {children}
+        <div className="modalBody">{children}</div>
       </div>
     </div>
   );
@@ -58,7 +58,7 @@ export function FormModal({
 
   return (
     <Modal title={title} onClose={onClose} maxWidth={maxWidth}>
-      <form className="inlineForm" onSubmit={handleSubmit}>
+      <form className="inlineForm formStack" onSubmit={handleSubmit}>
         {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
         {children}
         <div className="formActions">

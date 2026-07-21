@@ -2,10 +2,10 @@ from typing import Optional
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, ForeignKey, String, Text, select
+from sqlalchemy import Boolean, Date, ForeignKey, String, Text, UniqueConstraint, select
 from sqlalchemy.orm import Mapped, column_property, declared_attr, mapped_column
 
-from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
+from app.db.base import Base, IdMixin, PortableJSONB, TenantMixin, TimestampMixin
 from app.modules.auth.models import User
 from app.modules.academics.models import Enrollment, AcademicClass
 
@@ -59,7 +59,7 @@ class StudentProfile(Base, IdMixin, TenantMixin, TimestampMixin):
             select(AcademicClass.name)
             .select_from(Enrollment)
             .join(AcademicClass, Enrollment.class_id == AcademicClass.id)
-            .where(Enrollment.student_id == cls.id)
+            .where(Enrollment.student_id == cls.id, Enrollment.ended_on.is_(None))
             .order_by(Enrollment.created_at.desc())
             .limit(1)
             .correlate_except(Enrollment, AcademicClass)
@@ -85,3 +85,30 @@ class StudentGuardian(Base, IdMixin, TimestampMixin):
 
     student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"))
     guardian_id: Mapped[UUID] = mapped_column(ForeignKey("guardians.id"))
+
+
+class StudentAdmissionRecord(Base, IdMixin, TenantMixin, TimestampMixin):
+    """Immutable admission context retained with a student.
+
+    The live form/application foreign keys are navigational only.  The copied
+    title, schema and answers remain authoritative if a template is edited or
+    deleted later.
+    """
+
+    __tablename__ = "student_admission_records"
+    __table_args__ = (
+        UniqueConstraint("student_id", name="uq_student_admission_record_student"),
+        UniqueConstraint("application_id", name="uq_student_admission_record_application"),
+    )
+
+    student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"), index=True)
+    form_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("admission_forms.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    application_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("admission_applications.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    form_title: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    fields_definition: Mapped[list] = mapped_column(PortableJSONB, default=list)
+    answers: Mapped[dict] = mapped_column(PortableJSONB, default=dict)
+    created_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))

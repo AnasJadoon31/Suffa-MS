@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
@@ -79,6 +79,7 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
                     .where(
                         Enrollment.madrasa_id == madrasa.id,
                         Enrollment.session_id == active_session_id,
+                        Enrollment.ended_on.is_(None),
                         StudentProfile.status == "active",
                     )
                 )
@@ -103,6 +104,7 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
                 .where(
                     Enrollment.madrasa_id == madrasa.id,
                     Enrollment.session_id == active_session_id,
+                    Enrollment.ended_on.is_(None),
                     StudentProfile.status == "active",
                 )
             )
@@ -124,6 +126,7 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
                     StudentAttendance.session_id == active_session_id,
                     StudentAttendance.attendance_date == today,
                     Enrollment.madrasa_id == madrasa.id,
+                    Enrollment.ended_on.is_(None),
                     StudentProfile.status == "active",
                 )
                 .group_by(StudentAttendance.status)
@@ -205,7 +208,7 @@ async def _todays_timetable(session: AsyncSession, madrasa_id, **filters) -> lis
 
 
 async def _teacher_dashboard(session: AsyncSession, madrasa: Madrasa, current_user: User) -> dict[str, object]:
-    teacher = await _teacher_profile(session, current_user, madrasa.id)
+    teacher = await _teacher_profile(session, current_user)
     if teacher is None:
         return {"role": "teacher", "my_classes": [], "pending_submissions": 0, "today_timetable": [], "today_attendance": None, "announcements": []}
 
@@ -304,6 +307,7 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
             await session.execute(
                 select(Enrollment)
                 .where(Enrollment.student_id == student.id, Enrollment.session_id == active_session_id)
+                .where(Enrollment.ended_on.is_(None))
                 .order_by(Enrollment.created_at.desc())
             )
         ).scalars().first()
@@ -372,13 +376,24 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
 
     # Own attendance for the calendar view (last ~2 months of statuses).
     my_attendance: dict[str, str] = {}
+    my_attendance_periods: list[dict[str, object]] = []
     if active_session_id is not None:
         from datetime import timedelta
 
         window_start = datetime.now(timezone.utc).date() - timedelta(days=62)
         attendance_rows = (
             await session.execute(
-                select(StudentAttendance.attendance_date, StudentAttendance.status).where(
+                select(
+                    StudentAttendance.attendance_date,
+                    StudentAttendance.status,
+                    Course.id,
+                    Course.name,
+                    TimetableSlot.id,
+                    TimetableSlot.period,
+                )
+                .outerjoin(Course, Course.id == StudentAttendance.course_id)
+                .outerjoin(TimetableSlot, TimetableSlot.id == StudentAttendance.timetable_slot_id)
+                .where(
                     StudentAttendance.madrasa_id == madrasa.id,
                     StudentAttendance.student_id == student.id,
                     StudentAttendance.session_id == active_session_id,
@@ -386,10 +401,28 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
                 )
             )
         ).all()
-        my_attendance = {
-            str(day): str(status.value if isinstance(status, AttendanceStatus) else status)
-            for day, status in attendance_rows
-        }
+        # Calendar cells need one deterministic summary while the detailed
+        # period list below preserves every mark. Any absence takes priority,
+        # followed by leave, then present.
+        priority = {"present": 1, "leave": 2, "absent": 3}
+        for day, status, _course_id, _course_name, _slot_id, _period in attendance_rows:
+            key = str(day)
+            value = str(status.value if isinstance(status, AttendanceStatus) else status)
+            current = my_attendance.get(key)
+            if current is None or priority[value] > priority[current]:
+                my_attendance[key] = value
+        my_attendance_periods = [
+            {
+                "date": str(day),
+                "status": str(status.value if isinstance(status, AttendanceStatus) else status),
+                "course_id": str(course_id) if course_id else None,
+                "course_name": course_name,
+                "timetable_slot_id": str(slot_id) if slot_id else None,
+                "period": period,
+                "legacy_general": slot_id is None,
+            }
+            for day, status, course_id, course_name, slot_id, period in attendance_rows
+        ]
 
     viewer_class_id = enrollment.class_id if enrollment else None
 
@@ -415,6 +448,7 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
     return {
         "role": "student",
         "my_attendance": my_attendance,
+        "my_attendance_periods": my_attendance_periods,
         "today_timetable": today_timetable,
         "latest_result": latest_result,
         "due_assignments": due_assignments,
@@ -435,6 +469,43 @@ def _csv_response(filename: str, headers: list[str], rows: list[list[str]]) -> R
     )
 
 
+_URDU_REPORT_COPY = {
+    "Attendance Summary": "حاضری کا خلاصہ",
+    "Results Report": "نتائج کی رپورٹ",
+    "Finance Report": "مالیاتی رپورٹ",
+    "Salary Report": "تنخواہ کی رپورٹ",
+    "Donations Report": "عطیات کی رپورٹ",
+    "Admission #": "داخلہ نمبر",
+    "Name": "نام",
+    "Present": "حاضر",
+    "Absent": "غیر حاضر",
+    "Leave": "رخصت",
+    "Excluded holidays": "تعطیلات",
+    "Overall": "مجموعی نتیجہ",
+    "Date": "تاریخ",
+    "Type": "قسم",
+    "Payer/Donor": "ادا کنندہ / عطیہ دہندہ",
+    "Category": "زمرہ",
+    "Amount": "رقم",
+    "Currency": "کرنسی",
+    "Teacher": "استاد",
+    "Employee #": "ملازم نمبر",
+    "Period": "مدت",
+    "Method": "طریقہ",
+    "Donor": "عطیہ دہندہ",
+    "Payment": "ادائیگی",
+    "Donation": "عطیہ",
+}
+
+
+def _localize_report_text(value: str, language: str) -> str:
+    if language != "ur":
+        return value
+    if value in _URDU_REPORT_COPY:
+        return _URDU_REPORT_COPY[value]
+    return value.replace(" to ", " تا ")
+
+
 async def _pdf_response(
     session: AsyncSession,
     madrasa: Madrasa,
@@ -443,8 +514,20 @@ async def _pdf_response(
     subtitle: str,
     headers: list[str],
     rows: list[list[str]],
+    language: str,
 ) -> Response:
-    content = render_table_pdf(title, subtitle, headers, rows, await load_report_branding(session, madrasa))
+    localized_rows = [
+        [_localize_report_text(str(value), language) for value in row]
+        for row in rows
+    ]
+    content = render_table_pdf(
+        _localize_report_text(title, language),
+        _localize_report_text(subtitle, language),
+        [_localize_report_text(header, language) for header in headers],
+        localized_rows,
+        await load_report_branding(session, madrasa),
+        language=language,
+    )
     return Response(
         content=content,
         media_type="application/pdf",
@@ -460,10 +543,19 @@ async def _require_teacher_report_scope(
     class_id: UUID,
     section_id: UUID | None,
     session_id: UUID,
+    course_id: UUID | None = None,
 ) -> None:
-    if current_user.role == UserRole.principal or await user_has_permission(current_user, permission_code, session):
+    if current_user.role == UserRole.principal:
         return
-    teacher = await _teacher_profile(session, current_user, madrasa_id)
+    # A teacher's report scope must match the timetable-backed scope used by
+    # attendance and grading. The base scoped permission opens the feature;
+    # it must not silently turn an ordinary teacher into a madrasa-wide
+    # reporter merely because an older grant row has no scope columns.
+    if current_user.role != UserRole.teacher:
+        if await user_has_permission(current_user, permission_code, session):
+            return
+        raise HTTPException(status_code=403, detail=f"Missing permission: {permission_code}")
+    teacher = await _teacher_profile(session, current_user)
     if teacher is None or section_id is None:
         raise HTTPException(status_code=403, detail=ErrorCode.REPORT_SECTION_REQUIRED)
     if not await teacher_teaches(
@@ -473,6 +565,7 @@ async def _require_teacher_report_scope(
         session_id=session_id,
         class_id=class_id,
         section_id=section_id,
+        course_id=course_id,
     ):
         raise HTTPException(status_code=403, detail=ErrorCode.REPORT_SECTION_NOT_ASSIGNED)
 
@@ -483,6 +576,7 @@ async def attendance_report(
     start_date: date = Query(...),
     end_date: date = Query(...),
     section_id: UUID | None = None,
+    course_id: UUID | None = None,
     format: str = Query("csv", pattern="^(csv|pdf)$"),
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
@@ -490,21 +584,32 @@ async def attendance_report(
 ) -> Response:
     active_session_id = await _active_session_id(session, madrasa.id)
     await _require_teacher_report_scope(
-        session, current_user, madrasa.id, "attendance.take", class_id, section_id, active_session_id
+        session,
+        current_user,
+        madrasa.id,
+        "attendance.take",
+        class_id,
+        section_id,
+        active_session_id,
+        course_id,
     )
-    stmt = select(Enrollment, StudentProfile).join(StudentProfile, StudentProfile.id == Enrollment.student_id).where(
-        Enrollment.madrasa_id == madrasa.id, Enrollment.class_id == class_id
+    stmt = select(StudentProfile).join(Enrollment, StudentProfile.id == Enrollment.student_id).where(
+        Enrollment.madrasa_id == madrasa.id,
+        Enrollment.class_id == class_id,
+        Enrollment.started_on <= end_date,
+        or_(Enrollment.ended_on.is_(None), Enrollment.ended_on >= start_date),
     )
     if section_id:
         stmt = stmt.where(Enrollment.section_id == section_id)
-    enrolled = (await session.execute(stmt)).all()
+    enrolled = (await session.execute(stmt.distinct())).scalars().all()
     if not enrolled:
         raise HTTPException(status_code=404, detail="No students enrolled for this class/section")
 
     rows = []
-    for _enrollment, student in enrolled:
+    for student in enrolled:
         summary = await compute_attendance_summary(
-            session, madrasa.id, "student", student.id, start_date, end_date
+            session, madrasa.id, "student", student.id, start_date, end_date,
+            course_id=course_id, class_id=class_id, section_id=section_id,
         )
         rows.append(
             [student.admission_number, student.name, str(summary.present), str(summary.absent), str(summary.leave), str(summary.excluded_days)]
@@ -514,7 +619,10 @@ async def attendance_report(
     filename = f"attendance-summary-{start_date}-to-{end_date}"
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return await _pdf_response(session, madrasa, filename, "Attendance Summary", f"{start_date} to {end_date}", headers, rows)
+    return await _pdf_response(
+        session, madrasa, filename, "Attendance Summary", f"{start_date} to {end_date}",
+        headers, rows, current_user.preferred_language,
+    )
 
 
 @router.get("/reports/results")
@@ -576,7 +684,10 @@ async def results_report(
     filename = f"results-{class_name}-{session_name}".replace(" ", "-").lower()
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return await _pdf_response(session, madrasa, filename, "Results Report", f"{class_name} — {session_name}", headers, rows)
+    return await _pdf_response(
+        session, madrasa, filename, "Results Report", f"{class_name} — {session_name}",
+        headers, rows, current_user.preferred_language,
+    )
 
 
 @router.get("/reports/finance")
@@ -618,7 +729,10 @@ async def finance_report(
     filename = f"finance-report-{start_date}-to-{end_date}"
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return await _pdf_response(session, madrasa, filename, "Finance Report", f"{start_date} to {end_date}", headers, rows)
+    return await _pdf_response(
+        session, madrasa, filename, "Finance Report", f"{start_date} to {end_date}",
+        headers, rows, current_user.preferred_language,
+    )
 
 
 @router.get("/reports/salary")
@@ -661,7 +775,10 @@ async def salary_report(
     filename = f"salary-report-{start_date}-to-{end_date}"
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return await _pdf_response(session, madrasa, filename, "Salary Report", f"{start_date} to {end_date}", headers, rows)
+    return await _pdf_response(
+        session, madrasa, filename, "Salary Report", f"{start_date} to {end_date}",
+        headers, rows, current_user.preferred_language,
+    )
 
 
 @router.get("/reports/donations")
@@ -697,4 +814,7 @@ async def donations_report(
     filename = f"donations-report-{start_date}-to-{end_date}"
     if format == "csv":
         return _csv_response(filename, headers, rows)
-    return await _pdf_response(session, madrasa, filename, "Donations Report", f"{start_date} to {end_date}", headers, rows)
+    return await _pdf_response(
+        session, madrasa, filename, "Donations Report", f"{start_date} to {end_date}",
+        headers, rows, current_user.preferred_language,
+    )

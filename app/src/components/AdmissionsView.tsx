@@ -1,6 +1,6 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import { CheckCircle2, ClipboardList, Copy, Edit2, Eye, Plus, Trash2, XCircle } from "lucide-react";
+import { Bell, CheckCircle2, ClipboardList, Copy, Edit2, Eye, Plus, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
 
@@ -12,6 +12,10 @@ import {
   type ContactEnquiry,
   type FormFieldDefinition,
   type Program,
+  type AcademicClass,
+  type AcademicSession,
+  type Section,
+  type AdminNotification,
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
@@ -58,6 +62,7 @@ export function AdmissionsView({ section = "registrations" }: Readonly<{ section
 
 function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ programs: Program[]; canReview: boolean; canMutate: boolean }>) {
   const { t } = useTranslation();
+  const { confirm } = useDialog();
   const [applications, setApplications] = useState<AdmissionApplication[]>([]);
   const emptyForm = {
     applicant_name: "", guardian_name: "", guardian_relationship: "", guardian_contact: "", guardian_cnic: "",
@@ -73,6 +78,9 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
   const [loadError, setLoadError] = useState("");
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
+  const [editing, setEditing] = useState<AdmissionApplication | null>(null);
+  const [converting, setConverting] = useState<AdmissionApplication | null>(null);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
 
   const load = async () => {
     if (!canReview) {
@@ -86,6 +94,7 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
       setApplications(result.items);
       setTotal(result.total);
       setLoadError("");
+      setNotifications(await operationsApi.listAdminNotifications());
     } catch (err: any) {
       setLoadError(err.response?.data?.detail ?? t("failedLoadApplications"));
     } finally {
@@ -97,8 +106,24 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination]);
 
+  const changeStatus = async (application: AdmissionApplication, status: "pending" | "rejected" | "accepted") => {
+    if (application.converted_student_id && status !== "accepted") {
+      const approved = await confirm(t("reverseAcceptedApplicationWarning"), {
+        title: t("reverseAcceptedApplicationTitle"),
+        confirmLabel: t("continueBtn"),
+      });
+      if (!approved) return;
+    }
+    await operationsApi.setAdmissionStatus(application.id, status);
+    await load();
+  };
+
   return (
     <>
+      {notifications.some((item) => !item.is_read) && <section className="adminNotifications" aria-label={t("adminNotificationsHeading")}>
+        <h3><Bell size={16} /> {t("adminNotificationsHeading")}</h3>
+        {notifications.filter((item) => !item.is_read).map((item) => <Button type="button" key={item.id} onClick={async () => { await operationsApi.markAdminNotificationRead(item.id); await load(); }}><strong>{item.title === "notificationAdmissionConvertedTitle" ? t("notificationAdmissionConvertedTitle", { name: item.message }) : item.title}</strong>{item.title !== "notificationAdmissionConvertedTitle" && <span>{item.message}</span>}</Button>)}
+      </section>}
       {canMutate && <div className="formActions" style={{ marginBottom: 12 }}>
         <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("submitApplicationBtn")}</Button>
       </div>}
@@ -186,16 +211,17 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
             { header: t("actionsCol"), render: (a) => (
               <>
                 <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(a)}><Eye size={14} /></Button>
-                {canMutate && a.status === "pending" && (
+                {canMutate && <Button className="tableAction" type="button" title={t("editBtn")} onClick={() => setEditing(a)}><Edit2 size={14} /></Button>}
+                {canMutate && !a.converted_student_id && (
                   <>
-                    <Button className="tableAction" type="button" onClick={async () => { await operationsApi.setAdmissionStatus(a.id, "accepted"); await load(); }}>
+                    <Button className="tableAction" type="button" title={t("acceptAndCreatePeopleBtn")} onClick={() => setConverting(a)}>
                       <CheckCircle2 size={14} />
-                    </Button>
-                    <Button className="tableAction" type="button" onClick={async () => { await operationsApi.setAdmissionStatus(a.id, "rejected"); await load(); }}>
-                      <XCircle size={14} />
                     </Button>
                   </>
                 )}
+                {canMutate && a.status !== "rejected" && <Button className="tableAction" type="button" title={t("rejectApplicationBtn")} onClick={() => changeStatus(a, "rejected")}><XCircle size={14} /></Button>}
+                {canMutate && a.status !== "pending" && <Button className="tableAction" type="button" title={t("returnToPendingBtn")} onClick={() => changeStatus(a, "pending")}><RotateCcw size={14} /></Button>}
+                {canMutate && a.converted_student_id && a.status !== "accepted" && <Button className="tableAction" type="button" title={t("restoreAcceptedBtn")} onClick={() => changeStatus(a, "accepted")}><CheckCircle2 size={14} /></Button>}
               </>
             )},
           ]}
@@ -214,9 +240,65 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
           <dt>{t("notesLabel")}</dt><dd>{detail.notes ?? "—"}</dd>
           {Object.entries(detail.extra_data ?? {}).map(([key, value]) => <div key={key} style={{ display: "contents" }}><dt>{key.replaceAll("_", " ")}</dt><dd>{String(value || "—")}</dd></div>)}
         </dl>
+        <section className="detailSection">
+          <h4>{t("statusHistoryHeading")}</h4>
+          <ol className="statusHistoryList">
+            {(detail.status_history ?? []).map((event, index) => <li key={`${event.changed_at}-${index}`}><strong>{t(event.status)}</strong><span>{new Date(event.changed_at).toLocaleString()}</span></li>)}
+          </ol>
+        </section>
       </Modal>}
+      {editing && <FormModal title={t("editApplicationHeading")} onClose={() => setEditing(null)} submitLabel={t("saveBtn")} submitIcon={<Edit2 size={16} />} error={error} onSubmit={async () => {
+        try { await operationsApi.updateAdmission(editing.id, {
+          applicant_name: editing.applicant_name, guardian_contact: editing.guardian_contact,
+          program_id: editing.program_id, date_of_birth: editing.date_of_birth, notes: editing.notes,
+          extra_data: editing.extra_data,
+        }); setEditing(null); await load(); }
+        catch (err: any) { setError(err.response?.data?.detail ?? t("failedUpdateApplication")); }
+      }}>
+        <label>{t("applicantNameLabel")}<Input required value={editing.applicant_name} onChange={(e) => setEditing({ ...editing, applicant_name: e.target.value })} /></label>
+        <label>{t("guardianContactLabel")}<Input value={editing.guardian_contact} onChange={(e) => setEditing({ ...editing, guardian_contact: e.target.value })} /></label>
+        <label>{t("programLabel")}<Select value={editing.program_id ?? ""} onChange={(e) => setEditing({ ...editing, program_id: e.target.value || null })}><option value="">{t("selectEllipsis")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</Select></label>
+        <label>{t("dobLabel")}<Input type="date" value={editing.date_of_birth ?? ""} onChange={(e) => setEditing({ ...editing, date_of_birth: e.target.value || null })} /></label>
+        {Object.entries(editing.extra_data ?? {}).map(([key, value]) => <label key={key}>{key.replaceAll("_", " ")}<Input value={String(value ?? "")} onChange={(e) => setEditing({ ...editing, extra_data: { ...(editing.extra_data ?? {}), [key]: e.target.value } })} /></label>)}
+        <label>{t("notesLabel")}<Input value={editing.notes ?? ""} onChange={(e) => setEditing({ ...editing, notes: e.target.value || null })} /></label>
+      </FormModal>}
+      {converting && <AdmissionConversionModal application={converting} programs={programs} onClose={() => setConverting(null)} onSuccess={async () => { setConverting(null); setNotice(t("applicationConvertedNotice")); await load(); }} />}
     </>
   );
+}
+
+function AdmissionConversionModal({ application, programs, onClose, onSuccess }: Readonly<{ application: AdmissionApplication; programs: Program[]; onClose: () => void; onSuccess: () => Promise<void> }>) {
+  const { t } = useTranslation();
+  const [sessions, setSessions] = useState<AcademicSession[]>([]);
+  const [classes, setClasses] = useState<AcademicClass[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const extra = application.extra_data ?? {};
+  const [form, setForm] = useState({
+    student_username: "", guardian_username: "", guardian_name: String(extra.guardian_name ?? ""),
+    guardian_relationship: String(extra.guardian_relationship ?? ""), guardian_cnic: String(extra.guardian_cnic ?? ""),
+    guardian_address: String(extra.address ?? ""), admission_number: "", session_id: "", class_id: "", section_id: "",
+  });
+  const [error, setError] = useState("");
+  useEffect(() => { void Promise.all([academicsApi.listSessions(), academicsApi.listClasses()]).then(([sessionRows, classRows]) => { setSessions(sessionRows); setClasses(classRows); }); }, []);
+  useEffect(() => { if (!form.class_id) setSections([]); else void academicsApi.listSections(form.class_id).then(setSections); }, [form.class_id]);
+  return <FormModal title={t("acceptApplicationHeading")} maxWidth={800} onClose={onClose} submitLabel={t("acceptAndCreatePeopleBtn")} submitIcon={<CheckCircle2 size={16} />} error={error} onSubmit={async () => {
+    setError("");
+    try { await operationsApi.convertAdmission(application.id, { ...form, guardian_cnic: form.guardian_cnic || undefined, guardian_address: form.guardian_address || undefined, admission_number: form.admission_number || undefined }); await onSuccess(); }
+    catch (err: any) { setError(err.response?.data?.detail ?? t("failedConvertApplication")); }
+  }}>
+    <p className="notice">{t("acceptApplicationHint", { name: application.applicant_name })}</p>
+    <div className="formGridTwo">
+      <label>{t("studentUsernameLabel")}<Input required value={form.student_username} onChange={(e) => setForm({ ...form, student_username: e.target.value })} /></label>
+      <label>{t("admissionNumberCol")}<Input value={form.admission_number} onChange={(e) => setForm({ ...form, admission_number: e.target.value })} /></label>
+      <label>{t("guardianNameLabel")}<Input required value={form.guardian_name} onChange={(e) => setForm({ ...form, guardian_name: e.target.value })} /></label>
+      <label>{t("guardianUsernameLabel")}<Input required value={form.guardian_username} onChange={(e) => setForm({ ...form, guardian_username: e.target.value })} /></label>
+      <label>{t("relationshipLabel")}<Input required value={form.guardian_relationship} onChange={(e) => setForm({ ...form, guardian_relationship: e.target.value })} /></label>
+      <label>{t("guardianCnicLabel")}<Input value={form.guardian_cnic} onChange={(e) => setForm({ ...form, guardian_cnic: e.target.value })} /></label>
+      <label>{t("sessionLabel")}<Select required value={form.session_id} onChange={(e) => setForm({ ...form, session_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sessions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+      <label>{t("classLabel")}<Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: "" })}><option value="">{t("selectEllipsis")}</option>{classes.filter((item) => !application.program_id || item.program_id === application.program_id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+      <label>{t("sectionLabel")}<Select required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+    </div>
+  </FormModal>;
 }
 
 // ---------------------------------------------------- Public admission forms
@@ -302,8 +384,8 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
       </div>}
       
       {showTypeSelection && (
-        <Modal title={t("selectFormType")} onClose={() => setShowTypeSelection(false)}>
-          <div style={{ display: "flex", gap: "1rem", padding: "1rem" }}>
+        <Modal title={t("chooseAdmissionFormType")} onClose={() => setShowTypeSelection(false)}>
+          <div className="modalChoiceGrid">
             <Button className="primaryAction" onClick={() => { setForm({ ...form, category: "General" }); setShowTypeSelection(false); setShowCreate(true); }}>
               {t("generalFormLabel")}
             </Button>

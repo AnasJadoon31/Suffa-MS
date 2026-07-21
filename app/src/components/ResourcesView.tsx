@@ -23,6 +23,7 @@ import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter } from "./ui/InlineFilter";
 
 const emptyForm = { category_id: "", title: "", description: "", video_url: "" };
 
@@ -148,43 +149,31 @@ export function ResourcesView() {
                     )}
           </FormModal>}
 
-      <div className="moduleToolbar">
-        <div className="searchBox">
-          <label htmlFor="resource-category">{t("categoryCol")}</label>
-          <Select id="resource-category" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-            <option value="">{t("allCategories")}</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}{c.is_mine && c.owner_id ? ` (${t("mineTagLabel")})` : ""}</option>
-            ))}
-          </Select>
-        </div>
-        {canManageAll && (
-          <>
-            <div className="searchBox">
-              <label htmlFor="resource-browse-class">{t("browseByClassLabel")}</label>
-              <Select id="resource-browse-class" value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
-                <option value="">{t("allClasses")}</option>
-                {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
-            </div>
-            {classFilter && (
-              <div className="searchBox">
-                <label htmlFor="resource-browse-section">{t("browseBySectionLabel")}</label>
-                <Select id="resource-browse-section" value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)}>
-                  <option value="">{t("allSections")}</option>
-                  {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </Select>
-              </div>
-            )}
-          </>
-        )}
+      <InlineFilter filters={[
+        {
+          key: "resource-category", type: "select", label: t("categoryCol"), value: categoryFilter,
+          placeholder: t("allCategories"), onChange: setCategoryFilter,
+          options: categories.map((category) => ({
+            value: category.id,
+            label: `${category.name}${category.is_mine && category.owner_id ? ` (${t("mineTagLabel")})` : ""}`,
+          })),
+        },
+        ...(canManageAll ? [{
+          key: "resource-class", type: "select" as const, label: t("browseByClassLabel"), value: classFilter,
+          placeholder: t("allClasses"), options: classes.map((academicClass) => ({ value: academicClass.id, label: academicClass.name })), onChange: setClassFilter,
+        }] : []),
+        ...(canManageAll && classFilter ? [{
+          key: "resource-section", type: "select" as const, label: t("browseBySectionLabel"), value: sectionFilter,
+          placeholder: t("allSections"), options: sections.map((section) => ({ value: section.id, label: section.name })), onChange: setSectionFilter,
+        }] : []),
+      ]}>
         {canManage && (
           <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
             {t("myUploadsOnlyLabel")}
           </label>
         )}
-      </div>
+      </InlineFilter>
 
       {canManage && showResourceForm && <FormModal
             title={t("addResourceBtn")} onClose={() => setShowResourceForm(false)}

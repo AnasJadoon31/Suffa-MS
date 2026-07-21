@@ -5,26 +5,25 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../lib/AuthContext";
 import { academicsApi, operationsApi, type AcademicClass, type AcademicSession, type Section, type TimetableSlot, reportingApi } from "../lib/endpoints";
-import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter, type InlineFilterConfig } from "./ui/InlineFilter";
 
 function ReportCard({
   title,
-  children,
+  filters,
   disabled,
   onDownload,
 }: Readonly<{
   title: string;
-  children?: React.ReactNode;
+  filters: InlineFilterConfig[];
   disabled: boolean;
   onDownload: (format: "csv" | "pdf") => void;
 }>) {
   return (
     <PageSection>
       <PageHeader title={title} />
-      <div className="moduleToolbar">
-        {children}
+      <InlineFilter filters={filters}>
         <div className="formActions">
           <Button className="secondaryAction" type="button" disabled={disabled} onClick={() => onDownload("csv")}>
             <FileDown size={16} /> CSV
@@ -33,26 +32,9 @@ function ReportCard({
             <FileDown size={16} /> PDF
           </Button>
         </div>
-      </div>
+      </InlineFilter>
     </PageSection>
   );
-}
-
-function ClassSectionSelectors({
-  classes, sections, classId, sectionId, onClassChange, onSectionChange,
-}: Readonly<{
-  classes: AcademicClass[];
-  sections: Section[];
-  classId: string;
-  sectionId: string;
-  onClassChange: (value: string) => void;
-  onSectionChange: (value: string) => void;
-}>) {
-  const { t } = useTranslation();
-  return <>
-    <label>{t("classLabel")}<Select value={classId} onChange={(event) => onClassChange(event.target.value)}><option value="">{t("selectEllipsis")}</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
-    <label>{t("sectionLabel")}<Select value={sectionId} onChange={(event) => onSectionChange(event.target.value)} disabled={!classId}><option value="">{t("selectEllipsis")}</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
-  </>;
 }
 
 export function ReportsView() {
@@ -119,6 +101,10 @@ export function ReportsView() {
   };
 
   const hasRange = Boolean(startDate && endDate);
+  const classSectionFilters: InlineFilterConfig[] = [
+    { key: "class", type: "select", label: t("classLabel"), value: classId, placeholder: t("selectEllipsis"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: setClassId },
+    { key: "section", type: "select", label: t("sectionLabel"), value: sectionId, placeholder: t("selectEllipsis"), options: sections.map((item) => ({ value: item.id, label: item.name })), disabled: !classId, onChange: setSectionId },
+  ];
 
   return (
     <PageSection>
@@ -127,43 +113,38 @@ export function ReportsView() {
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
 
-      <div className="moduleToolbar">
-        <label>{t("fromLabel")}<Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-        <label>{t("toLabel")}<Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
-      </div>
+      <InlineFilter filters={[
+        { key: "from", type: "input", inputType: "date", label: t("fromLabel"), value: startDate, onChange: setStartDate },
+        { key: "to", type: "input", inputType: "date", label: t("toLabel"), value: endDate, onChange: setEndDate },
+      ]} />
 
       <ReportCard
         title={t("attendanceReportHeading")}
+        filters={classSectionFilters}
         disabled={!classId || !sectionId || !hasRange}
         onDownload={(format) =>
           run(() => reportingApi.downloadAttendanceReport({ class_id: classId, section_id: sectionId, start_date: startDate, end_date: endDate }, format))
         }
-      >
-        <ClassSectionSelectors classes={classes} sections={sections} classId={classId} sectionId={sectionId} onClassChange={setClassId} onSectionChange={setSectionId} />
-      </ReportCard>
+      />
 
       {(isTeacher || hasPermission("assessments.marks.enter")) && (
         <ReportCard
           title={t("resultsReportHeading")}
+          filters={[...classSectionFilters, {
+            key: "session", type: "select", label: t("sessionLabel"), value: sessionId, placeholder: t("selectEllipsis"),
+            options: sessions.map((session) => ({ value: session.id, label: session.name })), onChange: setSessionId,
+          }]}
           disabled={!classId || !sectionId || !sessionId}
           onDownload={(format) =>
             run(() => reportingApi.downloadResultsReport({ class_id: classId, section_id: sectionId, session_id: sessionId }, format))
           }
-        >
-          <ClassSectionSelectors classes={classes} sections={sections} classId={classId} sectionId={sectionId} onClassChange={setClassId} onSectionChange={setSectionId} />
-          <label>
-            {t("sessionLabel")}
-            <Select value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
-              <option value="">{t("selectEllipsis")}</option>
-              {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </Select>
-          </label>
-        </ReportCard>
+        />
       )}
 
       {hasPermission("finance.reports.view") && (
         <ReportCard
           title={t("financeReportHeading")}
+          filters={[]}
           disabled={!hasRange}
           onDownload={(format) =>
             run(() => reportingApi.downloadFinanceReport({ start_date: startDate, end_date: endDate }, format))
@@ -174,6 +155,7 @@ export function ReportsView() {
       {hasPermission("finance.reports.view") && (
         <ReportCard
           title={t("donationsReportHeading")}
+          filters={[]}
           disabled={!hasRange}
           onDownload={(format) =>
             run(() => reportingApi.downloadDonationsReport({ start_date: startDate, end_date: endDate }, format))
@@ -184,6 +166,7 @@ export function ReportsView() {
       {hasPermission("teachers.salary.manage") && (
         <ReportCard
           title={t("salaryReportHeading")}
+          filters={[]}
           disabled={!hasRange}
           onDownload={(format) =>
             run(() => reportingApi.downloadSalaryReport({ start_date: startDate, end_date: endDate }, format))

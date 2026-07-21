@@ -19,6 +19,8 @@ function createAttendanceEntry(
   studentId: string,
   status: AttendanceStatus,
   sessionId: string,
+  courseId: string,
+  timetableSlotId: string,
   capturedAt = new Date().toISOString(),
 ): OutboxEntry {
   const attendanceDate = capturedAt.slice(0, 10);
@@ -28,17 +30,23 @@ function createAttendanceEntry(
     subject_type: "student",
     subject_id: studentId,
     session_id: sessionId,
+    course_id: courseId,
+    timetable_slot_id: timetableSlotId,
     attendance_date: attendanceDate,
     status,
     captured_at: capturedAt,
     // Deterministic per (student, session, day): a same-day re-mark reuses the
     // key, so the server updates the existing row (logging a correction)
     // instead of inserting a duplicate.
-    idempotency_key: `${studentId}:${sessionId}:${attendanceDate}`
+    idempotency_key: `${studentId}:${sessionId}:${attendanceDate}:${timetableSlotId}`
   };
 }
 
-export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxState {
+export function useAttendanceOutbox(
+  sessionId: string | null,
+  courseId: string | null,
+  timetableSlotId: string | null,
+): AttendanceOutboxState {
   const accountKey = getOfflineAccountKey();
   const [entries, setEntries] = useState<OutboxEntry[]>([]);
   const [lockedKeys, setLockedKeys] = useState<string[]>([]);
@@ -89,8 +97,8 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
 
   const queueAttendance = useCallback(
     async (studentId: string, status: AttendanceStatus): Promise<void> => {
-      if (!sessionId) return;
-      const entry = createAttendanceEntry(studentId, status, sessionId);
+      if (!sessionId || !courseId || !timetableSlotId) return;
+      const entry = createAttendanceEntry(studentId, status, sessionId, courseId, timetableSlotId);
       // Upsert: re-marking a student the same day replaces the queued entry.
       await db.outbox.where("[account_key+idempotency_key]").equals([accountKey, entry.idempotency_key]).delete();
       await db.outbox.add(entry);
@@ -99,15 +107,15 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
         sync();
       }
     },
-    [accountKey, refresh, sync, sessionId],
+    [accountKey, courseId, refresh, sync, sessionId, timetableSlotId],
   );
 
   const queueAttendanceBatch = useCallback(
     async (marks: Record<string, AttendanceStatus>): Promise<void> => {
-      if (!sessionId) return;
+      if (!sessionId || !courseId || !timetableSlotId) return;
       const capturedAt = new Date().toISOString();
       const batch = Object.entries(marks).map(([studentId, status]) =>
-        createAttendanceEntry(studentId, status, sessionId, capturedAt),
+        createAttendanceEntry(studentId, status, sessionId, courseId, timetableSlotId, capturedAt),
       );
       if (batch.length === 0) return;
 
@@ -121,7 +129,7 @@ export function useAttendanceOutbox(sessionId: string | null): AttendanceOutboxS
         sync();
       }
     },
-    [accountKey, refresh, sync, sessionId],
+    [accountKey, courseId, refresh, sync, sessionId, timetableSlotId],
   );
 
   return { entries, lockedKeys, isSyncing, queueAttendance, queueAttendanceBatch, sync, overrideEntry };

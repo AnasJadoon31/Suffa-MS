@@ -148,6 +148,51 @@ class ExamTypeRead(BaseModel):
     grading_scheme_id: UUID
 
 
+class GradingPlanComponent(BaseModel):
+    id: UUID | None = None
+    name: str = Field(min_length=1, max_length=160)
+    weightage: float = Field(gt=0, le=100)
+
+
+class GradingPlanWrite(BaseModel):
+    course_id: UUID
+    class_id: UUID | None = None
+    name: str = Field(min_length=1, max_length=160)
+    bands: list[GradeBand] = Field(min_length=1)
+    assignment_weightage: float = Field(default=0, ge=0, le=100)
+    components: list[GradingPlanComponent] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _validate_complete_plan(self) -> "GradingPlanWrite":
+        total = self.assignment_weightage + sum(component.weightage for component in self.components)
+        if abs(total - 100) > 0.01:
+            raise ValueError("grading component weights must total 100")
+        names = [component.name.strip().casefold() for component in self.components]
+        if len(names) != len(set(names)):
+            raise ValueError("grading component names must be unique")
+        ordered = sorted(self.bands, key=lambda band: band.min_score)
+        if ordered[0].min_score != 0 or ordered[-1].max_score != 100:
+            raise ValueError("grade bands must cover scores from 0 through 100")
+        for index, band in enumerate(ordered):
+            if band.min_score > band.max_score:
+                raise ValueError("grade band minimum cannot exceed its maximum")
+            if index and band.min_score - ordered[index - 1].max_score > 0.011:
+                raise ValueError("grade bands cannot contain gaps")
+            if index and band.min_score <= ordered[index - 1].max_score:
+                raise ValueError("grade bands cannot overlap")
+        return self
+
+
+class GradingPlanRead(BaseModel):
+    id: UUID
+    course_id: UUID
+    class_id: UUID | None
+    name: str
+    bands: list
+    assignment_weightage: float
+    components: list[GradingPlanComponent]
+
+
 class MarkUpsert(BaseModel):
     exam_type_id: UUID
     student_id: UUID

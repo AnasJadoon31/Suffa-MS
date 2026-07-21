@@ -67,6 +67,10 @@ export const academicsApi = {
   enrollStudent: (payload: {
     student_id: string; session_id: string; program_id: string; class_id: string; section_id: string;
   }) => api.post("/api/v1/academics/students/enroll", payload).then((r) => r.data),
+  unassignStudent: (studentId: string, sessionId: string, effectiveDate?: string) =>
+    api.delete(`/api/v1/academics/students/${studentId}/enrollments/${sessionId}`, { params: { effective_date: effectiveDate } }).then((r) => r.data),
+  studentEnrollmentHistory: (studentId: string, sessionId?: string) =>
+    api.get(`/api/v1/academics/students/${studentId}/enrollments`, { params: { session_id: sessionId } }).then((r) => r.data),
 };
 
 // -------------------------------------------------------------------- People
@@ -82,6 +86,14 @@ export interface Student {
   portal_enabled: boolean; notes: string | null; created_at: string; set_password_url?: string;
   username?: string | null; current_class?: string | null;
   b_form_number?: string | null; address?: string | null;
+  active_enrollment?: {
+    id: string; session_id: string; session_name: string; program_id: string; program_name: string;
+    class_id: string; class_name: string; section_id: string; section_name: string; started_on: string;
+  } | null;
+  admission_record?: {
+    id: string; form_id: string | null; application_id: string | null; form_title: string | null;
+    fields_definition: FormFieldDefinition[]; answers: Record<string, unknown>; created_at: string;
+  } | null;
 }
 export interface Guardian {
   id: string; user_id: string | null; name: string; relationship: string; phone_numbers: string;
@@ -143,6 +155,7 @@ export const peopleApi = {
     username: string; name: string; date_of_birth: string; admission_number?: string;
     portal_enabled?: boolean; guardian_ids?: string[]; preferred_language?: string;
     b_form_number?: string; address?: string; photo_file_id?: string;
+    admission_form_id?: string; admission_answers?: Record<string, unknown>;
   }) =>
     api.post<Student>("/api/v1/people/students", payload).then((r) => r.data),
   updateStudent: (id: string, payload: Partial<Omit<Student, "id" | "user_id" | "created_at">>) =>
@@ -192,6 +205,7 @@ export interface AttendanceClassOption {
   id: string;
   name: string;
   course_names: string[];
+  courses: { id: string; name: string }[];
   student_count: number;
   sections: { id: string; name: string; student_count: number }[];
 }
@@ -209,6 +223,8 @@ export interface AttendanceRoster {
   class_name: string;
   section_id: string | null;
   section_name: string | null;
+  course: { id: string; name: string } | null;
+  timetable_slot: { id: string; period: number; day_of_week: number; start_time: string; end_time: string } | null;
   students: AttendanceRosterStudent[];
 }
 export interface AttendanceMarker {
@@ -231,6 +247,9 @@ export interface AttendanceLogEntry {
   source: "manual" | "approved_leave";
   locked_reason: "approved_leave" | null;
   leave_id: string | null;
+  course: { id: string; name: string } | null;
+  timetable_slot: { id: string; period: number; day_of_week: number; start_time: string; end_time: string } | null;
+  legacy_general: boolean;
 }
 export interface TeacherAttendanceLogEntry {
   id: string;
@@ -261,6 +280,7 @@ export interface AttendanceDateRange {
   start_date?: string;
   end_date?: string;
   section_id?: string;
+  course_id?: string;
 }
 export interface TeacherAttendanceToday {
   session_id: string;
@@ -275,8 +295,10 @@ export interface TeacherAttendanceToday {
 
 export const attendanceApi = {
   listClasses: () => getAllPages<AttendanceClassOption>("/api/v1/attendance/classes"),
-  classRoster: (classId: string, sectionId?: string) =>
-    api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`, { params: { section_id: sectionId } }).then((r) => r.data),
+  classRoster: (classId: string, sectionId?: string, courseId?: string, timetableSlotId?: string) =>
+    api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`, {
+      params: { section_id: sectionId, course_id: courseId, timetable_slot_id: timetableSlotId },
+    }).then((r) => r.data),
   classHistory: (classId: string, range?: AttendanceDateRange) =>
     api
       .get<ClassAttendanceHistory>(`/api/v1/attendance/classes/${classId}/history`, { params: range })
@@ -337,12 +359,21 @@ export interface Submission {
 }
 export interface GradingScheme { id: string; name: string; bands: { label: string; min_score: number; max_score: number }[]; include_assignments: boolean }
 export interface ExamType { id: string; course_id: string; class_id: string | null; name: string; weightage: number; grading_scheme_id: string }
+export interface GradingPlan {
+  id: string; course_id: string; class_id: string | null; name: string;
+  bands: GradingScheme["bands"]; assignment_weightage: number;
+  components: { id?: string | null; name: string; weightage: number }[];
+}
 export interface CourseResult { course_id: string; raw_score: number | null; band: string | null; exam_count: number }
 export interface SessionResult {
   session_id: string; student_id: string; course_results: CourseResult[]; overall_score: number | null; published: boolean;
 }
 
 export const assessmentsApi = {
+  getGradingPlan: (courseId: string, classId?: string) =>
+    api.get<GradingPlan>("/api/v1/assessments/grading-plan", { params: { course_id: courseId, class_id: classId } }).then((r) => r.data),
+  saveGradingPlan: (payload: Omit<GradingPlan, "id">) =>
+    api.put<GradingPlan>("/api/v1/assessments/grading-plan", payload).then((r) => r.data),
   listAssignments: (params?: {
     class_id?: string; section_id?: string; course_id?: string; category?: string; created_by_id?: string; sort?: string;
     limit?: number; offset?: number;
@@ -434,6 +465,11 @@ export interface TeacherDashboard {
 export interface StudentDashboard {
   role: "student";
   my_attendance: Record<string, "present" | "absent" | "leave">;
+  my_attendance_periods: {
+    date: string; status: "present" | "absent" | "leave";
+    course_id: string | null; course_name: string | null;
+    timetable_slot_id: string | null; period: number | null; legacy_general: boolean;
+  }[];
   today_timetable: TimetableEntry[];
   latest_result: SessionResult | null;
   due_assignments: { id: string; title: string; due_date: string; course_id: string; submitted?: boolean; file_key?: string | null; mark?: number | null; max_marks?: number | null; feedback?: string | null }[];
@@ -623,8 +659,19 @@ export const operationsApi = {
     applicant_name: string; guardian_contact: string; program_id?: string; date_of_birth?: string; notes?: string;
     extra_data?: Record<string, string>;
   }) => api.post<AdmissionApplication>("/api/v1/operations/admissions", payload).then((r) => r.data),
+  updateAdmission: (id: string, payload: Partial<Pick<AdmissionApplication, "applicant_name" | "guardian_contact" | "program_id" | "date_of_birth" | "notes" | "extra_data">>) =>
+    api.put<AdmissionApplication>(`/api/v1/operations/admissions/${id}`, payload).then((r) => r.data),
   setAdmissionStatus: (id: string, status: string) =>
     api.post<AdmissionApplication>(`/api/v1/operations/admissions/${id}/status`, null, { params: { status_value: status } }).then((r) => r.data),
+  admissionStatusHistory: (id: string) =>
+    api.get<AdmissionApplication["status_history"]>(`/api/v1/operations/admissions/${id}/status-history`).then((r) => r.data),
+  convertAdmission: (id: string, payload: {
+    student_username: string; guardian_username: string; guardian_name: string; guardian_relationship: string;
+    guardian_cnic?: string; guardian_address?: string; student_preferred_language?: string; guardian_preferred_language?: string;
+    admission_number?: string; session_id: string; class_id: string; section_id: string;
+  }) => api.post<AdmissionConversion>(`/api/v1/operations/admissions/${id}/convert`, payload).then((r) => r.data),
+  listAdminNotifications: () => getAllPages<AdminNotification>("/api/v1/operations/admin-notifications"),
+  markAdminNotificationRead: (id: string) => api.post<AdminNotification>(`/api/v1/operations/admin-notifications/${id}/read`).then((r) => r.data),
 
   listEnquiries: () => getAllPages<ContactEnquiry>("/api/v1/operations/enquiries"),
   listEnquiriesPage: (params: { limit: number; offset: number }) => getPage<ContactEnquiry>("/api/v1/operations/enquiries", params),
@@ -645,7 +692,15 @@ export interface BlogPost {
 export interface AdmissionApplication {
   id: string; applicant_name: string; guardian_contact: string; program_id: string | null;
   date_of_birth: string | null; notes: string | null; status: string;
+  status_history: { status: string; changed_at: string; changed_by_id: string | null }[];
   form_id: string | null; extra_data: Record<string, unknown> | null; created_at: string;
+  converted_student_id: string | null; converted_guardian_id: string | null;
+  converted_by_id: string | null; converted_at: string | null;
+}
+export interface AdminNotification { id: string; event_type: string; title: string; message: string; entity_type: string | null; entity_id: string | null; is_read: boolean; created_at: string }
+export interface AdmissionConversion {
+  application: AdmissionApplication; student: Student; guardian: Guardian;
+  student_set_password_url: string | null; guardian_set_password_url: string | null; already_converted: boolean;
 }
 export interface PublicAdmissionForm {
   title: string;
@@ -709,7 +764,7 @@ export const financeApi = {
     student_id: string; category_id: string; amount: number; currency?: string; payment_date: string; note?: string;
   }) => api.post<Payment>("/api/v1/finance/payments", payload).then((r) => r.data),
 
-  listDonors: () => getAllPages<Donor>("/api/v1/finance/donors"),
+  listDonors: (params?: { q?: string }) => getAllPages<Donor>("/api/v1/finance/donors", params),
   createDonor: (payload: { name: string; contact: string }) => api.post<Donor>("/api/v1/finance/donors", payload).then((r) => r.data),
   updateDonor: (id: string, payload: Partial<Omit<Donor, "id">>) => api.put<Donor>(`/api/v1/finance/donors/${id}`, payload).then((r) => r.data),
   listDonations: (donorId?: string) =>

@@ -8,8 +8,8 @@ from app.modules.attendance.models import StudentAttendance, TeacherAttendance, 
 from app.modules.auth.models import User, UserPermission
 from app.modules.finance.models import PaymentCategory, Payment, Donor, Donation, SalaryRecord, SalaryPayment
 from app.modules.messaging.models import MessageTemplate, MessageLog
-from app.modules.operations.models import TimetableSlot, Holiday, Leave, ResourceCategory, Resource, Form, FormResponse, Announcement, AdmissionForm, AdmissionApplication, BlogPost, ContactEnquiry, MadrasaSetting
-from app.modules.people.models import TeacherProfile, StudentProfile, Guardian, StudentGuardian
+from app.modules.operations.models import TimetableSlot, Holiday, Leave, ResourceCategory, Resource, Form, FormResponse, Announcement, AdmissionForm, AdmissionApplication, AdminNotification, BlogPost, ContactEnquiry, MadrasaSetting
+from app.modules.people.models import TeacherProfile, StudentProfile, Guardian, StudentGuardian, StudentAdmissionRecord
 from app.modules.platform.models import MadrasaFeature
 
 # Ensure all models are loaded
@@ -23,7 +23,7 @@ __all__ = [
     "PaymentCategory", "Payment", "Donor", "Donation", "SalaryRecord", "SalaryPayment",
     "MessageTemplate", "MessageLog",
     "TimetableSlot", "Holiday", "Leave", "ResourceCategory", "Resource", "Form", "FormResponse", "Announcement",
-    "AdmissionForm", "AdmissionApplication", "BlogPost", "ContactEnquiry", "MadrasaSetting",
-    "TeacherProfile", "StudentProfile", "Guardian", "StudentGuardian",
+    "AdmissionForm", "AdmissionApplication", "AdminNotification", "BlogPost", "ContactEnquiry", "MadrasaSetting",
+    "TeacherProfile", "StudentProfile", "Guardian", "StudentGuardian", "StudentAdmissionRecord",
     "MadrasaFeature"
 ]

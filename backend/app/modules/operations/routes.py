@@ -3,10 +3,11 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select, delete
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
+    ensure_writable_session,
     get_context_session,
     get_current_madrasa,
     get_current_user,
@@ -27,11 +28,15 @@ from app.modules.academics.models import (
     Course,
     Enrollment,
     Madrasa,
+    Program,
     Section,
 )
 from app.modules.operations.audience import get_viewer_context, scope_allows
 from app.modules.auth.models import User, UserRole
+from app.modules.auth.service import UsernameTakenError, provision_login
+from app.modules.operations.admissions import validate_admission_answers
 from app.modules.operations.models import (
+    AdminNotification,
     AdmissionApplication,
     AdmissionForm,
     Announcement,
@@ -47,8 +52,12 @@ from app.modules.operations.models import (
     TimetableSlot,
 )
 from app.modules.operations.schemas import (
+    AdminNotificationRead,
     AdmissionApplicationCreate,
+    AdmissionApplicationConvertRequest,
     AdmissionApplicationRead,
+    AdmissionApplicationUpdate,
+    AdmissionConversionRead,
     AdmissionFormCreate,
     AdmissionFormRead,
     AdmissionFormUpdate,
@@ -85,7 +94,14 @@ from app.modules.operations.schemas import (
     TimetableSlotCreate,
     TimetableSlotRead,
 )
-from app.modules.people.models import StudentProfile, TeacherProfile
+from app.modules.people.models import (
+    Guardian,
+    StudentAdmissionRecord,
+    StudentGuardian,
+    StudentProfile,
+    TeacherProfile,
+)
+from app.modules.people.schemas import GuardianRead
 
 router = APIRouter()
 
@@ -113,7 +129,11 @@ async def _viewer_class_id(session: AsyncSession, current_user: User, madrasa_id
         return None
     enrollment = (
         await session.execute(
-            select(Enrollment).where(Enrollment.student_id == profile.id, Enrollment.session_id == active_session_id)
+            select(Enrollment).where(
+                Enrollment.student_id == profile.id,
+                Enrollment.session_id == active_session_id,
+                Enrollment.ended_on.is_(None),
+            )
         )
     ).scalar_one_or_none()
     return enrollment.class_id if enrollment else None
@@ -428,7 +448,12 @@ async def export_timetable(
     if not rows:
         raise HTTPException(status_code=404, detail="No timetable slots to export")
 
-    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    is_urdu = current_user.preferred_language == "ur"
+    day_names = (
+        ["پیر", "منگل", "بدھ", "جمعرات", "جمعہ", "ہفتہ", "اتوار"]
+        if is_urdu
+        else ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    )
     # section key → {"label": str, "slots": {(day, start_time): cell}}
     sections_grid: dict[tuple[str, str], dict] = {}
     for slot, class_name, section_name, course_name, teacher_name in rows:
@@ -436,7 +461,7 @@ async def export_timetable(
         entry = sections_grid.setdefault(key, {"slots": {}})
         entry["slots"][(slot.day_of_week, slot.start_time, slot.end_time)] = f"{course_name}\n{teacher_name}"
 
-    headers = ["Time"] + day_names
+    headers = (["وقت"] if is_urdu else ["Time"]) + day_names
     table_rows: list[list[str]] = []
     for (class_name, section_name), entry in sections_grid.items():
         table_rows.append([f"— {class_name} / {section_name} —"] + [""] * len(day_names))
@@ -449,35 +474,16 @@ async def export_timetable(
             table_rows.append(row)
 
     pdf_bytes = render_table_pdf(
-        "Timetable", f"{madrasa.name} — {context_session.name}", headers, table_rows,
+        "نظام الاوقات" if is_urdu else "Timetable",
+        f"{madrasa.name} — {context_session.name}", headers, table_rows,
         await load_report_branding(session, madrasa),
+        language=current_user.preferred_language,
     )
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="timetable.pdf"'},
     )
-
-
-@router.get("/admission-forms", response_model=list[AdmissionFormRead])
-async def list_admission_forms(
-    response: Response,
-    category: str | None = None,
-    program_id: UUID | None = None,
-    limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
-    offset: int = Query(0, ge=0),
-    madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session),
-) -> list[AdmissionFormRead]:
-    query = select(AdmissionForm).where(AdmissionForm.madrasa_id == madrasa.id)
-    if category:
-        query = query.where(AdmissionForm.category == category)
-    if program_id:
-        query = query.where(AdmissionForm.program_id == program_id)
-        
-    query = query.order_by(AdmissionForm.created_at.desc())
-    
-    return await paginate_scalars(session, query, limit=limit, offset=offset, response=response)
 
 
 @router.delete("/timetable/{slot_id}")
@@ -641,6 +647,7 @@ async def my_timetable(
                     Enrollment.madrasa_id == madrasa.id,
                     Enrollment.student_id == profile.id,
                     Enrollment.session_id == context_session.id,
+                    Enrollment.ended_on.is_(None),
                 )
             )
         ).scalar_one_or_none()
@@ -870,6 +877,7 @@ async def list_leave(
                 .where(
                     StudentProfile.madrasa_id == madrasa.id,
                     Enrollment.class_id == class_id,
+                    Enrollment.ended_on.is_(None),
                     AcademicSession.is_active.is_(True),
                 )
             )
@@ -1655,13 +1663,25 @@ async def create_admission_form(
 @router.get("/admission-forms", response_model=list[AdmissionFormRead])
 async def list_admission_forms(
     response: Response,
-    current_user: User = Depends(require_permission("admissions.manage")),
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    category: str | None = None,
+    program_id: UUID | None = None,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[AdmissionFormRead]:
-    stmt = select(AdmissionForm).where(AdmissionForm.madrasa_id == madrasa.id).order_by(AdmissionForm.created_at.desc())
+    if not (
+        await user_has_permission(current_user, "admissions.manage", session)
+        or await user_has_permission(current_user, "students.add", session)
+    ):
+        raise HTTPException(status_code=403, detail=ErrorCode.PERMISSION_REQUIRED)
+    stmt = select(AdmissionForm).where(AdmissionForm.madrasa_id == madrasa.id)
+    if category:
+        stmt = stmt.where(AdmissionForm.category == category)
+    if program_id:
+        stmt = stmt.where(AdmissionForm.program_id == program_id)
+    stmt = stmt.order_by(AdmissionForm.created_at.desc())
     rows = await paginate_scalars(session, stmt, limit=limit, offset=offset, response=response)
     return [await _admission_form_read(session, row) for row in rows]
 
@@ -1705,9 +1725,13 @@ async def delete_admission_form(
         ).limit(1)
     )
     if has_applications is not None:
-        from sqlalchemy import update
         await session.execute(
             update(AdmissionApplication).where(AdmissionApplication.form_id == form.id).values(form_id=None)
+        )
+        await session.execute(
+            update(StudentAdmissionRecord)
+            .where(StudentAdmissionRecord.form_id == form.id)
+            .values(form_id=None)
         )
     await session.delete(form)
     await session.commit()
@@ -1721,8 +1745,63 @@ async def create_admission_application(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> AdmissionApplicationRead:
-    application = AdmissionApplication(madrasa_id=madrasa.id, **payload.model_dump())
+    data = payload.model_dump()
+    form_id = data.pop("form_id")
+    form = None
+    if form_id is not None:
+        form = await session.get(AdmissionForm, form_id)
+        if form is None or form.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Admission form not found")
+        validate_admission_answers(form.fields_definition or [], data.get("extra_data") or {})
+        if data.get("program_id") is not None and data["program_id"] != form.program_id:
+            raise HTTPException(status_code=422, detail="Program does not match the admission form")
+        data["program_id"] = form.program_id
+    elif data.get("program_id") is not None:
+        program = await session.get(Program, data["program_id"])
+        if program is None or program.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Program not found")
+    application = AdmissionApplication(
+        madrasa_id=madrasa.id,
+        form_id=form.id if form is not None else None,
+        form_title_snapshot=form.title if form is not None else None,
+        fields_definition_snapshot=(form.fields_definition or []) if form is not None else [],
+        status_history=[{
+            "status": "pending",
+            "changed_at": datetime.now(UTC).isoformat(),
+            "changed_by_id": str(current_user.id),
+        }],
+        **data,
+    )
     session.add(application)
+    await session.commit()
+    await session.refresh(application)
+    return AdmissionApplicationRead.model_validate(application)
+
+
+@router.put("/admissions/{application_id}", response_model=AdmissionApplicationRead)
+async def update_admission_application(
+    application_id: UUID,
+    payload: AdmissionApplicationUpdate,
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AdmissionApplicationRead:
+    application = await session.get(AdmissionApplication, application_id)
+    if application is None or application.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Admission application not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    if "program_id" in updates and updates["program_id"] is not None:
+        program = await session.get(Program, updates["program_id"])
+        if program is None or program.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Program not found")
+    if "extra_data" in updates and application.fields_definition_snapshot:
+        validate_admission_answers(
+            application.fields_definition_snapshot,
+            updates["extra_data"] or {},
+        )
+    for field, value in updates.items():
+        setattr(application, field, value)
     await session.commit()
     await session.refresh(application)
     return AdmissionApplicationRead.model_validate(application)
@@ -1746,6 +1825,24 @@ async def list_admission_applications(
     return [AdmissionApplicationRead.model_validate(row) for row in rows]
 
 
+@router.get("/admissions/{application_id}/status-history", response_model=list[dict])
+async def get_admission_status_history(
+    application_id: UUID,
+    response: Response,
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> list[dict]:
+    application = await session.get(AdmissionApplication, application_id)
+    if application is None or application.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Admission application not found")
+    return paginate_sequence(
+        application.status_history or [], limit=limit, offset=offset, response=response,
+    )
+
+
 @router.post("/admissions/{application_id}/status", response_model=AdmissionApplicationRead)
 async def set_admission_status(
     application_id: UUID,
@@ -1756,13 +1853,289 @@ async def set_admission_status(
 ) -> AdmissionApplicationRead:
     if status_value not in {"pending", "accepted", "rejected"}:
         raise HTTPException(status_code=400, detail="status must be pending, accepted, or rejected")
-    application = await session.get(AdmissionApplication, application_id)
-    if application is None or application.madrasa_id != madrasa.id:
+    application = (
+        await session.execute(
+            select(AdmissionApplication)
+            .where(
+                AdmissionApplication.id == application_id,
+                AdmissionApplication.madrasa_id == madrasa.id,
+            )
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if application is None:
         raise HTTPException(status_code=404, detail="Admission application not found")
+    if status_value == "accepted" and application.converted_student_id is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Accepting an application requires the conversion endpoint",
+        )
     application.status = status_value
+    application.status_history = [
+        *(application.status_history or []),
+        {
+            "status": status_value,
+            "changed_at": datetime.now(UTC).isoformat(),
+            "changed_by_id": str(current_user.id),
+        },
+    ]
     await session.commit()
     await session.refresh(application)
     return AdmissionApplicationRead.model_validate(application)
+
+
+@router.post("/admissions/{application_id}/convert", response_model=AdmissionConversionRead)
+async def convert_admission_application(
+    application_id: UUID,
+    payload: AdmissionApplicationConvertRequest,
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AdmissionConversionRead:
+    application = (
+        await session.execute(
+            select(AdmissionApplication)
+            .where(
+                AdmissionApplication.id == application_id,
+                AdmissionApplication.madrasa_id == madrasa.id,
+            )
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if application is None:
+        raise HTTPException(status_code=404, detail="Admission application not found")
+
+    # The conversion link is the idempotency key. A repeated browser request
+    # returns the already-created records and never provisions more accounts.
+    if application.converted_student_id is not None:
+        student = await session.get(StudentProfile, application.converted_student_id)
+        guardian = await session.get(Guardian, application.converted_guardian_id)
+        if (
+            student is None
+            or guardian is None
+            or student.madrasa_id != madrasa.id
+            or guardian.madrasa_id != madrasa.id
+        ):
+            raise HTTPException(status_code=409, detail="Application conversion links are incomplete")
+        from app.modules.people.routes import _student_read
+
+        return AdmissionConversionRead(
+            application=AdmissionApplicationRead.model_validate(application),
+            student=await _student_read(session, student),
+            guardian=GuardianRead.model_validate(guardian),
+            already_converted=True,
+        )
+
+    academic_session = await session.get(AcademicSession, payload.session_id)
+    if academic_session is None or academic_session.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Academic session not found")
+    await ensure_writable_session(session, madrasa.id, payload.session_id)
+
+    academic_class = await session.get(AcademicClass, payload.class_id)
+    if academic_class is None or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+    section = await session.get(Section, payload.section_id)
+    if (
+        section is None
+        or section.madrasa_id != madrasa.id
+        or section.class_id != academic_class.id
+    ):
+        raise HTTPException(status_code=404, detail="Section not found")
+    if application.program_id is not None and application.program_id != academic_class.program_id:
+        raise HTTPException(status_code=422, detail="Class does not belong to the application's program")
+    if application.date_of_birth is None:
+        raise HTTPException(status_code=422, detail="Application date_of_birth is required for conversion")
+
+    admission_number = payload.admission_number or await _next_admission_number(
+        session, madrasa.id
+    )
+    clash = await session.scalar(
+        select(StudentProfile.id).where(
+            StudentProfile.madrasa_id == madrasa.id,
+            StudentProfile.admission_number == admission_number,
+        ).limit(1)
+    )
+    if clash is not None:
+        raise HTTPException(status_code=409, detail="Admission number already in use")
+
+    try:
+        student_user, student_link = await provision_login(
+            session,
+            madrasa_id=madrasa.id,
+            actor_id=current_user.id,
+            username=payload.student_username,
+            role=UserRole.student,
+            preferred_language=payload.student_preferred_language,
+            portal_enabled=academic_class.default_portal_enabled,
+        )
+        guardian_user, guardian_link = await provision_login(
+            session,
+            madrasa_id=madrasa.id,
+            actor_id=current_user.id,
+            username=payload.guardian_username,
+            role=UserRole.parent,
+            preferred_language=payload.guardian_preferred_language,
+        )
+    except UsernameTakenError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    student = StudentProfile(
+        madrasa_id=madrasa.id,
+        user_id=student_user.id,
+        admission_number=admission_number,
+        name=application.applicant_name,
+        date_of_birth=application.date_of_birth,
+        portal_enabled=academic_class.default_portal_enabled,
+    )
+    guardian = Guardian(
+        madrasa_id=madrasa.id,
+        user_id=guardian_user.id,
+        name=payload.guardian_name,
+        relationship=payload.guardian_relationship,
+        phone_numbers=application.guardian_contact,
+        cnic=payload.guardian_cnic,
+        address=payload.guardian_address,
+        preferred_language=payload.guardian_preferred_language,
+    )
+    session.add_all([student, guardian])
+    await session.flush()
+    session.add_all(
+        [
+            StudentGuardian(student_id=student.id, guardian_id=guardian.id),
+            Enrollment(
+                madrasa_id=madrasa.id,
+                student_id=student.id,
+                session_id=academic_session.id,
+                program_id=academic_class.program_id,
+                class_id=academic_class.id,
+                section_id=section.id,
+            ),
+        ]
+    )
+
+    session.add(
+        StudentAdmissionRecord(
+            madrasa_id=madrasa.id,
+            student_id=student.id,
+            form_id=application.form_id,
+            application_id=application.id,
+            form_title=application.form_title_snapshot,
+            fields_definition=application.fields_definition_snapshot or [],
+            answers=application.extra_data or {},
+            created_by_id=current_user.id,
+        )
+    )
+    application.status = "accepted"
+    application.status_history = [
+        *(application.status_history or []),
+        {
+            "status": "accepted",
+            "changed_at": datetime.now(UTC).isoformat(),
+            "changed_by_id": str(current_user.id),
+        },
+    ]
+    application.converted_student_id = student.id
+    application.converted_guardian_id = guardian.id
+    application.converted_by_id = current_user.id
+    application.converted_at = datetime.now(UTC)
+    session.add(
+        AdminNotification(
+            madrasa_id=madrasa.id,
+            event_type="admission.application_converted",
+            # Persist translation identity + data, not user-facing English.
+            # The portal resolves the title key with the applicant name.
+            title="notificationAdmissionConvertedTitle",
+            message=application.applicant_name,
+            entity_type="admission_application",
+            entity_id=application.id,
+            created_by_id=current_user.id,
+        )
+    )
+    await session.commit()
+    await session.refresh(application)
+    await session.refresh(student)
+    await session.refresh(guardian)
+
+    from app.modules.people.routes import _student_read
+
+    return AdmissionConversionRead(
+        application=AdmissionApplicationRead.model_validate(application),
+        student=await _student_read(session, student),
+        guardian=GuardianRead.model_validate(guardian),
+        student_set_password_url=student_link,
+        guardian_set_password_url=guardian_link,
+        already_converted=False,
+    )
+
+
+async def _next_admission_number(session: AsyncSession, madrasa_id: UUID) -> str:
+    count = await session.scalar(
+        select(func.count()).select_from(StudentProfile).where(StudentProfile.madrasa_id == madrasa_id)
+    )
+    return f"ADM-{(count or 0) + 1:04d}"
+
+
+def _notification_read(notification: AdminNotification, current_user: User) -> AdminNotificationRead:
+    return AdminNotificationRead(
+        id=notification.id,
+        event_type=notification.event_type,
+        title=notification.title,
+        message=notification.message,
+        entity_type=notification.entity_type,
+        entity_id=notification.entity_id,
+        is_read=str(current_user.id) in (notification.read_by_user_ids or []),
+        created_at=notification.created_at,
+    )
+
+
+@router.get("/admin-notifications", response_model=list[AdminNotificationRead])
+async def list_admin_notifications(
+    response: Response,
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> list[AdminNotificationRead]:
+    rows = await paginate_scalars(
+        session,
+        select(AdminNotification)
+        .where(AdminNotification.madrasa_id == madrasa.id)
+        .order_by(AdminNotification.created_at.desc()),
+        limit=limit,
+        offset=offset,
+        response=response,
+    )
+    return [_notification_read(row, current_user) for row in rows]
+
+
+@router.post("/admin-notifications/{notification_id}/read", response_model=AdminNotificationRead)
+async def mark_admin_notification_read(
+    notification_id: UUID,
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AdminNotificationRead:
+    notification = (
+        await session.execute(
+            select(AdminNotification)
+            .where(
+                AdminNotification.id == notification_id,
+                AdminNotification.madrasa_id == madrasa.id,
+            )
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    readers = list(notification.read_by_user_ids or [])
+    if str(current_user.id) not in readers:
+        readers.append(str(current_user.id))
+        notification.read_by_user_ids = readers
+        await session.commit()
+        await session.refresh(notification)
+    return _notification_read(notification, current_user)
 
 
 # --------------------------------------------------------- Contact enquiries

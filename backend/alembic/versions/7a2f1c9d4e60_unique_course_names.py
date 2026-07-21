@@ -6,7 +6,7 @@ Revises: 6f41c8a2d9b0
 
 from collections.abc import Sequence
 
-from alembic import op
+from alembic import context, op
 import sqlalchemy as sa
 
 revision: str = "7a2f1c9d4e60"
@@ -15,9 +15,19 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _is_offline_mode() -> bool:
+    # Unit tests invoke upgrade() with a lightweight mocked bind and no
+    # Alembic EnvironmentContext proxy. Treat that as online so the duplicate
+    # merge remains directly testable.
+    try:
+        return context.is_offline_mode()
+    except NameError:
+        return False
+
+
 def upgrade() -> None:
     bind = op.get_bind()
-    duplicate_groups = bind.exec_driver_sql(
+    duplicate_groups = [] if _is_offline_mode() else bind.exec_driver_sql(
         """
         SELECT
             madrasa_id,

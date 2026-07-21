@@ -23,9 +23,11 @@ import {
   type Program,
   type AcademicClass,
   type Section,
+  operationsApi,
+  type AdmissionForm,
 } from "../lib/endpoints";
 import { SearchDropdown } from "./SearchDropdown";
-import { Input, Select } from "./ui/Field";
+import { Checkbox, Input, Select, Textarea } from "./ui/Field";
 import { LoadingState } from "./ui/AsyncState";
 import { DataTable, type Column } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
@@ -33,6 +35,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { DelegateModal } from "./DelegateButton";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter } from "./ui/InlineFilter";
 
 function SendCredentialsButton({
   subjectType,
@@ -251,7 +254,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
 
   return (
     <>
-      <div className="moduleToolbar">
+      <InlineFilter filters={[]}>
         <SearchDropdown
           id="teacher-search"
           label={t("searchLabel")}
@@ -284,7 +287,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
             </Button>
           )}
         </div>
-      </div>
+      </InlineFilter>
 
       {showCreate && canCreate && (
         <FormModal
@@ -558,6 +561,9 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [classStudentIds, setClassStudentIds] = useState<Set<string> | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ username: "", name: "", date_of_birth: "", b_form_number: "", address: "" });
+  const [admissionForms, setAdmissionForms] = useState<AdmissionForm[]>([]);
+  const [admissionFormId, setAdmissionFormId] = useState("");
+  const [admissionAnswers, setAdmissionAnswers] = useState<Record<string, unknown>>({});
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [justCreated, setJustCreated] = useState<Student | null>(null);
@@ -609,6 +615,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
     void attendanceApi.listClasses().then((rows: any[]) => {
       setClassOptions(rows.map((row) => ({ id: row.id ?? row.class_id, name: row.name ?? row.class_name })));
     }).catch(() => setClassOptions([]));
+    void operationsApi.listAdmissionForms().then(setAdmissionForms).catch(() => setAdmissionForms([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination]);
 
@@ -635,10 +642,14 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
         date_of_birth: form.date_of_birth,
         b_form_number: form.b_form_number || undefined,
         address: form.address || undefined,
+        admission_form_id: admissionFormId,
+        admission_answers: admissionAnswers,
       });
       setNotice(t("createdSetPasswordLink", { code: created.admission_number, url: created.set_password_url }));
       setJustCreated(created);
       setForm({ username: "", name: "", date_of_birth: "", b_form_number: "", address: "" });
+      setAdmissionFormId("");
+      setAdmissionAnswers({});
       setShowCreate(false);
       await load();
     } catch (err: any) {
@@ -648,7 +659,11 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
 
   return (
     <>
-      <div className="moduleToolbar">
+      <InlineFilter filters={[{
+        key: "student-class", type: "select", label: t("classLabel"), value: classFilter,
+        placeholder: t("allClasses"), options: classOptions.map((academicClass) => ({ value: academicClass.id, label: academicClass.name })),
+        onChange: setClassFilter,
+      }]}>
         <SearchDropdown
           id="student-search"
           label={t("searchLabel")}
@@ -669,13 +684,6 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           }}
           emptyLabel={t("noStudentsYet")}
         />
-        <label className="searchBox" htmlFor="student-class-filter">
-          {t("classLabel")}
-          <Select id="student-class-filter" value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
-            <option value="">{t("allClasses")}</option>
-            {classOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-        </label>
         <div className="formActions">
           {search && (
             <Button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
@@ -688,7 +696,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
             </Button>
           )}
         </div>
-      </div>
+      </InlineFilter>
 
       {showCreate && canCreate && (
         <FormModal
@@ -697,6 +705,13 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                 submitLabel={t("addStudentBtn")}
                 submitIcon={<UserPlus size={16} />}
               >
+                <label>
+                  {t("admissionFormLabel")}
+                  <Select required value={admissionFormId} onChange={(event) => { setAdmissionFormId(event.target.value); setAdmissionAnswers({}); }}>
+                    <option value="">{t("selectAdmissionFormPlaceholder")}</option>
+                    {admissionForms.map((item) => <option value={item.id} key={item.id}>{item.title} · {item.is_open ? t("openStatusLabel") : t("closedStatusLabel")}</option>)}
+                  </Select>
+                </label>
                 <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
 
               <label>{t("studentNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
@@ -706,6 +721,17 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
               <label>{t("bFormLabel")}<Input value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
 
               <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+              {admissionForms.find((item) => item.id === admissionFormId)?.fields_definition.map((field) => {
+                if (field.type === "label") return <p className="formSectionLabel" key={field.key}>{field.label}</p>;
+                if (field.type === "textarea") return <label key={field.key}>{field.label}<Textarea required={field.required} value={String(admissionAnswers[field.key] ?? "")} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.value })} /></label>;
+                if (field.type === "dropdown") return <label key={field.key}>{field.label}<Select required={field.required} value={String(admissionAnswers[field.key] ?? "")} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.value })}><option value="">{t("selectEllipsis")}</option>{field.options.map((option) => <option key={option} value={option}>{option}</option>)}</Select></label>;
+                if (field.type === "radio") return <fieldset className="choiceField" key={field.key}><legend>{field.label}</legend>{field.options.map((option) => <label className="checkboxLabel" key={option}><Input type="radio" name={`admission-${field.key}`} required={field.required} checked={admissionAnswers[field.key] === option} onChange={() => setAdmissionAnswers({ ...admissionAnswers, [field.key]: option })} />{option}</label>)}</fieldset>;
+                if (field.type === "checkbox_group") {
+                  const chosen = Array.isArray(admissionAnswers[field.key]) ? admissionAnswers[field.key] as string[] : [];
+                  return <fieldset className="choiceField" key={field.key}><legend>{field.label}</legend>{field.options.map((option) => <label className="checkboxLabel" key={option}><Checkbox checked={chosen.includes(option)} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.checked ? [...chosen, option] : chosen.filter((item) => item !== option) })} />{option}</label>)}</fieldset>;
+                }
+                return <label key={field.key}>{field.label}<Input required={field.required} value={String(admissionAnswers[field.key] ?? "")} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.value })} /></label>;
+              })}
               </FormModal>
       )}
 
@@ -718,7 +744,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
         >
           <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
           <label>{t("dobCol")}<Input type="date" required value={editForm.date_of_birth} onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })} /></label>
-          <label>{t("bFormNumberLabel")}<Input value={editForm.b_form_number} onChange={(e) => setEditForm({ ...editForm, b_form_number: e.target.value })} /></label>
+          <label>{t("bFormLabel")}<Input value={editForm.b_form_number} onChange={(e) => setEditForm({ ...editForm, b_form_number: e.target.value })} /></label>
           <label>{t("addressLabel")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
         </FormModal>
       )}
@@ -750,9 +776,9 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                   <Edit2 size={14} />
                 </Button>
               )}
-              <Button className="tableAction" type="button" title={t("assignClassBtn", "Assign Class")} onClick={() => setAssignClassStudent(s)}>
+              {!s.active_enrollment && !s.current_class && <Button className="tableAction" type="button" title={t("assignClassBtn", "Assign Class")} onClick={() => setAssignClassStudent(s)}>
                 <GraduationCap size={14} />
-              </Button>
+              </Button>}
               <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(s)}>
                 <Eye size={14} />
               </Button>
@@ -787,6 +813,7 @@ function StudentDetail({
   onUpdate,
 }: Readonly<{ student: Student; canFinance: boolean; onClose: () => void; onUpdate: () => void }>) {
   const { t } = useTranslation();
+  const { confirm } = useDialog();
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [categories, setCategories] = useState<PaymentCategory[]>([]);
@@ -800,10 +827,11 @@ function StudentDetail({
   const [editForm, setEditForm] = useState({
     name: student.name, date_of_birth: student.date_of_birth, admission_number: student.admission_number ?? "",
     portal_enabled: student.portal_enabled,
-    b_form_number: student.b_form_number ?? "", address: student.address ?? ""
+    b_form_number: student.b_form_number ?? "", address: student.address ?? "", notes: student.notes ?? ""
   });
   const { hasPermission } = useAuth();
   const canEdit = hasPermission("students.edit");
+  const activeEnrollment = student.active_enrollment;
 
   const load = async () => {
     void peopleApi.studentGuardians(student.id).then(setGuardians).catch(() => setGuardians([]));
@@ -819,7 +847,7 @@ function StudentDetail({
 
   return (
     <Modal
-      title={`${student.name} · ${student.username || student.admission_number}${student.current_class ? ` · ${student.current_class}` : ""}`}
+      title={t("studentDetailsHeading")}
       onClose={onClose}
       actions={
         <>
@@ -828,18 +856,47 @@ function StudentDetail({
               <Pencil size={16} /> {t("edit", "Edit")}
             </Button>
           )}
-          <Button className="secondaryAction" onClick={() => setShowEnrollModal(true)}>
-            {t("assignClassBtn", "Assign Class")}
-          </Button>
+          {!activeEnrollment && !student.current_class && <Button className="secondaryAction" onClick={() => setShowEnrollModal(true)}>{t("assignClassBtn")}</Button>}
+          {activeEnrollment && <Button className="secondaryAction dangerAction" onClick={async () => {
+            if (!(await confirm(t("unassignStudentConfirm", { class: activeEnrollment.class_name })))) return;
+            try {
+              await academicsApi.unassignStudent(student.id, activeEnrollment.session_id);
+              onUpdate();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedToUnassignStudent"));
+            }
+          }}><UserMinus size={16} /> {t("unassignClassBtn")}</Button>}
         </>
       }
     >
       <div className="detailPanel" style={{ padding: "1.5rem" }}>
+        <section className="personHero" aria-label={t("studentIdentityHeading")}>
+          <div><span>{t("fullNameLabel")}</span><strong>{student.name}</strong></div>
+          <div><span>{t("usernameLabel")}</span><strong>{student.username || "—"}</strong></div>
+          <div><span>{t("currentClassLabel")}</span><strong>{activeEnrollment ? `${activeEnrollment.class_name} / ${activeEnrollment.section_name}` : (student.current_class || t("notAssignedLabel"))}</strong></div>
+        </section>
+        <section className="detailSection">
+          <h4>{t("studentIdentityHeading")}</h4>
+          <dl className="detailGrid">
+            <dt>{t("admissionNumberCol")}</dt><dd>{student.admission_number}</dd>
+            <dt>{t("dobCol")}</dt><dd>{student.date_of_birth}</dd>
+            <dt>{t("bFormLabel")}</dt><dd>{student.b_form_number || "—"}</dd>
+            <dt>{t("addressLabel")}</dt><dd>{student.address || "—"}</dd>
+            <dt>{t("portalCol")}</dt><dd>{student.portal_enabled ? t("enabledLabel") : t("disabledLabel")}</dd>
+            <dt>{t("statusCol")}</dt><dd>{student.status}</dd>
+            <dt>{t("notesLabel")}</dt><dd>{student.notes || "—"}</dd>
+          </dl>
+        </section>
+
+      {student.admission_record && <section className="detailSection">
+        <h4>{t("admissionOriginHeading")}</h4>
         <dl className="detailGrid">
-        <dt>{t("dobCol")}</dt><dd>{student.date_of_birth}</dd>
-        <dt>{t("portalCol")}</dt><dd>{student.portal_enabled ? t("enabledLabel") : t("disabledLabel")}</dd>
-        <dt>{t("statusCol")}</dt><dd>{student.status}</dd>
-      </dl>
+          <dt>{t("admissionFormLabel")}</dt><dd>{student.admission_record.form_title || t("sourceWalkIn")}</dd>
+          {student.admission_record.fields_definition.map((field) => <div className="detailGridRow" key={field.key}>
+            <dt>{field.label}</dt><dd>{String(student.admission_record?.answers[field.key] ?? "—")}</dd>
+          </div>)}
+        </dl>
+      </section>}
 
       <h4>{t("guardians")}</h4>
       <div className="dataTable">
@@ -950,6 +1007,7 @@ function StudentDetail({
                 portal_enabled: editForm.portal_enabled,
                 b_form_number: editForm.b_form_number || undefined,
                 address: editForm.address || undefined,
+                notes: editForm.notes || undefined,
               });
               setShowEdit(false);
               onUpdate();
@@ -963,6 +1021,8 @@ function StudentDetail({
           <label>{t("admissionNumberCol")}<Input value={editForm.admission_number} onChange={(e) => setEditForm({ ...editForm, admission_number: e.target.value })} /></label>
           <label>{t("bFormNumberCol")}<Input value={editForm.b_form_number} onChange={(e) => setEditForm({ ...editForm, b_form_number: e.target.value })} placeholder="12345-1234567-1" /></label>
           <label>{t("addressCol")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
+          <label>{t("notesLabel")}<Input value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>
+          <label className="checkboxLabel"><Input type="checkbox" checked={editForm.portal_enabled} onChange={(e) => setEditForm({ ...editForm, portal_enabled: e.target.checked })} />{t("portalEnabledLabel")}</label>
         </FormModal>
       )}
     </Modal>
@@ -1302,6 +1362,12 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
       }
     >
       <div className="detailPanel" style={{ padding: "1.5rem" }}>
+      <section className="guardianIdentityCard">
+        <div className="personHero compactPersonHero">
+          <div><span>{t("fullNameLabel")}</span><strong>{guardian.name}</strong></div>
+          <div><span>{t("relationshipLabel")}</span><strong>{guardian.relationship}</strong></div>
+          <div><span>{t("portalCol")}</span><strong>{guardian.user_id ? t("enabledLabel") : t("disabledLabel")}</strong></div>
+        </div>
       <div className="infoGrid">
         <div className="infoGroup">
           <label>{t("relationshipLabel")}</label>
@@ -1320,6 +1386,7 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
           <div>{guardian.address || "—"}</div>
         </div>
       </div>
+      </section>
 
       <div style={{ marginTop: "2rem" }}>
         <h3>{t("linkedStudents", "Linked Students")}</h3>
@@ -1346,9 +1413,10 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
             <p className="notice">{t("noStudentsLinked", "No students linked yet.")}</p>
           ) : (
             linkedStudents.map((s) => (
-              <div key={s.id} className="dataRow" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div key={s.id} className="linkedPersonCard">
                 <div>
-                  <strong>{s.name}</strong> <span style={{ color: "var(--slate-500)", fontSize: "0.85rem" }}>({s.admission_number})</span>
+                  <strong>{s.name}</strong>
+                  <span>{s.admission_number} · {s.current_class || t("notAssignedLabel")}</span>
                 </div>
                 <Button className="tableAction" type="button" onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn")}>
                   <X size={14} />
@@ -1409,13 +1477,24 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const [isLoading, setIsLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", contact: "" });
+  const [search, setSearch] = useState("");
+
+  const loadDonors = async (query = search) => {
+    setIsLoading(true);
+    try {
+      setDonors(await financeApi.listDonors({ q: query.trim() || undefined }));
+      setError("");
+    } catch (err: any) {
+      setDonors([]);
+      setError(err.response?.data?.detail ?? t("failedLoadDonors"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     void Promise.all([
-      financeApi.listDonors().then(setDonors).catch((err: any) => {
-        setDonors([]);
-        setError(err.response?.data?.detail ?? t("failedLoadDonors"));
-      }),
+      loadDonors(),
       financeApi.listCategories().then(setCategories).catch(() => setCategories([])),
     ]).finally(() => setIsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1429,6 +1508,11 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
 
   return (
     <>
+      <InlineFilter filters={[{
+        key: "donor-search", type: "input", inputType: "search", value: search,
+        ariaLabel: t("searchLabel"), placeholder: t("donorSearchPlaceholder"),
+        onChange: (value) => { setSearch(value); void loadDonors(value); },
+      }]} />
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <DataTable<Donor>
         columns={[
@@ -1532,7 +1616,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
                   setShowEdit(false);
                   setSelected(null);
                   setIsLoading(true);
-                  const newDonors = await financeApi.listDonors();
+                  const newDonors = await financeApi.listDonors({ q: search.trim() || undefined });
                   setDonors(newDonors);
                   setIsLoading(false);
                 } catch (err: any) {

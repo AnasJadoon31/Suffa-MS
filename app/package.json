@@ -7,7 +7,9 @@
     "dev": "vite",
     "dev:host": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
+    "test:i18n": "node scripts/check-i18n-keys.mjs",
     "test:admission-builder": "node scripts/check-admission-form-builder.mjs",
+    "test:visual-issues": "node scripts/verify-current-issues.mjs",
     "test:drawer": "npm run build && node scripts/check-drawer.mjs",
     "preview": "vite preview --host 0.0.0.0"
   },

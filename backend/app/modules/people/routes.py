@@ -8,16 +8,26 @@ from app.core.dependencies import get_current_madrasa, get_current_user, require
 from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
-from app.modules.academics.models import Madrasa
+from app.modules.academics.models import AcademicClass, AcademicSession, Enrollment, Madrasa, Program, Section
 from app.modules.auth.models import User, UserRole
 from app.modules.auth.service import UsernameTakenError, provision_login, reissue_set_password_link
-from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
+from app.modules.people.models import (
+    Guardian,
+    StudentAdmissionRecord,
+    StudentGuardian,
+    StudentProfile,
+    TeacherProfile,
+)
+from app.modules.operations.admissions import validate_admission_answers
+from app.modules.operations.models import AdmissionForm
 from app.modules.people.schemas import (
     GuardianCreate,
     GuardianCredentialsRequest,
     GuardianRead,
     GuardianUpdate,
     StudentCreate,
+    StudentAdmissionRecordRead,
+    StudentEnrollmentRead,
     StudentProvisionedRead,
     StudentRead,
     StudentUpdate,
@@ -28,6 +38,51 @@ from app.modules.people.schemas import (
 )
 
 router = APIRouter()
+
+
+async def _student_read(session: AsyncSession, student: StudentProfile) -> StudentRead:
+    record = (
+        await session.execute(
+            select(StudentAdmissionRecord).where(
+                StudentAdmissionRecord.student_id == student.id,
+                StudentAdmissionRecord.madrasa_id == student.madrasa_id,
+            )
+        )
+    ).scalar_one_or_none()
+    data = StudentRead.model_validate(student).model_dump()
+    enrollment_row = (
+        await session.execute(
+            select(Enrollment, AcademicSession.name, Program.name, AcademicClass.name, Section.name)
+            .join(AcademicSession, AcademicSession.id == Enrollment.session_id)
+            .join(Program, Program.id == Enrollment.program_id)
+            .join(AcademicClass, AcademicClass.id == Enrollment.class_id)
+            .join(Section, Section.id == Enrollment.section_id)
+            .where(
+                Enrollment.student_id == student.id,
+                Enrollment.madrasa_id == student.madrasa_id,
+                Enrollment.ended_on.is_(None),
+            )
+            .order_by(AcademicSession.is_active.desc(), Enrollment.started_on.desc())
+        )
+    ).first()
+    data["admission_record"] = (
+        StudentAdmissionRecordRead.model_validate(record) if record is not None else None
+    )
+    if enrollment_row is not None:
+        enrollment, session_name, program_name, class_name, section_name = enrollment_row
+        data["active_enrollment"] = StudentEnrollmentRead(
+            id=enrollment.id,
+            session_id=enrollment.session_id,
+            session_name=session_name,
+            program_id=enrollment.program_id,
+            program_name=program_name,
+            class_id=enrollment.class_id,
+            class_name=class_name,
+            section_id=enrollment.section_id,
+            section_name=section_name,
+            started_on=enrollment.started_on,
+        )
+    return StudentRead(**data)
 
 
 async def _next_code(session: AsyncSession, madrasa_id: UUID, model, prefix: str) -> str:
@@ -220,6 +275,15 @@ async def create_student(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> StudentProvisionedRead:
+    admission_form = None
+    if payload.admission_form_id is not None:
+        admission_form = await session.get(AdmissionForm, payload.admission_form_id)
+        if admission_form is None or admission_form.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Admission form not found")
+        validate_admission_answers(admission_form.fields_definition or [], payload.admission_answers)
+    elif payload.admission_answers:
+        raise HTTPException(status_code=422, detail="admission_form_id is required with admission_answers")
+
     try:
         user, set_password_url = await provision_login(
             session,
@@ -268,10 +332,25 @@ async def create_student(
             raise HTTPException(status_code=404, detail=f"Guardian {guardian_id} not found")
         session.add(StudentGuardian(student_id=profile.id, guardian_id=guardian_id))
 
+    if admission_form is not None:
+        session.add(
+            StudentAdmissionRecord(
+                madrasa_id=madrasa.id,
+                student_id=profile.id,
+                form_id=admission_form.id,
+                application_id=None,
+                form_title=admission_form.title,
+                fields_definition=admission_form.fields_definition or [],
+                answers=payload.admission_answers,
+                created_by_id=current_user.id,
+            )
+        )
+
     await session.commit()
     await session.refresh(profile)
 
-    return StudentProvisionedRead(**StudentRead.model_validate(profile).model_dump(), set_password_url=set_password_url)
+    student_read = await _student_read(session, profile)
+    return StudentProvisionedRead(**student_read.model_dump(), set_password_url=set_password_url)
 
 
 @router.get("/students", response_model=list[StudentRead])
@@ -294,7 +373,7 @@ async def list_students(
     rows = await paginate_scalars(
         session, stmt.order_by(StudentProfile.name), limit=limit, offset=offset, response=response
     )
-    return [StudentRead.model_validate(row) for row in rows]
+    return [await _student_read(session, row) for row in rows]
 
 
 @router.get("/students/{student_id}", response_model=StudentRead)
@@ -305,7 +384,7 @@ async def get_student(
     session: AsyncSession = Depends(get_session),
 ) -> StudentRead:
     student = await _get_or_404(session, StudentProfile, student_id, madrasa.id)
-    return StudentRead.model_validate(student)
+    return await _student_read(session, student)
 
 
 @router.put("/students/{student_id}", response_model=StudentRead)
@@ -325,7 +404,7 @@ async def update_student(
         await session.rollback()
         raise HTTPException(status_code=409, detail=ErrorCode.ADMISSION_NUMBER_EXISTS) from e
     await session.refresh(student)
-    return StudentRead.model_validate(student)
+    return await _student_read(session, student)
 
 
 @router.post("/students/{student_id}/deactivate", response_model=StudentRead)
@@ -339,7 +418,7 @@ async def deactivate_student(
     student.status = "inactive"
     await session.commit()
     await session.refresh(student)
-    return StudentRead.model_validate(student)
+    return await _student_read(session, student)
 
 
 @router.post("/students/{student_id}/credentials-link")

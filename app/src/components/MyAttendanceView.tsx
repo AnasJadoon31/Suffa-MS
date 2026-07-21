@@ -119,11 +119,14 @@ function MyStudentAttendance() {
             studentDayStatus={statuses}
           />
           <div className="dataTable" style={{ marginTop: 16 }}>
-            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("statusCol")}</span><span>{t("markedByCol")}</span></div>
+            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("courseAndPeriodLabel")}</span><span>{t("statusCol")}</span><span>{t("markedByCol")}</span></div>
             {selectedDate && selectedEntries.length === 0 && <p className="emptyState">{t("noAttendanceHistory")}</p>}
             {selectedEntries.map((entry) => (
               <div className="dataRow" key={entry.id}>
                 <span>{entry.attendance_date}</span>
+                <span>{entry.legacy_general
+                  ? t("legacyGeneralAttendance")
+                  : `${entry.course?.name ?? "—"} · ${t("periodLabel", { period: entry.timetable_slot?.period })}`}</span>
                 <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
                 <span>{entry.marked_by.display_name}</span>
               </div>

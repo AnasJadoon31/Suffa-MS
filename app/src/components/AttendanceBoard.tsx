@@ -33,6 +33,7 @@ import {
   type TeacherAttendanceLogEntry,
   type TeacherAttendanceToday
 } from "../lib/endpoints";
+import type { TimetableSlot } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
 import { consumePendingClassNav } from "../lib/pendingNav";
 import { Modal, FormModal } from "./ui/Modal";
@@ -42,9 +43,11 @@ import { SearchDropdown } from "./SearchDropdown";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Input } from "./ui/Field";
 import { DataTable } from "./ui/DataTable";
+import { InlineFilter } from "./ui/InlineFilter";
 
 
 const attendanceOptions = ["present", "absent", "leave"] as const;
+const attendanceDayKeys = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
 type AttendanceTab = "calendar" | "studentHistory";
 type AttendanceMode = "students" | "teachers";
 
@@ -98,7 +101,7 @@ function TeacherAttendancePanel() {
   return (
     <PageSection>
       <PageHeader title={t("teacherAttendanceHeading")} notice={t("teacherAttendanceDescription")} />
-      <div className="moduleToolbar">
+      <InlineFilter filters={[]}>
         <SearchDropdown
           id="teacher-attendance-search"
           label={t("teacherLabel")}
@@ -132,7 +135,7 @@ function TeacherAttendancePanel() {
             </Button>
           </div>
         )}
-      </div>
+      </InlineFilter>
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <DataTable<TeacherAttendanceLogEntry>
         columns={[
@@ -219,6 +222,18 @@ function AttendanceHistoryTable({
             <small>{entry.admission_number}</small>
           </>
         ) }] : []),
+        { header: t("courseAndPeriodLabel"), render: (entry) => entry.legacy_general ? (
+          <span className="syncBadge">{t("legacyGeneralAttendance")}</span>
+        ) : (
+          <>
+            <strong>{entry.course?.name}</strong>
+            <small>{t("periodWithTime", {
+              period: entry.timetable_slot?.period,
+              start: formatTime(entry.timetable_slot?.start_time),
+              end: formatTime(entry.timetable_slot?.end_time),
+            })}</small>
+          </>
+        ) },
         { header: t("statusCol"), render: (entry) => (
           <>
             <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
@@ -258,6 +273,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [classes, setClasses] = useState<AttendanceClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(() => searchParams.get("class"));
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(() => searchParams.get("section"));
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(() => searchParams.get("course") ?? "");
+  const [selectedSlotId, setSelectedSlotId] = useState<string>(() => searchParams.get("slot") ?? "");
+  const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>([]);
   const [activeTab, setActiveTab] = useState<AttendanceTab>(() => searchParams.get("view") === "history" ? "studentHistory" : "calendar");
   const [roster, setRoster] = useState<AttendanceRoster | null>(null);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
@@ -268,7 +286,11 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [saveMessage, setSaveMessage] = useState("");
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const { entries, lockedKeys, isSyncing, queueAttendanceBatch, sync, overrideEntry } = useAttendanceOutbox(sessionId);
+  const { entries, lockedKeys, isSyncing, queueAttendanceBatch, sync, overrideEntry } = useAttendanceOutbox(
+    sessionId,
+    selectedCourseId || null,
+    selectedSlotId || null,
+  );
   const canOverride = !readOnly && hasPermission("attendance.edit_locked");
   const lockedEntries = entries.filter((entry) => lockedKeys.includes(entry.idempotency_key));
   const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
@@ -292,6 +314,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setAttendanceMode(searchParams.get("mode") === "teachers" ? "teachers" : "students");
     setSelectedClassId(searchParams.get("class"));
     setSelectedSectionId(searchParams.get("section"));
+    setSelectedCourseId(searchParams.get("course") ?? "");
+    setSelectedSlotId(searchParams.get("slot") ?? "");
     setActiveTab(searchParams.get("view") === "history" ? "studentHistory" : "calendar");
     setSelectedStudentId(searchParams.get("student") ?? "");
   }, [searchParams]);
@@ -305,6 +329,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   function selectClass(classId: string, sectionId: string): void {
     setSelectedClassId(classId);
     setSelectedSectionId(sectionId);
+    setSelectedCourseId("");
+    setSelectedSlotId("");
     setActiveTab("calendar");
     setCalendarMonth(new Date());
     setSelectedDate(toDateKey(new Date()));
@@ -323,6 +349,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   function returnToClasses(): void {
     setSelectedClassId(null);
     setSelectedSectionId(null);
+    setSelectedCourseId("");
+    setSelectedSlotId("");
+    setTimetableSlots([]);
     setActiveTab("calendar");
     setClassHistory(null);
     setStudentHistory(null);
@@ -370,6 +399,24 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
   useEffect(() => {
     if (!selectedClassId || !selectedSectionId) {
+      setTimetableSlots([]);
+      return;
+    }
+    void (async () => {
+      try {
+        const slots = user?.role === "teacher"
+          ? await operationsApi.listMyTimetable()
+          : await operationsApi.listTimetable({ class_id: selectedClassId, section_id: selectedSectionId });
+        const scoped = slots.filter((slot) => slot.class_id === selectedClassId && slot.section_id === selectedSectionId);
+        setTimetableSlots(scoped);
+      } catch {
+        setTimetableSlots([]);
+      }
+    })();
+  }, [selectedClassId, selectedSectionId, user?.role]);
+
+  useEffect(() => {
+    if (!selectedClassId || !selectedSectionId || !selectedCourseId || !selectedSlotId) {
       setRoster(null);
       setSessionId(null);
       setMarked({});
@@ -384,8 +431,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       setHasUnsavedMarks(false);
       setSaveMessage("");
       try {
-        const { data } = await cachedFetch(`attendance-roster-${selectedClassId}-${selectedSectionId}`, () =>
-          attendanceApi.classRoster(selectedClassId, selectedSectionId),
+        const { data } = await cachedFetch(`attendance-roster-${selectedClassId}-${selectedSectionId}-${selectedCourseId}-${selectedSlotId}`, () =>
+          attendanceApi.classRoster(selectedClassId, selectedSectionId, selectedCourseId, selectedSlotId),
         );
         setRoster(data);
         setSessionId(data.session_id);
@@ -397,15 +444,17 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         setIsLoadingRoster(false);
       }
     })();
-  }, [selectedClassId, selectedSectionId, t]);
+  }, [selectedClassId, selectedSectionId, selectedCourseId, selectedSlotId, t]);
 
   useEffect(() => {
-    if (!selectedClassId || !selectedSectionId) return;
+    if (!selectedClassId || !selectedSectionId || !selectedCourseId) return;
     void (async () => {
       setIsLoadingClassHistory(true);
       setError("");
       try {
-        setClassHistory(await attendanceApi.classHistory(selectedClassId, { ...monthRange(calendarMonth), section_id: selectedSectionId ?? undefined }));
+        setClassHistory(await attendanceApi.classHistory(selectedClassId, {
+          ...monthRange(calendarMonth), section_id: selectedSectionId ?? undefined, course_id: selectedCourseId,
+        }));
       } catch (err: any) {
         setClassHistory(null);
         setError(err.response?.data?.detail ?? t("failedLoadAttendanceHistory"));
@@ -413,7 +462,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         setIsLoadingClassHistory(false);
       }
     })();
-  }, [selectedClassId, selectedSectionId, calendarMonth, t]);
+  }, [selectedClassId, selectedSectionId, selectedCourseId, calendarMonth, t]);
 
   useEffect(() => {
     if (activeTab === "studentHistory" && !selectedStudentId && roster?.students.length) {
@@ -429,7 +478,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       setError("");
       try {
         setStudentHistory(
-          await attendanceApi.studentHistory(selectedClassId, selectedStudentId, { ...monthRange(studentMonth), section_id: selectedSectionId ?? undefined }),
+          await attendanceApi.studentHistory(selectedClassId, selectedStudentId, {
+            ...monthRange(studentMonth), section_id: selectedSectionId ?? undefined, course_id: selectedCourseId || undefined,
+          }),
         );
       } catch (err: any) {
         setStudentHistory(null);
@@ -438,7 +489,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         setIsLoadingStudentHistory(false);
       }
     })();
-  }, [activeTab, selectedClassId, selectedSectionId, selectedStudentId, studentMonth, t]);
+  }, [activeTab, selectedClassId, selectedSectionId, selectedCourseId, selectedStudentId, studentMonth, t]);
 
   function mark(studentId: string, status: AttendanceStatus): void {
     if (approvedLeaveStudentIds.has(studentId)) return;
@@ -472,6 +523,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           source: "manual",
           locked_reason: null,
           leave_id: null,
+          course: roster.course,
+          timetable_slot: roster.timetable_slot,
+          legacy_general: false,
         };
       });
       setClassHistory((current) => {
@@ -634,13 +688,42 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       )}
 
       {attendanceMode === "students" && selectedClassId && (
+        <>
+        <InlineFilter
+          className="attendancePeriodFilter"
+          filters={[
+            {
+              key: "course", type: "select", label: t("courseLabel"), value: selectedCourseId,
+              placeholder: t("selectCoursePrompt"),
+              options: (selectedClass?.courses ?? []).map((course) => ({ value: course.id, label: course.name })),
+              onChange: (value) => {
+                setSelectedCourseId(value);
+                setSelectedSlotId("");
+                setRoster(null);
+                setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: value, view: activeTab === "studentHistory" ? "history" : "calendar" });
+              },
+            },
+            {
+              key: "period", type: "select", label: t("periodCol"), value: selectedSlotId,
+              placeholder: t("selectPeriodPrompt"), disabled: !selectedCourseId,
+              options: timetableSlots.filter((slot) => slot.course_id === selectedCourseId).map((slot) => ({
+                value: slot.id,
+                label: t("scheduledPeriodOption", { day: t(attendanceDayKeys[slot.day_of_week] ?? "dayMon"), period: slot.period, start: formatTime(slot.start_time), end: formatTime(slot.end_time) }),
+              })),
+              onChange: (value) => {
+                setSelectedSlotId(value);
+                setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: value, view: activeTab === "studentHistory" ? "history" : "calendar" });
+              },
+            },
+          ]}
+        />
         <div className="formActions" style={{ marginTop: 16 }}>
           <Button
             className={activeTab === "calendar" ? "primaryAction" : "secondaryAction"}
             type="button"
             onClick={() => {
               setActiveTab("calendar");
-              setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", view: "calendar" });
+              setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "calendar" });
             }}
           >
             {t("calendarTab")}
@@ -650,15 +733,17 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             type="button"
             onClick={() => {
               setActiveTab("studentHistory");
-              setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
+              setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
             }}
           >
             {t("studentAttendanceHistory")}
           </Button>
         </div>
+        {!selectedCourseId || !selectedSlotId ? <p className="notice">{t("chooseCoursePeriodPrompt")}</p> : null}
+        </>
       )}
 
-      {attendanceMode === "students" && selectedClassId && activeTab === "calendar" && (
+      {attendanceMode === "students" && selectedClassId && selectedCourseId && selectedSlotId && activeTab === "calendar" && (
         <>
           <AttendanceCalendar
             mode="class"
@@ -758,7 +843,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </>
       )}
 
-      {attendanceMode === "students" && selectedClassId && activeTab === "studentHistory" && (
+      {attendanceMode === "students" && selectedClassId && selectedCourseId && selectedSlotId && activeTab === "studentHistory" && (
         <div className="attendanceStudentSplit">
           <div className="attendanceStudentList">
             <Input
@@ -776,7 +861,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 onClick={() => {
                   setSelectedStudentId(student.id);
                   setStudentSelectedDate(null);
-                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", view: "history", student: student.id });
+                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", student: student.id });
                 }}
               >
                 <strong>{student.name}</strong>

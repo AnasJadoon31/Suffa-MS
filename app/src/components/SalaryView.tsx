@@ -13,6 +13,7 @@ import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
+import { InlineFilter } from "./ui/InlineFilter";
 
 /** Read-only self-view for teachers without teachers.salary.manage — own
  * salary record + payment history only, no ability to browse other teachers. */
@@ -123,7 +124,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
 
-      <div className="moduleToolbar">
+      <InlineFilter filters={[]}>
         <SearchDropdown
           id="salary-teacher"
           label={t("teacherLabel")}
@@ -157,7 +158,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
             </Button>
           </div>
         )}
-      </div>
+      </InlineFilter>
 
       {teacherId && (
         <>

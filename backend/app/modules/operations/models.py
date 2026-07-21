@@ -150,9 +150,37 @@ class AdmissionApplication(Base, IdMixin, TenantMixin, TimestampMixin):
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(24), default="pending") # pending, accepted, rejected
+    status_history: Mapped[list] = mapped_column(PortableJSONB, default=list)
     # Set when the application arrived through a public admission form.
     form_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("admission_forms.id"), nullable=True, index=True)
     extra_data: Mapped[Optional[dict]] = mapped_column(PortableJSONB, nullable=True)
+    form_title_snapshot: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    fields_definition_snapshot: Mapped[list] = mapped_column(PortableJSONB, default=list)
+    converted_student_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("student_profiles.id"), nullable=True, unique=True, index=True
+    )
+    converted_guardian_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("guardians.id"), nullable=True, index=True
+    )
+    converted_by_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    converted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AdminNotification(Base, IdMixin, TenantMixin, TimestampMixin):
+    """Tenant-wide durable notification intended for principals/admin staff."""
+
+    __tablename__ = "admin_notifications"
+
+    event_type: Mapped[str] = mapped_column(String(120), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    message: Mapped[str] = mapped_column(Text)
+    entity_type: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    entity_id: Mapped[Optional[UUID]] = mapped_column(nullable=True, index=True)
+    created_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    # User IDs are stored as strings so PortableJSONB works identically on
+    # PostgreSQL and SQLite.  This is a small tenant-wide audience, not an
+    # unbounded delivery log.
+    read_by_user_ids: Mapped[list] = mapped_column(PortableJSONB, default=list)
 
 
 class ContactEnquiry(Base, IdMixin, TenantMixin, TimestampMixin):

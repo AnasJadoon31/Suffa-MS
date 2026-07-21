@@ -61,11 +61,13 @@ class StudentCreate(BaseModel):
     date_of_birth: date
     admission_number: str | None = None
     portal_enabled: bool | None = None
-    guardian_ids: list[UUID] = []
+    guardian_ids: list[UUID] = Field(default_factory=list)
     preferred_language: str = "ur"
     b_form_number: str | None = None
     address: str | None = None
     photo_file_id: UUID | None = None
+    admission_form_id: UUID | None = None
+    admission_answers: dict = Field(default_factory=dict)
 
 
 class StudentUpdate(BaseModel):
@@ -77,6 +79,30 @@ class StudentUpdate(BaseModel):
     b_form_number: str | None = None
     address: str | None = None
     photo_file_id: UUID | None = None
+
+
+class StudentAdmissionRecordRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    form_id: UUID | None = None
+    application_id: UUID | None = None
+    form_title: str | None = None
+    fields_definition: list
+    answers: dict
+    created_at: datetime
+
+
+class StudentEnrollmentRead(BaseModel):
+    id: UUID
+    session_id: UUID
+    session_name: str
+    program_id: UUID
+    program_name: str
+    class_id: UUID
+    class_name: str
+    section_id: UUID
+    section_name: str
+    started_on: date
 
 
 class StudentRead(BaseModel):
@@ -94,6 +120,8 @@ class StudentRead(BaseModel):
     b_form_number: str | None = None
     address: str | None = None
     photo_file_id: UUID | None = None
+    admission_record: StudentAdmissionRecordRead | None = None
+    active_enrollment: StudentEnrollmentRead | None = None
     created_at: datetime
 
 
@@ -108,7 +136,7 @@ class GuardianCreate(BaseModel):
     cnic: str | None = None
     address: str | None = None
     preferred_language: str = "ur"
-    student_ids: list[UUID] = []
+    student_ids: list[UUID] = Field(default_factory=list)
 
 class GuardianUpdate(BaseModel):
     name: str | None = None

@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, String, Text, UniqueConstraint, text
 
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -44,10 +44,27 @@ class Submission(Base, IdMixin, TimestampMixin):
 
 class GradingScheme(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "grading_schemes"
+    __table_args__ = (
+        Index(
+            "uq_grading_plan_course_default", "madrasa_id", "course_id", unique=True,
+            postgresql_where=text("course_id IS NOT NULL AND class_id IS NULL"),
+            sqlite_where=text("course_id IS NOT NULL AND class_id IS NULL"),
+        ),
+        Index(
+            "uq_grading_plan_class_override", "madrasa_id", "course_id", "class_id", unique=True,
+            postgresql_where=text("course_id IS NOT NULL AND class_id IS NOT NULL"),
+            sqlite_where=text("course_id IS NOT NULL AND class_id IS NOT NULL"),
+        ),
+    )
 
     name: Mapped[str] = mapped_column(String(160))
     bands: Mapped[list] = mapped_column(PortableJSONB)
     include_assignments: Mapped[bool] = mapped_column(Boolean, default=False)
+    # New aggregate grading plans own their course/class scope. Legacy
+    # schemes remain nullable and continue to be resolved through ExamType.
+    course_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("courses.id"), nullable=True, index=True)
+    class_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("classes.id"), nullable=True, index=True)
+    assignment_weightage: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
 
 class ExamType(Base, IdMixin, TenantMixin, TimestampMixin):

@@ -13,13 +13,13 @@ import {
   type Section,
   academicsApi,
 } from "../lib/endpoints";
-import { peopleApi, type Teacher } from "../lib/endpoints";
 import { RolloverWizard } from "./RolloverWizard";
 import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter } from "./ui/InlineFilter";
 
 
 export type AcademicTab = "programs" | "classes" | "courses" | "sessions";
@@ -34,7 +34,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
   const [courses, setCourses] = useState<Record<string, Course[]>>({});
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [sessions, setSessions] = useState<AcademicSession[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
 
   const [programName, setProgramName] = useState("");
   const [className, setClassName] = useState("");
@@ -87,17 +86,15 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
 
   const refreshAll = async () => {
     try {
-      const [p, c, s, t_res, ac] = await Promise.all([
+      const [p, c, s, ac] = await Promise.all([
         academicsApi.listPrograms(),
         academicsApi.listClasses(),
         academicsApi.listSessions(),
-        peopleApi.listTeachers(),
         academicsApi.listAllCourses(),
       ]);
       setPrograms(p);
       setClasses(c);
       setSessions(s);
-      setTeachers(t_res);
       setAllCourses(ac);
       const secByClass: Record<string, Section[]> = {};
       const courseByClass: Record<string, Course[]> = {};
@@ -282,17 +279,14 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                                           </label>
 
                           </FormModal>}
-              <div className="moduleToolbar">
-                <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={classSearch} onChange={(e) => setClassSearch(e.target.value)} />
-                <Select value={classFilterProgram} onChange={(e) => setClassFilterProgram(e.target.value)}>
-                  <option value="">{t("allPrograms")}</option>
-                  {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </Select>
-                <Select value={classSortBy} onChange={(e) => setClassSortBy(e.target.value as "name" | "program")}>
-                  <option value="name">{t("sortByNameLabel")}</option>
-                  <option value="program">{t("sortByProgramLabel")}</option>
-                </Select>
-              </div>
+              <InlineFilter filters={[
+                { key: "class-search", type: "input", inputType: "search", ariaLabel: t("searchLabel"), placeholder: t("searchClassesPlaceholder"), value: classSearch, onChange: setClassSearch },
+                { key: "program", type: "select", ariaLabel: t("programLabel"), placeholder: t("allPrograms"), value: classFilterProgram, options: programs.map((p) => ({ value: p.id, label: p.name })), onChange: setClassFilterProgram },
+                { key: "sort", type: "select", ariaLabel: t("sortByNameLabel"), value: classSortBy, options: [
+                  { value: "name", label: t("sortByNameLabel") },
+                  { value: "program", label: t("sortByProgramLabel") },
+                ], onChange: (value) => setClassSortBy(value as "name" | "program") },
+              ]} />
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("programLabel")}</span><span>{t("portalCol")}</span><span>{t("actionsCol")}</span></div>
                 {classesToShow.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
@@ -436,13 +430,10 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                                             <Input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder={t("sectionExample")} />
                                           </label>
                           </FormModal>}
-              <div className="moduleToolbar">
-                <Input placeholder={t("searchClassesPlaceholder") ?? ""} value={courseMapSearch} onChange={(e) => setCourseMapSearch(e.target.value)} />
-                <Select value={courseMapFilterClass} onChange={(e) => setCourseMapFilterClass(e.target.value)}>
-                  <option value="">{t("filterByClassLabel")}</option>
-                  {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
-              </div>
+              <InlineFilter filters={[
+                { key: "mapping-search", type: "input", inputType: "search", ariaLabel: t("searchLabel"), placeholder: t("searchClassesPlaceholder"), value: courseMapSearch, onChange: setCourseMapSearch },
+                { key: "mapping-class", type: "select", ariaLabel: t("classLabel"), placeholder: t("filterByClassLabel"), value: courseMapFilterClass, options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: setCourseMapFilterClass },
+              ]} />
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("classLabel")}</span><span>{t("sectionsCol")}</span><span>{t("coursesCol")}</span></div>
                 {classesForCourseMap.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}

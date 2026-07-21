@@ -74,6 +74,20 @@ class StudentEnrollRequest(BaseModel):
     program_id: UUID
     class_id: UUID
     section_id: UUID
+    effective_date: date | None = None
+
+
+class EnrollmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    student_id: UUID
+    session_id: UUID
+    program_id: UUID
+    class_id: UUID
+    section_id: UUID
+    started_on: date
+    ended_on: date | None
+    is_active: bool
 
 
 class TeacherProfileRead(BaseModel):

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from datetime import date as DateType
 from uuid import UUID
 
@@ -48,6 +48,7 @@ from app.modules.academics.schemas import (
     SectionRead,
     SectionUpdate,
     SessionRolloverRequest,
+    EnrollmentRead,
     StudentEnrollRequest,
 )
 
@@ -648,18 +649,26 @@ async def enroll_student(
     if not section or section.madrasa_id != madrasa.id or section.class_id != payload.class_id:
         raise HTTPException(status_code=404, detail="Section not found")
 
-    await ensure_writable_session(session, madrasa.id, payload.session_id)
+    academic_session = await ensure_writable_session(session, madrasa.id, payload.session_id)
 
-    # One enrollment per (student, session) — re-enrolling moves the student
-    # to the new program/class/section instead of stacking duplicate rows.
+    # Keep an effective-dated history. Exactly one row per student/session may
+    # have ended_on=NULL; moving closes that row and creates its successor.
     enrollment = (
         await session.execute(
             select(Enrollment).where(
+                Enrollment.madrasa_id == madrasa.id,
                 Enrollment.student_id == payload.student_id,
                 Enrollment.session_id == payload.session_id,
+                Enrollment.ended_on.is_(None),
             )
         )
     ).scalars().first()
+    effective_date = payload.effective_date or DateType.today()
+    target_is_unchanged = enrollment is not None and (
+        enrollment.program_id == payload.program_id
+        and enrollment.class_id == payload.class_id
+        and enrollment.section_id == payload.section_id
+    )
     if enrollment is None:
         enrollment = Enrollment(
             madrasa_id=madrasa.id,
@@ -667,13 +676,33 @@ async def enroll_student(
             session_id=payload.session_id,
             program_id=payload.program_id,
             class_id=payload.class_id,
-            section_id=payload.section_id
+            section_id=payload.section_id,
+            started_on=effective_date,
         )
         session.add(enrollment)
-    else:
-        enrollment.program_id = payload.program_id
-        enrollment.class_id = payload.class_id
-        enrollment.section_id = payload.section_id
+    elif not target_is_unchanged:
+        # Rows created before effective dating receive the session start as
+        # their natural lower bound when they are first superseded.
+        if enrollment.started_on > effective_date:
+            enrollment.started_on = academic_session.gregorian_start
+        if effective_date <= enrollment.started_on:
+            # No completed interval exists to preserve (common when an admin
+            # corrects a just-created enrollment on the same day).
+            enrollment.program_id = payload.program_id
+            enrollment.class_id = payload.class_id
+            enrollment.section_id = payload.section_id
+        else:
+            enrollment.ended_on = effective_date - timedelta(days=1)
+            enrollment = Enrollment(
+                madrasa_id=madrasa.id,
+                student_id=payload.student_id,
+                session_id=payload.session_id,
+                program_id=payload.program_id,
+                class_id=payload.class_id,
+                section_id=payload.section_id,
+                started_on=effective_date,
+            )
+            session.add(enrollment)
 
     # B7-k: a class with portal access switched off means its students don't
     # get their own portal login — instead their guardians do. We never
@@ -713,4 +742,68 @@ async def enroll_student(
             guardian_logins.append({"guardian_id": str(guardian.id), "username": guardian_user.username, "set_password_url": set_password_url})
 
     await session.commit()
-    return {"status": "success", "enrollment_id": str(enrollment.id), "guardian_logins_provisioned": guardian_logins}
+    return {
+        "status": "success",
+        "enrollment_id": str(enrollment.id),
+        "active_enrollment": EnrollmentRead.model_validate(enrollment).model_dump(mode="json"),
+        "guardian_logins_provisioned": guardian_logins,
+    }
+
+
+@router.get("/students/{student_id}/enrollments", response_model=list[EnrollmentRead])
+async def list_student_enrollments(
+    student_id: UUID,
+    response: Response,
+    session_id: UUID | None = None,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> list[EnrollmentRead]:
+    student = await session.get(StudentProfile, student_id)
+    if student is None or student.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Student not found")
+    stmt = select(Enrollment).where(
+        Enrollment.madrasa_id == madrasa.id,
+        Enrollment.student_id == student_id,
+    )
+    if session_id is not None:
+        stmt = stmt.where(Enrollment.session_id == session_id)
+    return list(await paginate_scalars(
+        session,
+        stmt.order_by(Enrollment.started_on, Enrollment.created_at),
+        limit=limit,
+        offset=offset,
+        response=response,
+    ))
+
+
+@router.delete("/students/{student_id}/enrollments/{session_id}")
+async def unassign_student(
+    student_id: UUID,
+    session_id: UUID,
+    effective_date: DateType | None = Query(default=None),
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    await ensure_writable_session(session, madrasa.id, session_id)
+    enrollment = (
+        await session.execute(
+            select(Enrollment).where(
+                Enrollment.madrasa_id == madrasa.id,
+                Enrollment.student_id == student_id,
+                Enrollment.session_id == session_id,
+                Enrollment.ended_on.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if enrollment is None:
+        raise HTTPException(status_code=404, detail="Active enrollment not found")
+    end_date = (effective_date or DateType.today()) - timedelta(days=1)
+    if end_date < enrollment.started_on:
+        end_date = enrollment.started_on
+    enrollment.ended_on = end_date
+    await session.commit()
+    return {"status": "success", "ended_on": end_date.isoformat()}

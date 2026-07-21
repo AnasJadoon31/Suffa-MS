@@ -3,6 +3,60 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-22 — Verified CURRENT-01 through 20 implementation
+
+All twenty issues in the current report now have both an automated regression
+path and reviewed visual evidence where the behavior is visible. This is a
+bounded completion claim for `CURRENT-01..20`, not a release-wide claim for the
+remaining `PDF-*` role journeys or deployment gates.
+
+- Fixed the seeded teacher dashboard failure and added structured request/error
+  logging that does not return internal exception details. Delegated Academics
+  no longer depends on an unrelated teacher-directory request, and teaching
+  scope is shared by timetable, grading, attendance, reports, resources, and
+  forms.
+- Replaced filtering toolbars with the responsive `InlineFilter`, including
+  donor name/contact search; standardized rounded modal clipping, scrollable
+  bodies, button loading, reusable form spacing, and English/Urdu labels. The
+  910-key missing-translation audit passes.
+- Rebuilt Student and Guardian details around labeled identity, enrollment,
+  guardian, admission-origin, and finance sections. Enrollment is effective-
+  dated with an explicit unassign action and only one active row per session.
+- Added immutable `StudentAdmissionRecord` snapshots. People → Add Student can
+  use an open or closed Admission Form; Applications can be edited, reversed,
+  or atomically/idempotently converted to Student, Guardian, login roles,
+  enrollment, admission record, and administrator notification.
+- Replaced comma-separated choices with validated option rows and raw response
+  JSON with an Actions/eye viewer. Rebuilt grading setup as an atomic course
+  default or class override plan with exact 100% component weight and complete
+  grade bands.
+- Attendance now records course/timetable-period identity, keeps labeled legacy
+  daily rows, carries period context through offline sync/history/dashboard/
+  reports, and attributes marks, approved leave, and class holidays using the
+  enrollment effective on that historical date.
+- PDFs now use madrasa branding, repeated table headers, page numbers, RTL Urdu
+  fonts, print-safe styling, and the authenticated user's saved language.
+
+Evidence:
+
+- Backend: `179 passed` (full suite; includes tenant/API, conversion rollback and
+  idempotency, grading math/override, period attendance, historical enrollment,
+  dashboard, permissions, migration, and PDF regressions).
+- Frontend: production TypeScript/Vite PWA build passed; i18n audit passed
+  (`910 keys checked`).
+- Browser: admission builder journey passed; current-issue journey passed for
+  principal and delegated-teacher UI states at desktop and Urdu mobile sizes.
+- Visual: named `CURRENT-*` screenshots and EN/UR PDF page renders are in
+  `app/artifacts/issue-verification/` and were reviewed.
+- Migration: one Alembic head (`84d3b7e91a20`) and full offline SQL generation
+  to head passed.
+
+Still not claimed complete: the live PostgreSQL/RLS suite, populated legacy
+PostgreSQL upgrade, five-role live-backend EN/UR browser matrix, remaining open
+`PDF-*` evidence rows, and Docker health startup. Docker configuration resolves
+`app`, `backend`, `web`, and `worker`, but the local Docker socket is not
+accessible. These remain explicitly open in `TO_IMPLEMENT.md`.
+
 ## 2026-07-22 — Admission-form migration deployment fix
 
 - Fixed the backend startup migration for existing installations: the new
@@ -14,7 +68,12 @@ Running log of completed work (newest first). Design rationale lives in
 - Added a migration regression that reproduces PostgreSQL's legacy-row failure.
   Alembic retains one head and the complete backend suite passes.
 
-## 2026-07-21 — Issues.pdf closeout (31 reported portal issues)
+## 2026-07-21 — Superseded Issues.pdf closeout claim
+
+This historical entry is **not completion evidence**. The 2026-07-22 re-audit
+found multiple regressions despite the earlier blanket closeout. Its claims are
+retained below only as project history; every requirement was reopened under a
+stable `PDF-*` ID in `TO_IMPLEMENT.md` and must now satisfy the V-Model gates.
 
 - Completed and re-verified the full 31-item report across People, Applications,
   public/forms, settings/branding, grading/results, resources, PWA layouts,

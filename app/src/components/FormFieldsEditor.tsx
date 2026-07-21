@@ -1,5 +1,5 @@
 import { Button } from "./ui/Button";
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { FormFieldDefinition } from "../lib/endpoints";
@@ -29,13 +29,17 @@ export function cleanFormFields(fields: FormFieldDefinition[]): FormFieldDefinit
     }));
 }
 
-export function validateFormFields(fields: FormFieldDefinition[]): "duplicateFieldKeysError" | "fieldOptionsRequiredError" | null {
+export function validateFormFields(fields: FormFieldDefinition[]): "duplicateFieldKeysError" | "fieldOptionsRequiredError" | "duplicateFieldOptionsError" | null {
   const cleaned = cleanFormFields(fields);
   const normalizedKeys = cleaned.map((field) => field.key.toLocaleLowerCase());
   if (new Set(normalizedKeys).size !== normalizedKeys.length) return "duplicateFieldKeysError";
-  if (cleaned.some((field) => OPTION_FIELD_TYPES.has(field.type) && field.options.length === 0)) {
+  if (cleaned.some((field) => OPTION_FIELD_TYPES.has(field.type) && field.options.filter((option) => option.trim()).length < 2)) {
     return "fieldOptionsRequiredError";
   }
+  if (cleaned.some((field) => {
+    const normalized = field.options.map((option) => option.trim().toLocaleLowerCase()).filter(Boolean);
+    return OPTION_FIELD_TYPES.has(field.type) && new Set(normalized).size !== normalized.length;
+  })) return "duplicateFieldOptionsError";
   return null;
 }
 
@@ -76,21 +80,48 @@ export function FormFieldsEditor({
             </label>
             <label>
               {t("fieldTypeLabel")}
-              <Select value={field.type} onChange={(event) => updateField(index, { type: event.target.value })}>
+              <Select value={field.type} onChange={(event) => {
+                const type = event.target.value;
+                updateField(index, { type, options: OPTION_FIELD_TYPES.has(type) && field.options.length === 0 ? ["", ""] : field.options });
+              }}>
                 {FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
               </Select>
             </label>
             {OPTION_FIELD_TYPES.has(field.type) && (
-              <label>
-                {t("fieldOptionsLabel")}
-                <Input
-                  required
-                  value={field.options.join(", ")}
-                  onChange={(event) => updateField(index, {
-                    options: event.target.value.split(",").map((option) => option.trim()).filter(Boolean),
-                  })}
-                />
-              </label>
+              <fieldset className="formFieldOptions">
+                <legend>{t("fieldOptionsLabel")}</legend>
+                {field.options.map((option, optionIndex) => (
+                  <div className="formFieldOptionRow" key={optionIndex}>
+                    <Input
+                      required
+                      aria-label={t("optionNumberLabel", { number: optionIndex + 1 })}
+                      value={option}
+                      onChange={(event) => updateField(index, {
+                        options: field.options.map((item, itemIndex) => itemIndex === optionIndex ? event.target.value : item),
+                      })}
+                    />
+                    <Button className="iconBtn" type="button" disabled={optionIndex === 0} aria-label={t("moveOptionUp")}
+                      onClick={() => {
+                        const options = [...field.options];
+                        [options[optionIndex - 1], options[optionIndex]] = [options[optionIndex], options[optionIndex - 1]];
+                        updateField(index, { options });
+                      }}><ArrowUp size={14} /></Button>
+                    <Button className="iconBtn" type="button" disabled={optionIndex === field.options.length - 1} aria-label={t("moveOptionDown")}
+                      onClick={() => {
+                        const options = [...field.options];
+                        [options[optionIndex], options[optionIndex + 1]] = [options[optionIndex + 1], options[optionIndex]];
+                        updateField(index, { options });
+                      }}><ArrowDown size={14} /></Button>
+                    <Button className="iconBtn danger" type="button" aria-label={t("removeOption")}
+                      onClick={() => updateField(index, { options: field.options.filter((_, itemIndex) => itemIndex !== optionIndex) })}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                ))}
+                <Button className="secondaryAction" type="button" onClick={() => updateField(index, { options: [...field.options, ""] })}>
+                  <Plus size={14} /> {t("addOption")}
+                </Button>
+              </fieldset>
             )}
             <label className="checkboxLabel formFieldRequired">
               <Input type="checkbox" checked={field.required} onChange={(event) => updateField(index, { required: event.target.checked })} />

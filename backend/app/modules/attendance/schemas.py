@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AttendanceStatus(StrEnum):
@@ -22,6 +22,16 @@ class AttendanceEntry(BaseModel):
     idempotency_key: str
     check_in: Optional[time] = None
     check_out: Optional[time] = None
+    course_id: UUID | None = None
+    timetable_slot_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def period_scope_is_complete(self):
+        if (self.course_id is None) != (self.timetable_slot_id is None):
+            raise ValueError("course_id and timetable_slot_id must be provided together")
+        if self.subject_type == "teacher" and self.course_id is not None:
+            raise ValueError("period scope is only valid for student attendance")
+        return self
 
 
 class AttendanceSyncRequest(BaseModel):
@@ -56,6 +66,7 @@ class AttendanceClassRead(BaseModel):
     id: UUID
     name: str
     course_names: list[str] = Field(default_factory=list)
+    courses: list["AttendanceCourseRead"] = Field(default_factory=list)
     student_count: int = 0
     sections: list[AttendanceSectionRead] = Field(default_factory=list)
 
@@ -68,6 +79,19 @@ class AttendanceRosterStudent(BaseModel):
     section_name: str | None = None
 
 
+class AttendanceCourseRead(BaseModel):
+    id: UUID
+    name: str
+
+
+class AttendanceTimetableSlotRead(BaseModel):
+    id: UUID
+    period: int
+    day_of_week: int
+    start_time: str
+    end_time: str
+
+
 class AttendanceRosterResponse(BaseModel):
     session_id: UUID
     session_name: str
@@ -75,6 +99,8 @@ class AttendanceRosterResponse(BaseModel):
     class_name: str
     section_id: UUID | None = None
     section_name: str | None = None
+    course: AttendanceCourseRead | None = None
+    timetable_slot: AttendanceTimetableSlotRead | None = None
     students: list[AttendanceRosterStudent]
 
 
@@ -99,6 +125,9 @@ class AttendanceLogEntry(BaseModel):
     source: str = "manual"
     locked_reason: Optional[str] = None
     leave_id: Optional[UUID] = None
+    course: AttendanceCourseRead | None = None
+    timetable_slot: AttendanceTimetableSlotRead | None = None
+    legacy_general: bool = True
 
 
 class TeacherAttendanceLogEntry(BaseModel):
@@ -153,6 +182,7 @@ class AttendanceDayBreakdown(BaseModel):
 class AttendanceSummary(BaseModel):
     subject_id: UUID
     subject_type: str
+    course_id: UUID | None = None
     present: int
     absent: int
     leave: int

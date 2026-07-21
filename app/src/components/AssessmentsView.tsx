@@ -123,7 +123,7 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
         <GradingTab classes={classes} />
       )}
       {!isLoading && !loadError && tab === "setup" && (
-        <GradingSetup
+        <GradingPlanSetup
           courses={courses}
           classes={classes}
           canCreateScheme={!readOnly && hasPermission("grading.schemes.manage")}
@@ -768,6 +768,84 @@ function MarkCell({
       )}
     </div>
   );
+}
+
+function GradingPlanSetup({
+  courses,
+  classes,
+  canCreateScheme,
+  canCreateExamType,
+}: Readonly<{ courses: Course[]; classes: AcademicClass[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
+  const { t } = useTranslation();
+  type EditableBand = { label: string; min_score: string; max_score: string };
+  type EditableComponent = { id?: string | null; name: string; weightage: string };
+  const defaults: EditableBand[] = [
+    { label: "A", min_score: "80", max_score: "100" },
+    { label: "B", min_score: "60", max_score: "79.99" },
+    { label: "C", min_score: "0", max_score: "59.99" },
+  ];
+  const [courseId, setCourseId] = useState("");
+  const [classId, setClassId] = useState("");
+  const [name, setName] = useState("");
+  const [assignmentWeight, setAssignmentWeight] = useState("0");
+  const [components, setComponents] = useState<EditableComponent[]>([{ name: t("examComponentDefault"), weightage: "100" }]);
+  const [bands, setBands] = useState<EditableBand[]>(defaults);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [limitClassId, setLimitClassId] = useState("");
+  const [assignmentLimit, setAssignmentLimit] = useState("");
+
+  useEffect(() => {
+    if (!courseId) return;
+    setIsLoading(true);
+    setError("");
+    void assessmentsApi.getGradingPlan(courseId, classId || undefined).then((plan) => {
+      setName(plan.name);
+      setAssignmentWeight(String(plan.assignment_weightage));
+      setComponents(plan.components.map((item) => ({ id: item.id, name: item.name, weightage: String(item.weightage) })));
+      setBands(plan.bands.map((item) => ({ label: item.label, min_score: String(item.min_score), max_score: String(item.max_score) })));
+    }).catch((err: any) => {
+      if (err.response?.status === 404) {
+        setName(t("gradingPlanDefaultName", { course: courses.find((item) => item.id === courseId)?.name ?? "" }));
+        setAssignmentWeight("0");
+        setComponents([{ name: t("examComponentDefault"), weightage: "100" }]);
+        setBands(defaults);
+      } else setError(err.response?.data?.detail ?? t("failedLoadGradingPlan"));
+    }).finally(() => setIsLoading(false));
+  }, [courseId, classId, courses, t]);
+
+  const totalWeight = Number(assignmentWeight || 0) + components.reduce((sum, item) => sum + Number(item.weightage || 0), 0);
+  const canSave = canCreateScheme && canCreateExamType && !!courseId && !!name.trim() && components.length > 0 && Math.abs(totalWeight - 100) < 0.01 && bands.length > 0;
+  const previewBand = bands.find((item) => 75 >= Number(item.min_score) && 75 <= Number(item.max_score))?.label ?? "—";
+
+  return <div className="gradingSetupLayout">
+    <PageSection className="gradingPlanCard">
+      <div className="gradingPlanHeader"><div><h3>{t("gradingPlanHeading")}</h3><p className="notice">{t("gradingPlanHint")}</p></div><div className={`weightTotal ${Math.abs(totalWeight - 100) < 0.01 ? "valid" : "invalid"}`}>{t("totalWeightLabel")}: {totalWeight}%</div></div>
+      <InlineFilter filters={[
+        { key: "course", type: "select", label: t("courseLabel"), value: courseId, placeholder: t("selectEllipsis"), options: courses.map((item) => ({ value: item.id, label: item.name })), onChange: setCourseId },
+        { key: "class", type: "select", label: t("classOverrideLabel"), value: classId, placeholder: t("courseDefaultOption"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: setClassId, disabled: !courseId },
+      ]} />
+      {isLoading ? <LoadingState /> : <>
+        <label className="gradingPlanName">{t("schemeNameLabel")}<Input value={name} onChange={(event) => setName(event.target.value)} /></label>
+        <section className="gradingBuilderSection">
+          <div className="sectionTitleRow"><div><h4>{t("gradeComponentsHeading")}</h4><p>{t("gradeComponentsHint")}</p></div><Button className="secondaryAction" type="button" onClick={() => setComponents([...components, { name: "", weightage: "" }])}><Plus size={14} /> {t("addComponentBtn")}</Button></div>
+          <div className="gradingRows">
+            {components.map((component, index) => <div className="gradingRow" key={component.id ?? index}><label>{t("componentNameLabel")}<Input required value={component.name} onChange={(event) => setComponents(components.map((item, i) => i === index ? { ...item, name: event.target.value } : item))} /></label><label>{t("weightageLabel")}<Input required type="number" min="0.01" max="100" step="0.01" value={component.weightage} onChange={(event) => setComponents(components.map((item, i) => i === index ? { ...item, weightage: event.target.value } : item))} /></label><Button className="iconBtn danger" type="button" aria-label={t("removeComponentBtn")} onClick={() => setComponents(components.filter((_, i) => i !== index))}><Trash2 size={14} /></Button></div>)}
+            <div className="gradingRow assignmentPoolRow"><label>{t("assignmentPoolLabel")}<Input value={t("assignmentsCol")} disabled /></label><label>{t("weightageLabel")}<Input type="number" min="0" max="100" step="0.01" value={assignmentWeight} onChange={(event) => setAssignmentWeight(event.target.value)} /></label></div>
+          </div>
+        </section>
+        <section className="gradingBuilderSection">
+          <div className="sectionTitleRow"><div><h4>{t("gradeBandsHeading")}</h4><p>{t("gradeBandsHint")}</p></div><Button className="secondaryAction" type="button" onClick={() => setBands([...bands, { label: "", min_score: "", max_score: "" }])}><Plus size={14} /> {t("addBandBtn")}</Button></div>
+          <div className="gradingRows">{bands.map((band, index) => <div className="gradingBandRow" key={index}><label>{t("bandCol")}<Input value={band.label} onChange={(event) => setBands(bands.map((item, i) => i === index ? { ...item, label: event.target.value } : item))} /></label><label>{t("minimumLabel")}<Input type="number" min="0" max="100" step="0.01" value={band.min_score} onChange={(event) => setBands(bands.map((item, i) => i === index ? { ...item, min_score: event.target.value } : item))} /></label><label>{t("maximumLabel")}<Input type="number" min="0" max="100" step="0.01" value={band.max_score} onChange={(event) => setBands(bands.map((item, i) => i === index ? { ...item, max_score: event.target.value } : item))} /></label><Button className="iconBtn danger" type="button" aria-label={t("removeBandBtn")} onClick={() => setBands(bands.filter((_, i) => i !== index))}><Trash2 size={14} /></Button></div>)}</div>
+          <p className="gradingPreview">{t("gradingPreviewLabel", { score: 75, band: previewBand })}</p>
+        </section>
+        {error && <p className="notice errorText">{error}</p>}{notice && <p className="notice">{notice}</p>}
+        <div className="formActions"><Button className="primaryAction" type="button" disabled={!canSave} isLoading={isLoading} onClick={async () => { setError(""); setNotice(""); setIsLoading(true); try { await assessmentsApi.saveGradingPlan({ course_id: courseId, class_id: classId || null, name: name.trim(), assignment_weightage: Number(assignmentWeight || 0), components: components.map((item) => ({ id: item.id, name: item.name.trim(), weightage: Number(item.weightage) })), bands: bands.map((item) => ({ label: item.label.trim(), min_score: Number(item.min_score), max_score: Number(item.max_score) })) }); setNotice(t("gradingPlanSaved")); } catch (err: any) { setError(err.response?.data?.detail ?? t("failedSaveGradingPlan")); } finally { setIsLoading(false); } }}><Save size={16} /> {t("saveGradingPlanBtn")}</Button></div>
+      </>}
+    </PageSection>
+    {canCreateScheme && <PageSection className="assignmentPolicyCard"><h3>{t("assignmentPolicyHeading")}</h3><p className="notice">{t("assignmentPolicyHint")}</p><label>{t("classLabel")}<Select value={limitClassId} onChange={(event) => { setLimitClassId(event.target.value); setAssignmentLimit(String(classes.find((item) => item.id === event.target.value)?.assignment_limit ?? "")); }}><option value="">{t("chooseClassEllipsis")}</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label><label>{t("assignmentLimitLabel")}<Input type="number" min="1" value={assignmentLimit} onChange={(event) => setAssignmentLimit(event.target.value)} /></label><Button className="secondaryAction" type="button" disabled={!limitClassId} onClick={async () => { await academicsApi.updateClass(limitClassId, { assignment_limit: assignmentLimit ? Number(assignmentLimit) : null }); setNotice(t("assignmentPolicySaved")); }}><Save size={16} /> {t("saveBtn")}</Button></PageSection>}
+  </div>;
 }
 
 function GradingSetup({

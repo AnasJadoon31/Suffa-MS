@@ -113,6 +113,30 @@ def shape_urdu(text: str) -> str:
     return get_display(arabic_reshaper.reshape(text))
 
 
+def _contains_arabic(text: str) -> bool:
+    return any("\u0600" <= char <= "\u06ff" or "\u0750" <= char <= "\u077f" for char in text)
+
+
+def _page_number_callback(page_size, language: str):
+    is_urdu = language == "ur"
+
+    def draw(canvas, document) -> None:
+        canvas.saveState()
+        canvas.setFillColor(colors.HexColor("#667085"))
+        if is_urdu:
+            canvas.setFont(URDU_FONT, 8)
+            canvas.drawRightString(
+                page_size[0] - document.rightMargin, 18,
+                f"{document.page} {shape_urdu('صفحہ')}",
+            )
+        else:
+            canvas.setFont("Helvetica", 8)
+            canvas.drawRightString(page_size[0] - document.rightMargin, 18, f"Page {document.page}")
+        canvas.restoreState()
+
+    return draw
+
+
 def bilingual_line(urdu_label: str, value: str, *, bold: bool = False) -> str:
     """`value: label` markup for a right-aligned line mixing a Latin/numeric
     value with an Urdu label. The Urdu font here (NotoNaskhArabic) has no
@@ -131,6 +155,8 @@ def render_table_pdf(
     headers: list[str],
     rows: list[list[str]],
     branding: ReportBranding | None = None,
+    *,
+    language: str = "en",
 ) -> bytes:
     """Wide grids (timetables, result matrices) were overflowing the page:
     a plain reportlab Table auto-sizes columns to fit its content, and with
@@ -147,16 +173,33 @@ def render_table_pdf(
     page_size = landscape_pagesize(A4) if len(headers) > 5 else A4
     doc = SimpleDocTemplate(buffer, pagesize=page_size, title=title, topMargin=36, bottomMargin=36, leftMargin=36, rightMargin=36)
     styles = getSampleStyleSheet()
-    cell_style = ParagraphStyle("cell", fontName="Helvetica", fontSize=8, leading=10)
+    _ensure_urdu_font()
+    is_urdu = language == "ur"
+    alignment = 2 if is_urdu else 0
+    cell_style = ParagraphStyle("cell", fontName="Helvetica", fontSize=8, leading=11, alignment=alignment)
     header_style = ParagraphStyle("cellHeader", parent=cell_style, textColor=colors.white, fontName="Helvetica-Bold")
     section_style = ParagraphStyle("cellSection", parent=cell_style, fontName="Helvetica-Bold")
+    title_style = ParagraphStyle(
+        "reportTitle",
+        parent=styles["Title"],
+        fontName=URDU_FONT_BOLD if is_urdu else "Helvetica-Bold",
+        alignment=2 if is_urdu else 0,
+        leading=24,
+    )
+    subtitle_style = ParagraphStyle(
+        "reportSubtitle",
+        parent=styles["Normal"],
+        fontName=URDU_FONT if is_urdu and _contains_arabic(subtitle) else "Helvetica",
+        alignment=2 if is_urdu else 0,
+        leading=16,
+    )
 
     elements = []
     if branding:
-        elements.extend(_branding_header(branding, styles))
+        elements.extend(_branding_header(branding, styles, language=language))
     elements.extend([
-        Paragraph(escape(title), styles["Title"]),
-        Paragraph(escape(subtitle), styles["Normal"]),
+        Paragraph(shape_urdu(title) if is_urdu else escape(title), title_style),
+        Paragraph(shape_urdu(subtitle) if is_urdu and _contains_arabic(subtitle) else escape(subtitle), subtitle_style),
         Spacer(1, 16),
     ])
 
@@ -168,7 +211,12 @@ def render_table_pdf(
 
     def _cell(value: object, *, is_header: bool = False, is_section: bool = False) -> Paragraph:
         style = header_style if is_header else (section_style if is_section else cell_style)
-        text = escape(str(value)).replace("\n", "<br/>")
+        raw_text = str(value)
+        if is_urdu and _contains_arabic(raw_text):
+            font = URDU_FONT_BOLD if is_header or is_section else URDU_FONT
+            text = f'<font name="{font}">{shape_urdu(raw_text)}</font>'
+        else:
+            text = escape(raw_text).replace("\n", "<br/>")
         return Paragraph(text, style)
 
     table_data = [[_cell(h, is_header=True) for h in headers]]
@@ -195,7 +243,8 @@ def render_table_pdf(
     table = Table(table_data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle(style_commands))
     elements.append(table)
-    doc.build(elements)
+    draw_page_number = _page_number_callback(page_size, language)
+    doc.build(elements, onFirstPage=draw_page_number, onLaterPages=draw_page_number)
     return buffer.getvalue()
 
 
@@ -331,7 +380,11 @@ def render_result_card_pdf(
     formatted_course_rows = []
     for row in course_rows:
         formatted_course_rows.append([
-            Paragraph(escape(row[0]), center_style),
+            Paragraph(
+                f'<font name="{URDU_FONT}">{shape_urdu(row[0])}</font>'
+                if is_urdu and _contains_arabic(row[0]) else escape(row[0]),
+                center_style,
+            ),
             Paragraph(escape(row[1]), center_style),
             Paragraph(escape(row[2]), center_style),
         ])
@@ -384,5 +437,6 @@ def render_result_card_pdf(
     ]))
     elements.append(sig_table)
 
-    doc.build(elements)
+    draw_page_number = _page_number_callback(A4, language)
+    doc.build(elements, onFirstPage=draw_page_number, onLaterPages=draw_page_number)
     return buffer.getvalue()

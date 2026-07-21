@@ -377,6 +377,7 @@ function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashb
     (acc, status) => ({ ...acc, [status]: (acc[status] ?? 0) + 1 }),
     {} as Record<string, number>
   );
+  const selectedPeriods = (data.my_attendance_periods ?? []).filter((entry) => entry.date === selectedDate);
 
   return (
     <>
@@ -423,6 +424,18 @@ function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashb
             mode="student"
             studentDayStatus={statuses}
           />
+          {selectedDate && (
+            <div className="dataTable dashboardPeriodAttendance">
+              {selectedPeriods.length === 0 && <p className="emptyState">{t("noAttendanceHistory")}</p>}
+              {selectedPeriods.map((entry, index) => (
+                <div className="dataRow" key={entry.timetable_slot_id ?? `${entry.date}-legacy-${index}`}>
+                  <span><strong>{entry.legacy_general ? t("legacyGeneralAttendance") : entry.course_name}</strong></span>
+                  <span>{entry.legacy_general ? "—" : t("periodLabel", { period: entry.period })}</span>
+                  <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </PageSection>
 
         <div>

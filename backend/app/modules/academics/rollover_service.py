@@ -75,7 +75,10 @@ async def perform_rollover(
     next_class_ids = {c for c in mapping_dict.values() if c is not None}
 
     # Fetch all enrollments in the current session
-    enrollments_stmt = select(Enrollment).where(Enrollment.session_id == current_session_id)
+    enrollments_stmt = select(Enrollment).where(
+        Enrollment.session_id == current_session_id,
+        Enrollment.ended_on.is_(None),
+    )
     enrollments_result = await session.execute(enrollments_stmt)
     old_enrollments = enrollments_result.scalars().all()
 
@@ -107,6 +110,7 @@ async def perform_rollover(
                     program_id=old_enrollment.program_id,
                     class_id=next_class_id,
                     section_id=next_section_id,
+                    started_on=new_session.gregorian_start,
                 )
                 session.add(new_enrollment)
                 

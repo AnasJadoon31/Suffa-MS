@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from app.modules.people.schemas import GuardianRead, StudentRead
+
 
 # ------------------------------------------------------------------ Scope
 # Shared visibility/audience shape used by Resource, Form, Announcement —
@@ -366,6 +368,16 @@ class AdmissionApplicationCreate(BaseModel):
     date_of_birth: date | None = None
     notes: str | None = None
     extra_data: dict | None = None
+    form_id: UUID | None = None
+
+
+class AdmissionApplicationUpdate(BaseModel):
+    applicant_name: str | None = None
+    guardian_contact: str | None = None
+    program_id: UUID | None = None
+    date_of_birth: date | None = None
+    notes: str | None = None
+    extra_data: dict | None = None
 
 
 class AdmissionApplicationRead(BaseModel):
@@ -377,8 +389,50 @@ class AdmissionApplicationRead(BaseModel):
     date_of_birth: date | None
     notes: str | None
     status: str
+    status_history: list[dict] = Field(default_factory=list)
     form_id: UUID | None = None
     extra_data: dict | None = None
+    form_title_snapshot: str | None = None
+    fields_definition_snapshot: list = Field(default_factory=list)
+    converted_student_id: UUID | None = None
+    converted_guardian_id: UUID | None = None
+    converted_by_id: UUID | None = None
+    converted_at: datetime | None = None
+    created_at: datetime
+
+
+class AdmissionApplicationConvertRequest(BaseModel):
+    student_username: str = Field(min_length=3, max_length=80)
+    guardian_username: str = Field(min_length=3, max_length=80)
+    guardian_name: str = Field(min_length=1, max_length=160)
+    guardian_relationship: str = Field(min_length=1, max_length=80)
+    guardian_cnic: str | None = Field(default=None, max_length=20)
+    guardian_address: str | None = None
+    student_preferred_language: str = "ur"
+    guardian_preferred_language: str = "ur"
+    admission_number: str | None = Field(default=None, max_length=40)
+    session_id: UUID
+    class_id: UUID
+    section_id: UUID
+
+
+class AdmissionConversionRead(BaseModel):
+    application: AdmissionApplicationRead
+    student: "StudentRead"
+    guardian: "GuardianRead"
+    student_set_password_url: str | None = None
+    guardian_set_password_url: str | None = None
+    already_converted: bool
+
+
+class AdminNotificationRead(BaseModel):
+    id: UUID
+    event_type: str
+    title: str
+    message: str
+    entity_type: str | None = None
+    entity_id: UUID | None = None
+    is_read: bool
     created_at: datetime
 
 

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/Button";
+import { useTranslation } from "react-i18next";
 
 type DialogOptions = {
   title?: string;
@@ -24,6 +25,7 @@ export function useDialog() {
 }
 
 export function DialogProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [dialogState, setDialogState] = useState<{
     isOpen: boolean;
     type: "alert" | "confirm";
@@ -68,7 +70,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {children}
       {dialogState?.isOpen && (
         <Modal
-          title={dialogState.options.title || (dialogState.type === "alert" ? "Notice" : "Confirm")}
+          title={dialogState.options.title || (dialogState.type === "alert" ? t("dialogNoticeTitle") : t("dialogConfirmTitle"))}
           onClose={() => handleClose(false)}
         >
           <div style={{ padding: "0", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -78,7 +80,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             <div className="formActions" style={{ justifyContent: "flex-end" }}>
               {dialogState.type === "confirm" && (
                 <Button type="button" onClick={() => handleClose(false)}>
-                  {dialogState.options.cancelLabel || "Cancel"}
+                  {dialogState.options.cancelLabel || t("cancelBtn")}
                 </Button>
               )}
               <Button
@@ -86,7 +88,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => handleClose(true)}
               >
-                {dialogState.options.confirmLabel || "OK"}
+                {dialogState.options.confirmLabel || t("okBtn")}
               </Button>
             </div>
           </div>

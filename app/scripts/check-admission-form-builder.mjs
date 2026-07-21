@@ -91,25 +91,21 @@ try {
   const page = await context.newPage();
   await page.goto(`${baseUrl}/admission-forms`, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Create form" }).click();
+  await page.getByRole("dialog", { name: "Choose admission form type" }).getByRole("button", { name: "General public form" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Create form" });
   await dialog.getByRole("button", { name: "Add field" }).waitFor();
   await dialog.getByLabel(/^Program/).selectOption("program-1");
   await dialog.getByLabel("Title", { exact: true }).fill("2027 admissions");
-  await dialog.getByLabel("Key", { exact: true }).fill("previous_school");
   await dialog.getByLabel("Label", { exact: true }).fill("Previous school");
   await dialog.getByLabel(/^Type/).selectOption("textarea");
   await dialog.getByRole("button", { name: "Add field" }).click();
-  await dialog.getByLabel("Key", { exact: true }).nth(1).fill("previous_school");
   await dialog.getByLabel("Label", { exact: true }).nth(1).fill("Preferred campus");
   await dialog.getByLabel(/^Type/).nth(1).selectOption("radio");
   await dialog.getByRole("button", { name: "Create form" }).click();
   if (createdPayload) throw new Error("Option-based field was submitted without options");
-  await dialog.getByLabel(/^Options/).fill("North, South");
-  await dialog.getByRole("button", { name: "Create form" }).click();
-  await page.getByText("Each field must have a unique key.").waitFor();
-  if (createdPayload) throw new Error("Duplicate field keys were submitted");
-  await dialog.getByLabel("Key", { exact: true }).nth(1).fill("campus");
+  await dialog.getByLabel("Option 1").fill("North");
+  await dialog.getByLabel("Option 2").fill("South");
   if (process.env.TEST_SCREENSHOT) {
     await dialog.screenshot({ path: process.env.TEST_SCREENSHOT, animations: "disabled" });
   }
@@ -117,8 +113,8 @@ try {
   await page.getByText("2027 admissions").waitFor();
 
   if (JSON.stringify(createdPayload?.fields) !== JSON.stringify([
-    { key: "previous_school", label: "Previous school", type: "textarea", required: true, options: [] },
-    { key: "campus", label: "Preferred campus", type: "radio", required: true, options: ["North", "South"] },
+    { key: "Previous school", label: "Previous school", type: "textarea", required: true, options: [] },
+    { key: "Preferred campus", label: "Preferred campus", type: "radio", required: true, options: ["North", "South"] },
   ])) {
     throw new Error(`Admission form fields were not submitted: ${JSON.stringify(createdPayload)}`);
   }
@@ -141,7 +137,7 @@ try {
   await page.getByRole("button", { name: "Submit application" }).click();
   await page.getByText("Application submitted.").waitFor();
 
-  if (publicSubmission?.extra_data?.campus !== "North") {
+  if (publicSubmission?.extra_data?.["Preferred campus"] !== "North") {
     throw new Error(`Public form did not submit configured answers: ${JSON.stringify(publicSubmission)}`);
   }
 

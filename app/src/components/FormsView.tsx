@@ -1,6 +1,6 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
-import { Edit2, FileText, Plus, Send, Trash2 } from "lucide-react";
+import { Edit2, Eye, FileText, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
 
@@ -14,6 +14,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
+import { InlineFilter } from "./ui/InlineFilter";
 
 export function FormsView() {
   const { t } = useTranslation();
@@ -46,6 +47,7 @@ export function FormsView() {
   const [editAudience, setEditAudience] = useState<Scope>({ all: true });
   const [editError, setEditError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [selectedResponse, setSelectedResponse] = useState<FormResponse | null>(null);
 
   const knownCategories = useMemo(
     () => [...new Set(forms.map((f) => f.category).filter(Boolean))] as string[],
@@ -139,12 +141,12 @@ export function FormsView() {
         {knownCategories.map((c) => <option key={c} value={c} />)}
       </datalist>
 
-      <div className="moduleToolbar">
-        <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-          <option value="">{t("allCategories")}</option>
-          {knownCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </Select>
-      </div>
+      <InlineFilter filters={[{
+        key: "category", type: "select", value: categoryFilter,
+        ariaLabel: t("categoryFilterLabel"), placeholder: t("allCategories"),
+        options: knownCategories.map((category) => ({ value: category, label: category })),
+        onChange: setCategoryFilter,
+      }]} />
 
       <DataTable<FormDef>
         columns={[
@@ -229,18 +231,32 @@ export function FormsView() {
             ))}
           </div>          {canViewResponses && (
             <div className="dataTable" style={{ marginTop: 16 }}>
-              <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("submittedCol")}</span><span>{t("answersCol")}</span></div>
+              <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("submittedCol")}</span><span>{t("actionsCol")}</span></div>
               {responses.length === 0 && <p className="emptyState">{t("noResponsesYet")}</p>}
               {responses.map((r) => (
                 <div className="dataRow" key={r.id}>
                   <span>{r.student_name ?? t("unknownPersonLabel")}</span>
                   <span>{new Date(r.created_at).toLocaleString()}</span>
-                  <span>{JSON.stringify(r.response_data)}</span>
+                  <span><Button className="tableAction" type="button" title={t("viewResponseBtn")} onClick={() => setSelectedResponse(r)}><Eye size={14} /></Button></span>
                 </div>
               ))}
             </div>
           )}
         </FormModal>
+      )}
+
+      {selectedResponse && selected && (
+        <Modal title={t("responseDetailsHeading")} onClose={() => setSelectedResponse(null)}>
+          <dl className="responseDetails">
+            <dt>{t("studentCol")}</dt><dd>{selectedResponse.student_name ?? t("unknownPersonLabel")}</dd>
+            <dt>{t("submittedCol")}</dt><dd>{new Date(selectedResponse.created_at).toLocaleString()}</dd>
+            {selected.fields_definition.map((field) => {
+              const value = selectedResponse.response_data[field.key];
+              const display = Array.isArray(value) ? value.join(", ") : value && typeof value === "object" ? JSON.stringify(value) : String(value ?? "—");
+              return <div key={field.key} className="responseDetailRow"><dt>{field.label}</dt><dd>{display}</dd></div>;
+            })}
+          </dl>
+        </Modal>
       )}
 
       {editing && (

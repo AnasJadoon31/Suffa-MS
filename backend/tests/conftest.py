@@ -143,6 +143,7 @@ async def seed(db_sessionmaker):
                 Enrollment(
                     madrasa_id=mid, student_id=student.id, session_id=old_session.id,
                     program_id=program.id, class_id=class_a.id, section_id=sec.id,
+                    started_on=old_session.gregorian_start,
                 )
             )
             students.append(student)
