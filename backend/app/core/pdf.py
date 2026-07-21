@@ -15,7 +15,8 @@ from reportlab.platypus import Image as ReportImage, Paragraph, SimpleDocTemplat
 
 @dataclass(frozen=True)
 class ReportBranding:
-    name: str
+    name_en: str
+    name_ur: str
     address: str = ""
     phone: str = ""
     email: str = ""
@@ -29,7 +30,12 @@ def _branding_header(branding: ReportBranding, styles, *, name_style: str = "Hea
         logo = ReportImage(io.BytesIO(branding.logo_bytes), width=54, height=54, kind="proportional")
         logo.hAlign = "CENTER"
         elements.append(logo)
-    elements.append(Paragraph(escape(branding.name), styles[name_style]))
+    if branding.name_ur and branding.name_en:
+        elements.append(Paragraph(bilingual_line(branding.name_en, branding.name_ur, bold=True), styles[name_style]))
+    else:
+        name = branding.name_ur or branding.name_en
+        # Ensure fallback name is shaped if it is in Urdu, though simple shaping won't hurt English
+        elements.append(Paragraph(f'<font name="{URDU_FONT_BOLD}">{shape_urdu(name)}</font>', styles[name_style]))
     contact = " · ".join(filter(None, [branding.address, branding.phone, branding.email, branding.website]))
     if contact:
         elements.append(Paragraph(escape(contact), styles["Normal"]))
@@ -64,7 +70,8 @@ async def load_report_branding(session, madrasa) -> ReportBranding:
         except Exception:
             logo_bytes = None
     return ReportBranding(
-        name=values.get("madrasa.name_en") or values.get("madrasa.name_ur") or madrasa.name,
+        name_en=values.get("madrasa.name_en") or madrasa.name,
+        name_ur=values.get("madrasa.name_ur") or madrasa.name,
         address=values.get("madrasa.address", ""),
         phone=values.get("madrasa.phone", ""),
         email=values.get("madrasa.email", ""),
@@ -266,43 +273,107 @@ def render_result_card_pdf(
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, title=f"Result card — {student_name}")
     styles = getSampleStyleSheet()
-    urdu_style = ParagraphStyle("urdu", fontName="Helvetica", fontSize=13, alignment=2, leading=20)
-    urdu_title_style = ParagraphStyle("urduTitle", fontName=URDU_FONT_BOLD, fontSize=16, alignment=2, leading=24)
+    urdu_style = ParagraphStyle("urdu", fontName="Helvetica", fontSize=12, alignment=2, leading=16)
+    urdu_center_style = ParagraphStyle("urduCenter", fontName=URDU_FONT_BOLD, fontSize=16, alignment=1, leading=20)
+    center_style = ParagraphStyle("Center", parent=styles["Normal"], alignment=1)
+    header_style = ParagraphStyle("TableHeader", parent=styles["Normal"], textColor=colors.white, alignment=1, fontSize=11, leading=14)
 
     elements = []
     if branding:
         elements.extend(_branding_header(branding, styles))
+    
+    # Title
     elements.extend([
-        Paragraph("Result Card", styles["Title"]),
-        Paragraph(f'<font name="{URDU_FONT_BOLD}">{shape_urdu("نتائج کارڈ")}</font>', urdu_title_style),
-        Spacer(1, 10),
-        Paragraph(f"Student: {escape(student_name)} ({escape(admission_number)})", styles["Normal"]),
-        Paragraph(bilingual_line("طالب علم", student_name), urdu_style),
-        Paragraph(f"Session: {escape(session_name)}", styles["Normal"]),
-        Paragraph(f"Date: {gregorian_date} ({hijri_date})", styles["Normal"]),
+        Paragraph(f'<b>Result Card</b> <font name="{URDU_FONT_BOLD}">| {shape_urdu("نتائج کارڈ")}</font>', urdu_center_style),
         Spacer(1, 16),
     ])
 
-    headers = ["Course", "Score", "Band"]
-    table = Table([headers, *course_rows], repeatRows=1)
+    # Metadata Grid
+    info_table_data = [
+        [
+            Paragraph(f"<b>Student:</b> {escape(student_name)} ({escape(admission_number)})", styles["Normal"]),
+            Paragraph(bilingual_line("طالب علم", f"{student_name} ({admission_number})"), urdu_style),
+        ],
+        [
+            Paragraph(f"<b>Session:</b> {escape(session_name)}", styles["Normal"]),
+            Paragraph(bilingual_line("تعلیمی سال", session_name), urdu_style),
+        ],
+        [
+            Paragraph(f"<b>Date:</b> {gregorian_date} ({hijri_date})", styles["Normal"]),
+            Paragraph(bilingual_line("تاریخ", hijri_date), urdu_style),
+        ],
+    ]
+    info_table = Table(info_table_data, colWidths=[260, 260])
+    info_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 16))
+
+    # Course Table
+    headers = [
+        Paragraph(f'Course / <font name="{URDU_FONT_BOLD}">{shape_urdu("مضمون")}</font>', header_style),
+        Paragraph(f'Score / <font name="{URDU_FONT_BOLD}">{shape_urdu("نمبر")}</font>', header_style),
+        Paragraph(f'Band / <font name="{URDU_FONT_BOLD}">{shape_urdu("درجہ")}</font>', header_style),
+    ]
+    
+    # Center align course rows
+    formatted_course_rows = []
+    for row in course_rows:
+        formatted_course_rows.append([
+            Paragraph(escape(row[0]), center_style),
+            Paragraph(escape(row[1]), center_style),
+            Paragraph(escape(row[2]), center_style),
+        ])
+
+    table = Table([headers, *formatted_course_rows], repeatRows=1, colWidths=[200, 160, 160])
     table.setStyle(
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f3f4f6")]),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ]
         )
     )
     elements.append(table)
-    elements.append(Spacer(1, 16))
-    elements.append(Paragraph(f"Overall score: {escape(overall_score)}", styles["Heading3"]))
-    elements.append(Paragraph(bilingual_line("مجموعی نمبر", overall_score), urdu_style))
+    elements.append(Spacer(1, 20))
+
+    # Overall Score
+    score_table = Table([
+        [
+            Paragraph(f"<b>Overall score:</b> {escape(overall_score)}", styles["Normal"]),
+            Paragraph(bilingual_line("مجموعی نمبر", overall_score, bold=True), urdu_style),
+        ]
+    ], colWidths=[260, 260])
+    score_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    elements.append(score_table)
+    
     if not published:
         elements.append(Spacer(1, 10))
         elements.append(Paragraph("(Draft — not yet published)", styles["Italic"]))
+
+    # Signatures
+    elements.append(Spacer(1, 60))
+    sig_table = Table(
+        [
+            [
+                Paragraph(f'______________________<br/><br/>Principal / <font name="{URDU_FONT}">{shape_urdu("پرنسپل")}</font>', center_style),
+                "",
+                Paragraph(f'______________________<br/><br/>Class Teacher / <font name="{URDU_FONT}">{shape_urdu("کلاس ٹیچر")}</font>', center_style),
+            ]
+        ],
+        colWidths=[200, 120, 200]
+    )
+    sig_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    elements.append(sig_table)
 
     doc.build(elements)
     return buffer.getvalue()

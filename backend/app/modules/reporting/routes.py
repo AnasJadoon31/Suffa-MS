@@ -327,28 +327,48 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
             result = await _build_session_result(session, madrasa.id, student.id, active_session_id)
             latest_result = result.model_dump(mode="json")
 
-        submitted_assignment_ids = set(
-            (
-                await session.execute(
-                    select(Submission.assignment_id).where(Submission.student_id == student.id)
-                )
-            ).scalars().all()
-        )
+        submitted_submissions = (
+            await session.execute(
+                select(Submission).where(Submission.student_id == student.id)
+            )
+        ).scalars().all()
+        submission_by_assignment = {s.assignment_id: s for s in submitted_submissions}
+
         now = datetime.now(timezone.utc)
         assignment_rows = (
             await session.execute(
                 select(Assignment).where(
                     Assignment.madrasa_id == madrasa.id,
                     Assignment.class_id == enrollment.class_id,
-                    Assignment.due_date >= now,
                 )
             )
         ).scalars().all()
-        due_assignments = [
-            {"id": str(a.id), "title": a.title, "due_date": a.due_date.isoformat(), "course_id": str(a.course_id)}
-            for a in assignment_rows
-            if a.id not in submitted_assignment_ids and (not a.target_student_ids or str(student.id) in a.target_student_ids)
-        ]
+        
+        due_assignments = []
+        for a in assignment_rows:
+            if a.target_student_ids and str(student.id) not in a.target_student_ids:
+                continue
+                
+            sub = submission_by_assignment.get(a.id)
+            if not sub and a.due_date < now:
+                # If it's not submitted and past due date, don't show it as due? Or maybe show as late. 
+                # Let's keep existing logic: if not submitted and due_date >= now, it's due.
+                # If submitted, show it.
+                continue
+                
+            due_assignments.append(
+                {
+                    "id": str(a.id),
+                    "title": a.title,
+                    "due_date": a.due_date.isoformat(),
+                    "course_id": str(a.course_id),
+                    "submitted": sub is not None,
+                    "file_key": sub.file_key if sub else None,
+                    "mark": sub.mark if sub else None,
+                    "max_marks": a.max_marks,
+                    "feedback": sub.feedback if sub else None
+                }
+            )
 
     # Own attendance for the calendar view (last ~2 months of statuses).
     my_attendance: dict[str, str] = {}
@@ -443,7 +463,7 @@ async def _require_teacher_report_scope(
 ) -> None:
     if current_user.role == UserRole.principal or await user_has_permission(current_user, permission_code, session):
         return
-    teacher = await _teacher_profile(session, current_user, madrasa.id)
+    teacher = await _teacher_profile(session, current_user, madrasa_id)
     if teacher is None or section_id is None:
         raise HTTPException(status_code=403, detail=ErrorCode.REPORT_SECTION_REQUIRED)
     if not await teacher_teaches(

@@ -74,3 +74,9 @@ export function PageHeader({
     </div>
   );
 }
+
+export function FilterBar({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const classes = ["filterBar"];
+  if (className) classes.push(className);
+  return <div className={classes.join(" ")}>{children}</div>;
+}

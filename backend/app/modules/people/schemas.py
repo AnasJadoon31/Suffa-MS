@@ -16,6 +16,7 @@ class TeacherCreate(BaseModel):
     address: str | None = None
     emergency_contact: str | None = None
     photo_file_id: UUID | None = None
+    is_principal_delegate: bool | None = None
 
 
 class TeacherUpdate(BaseModel):
@@ -28,6 +29,7 @@ class TeacherUpdate(BaseModel):
     address: str | None = None
     emergency_contact: str | None = None
     photo_file_id: UUID | None = None
+    is_principal_delegate: bool | None = None
 
 
 class TeacherRead(BaseModel):
@@ -45,6 +47,7 @@ class TeacherRead(BaseModel):
     address: str | None = None
     emergency_contact: str | None = None
     photo_file_id: UUID | None = None
+    is_principal_delegate: bool
     created_at: datetime
 
 
@@ -85,6 +88,8 @@ class StudentRead(BaseModel):
     status: str
     portal_enabled: bool
     notes: str | None
+    username: str | None = None
+    current_class: str | None = None
     b_form_number: str | None = None
     address: str | None = None
     photo_file_id: UUID | None = None

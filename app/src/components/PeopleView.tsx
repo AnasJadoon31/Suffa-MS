@@ -1,6 +1,6 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import { Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X } from "lucide-react";
+import { Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X, Edit2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../lib/AuthContext";
@@ -163,7 +163,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({
     username: "", name: "", whatsapp_number: "", qualifications: "", join_date: "",
-    cnic: "", address: "", emergency_contact: "",
+    cnic: "", address: "", emergency_contact: "", is_principal_delegate: false,
   });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -172,6 +172,36 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
+
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "", whatsapp_number: "", qualifications: "", join_date: "",
+    cnic: "", address: "", emergency_contact: "", is_principal_delegate: false,
+  });
+
+  const onEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setNotice("");
+    if (!editingTeacher) return;
+    try {
+      await peopleApi.updateTeacher(editingTeacher.id, {
+        name: editForm.name,
+        whatsapp_number: editForm.whatsapp_number,
+        qualifications: editForm.qualifications || undefined,
+        join_date: editForm.join_date || undefined,
+        cnic: editForm.cnic || undefined,
+        address: editForm.address || undefined,
+        emergency_contact: editForm.emergency_contact || undefined,
+        is_principal_delegate: editForm.is_principal_delegate,
+      });
+      setNotice(t("teacherUpdated", "Teacher updated"));
+      setEditingTeacher(null);
+      await load();
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedUpdateTeacher", "Failed to update teacher"));
+    }
+  };
 
   const load = async (query = search) => {
     setIsLoading(true);
@@ -206,10 +236,11 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
         cnic: form.cnic || undefined,
         address: form.address || undefined,
         emergency_contact: form.emergency_contact || undefined,
+        is_principal_delegate: form.is_principal_delegate,
       });
       setNotice(t("createdSetPasswordLink", { code: created.employee_code, url: created.set_password_url }));
       setJustCreated(created);
-      setForm({ username: "", name: "", whatsapp_number: "", qualifications: "", join_date: "", cnic: "", address: "", emergency_contact: "" });
+      setForm({ username: "", name: "", whatsapp_number: "", qualifications: "", join_date: "", cnic: "", address: "", emergency_contact: "", is_principal_delegate: false });
       setShowCreate(false);
       await load();
     } catch (err: any) {
@@ -276,7 +307,33 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
               <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
 
               <label>{t("emergencyContactLabel")}<Input value={form.emergency_contact} onChange={(e) => setForm({ ...form, emergency_contact: e.target.value })} /></label>
+
+              <label className="checkboxLabel">
+                <input type="checkbox" checked={form.is_principal_delegate} onChange={(e) => setForm({ ...form, is_principal_delegate: e.target.checked })} />
+                <span>{t("principalDelegateLabel", "Delegate as Principal (Access all menus)")}</span>
+              </label>
               </FormModal>
+      )}
+
+      {editingTeacher && canCreate && (
+        <FormModal
+          title={t("editTeacherBtn", "Edit Teacher")} onClose={() => setEditingTeacher(null)}
+          onSubmit={onEditSubmit}
+          submitLabel={t("saveBtn", "Save")}
+          submitIcon={<Edit2 size={16} />}
+        >
+          <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
+          <label>{t("whatsappNumberLabel")}<Input required value={editForm.whatsapp_number} onChange={(e) => setEditForm({ ...editForm, whatsapp_number: e.target.value })} /></label>
+          <label>{t("qualificationsLabel")}<Input value={editForm.qualifications} onChange={(e) => setEditForm({ ...editForm, qualifications: e.target.value })} /></label>
+          <label>{t("joinDateLabel")}<Input type="date" value={editForm.join_date} onChange={(e) => setEditForm({ ...editForm, join_date: e.target.value })} /></label>
+          <label>{t("cnicLabel")}<Input value={editForm.cnic} onChange={(e) => setEditForm({ ...editForm, cnic: e.target.value })} /></label>
+          <label>{t("addressLabel")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
+          <label>{t("emergencyContactLabel")}<Input value={editForm.emergency_contact} onChange={(e) => setEditForm({ ...editForm, emergency_contact: e.target.value })} /></label>
+          <label className="checkboxLabel">
+            <input type="checkbox" checked={editForm.is_principal_delegate} onChange={(e) => setEditForm({ ...editForm, is_principal_delegate: e.target.checked })} />
+            <span>{t("principalDelegateLabel", "Delegate as Principal (Access all menus)")}</span>
+          </label>
+        </FormModal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -292,6 +349,23 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           { header: t("statusCol"), render: (teacher) => teacher.status },
           { header: t("actionsCol"), render: (teacher) => (
             <>
+              {canCreate && (
+                <Button className="tableAction" type="button" title={t("editBtn", "Edit")} onClick={() => {
+                  setEditingTeacher(teacher);
+                  setEditForm({
+                    name: teacher.name,
+                    whatsapp_number: teacher.whatsapp_number,
+                    qualifications: teacher.qualifications || "",
+                    join_date: teacher.join_date || "",
+                    cnic: teacher.cnic || "",
+                    address: teacher.address || "",
+                    emergency_contact: teacher.emergency_contact || "",
+                    is_principal_delegate: teacher.is_principal_delegate || false,
+                  });
+                }}>
+                  <Edit2 size={14} />
+                </Button>
+              )}
               <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(teacher)}>
                 <Eye size={14} />
               </Button>
@@ -348,7 +422,6 @@ function TeacherDetail({
                 <ShieldCheck size={16} /> {t("delegateBtn")}
               </Button>
             )}
-            <Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>
           </div>
         }
       />
@@ -441,6 +514,30 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
+
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [assignClassStudent, setAssignClassStudent] = useState<Student | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", date_of_birth: "", b_form_number: "", address: "" });
+
+  const onEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setNotice("");
+    if (!editingStudent) return;
+    try {
+      await peopleApi.updateStudent(editingStudent.id, {
+        name: editForm.name,
+        date_of_birth: editForm.date_of_birth,
+        b_form_number: editForm.b_form_number || undefined,
+        address: editForm.address || undefined,
+      });
+      setNotice(t("studentUpdated", "Student updated"));
+      setEditingStudent(null);
+      await load();
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedUpdateStudent", "Failed to update student"));
+    }
+  };
 
   const load = async (query = search) => {
     setIsLoading(true);
@@ -560,6 +657,20 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
               <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
               </FormModal>
       )}
+
+      {editingStudent && canCreate && (
+        <FormModal
+          title={t("editStudentBtn", "Edit Student")} onClose={() => setEditingStudent(null)}
+          onSubmit={onEditSubmit}
+          submitLabel={t("saveBtn", "Save")}
+          submitIcon={<Edit2 size={16} />}
+        >
+          <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
+          <label>{t("dobCol")}<Input type="date" required value={editForm.date_of_birth} onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })} /></label>
+          <label>{t("bFormNumberLabel")}<Input value={editForm.b_form_number} onChange={(e) => setEditForm({ ...editForm, b_form_number: e.target.value })} /></label>
+          <label>{t("addressLabel")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
+        </FormModal>
+      )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
       {justCreated?.set_password_url && (
@@ -575,6 +686,22 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           { header: t("statusCol"), render: (s) => s.status },
           { header: t("actionsCol"), render: (s) => (
             <>
+              {canCreate && (
+                <Button className="tableAction" type="button" title={t("editBtn", "Edit")} onClick={() => {
+                  setEditingStudent(s);
+                  setEditForm({
+                    name: s.name,
+                    date_of_birth: s.date_of_birth,
+                    b_form_number: s.b_form_number || "",
+                    address: s.address || "",
+                  });
+                }}>
+                  <Edit2 size={14} />
+                </Button>
+              )}
+              <Button className="tableAction" type="button" title={t("assignClassBtn", "Assign Class")} onClick={() => setAssignClassStudent(s)}>
+                <GraduationCap size={14} />
+              </Button>
               <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(s)}>
                 <Eye size={14} />
               </Button>
@@ -588,6 +715,14 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
         emptyMessage={t("noStudentsYet")}
       />
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
+
+      {assignClassStudent && (
+        <AssignClassModal
+          student={assignClassStudent}
+          onClose={() => setAssignClassStudent(null)}
+          onSuccess={() => { void load(""); }}
+        />
+      )}
 
       {detail && <Modal title={detail.name} onClose={() => setDetail(null)}><StudentDetail student={detail} canFinance={canFinance} onClose={() => setDetail(null)} /></Modal>}
     </>
@@ -608,12 +743,6 @@ function StudentDetail({
   const [error, setError] = useState("");
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
-  const [sessions, setSessions] = useState<AcademicSession[]>([]);
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [classes, setClasses] = useState<AcademicClass[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
-  const [enrollForm, setEnrollForm] = useState({ session_id: "", program_id: "", class_id: "", section_id: "" });
-  const [enrollError, setEnrollError] = useState("");
 
   const load = async () => {
     void peopleApi.studentGuardians(student.id).then(setGuardians).catch(() => setGuardians([]));
@@ -621,18 +750,7 @@ function StudentDetail({
       void financeApi.listPayments({ student_id: student.id }).then(setPayments).catch(() => setPayments([]));
       void financeApi.listCategories().then(setCategories).catch(() => setCategories([]));
     }
-    void academicsApi.listSessions().then(setSessions).catch(() => setSessions([]));
-    void academicsApi.listPrograms().then(setPrograms).catch(() => setPrograms([]));
-    void academicsApi.listClasses().then(setClasses).catch(() => setClasses([]));
   };
-  
-  useEffect(() => {
-    if (enrollForm.class_id) {
-      void academicsApi.listSections(enrollForm.class_id).then(setSections).catch(() => setSections([]));
-    } else {
-      setSections([]);
-    }
-  }, [enrollForm.class_id]);
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -641,13 +759,12 @@ function StudentDetail({
   return (
     <div className="detailPanel">
       <PageHeader
-        title={`${student.name} · ${student.admission_number}`}
+        title={`${student.name} · ${student.username || student.admission_number}${student.current_class ? ` · ${student.current_class}` : ""}`}
         actions={
           <>
             <Button className="secondaryAction" onClick={() => setShowEnrollModal(true)}>
               {t("assignClassBtn", "Assign Class")}
             </Button>
-            <Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>
           </>
         }
       />
@@ -730,60 +847,99 @@ function StudentDetail({
       )}
       
       {showEnrollModal && (
-        <FormModal
-          title={t("assignClassBtn", "Assign Class")}
+        <AssignClassModal
+          student={student}
           onClose={() => setShowEnrollModal(false)}
-          submitLabel={t("saveBtn")}
-          error={enrollError}
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setEnrollError("");
-            try {
-              await academicsApi.enrollStudent({
-                student_id: student.id,
-                session_id: enrollForm.session_id,
-                program_id: enrollForm.program_id,
-                class_id: enrollForm.class_id,
-                section_id: enrollForm.section_id,
-              });
-              setEnrollForm({ session_id: "", program_id: "", class_id: "", section_id: "" });
-              setShowEnrollModal(false);
-            } catch (err: any) {
-              setEnrollError(err.response?.data?.detail ?? t("failedToEnroll", "Failed to enroll student"));
-            }
-          }}
-        >
-          <label>
-            {t("sessionLabel", "Session")}
-            <Select required value={enrollForm.session_id} onChange={(e) => setEnrollForm({ ...enrollForm, session_id: e.target.value })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </Select>
-          </label>
-          <label>
-            {t("programLabel")}
-            <Select required value={enrollForm.program_id} onChange={(e) => setEnrollForm({ ...enrollForm, program_id: e.target.value, class_id: "", section_id: "" })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </Select>
-          </label>
-          <label>
-            {t("classLabel")}
-            <Select required value={enrollForm.class_id} onChange={(e) => setEnrollForm({ ...enrollForm, class_id: e.target.value, section_id: "" })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {classes.filter(c => !enrollForm.program_id || c.program_id === enrollForm.program_id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </label>
-          <label>
-            {t("sectionLabel", "Section")}
-            <Select required value={enrollForm.section_id} onChange={(e) => setEnrollForm({ ...enrollForm, section_id: e.target.value })}>
-              <option value="">{t("selectEllipsis")}</option>
-              {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </Select>
-          </label>
-        </FormModal>
+        />
       )}
     </div>
+  );
+}
+
+function AssignClassModal({
+  student,
+  onClose,
+  onSuccess,
+}: Readonly<{
+  student: Student;
+  onClose: () => void;
+  onSuccess?: () => void;
+}>) {
+  const { t } = useTranslation();
+  const [sessions, setSessions] = useState<AcademicSession[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [classes, setClasses] = useState<AcademicClass[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [enrollForm, setEnrollForm] = useState({ session_id: "", program_id: "", class_id: "", section_id: "" });
+  const [enrollError, setEnrollError] = useState("");
+
+  useEffect(() => {
+    void academicsApi.listSessions().then(setSessions).catch(() => setSessions([]));
+    void academicsApi.listPrograms().then(setPrograms).catch(() => setPrograms([]));
+    void academicsApi.listClasses().then(setClasses).catch(() => setClasses([]));
+  }, []);
+
+  useEffect(() => {
+    if (enrollForm.class_id) {
+      void academicsApi.listSections(enrollForm.class_id).then(setSections).catch(() => setSections([]));
+    } else {
+      setSections([]);
+    }
+  }, [enrollForm.class_id]);
+
+  return (
+    <FormModal
+      title={t("assignClassBtn", "Assign Class")}
+      onClose={onClose}
+      submitLabel={t("saveBtn")}
+      error={enrollError}
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setEnrollError("");
+        try {
+          await academicsApi.enrollStudent({
+            student_id: student.id,
+            session_id: enrollForm.session_id,
+            program_id: enrollForm.program_id,
+            class_id: enrollForm.class_id,
+            section_id: enrollForm.section_id,
+          });
+          onSuccess?.();
+          onClose();
+        } catch (err: any) {
+          setEnrollError(err.response?.data?.detail ?? t("failedToEnroll", "Failed to enroll student"));
+        }
+      }}
+    >
+      <label>
+        {t("sessionLabel", "Session")}
+        <Select required value={enrollForm.session_id} onChange={(e) => setEnrollForm({ ...enrollForm, session_id: e.target.value })}>
+          <option value="">{t("selectEllipsis")}</option>
+          {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </Select>
+      </label>
+      <label>
+        {t("programLabel")}
+        <Select required value={enrollForm.program_id} onChange={(e) => setEnrollForm({ ...enrollForm, program_id: e.target.value, class_id: "", section_id: "" })}>
+          <option value="">{t("selectEllipsis")}</option>
+          {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </Select>
+      </label>
+      <label>
+        {t("classLabel")}
+        <Select required value={enrollForm.class_id} onChange={(e) => setEnrollForm({ ...enrollForm, class_id: e.target.value, section_id: "" })}>
+          <option value="">{t("selectEllipsis")}</option>
+          {classes.filter(c => !enrollForm.program_id || c.program_id === enrollForm.program_id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </Select>
+      </label>
+      <label>
+        {t("sectionLabel", "Section")}
+        <Select required value={enrollForm.section_id} onChange={(e) => setEnrollForm({ ...enrollForm, section_id: e.target.value })}>
+          <option value="">{t("selectEllipsis")}</option>
+          {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </Select>
+      </label>
+    </FormModal>
   );
 }
 
@@ -799,6 +955,7 @@ function GuardiansTab({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [detail, setDetail] = useState<Guardian | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
@@ -888,11 +1045,16 @@ function GuardiansTab({
           { header: t("phoneCol"), render: (g) => g.phone_numbers },
           { header: t("portalCol"), render: (g) => g.user_id ? t("enabledLabel") : t("disabledLabel") },
           { header: t("actionsCol"), render: (g) => (
-            canSendCredentials ? (
-              <Button className="tableAction" type="button" onClick={() => void provisionLogin(g)}>
-                <KeyRound size={14} /> {t("loginLinkBtn")}
+            <>
+              <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(g)}>
+                <Eye size={14} />
               </Button>
-            ) : null
+              {canSendCredentials && (
+                <Button className="tableAction" type="button" onClick={() => void provisionLogin(g)}>
+                  <KeyRound size={14} /> {t("loginLinkBtn")}
+                </Button>
+              )}
+            </>
           )},
         ]}
         data={guardians}
@@ -901,7 +1063,131 @@ function GuardiansTab({
         emptyMessage={t("noGuardiansYet")}
       />
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
+
+      {detail && (
+        <Modal title={detail.name} onClose={() => setDetail(null)}>
+          <GuardianDetail guardian={detail} onClose={() => setDetail(null)} />
+        </Modal>
+      )}
     </>
+  );
+}
+
+function GuardianDetail({ guardian, onClose }: Readonly<{ guardian: Guardian; onClose: () => void }>) {
+  const { t } = useTranslation();
+  const [students, setStudents] = useState<Student[]>([]);
+  const [linkedStudents, setLinkedStudents] = useState<Student[]>([]);
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+
+  const loadLinked = async () => {
+    try {
+      const data = await peopleApi.getGuardianStudents(guardian.id);
+      setLinkedStudents(data);
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedLoadStudents", "Failed to load students"));
+    }
+  };
+
+  useEffect(() => {
+    void loadLinked();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardian.id]);
+
+  const searchStudents = async (query: string) => {
+    setSearch(query);
+    if (query.length < 2) return setStudents([]);
+    try {
+      const res = await peopleApi.listStudentsPage({ search: query, limit: 10, offset: 0 });
+      setStudents(res.items);
+    } catch {
+      setStudents([]);
+    }
+  };
+
+  const linkStudent = async (student: Student) => {
+    setError("");
+    try {
+      await peopleApi.linkStudentToGuardian(guardian.id, student.id);
+      setSearch("");
+      setStudents([]);
+      await loadLinked();
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedToLink", "Failed to link student"));
+    }
+  };
+
+  const unlinkStudent = async (studentId: string) => {
+    if (!window.confirm(t("confirmUnlink", "Are you sure you want to unlink this student?"))) return;
+    setError("");
+    try {
+      await peopleApi.unlinkStudentFromGuardian(guardian.id, studentId);
+      await loadLinked();
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedToUnlink", "Failed to unlink student"));
+    }
+  };
+
+  return (
+    <div className="detailPanel">
+      <PageHeader title={guardian.name} />
+      <div className="infoGrid">
+        <div className="infoGroup">
+          <label>{t("relationshipLabel")}</label>
+          <div>{guardian.relationship}</div>
+        </div>
+        <div className="infoGroup">
+          <label>{t("phoneCol")}</label>
+          <div>{guardian.phone_numbers}</div>
+        </div>
+        <div className="infoGroup">
+          <label>{t("cnicLabel")}</label>
+          <div>{guardian.cnic || "—"}</div>
+        </div>
+        <div className="infoGroup">
+          <label>{t("addressLabel")}</label>
+          <div>{guardian.address || "—"}</div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: "2rem" }}>
+        <h3>{t("linkedStudents", "Linked Students")}</h3>
+        {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+        
+        <div style={{ marginBottom: "1rem" }}>
+          <SearchDropdown
+            id="guardian-student-search"
+            label={t("searchStudentBtn", "Find Student to Link")}
+            placeholder={t("studentSearchPlaceholder", "Type name or admission number...")}
+            items={students}
+            value={search}
+            getKey={(s) => s.id}
+            getLabel={(s) => s.name}
+            getDescription={(s) => `${s.admission_number} · ${s.status}`}
+            onQueryChange={(q) => void searchStudents(q)}
+            onSelect={(s) => void linkStudent(s)}
+            emptyLabel={search.length < 2 ? t("typeToSearch", "Type to search...") : t("noStudentsFound", "No students found")}
+          />
+        </div>
+
+        <div className="dataList">
+          {linkedStudents.length === 0 ? (
+            <p className="notice">{t("noStudentsLinked", "No students linked yet.")}</p>
+          ) : (
+            linkedStudents.map((s) => (
+              <div key={s.id} className="dataRow" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <strong>{s.name}</strong> <span style={{ color: "var(--slate-500)", fontSize: "0.85rem" }}>({s.admission_number})</span>
+                </div>
+                <Button className="tableAction" type="button" onClick={() => void unlinkStudent(s.id)} title={t("unlinkBtn", "Unlink")}>
+                  <X size={14} />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -956,10 +1242,6 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
       {selected && (
         <Modal title={selected.name} onClose={() => setSelected(null)}>
           <div className="detailPanel">
-            <PageHeader
-              title={selected.name}
-              actions={<Button className="tableAction" type="button" onClick={() => setSelected(null)}><X size={16} /></Button>}
-            />
             <h4>{t("donationHistoryHeading")}</h4>
           <div className="dataTable">
             <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("amountCol")}</span><span>{t("categoryCol")}</span></div>

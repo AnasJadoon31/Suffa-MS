@@ -29,6 +29,7 @@ class UserRead(BaseModel):
     role: str
     status: str
     preferred_language: str
+    is_principal_delegate: bool = False
     selected_session_id: UUID | None = None
     created_at: datetime
 

@@ -8,6 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate", // fixes the stale-bundle problem the old manual SW had
+      includeAssets: ["apple-touch-icon.png"],
       manifest: {
         name: "Madrasa Management System",
         short_name: "MMS",
@@ -16,7 +17,7 @@ export default defineConfig({
         background_color: "#f7f7f2",
         theme_color: "#0f766e",
         icons: [
-          { src: "/pwa-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/pwa-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
           { src: "/pwa-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
       },

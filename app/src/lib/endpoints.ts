@@ -74,10 +74,14 @@ export const academicsApi = {
 export interface Teacher {
   id: string; user_id: string; employee_code: string; name: string; whatsapp_number: string; qualifications: string | null;
   join_date: string | null; status: string; notes: string | null; created_at: string; set_password_url?: string;
+  cnic?: string | null; address?: string | null; emergency_contact?: string | null;
+  is_principal_delegate?: boolean;
 }
 export interface Student {
   id: string; user_id: string; admission_number: string; name: string; date_of_birth: string; status: string;
   portal_enabled: boolean; notes: string | null; created_at: string; set_password_url?: string;
+  username?: string | null; current_class?: string | null;
+  b_form_number?: string | null; address?: string | null;
 }
 export interface Guardian {
   id: string; user_id: string | null; name: string; relationship: string; phone_numbers: string;
@@ -122,10 +126,13 @@ export const peopleApi = {
     getAllPages<Teacher>("/api/v1/people/teachers", { search }),
   listTeachersPage: (params: { search?: string; limit: number; offset: number }) => getPage<Teacher>("/api/v1/people/teachers", params),
   createTeacher: (payload: {
-    username: string; name: string; whatsapp_number?: string; qualifications?: string; join_date?: string;
-    cnic?: string; address?: string; emergency_contact?: string;
+    username: string; name: string; whatsapp_number: string; qualifications?: string;
+    join_date?: string; cnic?: string; address?: string; emergency_contact?: string; photo_file_id?: string;
+    is_principal_delegate?: boolean;
   }) =>
     api.post<Teacher>("/api/v1/people/teachers", payload).then((r) => r.data),
+  updateTeacher: (id: string, payload: Partial<Omit<Teacher, "id" | "user_id" | "created_at">>) =>
+    api.put<Teacher>(`/api/v1/people/teachers/${id}`, payload).then((r) => r.data),
   deactivateTeacher: (id: string) => api.post(`/api/v1/people/teachers/${id}/deactivate`).then((r) => r.data),
   taughtClasses: (userId: string) => api.get<string[]>(`/api/v1/people/teachers/${userId}/taught-classes`).then((r) => r.data),
 
@@ -133,10 +140,13 @@ export const peopleApi = {
     getAllPages<Student>("/api/v1/people/students", { search }),
   listStudentsPage: (params: { search?: string; limit: number; offset: number }) => getPage<Student>("/api/v1/people/students", params),
   createStudent: (payload: {
-    username: string; name: string; date_of_birth: string; guardian_ids?: string[];
-    b_form_number?: string; address?: string;
+    username: string; name: string; date_of_birth: string; admission_number?: string;
+    portal_enabled?: boolean; guardian_ids?: string[]; preferred_language?: string;
+    b_form_number?: string; address?: string; photo_file_id?: string;
   }) =>
     api.post<Student>("/api/v1/people/students", payload).then((r) => r.data),
+  updateStudent: (id: string, payload: Partial<Omit<Student, "id" | "user_id" | "created_at">>) =>
+    api.put<Student>(`/api/v1/people/students/${id}`, payload).then((r) => r.data),
   deactivateStudent: (id: string) => api.post(`/api/v1/people/students/${id}/deactivate`).then((r) => r.data),
 
   listGuardians: (search?: string) =>
@@ -146,10 +156,14 @@ export const peopleApi = {
     name: string; relationship: string; phone_numbers: string; student_ids?: string[]; cnic?: string; address?: string;
   }) =>
     api.post<Guardian>("/api/v1/people/guardians", payload).then((r) => r.data),
-  guardianCredentialsLink: (guardianId: string, username?: string) =>
-    api.post<{ username: string; set_password_url: string }>(
-      `/api/v1/people/guardians/${guardianId}/credentials-link`, { username }
-    ).then((r) => r.data),
+  guardianCredentialsLink: (id: string, customUsername?: string) =>
+    api.post<{ set_password_url: string; username: string }>(`/api/v1/people/guardians/${id}/credentials-link`, { username: customUsername }).then((r) => r.data),
+  linkStudentToGuardian: (guardianId: string, studentId: string) =>
+    api.post(`/api/v1/people/guardians/${guardianId}/students/${studentId}`).then((r) => r.data),
+  unlinkStudentFromGuardian: (guardianId: string, studentId: string) =>
+    api.delete(`/api/v1/people/guardians/${guardianId}/students/${studentId}`).then((r) => r.data),
+  getGuardianStudents: (guardianId: string) =>
+    api.get<Student[]>(`/api/v1/people/guardians/${guardianId}/students`).then((r) => r.data),
   studentGuardians: (studentId: string) =>
     getAllPages<Guardian>(`/api/v1/people/students/${studentId}/guardians`),
 
@@ -290,7 +304,10 @@ export const attendanceApi = {
 export interface Assignment {
   id: string; class_id: string; section_id: string | null; course_id: string; title: string;
   category: string | null; instructions: string;
-  attachment_key: string | null; due_date: string; target_student_ids: string[] | null;
+  attachment_key: string | null;  due_date: string;
+  max_marks?: number | null;
+  weightage?: number | null;
+  target_student_ids: string[] | null;
   created_by_id: string | null; batch_id: string | null; created_at: string;
   class_name: string | null; section_name: string | null; course_name: string | null; teacher_name: string | null;
 }
@@ -315,7 +332,7 @@ export interface Submission {
   mark: number | null; feedback: string | null; is_late: boolean; student_name: string | null;
 }
 export interface GradingScheme { id: string; name: string; bands: { label: string; min_score: number; max_score: number }[] }
-export interface ExamType { id: string; course_id: string; name: string; weightage: number; grading_scheme_id: string }
+export interface ExamType { id: string; course_id: string; class_id: string | null; name: string; weightage: number; grading_scheme_id: string }
 export interface CourseResult { course_id: string; raw_score: number | null; band: string | null; exam_count: number }
 export interface SessionResult {
   session_id: string; student_id: string; course_results: CourseResult[]; overall_score: number | null; published: boolean;
@@ -333,10 +350,10 @@ export const assessmentsApi = {
   }) => getPage<Assignment>("/api/v1/assessments/assignments", params),
   createAssignment: (payload: {
     class_id?: string; course_id: string; section_ids?: string[]; all_classes?: boolean; title: string; category?: string;
-    instructions: string; due_date: string; attachment_key?: string;
+    instructions: string; due_date: string; max_marks?: number; weightage?: number; attachment_key?: string;
   }) => api.post<Assignment[]>("/api/v1/assessments/assignments", payload).then((r) => r.data),
   updateAssignment: (id: string, payload: {
-    title?: string; category?: string; instructions?: string; due_date?: string; apply_to_batch?: boolean;
+    title?: string; category?: string; instructions?: string; due_date?: string; max_marks?: number; weightage?: number; apply_to_batch?: boolean;
   }) => api.put<Assignment>(`/api/v1/assessments/assignments/${id}`, payload).then((r) => r.data),
   deleteAssignment: (id: string, wholeBatch = false) =>
     api.delete(`/api/v1/assessments/assignments/${id}`, { params: { whole_batch: wholeBatch } }).then((r) => r.data),
@@ -358,11 +375,11 @@ export const assessmentsApi = {
     api.put<GradingScheme>(`/api/v1/assessments/grading-schemes/${id}`, payload).then((r) => r.data),
   deleteGradingScheme: (id: string) => api.delete(`/api/v1/assessments/grading-schemes/${id}`).then((r) => r.data),
 
-  listExamTypes: (courseId?: string) =>
-    getAllPages<ExamType>("/api/v1/assessments/exam-types", { course_id: courseId }),
-  createExamType: (payload: { course_id: string; name: string; weightage: number; grading_scheme_id: string }) =>
+  listExamTypes: (courseId?: string, classId?: string) =>
+    getAllPages<ExamType>("/api/v1/assessments/exam-types", { course_id: courseId, class_id: classId }),
+  createExamType: (payload: { course_id: string; class_id?: string; name: string; weightage: number; grading_scheme_id: string }) =>
     api.post<ExamType>("/api/v1/assessments/exam-types", payload).then((r) => r.data),
-  updateExamType: (id: string, payload: { course_id?: string; name?: string; weightage?: number; grading_scheme_id?: string }) =>
+  updateExamType: (id: string, payload: { course_id?: string; class_id?: string; name?: string; weightage?: number; grading_scheme_id?: string }) =>
     api.put<ExamType>(`/api/v1/assessments/exam-types/${id}`, payload).then((r) => r.data),
   deleteExamType: (id: string) => api.delete(`/api/v1/assessments/exam-types/${id}`).then((r) => r.data),
 
@@ -415,7 +432,7 @@ export interface StudentDashboard {
   my_attendance: Record<string, "present" | "absent" | "leave">;
   today_timetable: TimetableEntry[];
   latest_result: SessionResult | null;
-  due_assignments: { id: string; title: string; due_date: string; course_id: string }[];
+  due_assignments: { id: string; title: string; due_date: string; course_id: string; submitted?: boolean; file_key?: string | null; mark?: number | null; max_marks?: number | null; feedback?: string | null }[];
   resources: { id: string; title: string }[];
   announcements: { id: string; title: string; body: string }[];
 }

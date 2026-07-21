@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./Button";
 
@@ -39,13 +39,27 @@ export function FormModal({
   maxWidth?: number | string;
   children: ReactNode;
 }>) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onSubmit) {
+      setIsSubmitting(true);
+      try {
+        await onSubmit(e);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
   return (
     <Modal title={title} onClose={onClose} maxWidth={maxWidth}>
-      <form className="inlineForm" onSubmit={onSubmit}>
+      <form className="inlineForm" onSubmit={handleSubmit}>
         {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
         {children}
         <div className="formActions">
-          <Button className="primaryAction" type="submit" disabled={submitDisabled}>
+          <Button className="primaryAction" type="submit" disabled={submitDisabled} isLoading={isSubmitting}>
             {submitIcon} {submitLabel}
           </Button>
         </div>

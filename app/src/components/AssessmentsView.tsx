@@ -124,6 +124,7 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
       {!isLoading && !loadError && tab === "setup" && (
         <GradingSetup
           courses={courses}
+          classes={classes}
           canCreateScheme={!readOnly && hasPermission("grading.schemes.manage")}
           canCreateExamType={!readOnly && hasPermission("assessments.exam_types.manage")}
         />
@@ -373,7 +374,7 @@ function AssignmentCreateForm({
   onClose,
 }: Readonly<{ classes: AcademicClass[]; courses: Course[]; teacherSlots: TimetableSlot[] | null; canPublishAll: boolean; onCreated: () => void; onClose: () => void; }>) {
   const { t } = useTranslation();
-  const [form, setForm] = useState({ class_id: "", course_id: "", title: "", category: "", instructions: "", due_date: "" });
+  const [form, setForm] = useState({ class_id: "", course_id: "", title: "", category: "", instructions: "", due_date: "", max_marks: "", weightage: "" });
   const [sections, setSections] = useState<Section[]>([]);
   const [sectionIds, setSectionIds] = useState<string[]>([]);
   const [allClasses, setAllClasses] = useState(false);
@@ -426,6 +427,8 @@ function AssignmentCreateForm({
             category: form.category || undefined,
             instructions: form.instructions,
             due_date: new Date(form.due_date).toISOString(),
+            max_marks: form.max_marks ? Number(form.max_marks) : undefined,
+            weightage: form.weightage ? Number(form.weightage) : undefined,
             attachment_key,
           });
           onCreated();
@@ -497,6 +500,14 @@ function AssignmentCreateForm({
         <Input required type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
       </label>
       <label>
+        Max Marks
+        <Input type="number" step="any" min="0" value={form.max_marks} onChange={(e) => setForm({ ...form, max_marks: e.target.value })} placeholder="e.g. 100" />
+      </label>
+      <label>
+        Weightage (%)
+        <Input type="number" step="any" min="0" max="100" value={form.weightage} onChange={(e) => setForm({ ...form, weightage: e.target.value })} placeholder="e.g. 20" />
+      </label>
+      <label>
         {t("attachmentLabel")}
         <Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
       </label>
@@ -516,6 +527,8 @@ function AssignmentEditForm({
     category: assignment.category ?? "",
     instructions: assignment.instructions,
     due_date: assignment.due_date.slice(0, 10),
+    max_marks: assignment.max_marks?.toString() ?? "",
+    weightage: assignment.weightage?.toString() ?? "",
     apply_to_batch: false,
   });
   const [error, setError] = useState("");
@@ -535,6 +548,8 @@ function AssignmentEditForm({
             category: form.category || undefined,
             instructions: form.instructions,
             due_date: new Date(form.due_date).toISOString(),
+            max_marks: form.max_marks ? Number(form.max_marks) : undefined,
+            weightage: form.weightage ? Number(form.weightage) : undefined,
             apply_to_batch: form.apply_to_batch,
           });
           onDone();
@@ -548,6 +563,8 @@ function AssignmentEditForm({
       <label>{t("categoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
       <label>{t("instructionsLabel")}<Input required value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} /></label>
       <label>{t("dueDateLabel")}<Input required type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
+      <label>Max Marks<Input type="number" step="any" min="0" value={form.max_marks} onChange={(e) => setForm({ ...form, max_marks: e.target.value })} placeholder="e.g. 100" /></label>
+      <label>Weightage (%)<Input type="number" step="any" min="0" max="100" value={form.weightage} onChange={(e) => setForm({ ...form, weightage: e.target.value })} placeholder="e.g. 20" /></label>
       {assignment.batch_id && (
         <label className="checkboxLabel">
           <Checkbox  checked={form.apply_to_batch} onChange={(e) => setForm({ ...form, apply_to_batch: e.target.checked })} />
@@ -566,13 +583,15 @@ function SubmissionRow({
 }: Readonly<{ submission: Submission; studentName: string; onGraded: () => void }>) {
   const { t } = useTranslation();
   const [mark, setMark] = useState(submission.mark?.toString() ?? "");
+  const [feedback, setFeedback] = useState(submission.feedback ?? "");
   return (
     <div className="dataRow">
       <span>{studentName}</span>
       <span>{new Date(submission.submitted_at).toLocaleString()}</span>
       <span>{submission.is_late ? t("lateLabel") : t("onTimeLabel")}</span>
-      <span>
-        <Input style={{ width: 60 }} value={mark} onChange={(e) => setMark(e.target.value)} />
+      <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <Input style={{ width: 80 }} placeholder="Mark" value={mark} onChange={(e) => setMark(e.target.value)} />
+        <textarea className="input" placeholder="Feedback/Remarks" rows={2} style={{ width: 150 }} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
       </span>
       <span>
         <Button
@@ -589,7 +608,7 @@ function SubmissionRow({
           className="tableAction"
           type="button"
           onClick={async () => {
-            await assessmentsApi.gradeSubmission(submission.id, { mark: Number(mark) });
+            await assessmentsApi.gradeSubmission(submission.id, { mark: Number(mark), feedback: feedback || undefined });
             onGraded();
           }}
         >
@@ -764,16 +783,17 @@ function MarkCell({
 
 function GradingSetup({
   courses,
+  classes,
   canCreateScheme,
   canCreateExamType,
-}: Readonly<{ courses: Course[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
+}: Readonly<{ courses: Course[]; classes: AcademicClass[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
   const { t } = useTranslation();
   type EditableBand = { label: string; min_score: string; max_score: string };
   const defaultBands: EditableBand[] = [];
   const [schemes, setSchemes] = useState<GradingScheme[]>([]);
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
   const [schemeForm, setSchemeForm] = useState({ name: "", bands: defaultBands });
-  const [examForm, setExamForm] = useState({ course_id: "", name: "", weightage: "", grading_scheme_id: "" });
+  const [examForm, setExamForm] = useState({ course_id: "", class_id: "", name: "", weightage: "", grading_scheme_id: "" });
   const [editingScheme, setEditingScheme] = useState<GradingScheme | null>(null);
   const [editingExam, setEditingExam] = useState<ExamType | null>(null);
   const [showSchemeForm, setShowSchemeForm] = useState(false);
@@ -799,7 +819,7 @@ function GradingSetup({
         }}><Plus size={16} /> {t("addSchemeBtn")}</Button>}
         {canCreateExamType && <Button className="primaryAction" type="button" onClick={() => {
           setEditingExam(null);
-          setExamForm({ course_id: "", name: "", weightage: "", grading_scheme_id: "" });
+          setExamForm({ course_id: "", class_id: "", name: "", weightage: "", grading_scheme_id: "" });
           setShowExamForm(true);
         }}><Plus size={16} /> {t("addExamTypeBtn")}</Button>}
       </div>
@@ -827,8 +847,8 @@ function GradingSetup({
                       setError(err.response?.data?.detail ?? t("failedCreateScheme"));
                     }
                   }}
-            submitLabel={t("addSchemeBtn")}
-            submitIcon={<Plus size={16} />}
+            submitLabel={editingScheme ? t("saveBtn", "Save") : t("addSchemeBtn")}
+            submitIcon={editingScheme ? <Pencil size={16} /> : <Plus size={16} />}
             submitDisabled={schemeForm.bands.length === 0}
           >
             <label>{t("schemeNameLabel")}<Input required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} /></label>
@@ -875,13 +895,14 @@ function GradingSetup({
                     try {
                       const payload = {
                         course_id: examForm.course_id,
+                        class_id: examForm.class_id || undefined,
                         name: examForm.name,
                         weightage: Number(examForm.weightage),
                         grading_scheme_id: examForm.grading_scheme_id,
                       };
                       if (editingExam) await assessmentsApi.updateExamType(editingExam.id, payload);
                       else await assessmentsApi.createExamType(payload);
-                      setExamForm({ course_id: "", name: "", weightage: "", grading_scheme_id: "" });
+                      setExamForm({ course_id: "", class_id: "", name: "", weightage: "", grading_scheme_id: "" });
                       setEditingExam(null);
                       setShowExamForm(false);
                       await load();
@@ -889,14 +910,22 @@ function GradingSetup({
                       setError(err.response?.data?.detail ?? t("failedCreateExamType"));
                     }
                   }}
-            submitLabel={t("addExamTypeBtn")}
-            submitIcon={<Plus size={16} />}
+            submitLabel={editingExam ? t("saveBtn", "Save") : t("addExamTypeBtn")}
+            submitIcon={editingExam ? <Pencil size={16} /> : <Plus size={16} />}
           >
             <label>
                     {t("courseLabel")}
                     <Select required value={examForm.course_id} onChange={(e) => setExamForm({ ...examForm, course_id: e.target.value })}>
                       <option value="">{t("selectEllipsis")}</option>
                       {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </Select>
+                  </label>
+
+            <label>
+                    {t("classLabel")} <small>({t("optionalLabel", "Optional")})</small>
+                    <Select value={examForm.class_id} onChange={(e) => setExamForm({ ...examForm, class_id: e.target.value })}>
+                      <option value="">{t("allClassesLabel", "All Classes")}</option>
+                      {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </Select>
                   </label>
 
@@ -915,13 +944,14 @@ function GradingSetup({
       <DataTable<ExamType>
         columns={[
           { header: t("courseCol"), render: (et) => courses.find((c) => c.id === et.course_id)?.name ?? "—" },
+          { header: t("classCol"), render: (et) => et.class_id ? (classes.find((c) => c.id === et.class_id)?.name ?? "—") : t("allClassesLabel", "All Classes") },
           { header: t("examCol"), render: (et) => et.name },
           { header: t("weightageCol"), render: (et) => `${et.weightage}%` },
           { header: t("actionsCol"), render: (et) => (
             <span className="actions">
               {canCreateExamType && <Button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
                 setEditingExam(et);
-                setExamForm({ course_id: et.course_id, name: et.name, weightage: String(et.weightage), grading_scheme_id: et.grading_scheme_id });
+                setExamForm({ course_id: et.course_id, class_id: et.class_id || "", name: et.name, weightage: String(et.weightage), grading_scheme_id: et.grading_scheme_id });
                 setShowExamForm(true);
               }}><Pencil size={15} /></Button>}
               {canCreateExamType && <Button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {

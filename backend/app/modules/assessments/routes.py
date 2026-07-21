@@ -758,6 +758,7 @@ async def create_exam_type(
     exam_type = ExamType(
         madrasa_id=madrasa.id,
         course_id=payload.course_id,
+        class_id=payload.class_id,
         name=payload.name,
         weightage=payload.weightage,
         grading_scheme_id=payload.grading_scheme_id,
@@ -775,12 +776,15 @@ async def list_exam_types(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     course_id: UUID | None = None,
+    class_id: UUID | None = None,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[ExamTypeRead]:
     stmt = select(ExamType).where(ExamType.madrasa_id == madrasa.id)
     if course_id:
         stmt = stmt.where(ExamType.course_id == course_id)
+    if class_id:
+        stmt = stmt.where(ExamType.class_id == class_id)
     rows = await paginate_scalars(session, stmt.order_by(ExamType.name), limit=limit, offset=offset, response=response)
     return [ExamTypeRead.model_validate(row) for row in rows]
 
@@ -805,6 +809,8 @@ async def update_exam_type(
         exam_type.grading_scheme_id = payload.grading_scheme_id
     if payload.course_id is not None:
         exam_type.course_id = payload.course_id
+    if payload.class_id is not None:
+        exam_type.class_id = payload.class_id
     if payload.name is not None:
         exam_type.name = payload.name
     if payload.weightage is not None:
@@ -909,13 +915,19 @@ async def _compute_course_result(session: AsyncSession, madrasa_id: UUID, studen
     exam_types = (
         await session.execute(select(ExamType).where(ExamType.course_id == course_id, ExamType.madrasa_id == madrasa_id))
     ).scalars().all()
-    if not exam_types:
+    assignments_exist = (
+        await session.execute(select(Assignment).where(Assignment.course_id == course_id, Assignment.madrasa_id == madrasa_id, Assignment.weightage.is_not(None)))
+    ).scalars().first()
+    
+    if not exam_types and not assignments_exist:
         return CourseResult(course_id=course_id, raw_score=None, band=None, exam_count=0)
 
     total_weight = 0.0
     weighted_sum = 0.0
     count = 0
     last_scheme_id = None
+    
+    # 1. Include Exams
     for exam_type in exam_types:
         mark = (
             await session.execute(
@@ -928,6 +940,41 @@ async def _compute_course_result(session: AsyncSession, madrasa_id: UUID, studen
         total_weight += exam_type.weightage
         count += 1
         last_scheme_id = exam_type.grading_scheme_id
+
+    # 2. Include Assignments with weightage
+    assignments = (
+        await session.execute(
+            select(Assignment).where(
+                Assignment.course_id == course_id, 
+                Assignment.madrasa_id == madrasa_id,
+                Assignment.weightage.is_not(None),
+                Assignment.max_marks.is_not(None),
+                Assignment.max_marks > 0
+            )
+        )
+    ).scalars().all()
+    
+    for assignment in assignments:
+        submission = (
+            await session.execute(
+                select(Submission).where(
+                    Submission.assignment_id == assignment.id, 
+                    Submission.student_id == student_id,
+                    Submission.mark.is_not(None)
+                )
+            )
+        ).scalar_one_or_none()
+        
+        if submission is None or submission.mark is None:
+            continue
+            
+        # Normalize the assignment score to 100 before applying weightage
+        # (Assuming exam scores are out of 100 or they are already raw percentage)
+        # Actually, wait, if mark.score in exams is percentage, we should convert assignment mark to percentage:
+        normalized_score = (submission.mark / assignment.max_marks) * 100.0
+        weighted_sum += normalized_score * assignment.weightage
+        total_weight += assignment.weightage
+        count += 1
 
     if total_weight == 0:
         return CourseResult(course_id=course_id, raw_score=None, band=None, exam_count=0)
@@ -1069,15 +1116,17 @@ async def _render_result_card(session: AsyncSession, madrasa_id: UUID, student: 
     result = await _build_session_result(session, madrasa_id, student.id, session_id)
     academic_session = await session.get(AcademicSession, session_id)
 
-    course_names = dict(
-        (
-            await session.execute(
-                select(Course.id, Course.name).where(
-                    Course.id.in_([cr.course_id for cr in result.course_results])
+    course_names = {}
+    if result.course_results:
+        course_names = dict(
+            (
+                await session.execute(
+                    select(Course.id, Course.name).where(
+                        Course.id.in_([cr.course_id for cr in result.course_results])
+                    )
                 )
-            )
-        ).all()
-    )
+            ).all()
+        )
     course_rows = [
         [course_names.get(cr.course_id, str(cr.course_id)), f"{cr.raw_score:g}" if cr.raw_score is not None else "—", cr.band or "—"]
         for cr in result.course_results
@@ -1130,7 +1179,7 @@ async def get_my_result_card(
 async def get_result_card(
     student_id: UUID,
     session_id: UUID,
-    current_user: User = Depends(require_permission("assessments.marks.enter")),
+    current_user: User = Depends(require_assessment_staff("assessments.marks.enter")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
@@ -1194,7 +1243,11 @@ async def _section_matrix(
     for course in course_rows:
         exam_types_by_course[course.id] = (
             await session.execute(
-                select(ExamType).where(ExamType.course_id == course.id, ExamType.madrasa_id == madrasa_id)
+                select(ExamType).where(
+                    ExamType.course_id == course.id,
+                    ExamType.madrasa_id == madrasa_id,
+                    or_(ExamType.class_id == None, ExamType.class_id == section.class_id)
+                )
             )
         ).scalars().all()
 

@@ -1326,8 +1326,11 @@ async def submit_form_response(
         await session.execute(select(StudentProfile).where(StudentProfile.user_id == current_user.id))
     ).scalar_one_or_none()
     
-    if student is None and not form.visibility_scope.get("all", False):
-        raise HTTPException(status_code=403, detail="Only portal students can submit this form")
+    is_admin = await _form_admin(current_user, session)
+    ctx = await get_viewer_context(session, current_user, madrasa.id)
+    
+    if not is_admin and form.created_by_id != current_user.id and not scope_allows(form.visibility_scope, ctx):
+        raise HTTPException(status_code=403, detail="You do not have permission to submit this form")
 
     student_id = student.id if student else None
 
@@ -1699,9 +1702,9 @@ async def delete_admission_form(
         ).limit(1)
     )
     if has_applications is not None:
-        raise HTTPException(
-            status_code=409,
-            detail="This form has applications; close it to preserve submitted records",
+        from sqlalchemy import update
+        await session.execute(
+            update(AdmissionApplication).where(AdmissionApplication.form_id == form.id).values(form_id=None)
         )
     await session.delete(form)
     await session.commit()

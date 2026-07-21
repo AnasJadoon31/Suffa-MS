@@ -9,6 +9,7 @@ export interface User {
   role: string;
   status: string;
   preferred_language: string;
+  is_principal_delegate: boolean;
   selected_session_id: string | null;
   has_teaching_assignment: boolean;
 }

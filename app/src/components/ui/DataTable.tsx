@@ -108,9 +108,10 @@ function DataRow<T>({
     <>
       {before}
       <div className="dataRow">
-        {columns.map((col, i) => (
-          <span key={i}>{col.render(item, index)}</span>
-        ))}
+        {columns.map((col, i) => {
+          const label = typeof col.header === "string" ? col.header : undefined;
+          return <span key={i} data-label={label}>{col.render(item, index)}</span>;
+        })}
       </div>
     </>
   );

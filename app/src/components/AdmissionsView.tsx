@@ -222,6 +222,7 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
 
 function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program[]; canMutate: boolean }>) {
   const { t } = useTranslation();
+  const { confirm } = useDialog();
   const [forms, setForms] = useState<AdmissionForm[]>([]);
   const [form, setForm] = useState({ program_id: "", title: "", description: "", category: "General" });
   const [fields, setFields] = useState<FormFieldDefinition[]>([emptyFormField()]);
@@ -303,7 +304,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
       )}
 
       {canMutate && showCreate && <FormModal
-            title={t("createAdmissionFormBtn")} onClose={() => setShowCreate(false)}
+            title={t("createAdmissionFormBtn")} onClose={() => setShowCreate(false)} maxWidth={800}
             onSubmit={async (e) => {
                     e.preventDefault();
                     setError("");

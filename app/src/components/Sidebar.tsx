@@ -36,7 +36,7 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
           ? <img className="brandLogo" src={madrasa.logo_url} alt="" />
           : <span className="brandMark">م</span>}
         <div className="brandText">
-          <strong>{(i18n.language === "ur" ? madrasa?.name_ur : madrasa?.name_en) ?? madrasa?.name ?? t("appName")}</strong>
+          <strong>{(i18n.language === "ur" ? madrasa?.name_ur : madrasa?.name_en) || madrasa?.name || t("appName")}</strong>
           <small>{t("appName")}</small>
         </div>
       </div>
@@ -44,7 +44,7 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
       <nav className="navScroll" aria-label={t("primaryNavigationLabel")}>
         {navGroups.map((group) => {
           const visible = group.items.filter(
-            (item) => isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment),
+            (item) => isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate),
           );
           if (visible.length === 0) return null;
           return (
@@ -60,7 +60,7 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
                       }}
                       key={item.id}
                       onClick={onNavigate}
-                      to={resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment)}
+                      to={resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate)}
                     >
                       <Icon size={17} />
                       <span>{t(item.labelKey)}</span>

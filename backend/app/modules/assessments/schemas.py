@@ -20,6 +20,8 @@ class AssignmentCreate(BaseModel):
     instructions: str
     attachment_key: str | None = None
     due_date: datetime
+    max_marks: float | None = None
+    weightage: float | None = None
     target_student_ids: list[UUID] = []
 
     @model_validator(mode="after")
@@ -37,6 +39,8 @@ class AssignmentUpdate(BaseModel):
     instructions: str | None = None
     attachment_key: str | None = None
     due_date: datetime | None = None
+    max_marks: float | None = None
+    weightage: float | None = None
     target_student_ids: list[UUID] | None = None
     # Apply the edit to every row sharing this assignment's batch_id.
     apply_to_batch: bool = False
@@ -53,6 +57,8 @@ class AssignmentRead(BaseModel):
     instructions: str
     attachment_key: str | None
     due_date: datetime
+    max_marks: float | None
+    weightage: float | None
     target_student_ids: list | None
     created_by_id: UUID | None
     batch_id: UUID | None = None
@@ -111,6 +117,7 @@ class GradingSchemeRead(BaseModel):
 
 class ExamTypeCreate(BaseModel):
     course_id: UUID
+    class_id: UUID | None = None
     name: str
     weightage: float = Field(gt=0)
     grading_scheme_id: UUID
@@ -118,6 +125,7 @@ class ExamTypeCreate(BaseModel):
 
 class ExamTypeUpdate(BaseModel):
     course_id: UUID | None = None
+    class_id: UUID | None = None
     name: str | None = None
     weightage: float | None = Field(default=None, gt=0)
     grading_scheme_id: UUID | None = None
@@ -127,6 +135,7 @@ class ExamTypeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     course_id: UUID
+    class_id: UUID | None
     name: str
     weightage: float
     grading_scheme_id: UUID

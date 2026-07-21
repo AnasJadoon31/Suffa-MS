@@ -18,10 +18,10 @@ export const emptyFormField = (): FormFieldDefinition => ({
 
 export function cleanFormFields(fields: FormFieldDefinition[]): FormFieldDefinition[] {
   return fields
-    .filter((field) => field.key.trim() && field.label.trim())
+    .filter((field) => field.label.trim())
     .map((field) => ({
       ...field,
-      key: field.key.trim(),
+      key: field.key.trim() || field.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''),
       label: field.label.trim(),
       options: OPTION_FIELD_TYPES.has(field.type) ? field.options : [],
     }));
@@ -68,10 +68,6 @@ export function FormFieldsEditor({
         {fields.map((field, index) => (
           <div key={index} className="formFieldCard">
             <span className="formFieldNumber">{index + 1}</span>
-            <label>
-              {t("fieldKeyLabel")}
-              <Input required value={field.key} onChange={(event) => updateField(index, { key: event.target.value })} placeholder="field_key" />
-            </label>
             <label>
               {t("fieldLabelLabel")}
               <Input required value={field.label} onChange={(event) => updateField(index, { label: event.target.value })} />

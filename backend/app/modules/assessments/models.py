@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, String, Text, UniqueConstraint
@@ -20,6 +21,8 @@ class Assignment(Base, IdMixin, TenantMixin, TimestampMixin):
     instructions: Mapped[str] = mapped_column(Text)
     attachment_key: Mapped[str] = mapped_column(String(255), nullable=True)
     due_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    max_marks: Mapped[float] = mapped_column(Float, nullable=True)
+    weightage: Mapped[float] = mapped_column(Float, nullable=True)
     # Null/empty = whole class (FR-ASG-02); populated = only these students.
     target_student_ids: Mapped[list] = mapped_column(PortableJSONB, nullable=True)
     created_by_id: Mapped[UUID] = mapped_column(ForeignKey("teacher_profiles.id"), nullable=True)
@@ -50,10 +53,10 @@ class ExamType(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "exam_types"
 
     course_id: Mapped[UUID] = mapped_column(ForeignKey("courses.id"), index=True)
+    class_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("classes.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(160))
     weightage: Mapped[float] = mapped_column(Float)
     grading_scheme_id: Mapped[UUID] = mapped_column(ForeignKey("grading_schemes.id"))
-
 
 class Mark(Base, IdMixin, TimestampMixin):
     __tablename__ = "marks"

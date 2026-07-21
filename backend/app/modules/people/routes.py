@@ -85,6 +85,7 @@ async def create_teacher(
         address=payload.address,
         emergency_contact=payload.emergency_contact,
         photo_file_id=payload.photo_file_id,
+        is_principal_delegate=payload.is_principal_delegate or False,
     )
     session.add(profile)
     await session.commit()
@@ -440,6 +441,50 @@ async def list_guardians(
     return [GuardianRead.model_validate(row) for row in rows]
 
 
+@router.post("/guardians/{guardian_id}/students/{student_id}", response_model=dict)
+async def link_student_guardian(
+    guardian_id: UUID,
+    student_id: UUID,
+    current_user: User = Depends(require_permission("students.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+    student = await _get_or_404(session, StudentProfile, student_id, madrasa.id)
+    
+    # Check if already linked
+    exists = await session.scalar(
+        select(StudentGuardian.id)
+        .where(StudentGuardian.student_id == student_id, StudentGuardian.guardian_id == guardian_id)
+        .limit(1)
+    )
+    if not exists:
+        link = StudentGuardian(student_id=student_id, guardian_id=guardian_id)
+        session.add(link)
+        await session.commit()
+    return {"status": "success"}
+
+@router.delete("/guardians/{guardian_id}/students/{student_id}", response_model=dict)
+async def unlink_student_guardian(
+    guardian_id: UUID,
+    student_id: UUID,
+    current_user: User = Depends(require_permission("students.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+    student = await _get_or_404(session, StudentProfile, student_id, madrasa.id)
+    
+    link = await session.scalar(
+        select(StudentGuardian)
+        .where(StudentGuardian.student_id == student_id, StudentGuardian.guardian_id == guardian_id)
+        .limit(1)
+    )
+    if link:
+        await session.delete(link)
+        await session.commit()
+    return {"status": "success"}
+
 @router.get("/students/{student_id}/guardians", response_model=list[GuardianRead])
 async def list_student_guardians(
     student_id: UUID,
@@ -459,6 +504,26 @@ async def list_student_guardians(
     rows = await paginate_scalars(session, stmt.order_by(Guardian.name), limit=limit, offset=offset, response=response)
     return [GuardianRead.model_validate(row) for row in rows]
 
+
+@router.get("/guardians/{guardian_id}/students", response_model=list[StudentRead])
+async def list_guardian_students(
+    guardian_id: UUID,
+    current_user: User = Depends(require_permission("students.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[StudentRead]:
+    # Need to verify the guardian belongs to the madrasa
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+
+    stmt = (
+        select(StudentProfile)
+        .join(StudentGuardian, StudentProfile.id == StudentGuardian.student_id)
+        .where(StudentGuardian.guardian_id == guardian_id)
+        .where(StudentProfile.madrasa_id == madrasa.id)
+    )
+    result = await session.execute(stmt)
+    rows = result.scalars().all()
+    return [StudentRead.model_validate(row) for row in rows]
 
 async def _get_or_404(session: AsyncSession, model, record_id: UUID, madrasa_id: UUID):
     record = await session.get(model, record_id)

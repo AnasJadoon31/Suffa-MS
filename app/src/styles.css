@@ -1001,6 +1001,49 @@ button:disabled {
   border-inline-start: 0;
 }
 
+@media (max-width: 768px) {
+  .tableResponsive {
+    overflow-x: hidden;
+  }
+  .dataTable {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: transparent;
+    border: none;
+    min-width: 0;
+  }
+  .dataRow.header {
+    display: none;
+  }
+  .dataRow {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .dataRow span {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-inline-start: none;
+    border-bottom: 1px solid var(--line);
+    padding: 12px;
+  }
+  .dataRow span:last-child {
+    border-bottom: none;
+  }
+  .dataRow span::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--faint);
+    margin-right: 16px;
+    font-size: 0.85rem;
+  }
+}
+
 .dataRow input,
 .dataRow select {
   width: 100%;
@@ -2464,4 +2507,33 @@ input[type="radio"] {
   .login-card {
     padding: 28px 24px;
   }
+}
+
+/* Animation for loaders */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Fix Urdu text overlapping */
+html[lang="ur"],
+html[lang="ur"] h1,
+html[lang="ur"] h2,
+html[lang="ur"] h3,
+html[lang="ur"] button,
+html[lang="ur"] input,
+html[lang="ur"] select,
+html[lang="ur"] textarea,
+html[lang="ur"] .dataTable td,
+html[lang="ur"] .dataTable th,
+html[lang="ur"] p,
+html[lang="ur"] span {
+  line-height: 1.8;
 }

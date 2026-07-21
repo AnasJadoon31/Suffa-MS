@@ -1,5 +1,5 @@
 import { Button } from "./ui/Button";
-import { AlertTriangle, CalendarDays, CircleDollarSign, ClipboardCheck, ExternalLink, GraduationCap, LogIn, LogOut, UserRoundCog } from "lucide-react";
+import { AlertTriangle, CalendarDays, CircleDollarSign, ClipboardCheck, ExternalLink, FileDown, GraduationCap, LogIn, LogOut, UserRoundCog } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -40,7 +40,7 @@ function QuickLinks({ onNavigate }: Readonly<{ onNavigate?: (view: ViewId) => vo
   if (!onNavigate) return null;
   const priorityViews: ViewId[] = ["attendance", "timetable", "announcements", "assessments", "people", "finance"];
   const visible = navItems.filter(
-    (item) => item.id !== "dashboard" && isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment),
+    (item) => item.id !== "dashboard" && isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate),
   ).sort((a, b) => priorityViews.indexOf(a.id) - priorityViews.indexOf(b.id))
     .filter((item) => priorityViews.includes(item.id));
   return (
@@ -302,7 +302,7 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(assignment.submitted ?? false);
 
   const submit = async () => {
     if (!file) return;
@@ -321,20 +321,47 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
   };
 
   return (
-    <li>
-      {assignment.title} — due {assignment.due_date.slice(0, 10)}
-      {submitted ? (
-        <span> — {t("submittedLabel")}</span>
-      ) : (
-        <>
-          <Input type="file" disabled={readOnly} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <Button className="tableAction" type="button" disabled={readOnly || !file} onClick={() => void submit()}>
-            {t("submitBtn")}
-          </Button>
-        </>
-      )}
-      {error && <span className="notice" style={{ color: "var(--rose)" }}>{error}</span>}
-    </li>
+    <div className="dataRow">
+      <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <strong>{assignment.title}</strong>
+        <span className="notice">Due {assignment.due_date.slice(0, 10)}</span>
+        {assignment.feedback && (
+          <span className="notice" style={{ color: "var(--primary)", marginTop: 4 }}>
+            <strong>{t("remarksLabel", "Remarks")}:</strong> {assignment.feedback}
+          </span>
+        )}
+      </span>
+      <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {submitted ? (
+          <span style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+            <span className="notice">{t("submittedLabel")}</span>
+            {assignment.mark !== undefined && assignment.mark !== null && assignment.max_marks && (
+              <span className="badge success">{assignment.mark} / {assignment.max_marks}</span>
+            )}
+            {assignment.file_key && (
+              <Button
+                className="tableAction"
+                type="button"
+                onClick={async () => {
+                  const { url } = await filesApi.presignDownload(assignment.file_key!);
+                  window.open(url, "_blank", "noreferrer");
+                }}
+              >
+                <FileDown size={14} /> {t("downloadBtn")}
+              </Button>
+            )}
+          </span>
+        ) : (
+          <>
+            <Input type="file" disabled={readOnly} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <Button className="primaryAction" type="button" disabled={readOnly || !file} onClick={() => void submit()}>
+              {t("submitBtn")}
+            </Button>
+          </>
+        )}
+      </span>
+      {error && <span className="notice" style={{ color: "var(--rose)", width: "100%" }}>{error}</span>}
+    </div>
   );
 }
 
@@ -400,37 +427,48 @@ function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashb
           <PageSection>
             <PageHeader title={t("todaysTimetableHeading")} />
             {data.today_timetable.length === 0 && <p className="emptyState">{t("noPeriodsToday")}</p>}
-            <ul>
+            <div className="dataTable">
               {data.today_timetable.map((slot, i) => (
-                <li key={i}>{slot.start_time} – {slot.end_time} ({t("periodLabel", { period: slot.period })})</li>
+                <div className="dataRow" key={i}>
+                  <span><strong>{t("periodLabel", { period: slot.period })}</strong></span>
+                  <span>{slot.start_time} – {slot.end_time}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("dueAssignmentsHeading")} />
             {data.due_assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
-            <ul>
+            <div className="dataTable">
               {data.due_assignments.map((a) => (
                 <DueAssignmentRow key={a.id} assignment={a} readOnly={readOnly} onSubmitted={() => { /* refreshes next load */ }} />
               ))}
-            </ul>
+            </div>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("announcements")} />
             {data.announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsYet")}</p>}
-            <ul>
-              {data.announcements.map((a) => <li key={a.id}>{a.title}</li>)}
-            </ul>
+            <div className="dataTable">
+              {data.announcements.map((a) => (
+                <div className="dataRow" key={a.id}>
+                  <span>{a.title}</span>
+                </div>
+              ))}
+            </div>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("resources")} />
             {data.resources.length === 0 && <p className="emptyState">{t("noResourcesShared")}</p>}
-            <ul>
-              {data.resources.map((r) => <li key={r.id}>{r.title}</li>)}
-            </ul>
+            <div className="dataTable">
+              {data.resources.map((r) => (
+                <div className="dataRow" key={r.id}>
+                  <span>{r.title}</span>
+                </div>
+              ))}
+            </div>
           </PageSection>
         </div>
       </div>

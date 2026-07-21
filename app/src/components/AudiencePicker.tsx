@@ -30,7 +30,7 @@ export function AudiencePicker({
       : value.courses && value.courses.length > 0 ? "courses"
       : value.users && value.users.length > 0 ? "users"
       : value.classes && value.classes.length > 0 ? "classes"
-      : "all"
+      : user?.role === "teacher" ? "classes" : "all"
   );
 
   useEffect(() => {
@@ -90,13 +90,13 @@ export function AudiencePicker({
       <label>
         {t("audienceLabel")}
         <Select value={mode} onChange={(e) => setMode2(e.target.value as Mode)}>
-          <option value="all">{t("audienceEveryone")}</option>
-          <option value="teachers">{t("teachers")}</option>
-          <option value="students">{t("students")}</option>
+          {user?.role !== "teacher" && <option value="all">{t("audienceEveryone")}</option>}
+          {user?.role !== "teacher" && <option value="teachers">{t("teachers")}</option>}
+          {user?.role !== "teacher" && <option value="students">{t("students")}</option>}
           <option value="classes">{t("audienceClasses")}</option>
           <option value="sections">{t("audienceSections")}</option>
           <option value="courses">{t("audienceCourses")}</option>
-          <option value="users">{t("audienceUsers")}</option>
+          {user?.role !== "teacher" && <option value="users">{t("audienceUsers")}</option>}
         </Select>
       </label>
       {mode === "classes" && (

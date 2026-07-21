@@ -2,10 +2,12 @@ from typing import Optional
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, ForeignKey, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Date, ForeignKey, String, Text, select
+from sqlalchemy.orm import Mapped, mapped_column, column_property
 
 from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
+from app.modules.auth.models import User
+from app.modules.academics.models import Enrollment, AcademicClass
 
 
 class TeacherProfile(Base, IdMixin, TenantMixin, TimestampMixin):
@@ -18,6 +20,7 @@ class TeacherProfile(Base, IdMixin, TenantMixin, TimestampMixin):
     qualifications: Mapped[str] = mapped_column(Text, nullable=True)
     join_date: Mapped[date] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(24), default="active")
+    is_principal_delegate: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     # Formal-record fields (§11): identity + contacts + photo.
     cnic: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -40,6 +43,18 @@ class StudentProfile(Base, IdMixin, TenantMixin, TimestampMixin):
     b_form_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     photo_file_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("file_objects.id"), nullable=True)
+
+    username: Mapped[Optional[str]] = column_property(
+        select(User.username).where(User.id == user_id).correlate_except(User).scalar_subquery()
+    )
+    current_class: Mapped[Optional[str]] = column_property(
+        select(AcademicClass.name)
+        .select_from(Enrollment)
+        .join(AcademicClass, Enrollment.class_id == AcademicClass.id)
+        .where(Enrollment.student_id == id)
+        .correlate_except(Enrollment, AcademicClass)
+        .scalar_subquery()
+    )
 
 
 class Guardian(Base, IdMixin, TenantMixin, TimestampMixin):

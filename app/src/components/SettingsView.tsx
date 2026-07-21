@@ -124,7 +124,7 @@ export function SettingsView() {
                     </Modal>
                   ) : (
                     <FormModal
-                      title={t("editBtn") + " " + item.key}
+                      title={t("editBtn") + " " + item.label}
                       onClose={() => setEditingKey(null)}
                       submitLabel={t("saveBtn")}
                       onSubmit={(event: React.FormEvent) => { event.preventDefault(); void save(item).then(() => setEditingKey(null)); }}

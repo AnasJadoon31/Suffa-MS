@@ -109,7 +109,13 @@ async def get_me(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session)
 ) -> CurrentUserResponse:
-    if current_user.role == UserRole.principal:
+    is_delegate = False
+    if current_user.role == UserRole.teacher:
+        is_delegate = await session.scalar(
+            select(TeacherProfile.is_principal_delegate).where(TeacherProfile.user_id == current_user.id)
+        ) or False
+
+    if current_user.role == UserRole.principal or is_delegate:
         # Implicit superuser (FR-RBAC-01): holds every registered permission.
         permissions = [permission.code for permission in registry.all()]
     else:
@@ -124,6 +130,7 @@ async def get_me(
                 MadrasaSetting.key.in_([
                     "madrasa.address", "madrasa.phone", "madrasa.email",
                     "madrasa.website", "madrasa.logo_file_id",
+                    "madrasa.name_en", "madrasa.name_ur",
                 ]),
             )
         )
@@ -142,8 +149,11 @@ async def get_me(
             .limit(1)
         ) is not None
 
+    user_read = UserRead.model_validate(current_user)
+    user_read.is_principal_delegate = is_delegate
+
     return CurrentUserResponse(
-        user=UserRead.model_validate(current_user),
+        user=user_read,
         madrasa=MadrasaRead.model_validate(madrasa),
         permissions=permissions,
         features=await get_enabled_features(madrasa.id, session),

@@ -121,15 +121,8 @@ export function LoginScreen() {
                 </div>
               </div>
 
-              <Button type="submit" className="login-button" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 size={18} className="spin" />
-                    {t("signingIn")}
-                  </>
-                ) : (
-                  t("signInButton")
-                )}
+              <Button type="submit" className="login-button" isLoading={isLoading}>
+                {t("signInButton")}
               </Button>
             </form>
           </div>

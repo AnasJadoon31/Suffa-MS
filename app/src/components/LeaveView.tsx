@@ -13,6 +13,7 @@ import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { InlineFilter } from "./ui/InlineFilter";
 
 
 function resolvePerson(record: Leave, personByUserId: Map<string, { name: string; role: string }>, unknownPerson: string) {
@@ -159,9 +160,8 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
         title={t("leaveTitle")}
         icon={<CalendarDays size={18} />}
         notice={canManage ? t("leaveManageSubtitle") : t("leaveSelfSubtitle")}
+        actions={canWrite && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("requestLeaveBtn")}</Button>}
       />
-
-      {canWrite && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("requestLeaveBtn")}</Button>}
       {canWrite && showCreate && <FormModal
             title={t("requestLeaveBtn")} onClose={() => setShowCreate(false)}
             onSubmit={async (e) => {
@@ -269,16 +269,33 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
       {!isLoading && error && <ErrorState message={error} />}
 
       {canManage && (
-        <div className="filterBar">
-          <Button className={tab === "all" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("all")}>{t("allLabel")}</Button>
-          <Button className={tab === "teacher" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("teacher")}>{t("teachersLabel")}</Button>
-          <Button className={tab === "student" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => setTab("student")}>{t("studentsLabel")}</Button>
-          <Select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-            <option value="">{t("anyStatusLabel")}</option>
-            <option value="pending">{t("leaveStatus_pending")}</option>
-            <option value="approved">{t("leaveStatus_approved")}</option>
-            <option value="rejected">{t("leaveStatus_rejected")}</option>
-          </Select>
+        <InlineFilter
+          filters={[
+            {
+              key: "tabs",
+              type: "tab",
+              value: tab,
+              onChange: (v) => setTab(v as any),
+              options: [
+                { value: "all", label: t("allLabel") },
+                { value: "teacher", label: t("teachersLabel") },
+                { value: "student", label: t("studentsLabel") }
+              ]
+            },
+            {
+              key: "status",
+              type: "select",
+              value: filters.status,
+              onChange: (v) => setFilters({ ...filters, status: v }),
+              placeholder: t("anyStatusLabel"),
+              options: [
+                { value: "pending", label: t("leaveStatus_pending") },
+                { value: "approved", label: t("leaveStatus_approved") },
+                { value: "rejected", label: t("leaveStatus_rejected") }
+              ]
+            }
+          ]}
+        >
           {tab === "student" && (
             <Select value={filters.class_id} onChange={(e) => setFilters({ ...filters, class_id: e.target.value })}>
               <option value="">{t("allClasses")}</option>
@@ -287,7 +304,7 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
           )}
           <Input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} />
           <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
-        </div>
+        </InlineFilter>
       )}
 
       <form
@@ -306,7 +323,6 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
           />
         </label>
         <div className="formActions">
-          <Button className="primaryAction" type="submit"><Search size={16} /> {t("searchBtn")}</Button>
           {searchQuery && (
             <Button
               className="secondaryAction"

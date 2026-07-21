@@ -86,9 +86,9 @@ function Workspace() {
 
   const navigateToView = (view: ViewId) => {
     const item = navItems.find((candidate) => candidate.id === view);
-    if (!item || !isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment)) return;
+    if (!item || !isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate)) return;
     setNavOpen(false);
-    navigate(resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment));
+    navigate(resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate));
   };
 
   useEffect(() => {

@@ -187,7 +187,9 @@ export function isPortalRouteAccessible(
   hasPermission: (permission: string) => boolean,
   hasFeature: (feature: string) => boolean,
   hasTeachingAssignment = false,
+  isDelegate = false,
 ): boolean {
+  const effectiveRole = userRole === "teacher" && isDelegate ? "principal" : userRole;
   const hasRequiredPermission =
     (!route.permission || hasPermission(route.permission)) &&
     (!route.permissionsAny || route.permissionsAny.some(hasPermission));
@@ -198,7 +200,7 @@ export function isPortalRouteAccessible(
     userRole &&
     permissionAllowed &&
     (!route.feature || hasFeature(route.feature)) &&
-    (!route.roles || route.roles.includes(userRole)),
+    (!route.roles || route.roles.includes(effectiveRole!)),
   );
 }
 
@@ -208,9 +210,10 @@ export function isNavItemAccessible(
   hasPermission: (permission: string) => boolean,
   hasFeature: (feature: string) => boolean,
   hasTeachingAssignment = false,
+  isDelegate = false,
 ): boolean {
   return portalRoutes.some(
-    (route) => route.view === item.id && isPortalRouteAccessible(route, userRole, hasPermission, hasFeature, hasTeachingAssignment),
+    (route) => route.view === item.id && isPortalRouteAccessible(route, userRole, hasPermission, hasFeature, hasTeachingAssignment, isDelegate),
   );
 }
 
@@ -220,9 +223,10 @@ export function resolveNavItemPath(
   hasPermission: (permission: string) => boolean,
   hasFeature: (feature: string) => boolean,
   hasTeachingAssignment = false,
+  isDelegate = false,
 ): string {
   return portalRoutes.find(
-    (route) => route.view === item.id && isPortalRouteAccessible(route, userRole, hasPermission, hasFeature, hasTeachingAssignment),
+    (route) => route.view === item.id && isPortalRouteAccessible(route, userRole, hasPermission, hasFeature, hasTeachingAssignment, isDelegate),
   )?.path ?? "/dashboard";
 }
 
