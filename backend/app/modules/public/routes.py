@@ -124,7 +124,7 @@ async def get_public_admission_form(
 
 class PublicAdmissionSubmission(BaseModel):
     applicant_name: str = Field(min_length=2, max_length=160)
-    guardian_contact: str = Field(min_length=3, max_length=60)
+    guardian_contact: str = Field(default="", max_length=60)
     date_of_birth: str | None = None
     extra_data: dict = {}
     website: str = ""  # honeypot

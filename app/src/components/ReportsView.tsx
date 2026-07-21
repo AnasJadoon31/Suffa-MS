@@ -23,7 +23,7 @@ function ReportCard({
   return (
     <PageSection>
       <PageHeader title={title} />
-      <div className="inlineForm">
+      <div className="moduleToolbar">
         {children}
         <div className="formActions">
           <Button className="secondaryAction" type="button" disabled={disabled} onClick={() => onDownload("csv")}>
@@ -127,7 +127,7 @@ export function ReportsView() {
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
 
-      <div className="inlineForm">
+      <div className="moduleToolbar">
         <label>{t("fromLabel")}<Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
         <label>{t("toLabel")}<Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
       </div>

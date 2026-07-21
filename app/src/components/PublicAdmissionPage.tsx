@@ -63,7 +63,7 @@ export function PublicAdmissionPage() {
           }
         }}>
           <label>{t("applicantNameLabel")}<Input required value={form.applicant_name} onChange={(event) => setForm({ ...form, applicant_name: event.target.value })} /></label>
-          <label>{t("guardianContactLabel")}<Input required value={form.guardian_contact} onChange={(event) => setForm({ ...form, guardian_contact: event.target.value })} /></label>
+          <label>{t("guardianContactLabel")}<Input value={form.guardian_contact} onChange={(event) => setForm({ ...form, guardian_contact: event.target.value })} /></label>
           <label>{t("dobLabel")}<Input type="date" value={form.date_of_birth} onChange={(event) => setForm({ ...form, date_of_birth: event.target.value })} /></label>
           {definition.fields_definition.map((field) => {
             if (field.type === "label") return <p key={field.key}>{field.label}</p>;

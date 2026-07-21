@@ -205,7 +205,7 @@ async def _todays_timetable(session: AsyncSession, madrasa_id, **filters) -> lis
 
 
 async def _teacher_dashboard(session: AsyncSession, madrasa: Madrasa, current_user: User) -> dict[str, object]:
-    teacher = await _teacher_profile(session, current_user)
+    teacher = await _teacher_profile(session, current_user, madrasa.id)
     if teacher is None:
         return {"role": "teacher", "my_classes": [], "pending_submissions": 0, "today_timetable": [], "today_attendance": None, "announcements": []}
 
@@ -293,7 +293,7 @@ async def _teacher_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
 
 
 async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_user: User) -> dict[str, object]:
-    student = await _student_profile(session, current_user)
+    student = await _student_profile(session, current_user, madrasa.id)
     if student is None:
         return {"role": "student", "today_timetable": [], "latest_result": None, "due_assignments": [], "resources": [], "announcements": []}
 
@@ -443,7 +443,7 @@ async def _require_teacher_report_scope(
 ) -> None:
     if current_user.role == UserRole.principal or await user_has_permission(current_user, permission_code, session):
         return
-    teacher = await _teacher_profile(session, current_user)
+    teacher = await _teacher_profile(session, current_user, madrasa.id)
     if teacher is None or section_id is None:
         raise HTTPException(status_code=403, detail=ErrorCode.REPORT_SECTION_REQUIRED)
     if not await teacher_teaches(

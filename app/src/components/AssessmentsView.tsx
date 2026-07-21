@@ -257,7 +257,7 @@ function AssignmentsTab({
       </div>
 
       {showCreate && canCreate && (
-        <Modal title={t("createAssignmentBtn")} onClose={() => setShowCreate(false)}><AssignmentCreateForm
+        <AssignmentCreateForm
           classes={classes}
           courses={courses}
           teacherSlots={teacherSlots}
@@ -266,7 +266,8 @@ function AssignmentsTab({
             setShowCreate(false);
             void load();
           }}
-        /></Modal>
+          onClose={() => setShowCreate(false)}
+        />
       )}
 
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
@@ -332,14 +333,14 @@ function AssignmentsTab({
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {editing && (
-        <Modal title={t("editAssignmentHeading", { title: editing.title })} onClose={() => setEditing(null)}><AssignmentEditForm
+        <AssignmentEditForm
           assignment={editing}
           onDone={() => {
             setEditing(null);
             void load();
           }}
           onCancel={() => setEditing(null)}
-        /></Modal>
+        />
       )}
 
       {selected && (
@@ -369,7 +370,8 @@ function AssignmentCreateForm({
   teacherSlots,
   canPublishAll,
   onCreated,
-}: Readonly<{ classes: AcademicClass[]; courses: Course[]; teacherSlots: TimetableSlot[] | null; canPublishAll: boolean; onCreated: () => void }>) {
+  onClose,
+}: Readonly<{ classes: AcademicClass[]; courses: Course[]; teacherSlots: TimetableSlot[] | null; canPublishAll: boolean; onCreated: () => void; onClose: () => void; }>) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ class_id: "", course_id: "", title: "", category: "", instructions: "", due_date: "" });
   const [sections, setSections] = useState<Section[]>([]);
@@ -397,8 +399,12 @@ function AssignmentCreateForm({
     setSectionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   return (
-    <form
-      className="inlineForm"
+    <FormModal
+      title={t("createAssignmentBtn")}
+      onClose={onClose}
+      submitLabel={t("createAssignmentBtn")}
+      submitIcon={<Plus size={16} />}
+      error={error}
       onSubmit={async (e) => {
         e.preventDefault();
         setError("");
@@ -428,6 +434,7 @@ function AssignmentCreateForm({
         }
       }}
     >
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       {canPublishAll && (
         <label className="checkboxLabel">
           <Checkbox
@@ -493,11 +500,8 @@ function AssignmentCreateForm({
         {t("attachmentLabel")}
         <Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
       </label>
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <div className="formActions">
-        <Button className="primaryAction" type="submit"><Plus size={16} /> {t("createAssignmentBtn")}</Button>
       </div>
-    </form>
+    </FormModal>
   );
 }
 
@@ -517,9 +521,11 @@ function AssignmentEditForm({
   const [error, setError] = useState("");
 
   return (
-    <form
-      className="inlineForm"
-      style={{ marginTop: 16 }}
+    <FormModal
+      title={t("editAssignmentHeading", { title: assignment.title })}
+      onClose={onCancel}
+      submitLabel={t("saveBtn")}
+      error={error}
       onSubmit={async (e) => {
         e.preventDefault();
         setError("");
@@ -537,7 +543,7 @@ function AssignmentEditForm({
         }
       }}
     >
-      <h3 style={{ gridColumn: "1 / -1" }}>{t("editAssignmentHeading", { title: assignment.title })}</h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
       <label>{t("categoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
       <label>{t("instructionsLabel")}<Input required value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} /></label>
@@ -548,12 +554,8 @@ function AssignmentEditForm({
           {t("applyToBatchLabel")}
         </label>
       )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <div className="formActions">
-        <Button className="primaryAction" type="submit">{t("saveBtn")}</Button>
-        <Button className="secondaryAction" type="button" onClick={onCancel}>{t("cancelBtn")}</Button>
       </div>
-    </form>
+    </FormModal>
   );
 }
 
@@ -833,7 +835,7 @@ function GradingSetup({
 
           <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
                     <strong>{t("bandsLabel")}</strong>
-                    {schemeForm.bands.map((band, index) => <div className="inlineForm" style={{ margin: 0 }} key={index}>
+                    {schemeForm.bands.map((band, index) => <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", margin: 0 }} key={index}>
                       <label>{t("nameLabel")}<Input required value={band.label} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /></label>
                       <label>{t("minimumLabel")}<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: event.target.value } : item) })} /></label>
                       <label>{t("maximumLabel")}<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: event.target.value } : item) })} /></label>

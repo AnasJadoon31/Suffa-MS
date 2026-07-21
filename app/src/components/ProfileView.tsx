@@ -88,23 +88,21 @@ export function ProfileView() {
           </div>
         </div>
         <Button className="primaryAction" type="button" onClick={() => setProfileModal("language")}>{t("preferredLanguageLabel")}</Button>
-        {profileModal === "language" && <Modal title={t("preferredLanguageLabel")} onClose={() => setProfileModal(null)}><form
-          className="inlineForm"
-          style={{ marginTop: 16 }}
-          onSubmit={(e) => e.preventDefault()}
-        >
-          <label>
-            {t("preferredLanguageLabel")}
-            <Select
-              value={language}
-              disabled={savingLanguage}
-              onChange={(e) => void saveLanguage(e.target.value)}
-            >
-              <option value="en">English</option>
-              <option value="ur">اردو</option>
-            </Select>
-          </label>
-        </form></Modal>}
+        {profileModal === "language" && <Modal title={t("preferredLanguageLabel")} onClose={() => setProfileModal(null)}>
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <label>
+              {t("preferredLanguageLabel")}
+              <Select
+                value={language}
+                disabled={savingLanguage}
+                onChange={(e) => void saveLanguage(e.target.value)}
+              >
+                <option value="en">English</option>
+                <option value="ur">اردو</option>
+              </Select>
+            </label>
+          </div>
+        </Modal>}
         {languageNotice && <p className="notice">{languageNotice}</p>}
         {languageError && <p className="notice" style={{ color: "var(--rose)" }}>{languageError}</p>}
       </PageSection>

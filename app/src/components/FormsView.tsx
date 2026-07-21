@@ -121,7 +121,7 @@ export function FormsView() {
             submitLabel={t("createFormBtn")}
             submitIcon={<Plus size={16} />}
           >
-            <div className="inlineForm" style={{ margin: 0, padding: 0, border: "none", background: "none" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", margin: 0, padding: 0, border: "none", background: "none" }}>
                       <label>{t("titleLabel")}<Input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></label>
                       <label>{t("descriptionLabel")}<Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} /></label>
                       <label>{t("formCategoryLabel")}<Input value={formCategory} onChange={(e) => setFormCategory(e.target.value)} placeholder={t("formCategoryPlaceholder") ?? ""} list="form-categories" /></label>
@@ -194,23 +194,26 @@ export function FormsView() {
       />
 
       {selected && (
-        <Modal title={selected.title} onClose={() => setSelected(null)}>
-          <div style={{ padding: "16px 0" }}>
+        <FormModal
+          title={selected.title}
+          onClose={() => setSelected(null)}
+          submitLabel={t("submitResponseBtn")}
+          submitIcon={<Send size={16} />}
+          error={error}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            try {
+              await operationsApi.submitFormResponse(selected.id, answers);
+              setNotice(t("responseSubmitted"));
+              setAnswers({});
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedSubmitResponse"));
+            }
+          }}
+        >
           {notice && <p className="notice">{notice}</p>}
-          <form
-            className="inlineForm"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setError("");
-              try {
-                await operationsApi.submitFormResponse(selected.id, answers);
-                setNotice(t("responseSubmitted"));
-                setAnswers({});
-              } catch (err: any) {
-                setError(err.response?.data?.detail ?? t("failedSubmitResponse"));
-              }
-            }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {selected.fields_definition.map((f) => (
               <label key={f.key}>
                 {f.label}
@@ -223,12 +226,7 @@ export function FormsView() {
                 />
               </label>
             ))}
-            <div className="formActions">
-              <Button className="primaryAction" type="submit" disabled={readOnly}><Send size={16} /> {t("submitResponseBtn")}</Button>
-            </div>
-          </form>
-
-          {canViewResponses && (
+          </div>          {canViewResponses && (
             <div className="dataTable" style={{ marginTop: 16 }}>
               <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("submittedCol")}</span><span>{t("answersCol")}</span></div>
               {responses.length === 0 && <p className="emptyState">{t("noResponsesYet")}</p>}
@@ -241,57 +239,36 @@ export function FormsView() {
               ))}
             </div>
           )}
-        </div>
-        </Modal>
+        </FormModal>
       )}
 
       {editing && (
-        <div
-          style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)",
-            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+        <FormModal
+          title={t("editFormHeading")}
+          onClose={() => setEditing(null)}
+          submitLabel={t("editBtn")}
+          error={editError}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!editing) return;
+            setEditError("");
+            try {
+              await operationsApi.updateForm(editing.id, {
+                title: editing.title, description: editing.description, category: editing.category ?? undefined,
+                allow_multiple: editing.allow_multiple, visibility_scope: editAudience,
+              });
+              setEditing(null);
+              await load();
+            } catch (err: any) {
+              setEditError(err.response?.data?.detail ?? t("failedUpdateForm"));
+            }
           }}
-          onClick={() => setEditing(null)}
         >
-          <div
-            style={{
-              backgroundColor: "var(--surface)", padding: "2rem", borderRadius: "8px", width: "100%",
-              maxWidth: "600px", maxHeight: "90vh", overflowY: "auto",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ marginTop: 0 }}>{t("editFormHeading")}</h3>
-            <form
-              className="inlineForm"
-              style={{ gridTemplateColumns: "1fr", border: "none", padding: 0 }}
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!editing) return;
-                setEditError("");
-                try {
-                  await operationsApi.updateForm(editing.id, {
-                    title: editing.title, description: editing.description, category: editing.category ?? undefined,
-                    allow_multiple: editing.allow_multiple, visibility_scope: editAudience,
-                  });
-                  setEditing(null);
-                  await load();
-                } catch (err: any) {
-                  setEditError(err.response?.data?.detail ?? t("failedUpdateForm"));
-                }
-              }}
-            >
-              <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
-              <label>{t("descriptionLabel")}<Input value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
-              <label>{t("formCategoryLabel")}<Input value={editing.category ?? ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })} list="form-categories" /></label>
-              <AudiencePicker value={editAudience} onChange={setEditAudience} />
-              {editError && <p className="notice" style={{ color: "var(--rose)" }}>{editError}</p>}
-              <div className="formActions" style={{ justifyContent: "flex-end" }}>
-                <Button type="button" onClick={() => setEditing(null)}>{t("cancelBtn")}</Button>
-                <Button className="primaryAction" type="submit">{t("editBtn")}</Button>
-              </div>
-            </form>
-          </div>
-        </div>
+          <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
+          <label>{t("descriptionLabel")}<Input value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
+          <label>{t("formCategoryLabel")}<Input value={editing.category ?? ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })} list="form-categories" /></label>
+          <AudiencePicker value={editAudience} onChange={setEditAudience} />
+        </FormModal>
       )}
     </PageSection>
   );

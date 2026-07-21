@@ -50,6 +50,7 @@ async def load_report_branding(session, madrasa) -> ReportBranding:
                 MadrasaSetting.key.in_([
                     "madrasa.address", "madrasa.phone", "madrasa.email",
                     "madrasa.website", "madrasa.logo_file_id",
+                    "madrasa.name_en", "madrasa.name_ur",
                 ]),
             )
         )
@@ -63,7 +64,7 @@ async def load_report_branding(session, madrasa) -> ReportBranding:
         except Exception:
             logo_bytes = None
     return ReportBranding(
-        name=madrasa.name,
+        name=values.get("madrasa.name_en") or values.get("madrasa.name_ur") or madrasa.name,
         address=values.get("madrasa.address", ""),
         phone=values.get("madrasa.phone", ""),
         email=values.get("madrasa.email", ""),

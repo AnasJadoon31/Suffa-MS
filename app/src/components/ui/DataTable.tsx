@@ -55,9 +55,10 @@ export function DataTable<T>({
   const showData = !isLoading && !error;
 
   return (
-    <div className={className ? `dataTable ${className}` : "dataTable"}>
-      {/* ---- header row ---- */}
-      <div className="dataRow header">
+    <div className="tableResponsive">
+      <div className={className ? `dataTable ${className}` : "dataTable"}>
+        {/* ---- header row ---- */}
+        <div className="dataRow header">
         {columns.map((col, i) => (
           <span key={i}>{col.header}</span>
         ))}
@@ -82,6 +83,7 @@ export function DataTable<T>({
             renderBeforeRow={renderBeforeRow}
           />
         ))}
+      </div>
     </div>
   );
 }

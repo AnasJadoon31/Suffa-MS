@@ -7,6 +7,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className
       ref={ref}
       className={`mms-input ${className || ""}`}
       {...props}
+      onClick={(e) => {
+        if (props.type === "date" && "showPicker" in e.target) {
+          try { (e.target as HTMLInputElement).showPicker(); } catch (err) {}
+        }
+        props.onClick?.(e);
+      }}
     />
   );
 });

@@ -36,7 +36,7 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
           ? <img className="brandLogo" src={madrasa.logo_url} alt="" />
           : <span className="brandMark">م</span>}
         <div className="brandText">
-          <strong>{madrasa?.name ?? t("appName")}</strong>
+          <strong>{(i18n.language === "ur" ? madrasa?.name_ur : madrasa?.name_en) ?? madrasa?.name ?? t("appName")}</strong>
           <small>{t("appName")}</small>
         </div>
       </div>

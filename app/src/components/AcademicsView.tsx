@@ -214,32 +214,31 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 {programs.length === 0 && <p className="emptyState">{t("noProgramsYet")}</p>}
                 {programs.map((p) => (
                   <div className="dataRow" key={p.id}>
-                    {editingProgram?.id === p.id ? (
-                      <Modal title={t("editBtn")} onClose={() => setEditingProgram(null)}><form className="inlineForm" onSubmit={async (e) => {
-                        e.preventDefault();
-                        try {
-                          await academicsApi.updateProgram(p.id, { name: editingProgram.name });
-                          setEditingProgram(null);
-                          await refreshAll();
-                        } catch (err) { handleError(err); }
-                      }}>
-                        <span>
+                    {editingProgram?.id === p.id && (
+                      <FormModal
+                        title={t("editBtn")}
+                        onClose={() => setEditingProgram(null)}
+                        submitLabel={t("saveBtn")}
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          try {
+                            await academicsApi.updateProgram(p.id, { name: editingProgram.name });
+                            setEditingProgram(null);
+                            await refreshAll();
+                          } catch (err) { handleError(err); }
+                        }}
+                      >
+                        <label>
+                          {t("nameLabel")}
                           <Input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
-                        </span>
-                        <span className="actions" style={{ gap: "8px" }}>
-                          <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
-                          <Button className="tableAction" type="button" onClick={() => setEditingProgram(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
-                        </span>
-                      </form></Modal>
-                    ) : (
-                      <>
-                        <span>{p.name}</span>
-                        <span className="actions">
+                        </label>
+                      </FormModal>
+                    )}
+                    <span>{p.name}</span>
+                    <span className="actions">
                           <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingProgram(p)}><Edit2 size={16} /></Button>
                           <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteProgram(p.id))}><Trash2 size={16} /></Button>
                         </span>
-                      </>
-                    )}
                   </div>
                 ))}
               </div>
@@ -299,43 +298,44 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 {classesToShow.map((c) => (
                   <div className="dataRow" key={c.id}>
                     {editingClass?.id === c.id ? (
-                      <Modal title={t("editBtn")} onClose={() => setEditingClass(null)}><form className="inlineForm" onSubmit={async (e) => {
-                        e.preventDefault();
-                        try {
-                          await academicsApi.updateClass(c.id, {
-                            name: editingClass.name,
-                            program_id: editingClass.program_id,
-                            default_portal_enabled: editingClass.default_portal_enabled,
-                          });
-                          setEditingClass(null);
-                          await refreshAll();
-                        } catch (err) { handleError(err); }
-                      }}>
-                        <span>
+                    {editingClass?.id === c.id && (
+                      <FormModal
+                        title={t("editBtn")}
+                        onClose={() => setEditingClass(null)}
+                        submitLabel={t("saveBtn")}
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          try {
+                            await academicsApi.updateClass(c.id, {
+                              name: editingClass.name,
+                              program_id: editingClass.program_id,
+                              default_portal_enabled: editingClass.default_portal_enabled,
+                            });
+                            setEditingClass(null);
+                            await refreshAll();
+                          } catch (err) { handleError(err); }
+                        }}
+                      >
+                        <label>
+                          {t("nameLabel")}
                           <Input autoFocus value={editingClass.name} onChange={e => setEditingClass({ ...editingClass, name: e.target.value })} />
-                        </span>
-                        <span>
+                        </label>
+                        <label>
+                          {t("programLabel")}
                           <Select value={editingClass.program_id} onChange={e => setEditingClass({ ...editingClass, program_id: e.target.value })}>
                             {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                           </Select>
-                        </span>
-                        <span>
-                          <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }} title={t("classPortalEnabledHint") ?? ""}>
-                            <Input
-                              type="checkbox"
-                              checked={editingClass.default_portal_enabled}
-                              onChange={(e) => setEditingClass({ ...editingClass, default_portal_enabled: e.target.checked })}
-                            />
-                            {t("classPortalEnabledLabel")}
-                          </label>
-                        </span>
-                        <span className="actions" style={{ gap: "8px" }}>
-                          <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
-                          <Button className="tableAction" type="button" onClick={() => setEditingClass(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
-                        </span>
-                      </form></Modal>
-                    ) : (
-                      <>
+                        </label>
+                        <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }} title={t("classPortalEnabledHint") ?? ""}>
+                          <Input
+                            type="checkbox"
+                            checked={editingClass.default_portal_enabled}
+                            onChange={(e) => setEditingClass({ ...editingClass, default_portal_enabled: e.target.checked })}
+                          />
+                          {t("classPortalEnabledLabel")}
+                        </label>
+                      </FormModal>
+                    )}
                         <span>{c.name}</span>
                         <span>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
                         <span>{c.default_portal_enabled ? t("yesLabel") : t("noLabel")}</span>
@@ -343,8 +343,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingClass(c)}><Edit2 size={16} /></Button>
                           <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteClass(c.id))}><Trash2 size={16} /></Button>
                         </span>
-                      </>
-                    )}
                   </div>
                 ))}
               </div>
@@ -378,31 +376,31 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 {allCourses.map((c) => (
                   <div className="dataRow" key={c.id}>
                     {editingCourse?.id === c.id ? (
-                      <Modal title={t("editBtn")} onClose={() => setEditingCourse(null)}><form className="inlineForm" onSubmit={async (e) => {
-                        e.preventDefault();
-                        try {
-                          await academicsApi.updateCourse(c.id, { name: editingCourse.name });
-                          setEditingCourse(null);
-                          await refreshAll();
-                        } catch (err) { handleError(err); }
-                      }}>
-                        <span>
+                    {editingCourse?.id === c.id && (
+                      <FormModal
+                        title={t("editBtn")}
+                        onClose={() => setEditingCourse(null)}
+                        submitLabel={t("saveBtn")}
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          try {
+                            await academicsApi.updateCourse(c.id, { name: editingCourse.name });
+                            setEditingCourse(null);
+                            await refreshAll();
+                          } catch (err) { handleError(err); }
+                        }}
+                      >
+                        <label>
+                          {t("nameLabel")}
                           <Input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
-                        </span>
-                        <span className="actions" style={{ gap: "8px" }}>
-                          <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
-                          <Button className="tableAction" type="button" onClick={() => setEditingCourse(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
-                        </span>
-                      </form></Modal>
-                    ) : (
-                      <>
+                        </label>
+                      </FormModal>
+                    )}
                         <span>{c.name}</span>
                         <span className="actions">
                           <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingCourse(c)}><Edit2 size={16} /></Button>
                           <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteCourse(c.id))}><Trash2 size={16} /></Button>
                         </span>
-                      </>
-                    )}
                   </div>
                 ))}
               </div>
@@ -456,27 +454,31 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                       {(sections[c.id] ?? []).map((s) => (
                         <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           {editingSection?.id === s.id ? (
-                            <Modal title={t("editBtn")} onClose={() => setEditingSection(null)}><form className="inlineForm" onSubmit={async (e) => {
-                              e.preventDefault();
-                              try {
-                                await academicsApi.updateSection(c.id, s.id, { name: editingSection.name });
-                                setEditingSection(null);
-                                await refreshAll();
-                              } catch (err) { handleError(err); }
-                            }}>
-                              <Input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} style={{ padding: "4px 8px", minHeight: "30px", width: "120px" }} />
-                              <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
-                              <Button className="tableAction" type="button" onClick={() => setEditingSection(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
-                            </form></Modal>
-                          ) : (
-                            <>
+                          {editingSection?.id === s.id && (
+                            <FormModal
+                              title={t("editBtn")}
+                              onClose={() => setEditingSection(null)}
+                              submitLabel={t("saveBtn")}
+                              onSubmit={async (e) => {
+                                e.preventDefault();
+                                try {
+                                  await academicsApi.updateSection(c.id, s.id, { name: editingSection.name });
+                                  setEditingSection(null);
+                                  await refreshAll();
+                                } catch (err) { handleError(err); }
+                              }}
+                            >
+                              <label>
+                                {t("nameLabel")}
+                                <Input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} />
+                              </label>
+                            </FormModal>
+                          )}
                               <span>{s.name}</span>
                               <span className="actions" style={{ marginLeft: "auto" }}>
                                 <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSection(s)}><Edit2 size={14} /></Button>
                                 <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSection(c.id, s.id))}><Trash2 size={14} /></Button>
                               </span>
-                            </>
-                          )}
                         </div>
                       ))}
                       {!(sections[c.id]?.length > 0) && "—"}
@@ -532,35 +534,41 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 {sessions.map((s) => (
                   <div className="dataRow" key={s.id}>
                     {editingSession?.id === s.id ? (
-                      <Modal title={t("editBtn")} onClose={() => setEditingSession(null)}><form className="inlineForm" onSubmit={async (e) => {
-                        e.preventDefault();
-                        try {
-                          await academicsApi.updateSession(s.id, {
-                            name: editingSession.name, gregorian_start: editingSession.gregorian_start,
-                            gregorian_end: editingSession.gregorian_end, hijri_span: editingSession.hijri_span
-                          });
-                          setEditingSession(null);
-                          await refreshAll();
-                        } catch (err) { handleError(err); }
-                      }}>
-                        <span>
+                    {editingSession?.id === s.id && (
+                      <FormModal
+                        title={t("editBtn")}
+                        onClose={() => setEditingSession(null)}
+                        submitLabel={t("saveBtn")}
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          try {
+                            await academicsApi.updateSession(s.id, {
+                              name: editingSession.name, gregorian_start: editingSession.gregorian_start,
+                              gregorian_end: editingSession.gregorian_end, hijri_span: editingSession.hijri_span
+                            });
+                            setEditingSession(null);
+                            await refreshAll();
+                          } catch (err) { handleError(err); }
+                        }}
+                      >
+                        <label>
+                          {t("nameLabel")}
                           <Input autoFocus value={editingSession.name} onChange={e => setEditingSession({ ...editingSession, name: e.target.value })} />
-                        </span>
-                        <span style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        </label>
+                        <label>
+                          {t("startDateCol")}
                           <Input type="date" value={editingSession.gregorian_start} onChange={e => setEditingSession({ ...editingSession, gregorian_start: e.target.value })} />
-                          <span style={{ color: "var(--muted)", border: "none", padding: 0 }}>→</span>
+                        </label>
+                        <label>
+                          {t("endDateCol")}
                           <Input type="date" value={editingSession.gregorian_end} onChange={e => setEditingSession({ ...editingSession, gregorian_end: e.target.value })} />
-                        </span>
-                        <span>
+                        </label>
+                        <label>
+                          {t("hijriSpanCol")}
                           <Input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} />
-                        </span>
-                        <span className="actions" style={{ gap: "8px" }}>
-                          <Button className="tableAction" type="submit" style={{ margin: 0, background: "var(--brand-deep)", color: "#fff" }}>{t("saveBtn")}</Button>
-                          <Button className="tableAction" type="button" onClick={() => setEditingSession(null)} style={{ margin: 0, color: "var(--muted)" }}>{t("cancelBtn")}</Button>
-                        </span>
-                      </form></Modal>
-                    ) : (
-                      <>
+                        </label>
+                      </FormModal>
+                    )}
                         <span>{s.name}</span>
                         <span>{s.gregorian_start} → {s.gregorian_end}</span>
                         <span>{s.is_active ? <CheckCircle2 size={16} color="var(--leaf)" /> : "—"}</span>
@@ -578,8 +586,6 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSession(s)}><Edit2 size={16} /></Button>
                           {!s.is_active && <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSession(s.id))}><Trash2 size={16} /></Button>}
                         </span>
-                      </>
-                    )}
                   </div>
                 ))}
               </div>

@@ -19,6 +19,8 @@ class SettingDef:
 
 CATALOG: tuple[SettingDef, ...] = (
     # Madrasa profile — visible to every member of the madrasa.
+    SettingDef("madrasa.name_en", "profile", "string", "", "Name (English)"),
+    SettingDef("madrasa.name_ur", "profile", "string", "", "Name (Urdu)"),
     SettingDef("madrasa.address", "profile", "string", "", "Address"),
     SettingDef("madrasa.phone", "profile", "string", "", "Phone number"),
     SettingDef("madrasa.email", "profile", "string", "", "Email address"),

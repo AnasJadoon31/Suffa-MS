@@ -315,6 +315,7 @@ function TeacherDetail({
   const { user } = useAuth();
   const [payments, setPayments] = useState<SalaryPayment[]>([]);
   const [payForm, setPayForm] = useState({ amount: "", payment_date: "", period_covered: "", method: "cash" });
+  const [showPayModal, setShowPayModal] = useState(false);
   const [error, setError] = useState("");
   const [showDelegate, setShowDelegate] = useState(false);
 
@@ -374,32 +375,43 @@ function TeacherDetail({
               </div>
             ))}
           </div>
-          <form
-            className="inlineForm"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setError("");
-              try {
-                await financeApi.recordSalaryPayment(teacher.id, {
-                  amount: Number(payForm.amount),
-                  payment_date: payForm.payment_date,
-                  period_covered: payForm.period_covered,
-                  method: payForm.method,
-                });
-                setPayForm({ amount: "", payment_date: "", period_covered: "", method: "cash" });
-                await load();
-              } catch (err: any) {
-                setError(err.response?.data?.detail ?? t("failedRecordPayment"));
-              }
-            }}
-          >
-            <label>{t("amountCol")}<Input required type="number" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} /></label>
-            <label>{t("dateCol")}<Input required type="date" value={payForm.payment_date} onChange={(e) => setPayForm({ ...payForm, payment_date: e.target.value })} /></label>
-            <label>{t("periodCoveredCol")}<Input required value={payForm.period_covered} onChange={(e) => setPayForm({ ...payForm, period_covered: e.target.value })} placeholder={t("monthYearExample")} /></label>
-            <label>{t("methodCol")}<Input required value={payForm.method} onChange={(e) => setPayForm({ ...payForm, method: e.target.value })} /></label>
-            <div className="formActions"><Button className="primaryAction" type="submit"><Plus size={16} /> {t("recordSalaryBtn")}</Button></div>
-          </form>
-          {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+          <div className="formActions" style={{ marginTop: "1rem" }}>
+            <Button className="primaryAction" type="button" onClick={() => setShowPayModal(true)}>
+              <Plus size={16} /> {t("recordSalaryBtn")}
+            </Button>
+          </div>
+
+          {showPayModal && (
+            <FormModal
+              title={t("recordSalaryBtn")}
+              onClose={() => setShowPayModal(false)}
+              submitLabel={t("recordSalaryBtn")}
+              submitIcon={<Plus size={16} />}
+              error={error}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setError("");
+                try {
+                  await financeApi.recordSalaryPayment(teacher.id, {
+                    amount: Number(payForm.amount),
+                    payment_date: payForm.payment_date,
+                    period_covered: payForm.period_covered,
+                    method: payForm.method,
+                  });
+                  setPayForm({ amount: "", payment_date: "", period_covered: "", method: "cash" });
+                  await load();
+                  setShowPayModal(false);
+                } catch (err: any) {
+                  setError(err.response?.data?.detail ?? t("failedRecordPayment"));
+                }
+              }}
+            >
+              <label>{t("amountCol")}<Input required type="number" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} /></label>
+              <label>{t("dateCol")}<Input required type="date" value={payForm.payment_date} onChange={(e) => setPayForm({ ...payForm, payment_date: e.target.value })} /></label>
+              <label>{t("periodCoveredCol")}<Input required value={payForm.period_covered} onChange={(e) => setPayForm({ ...payForm, period_covered: e.target.value })} placeholder={t("monthYearExample")} /></label>
+              <label>{t("methodCol")}<Input required value={payForm.method} onChange={(e) => setPayForm({ ...payForm, method: e.target.value })} /></label>
+            </FormModal>
+          )}
         </>
       )}
     </div>
@@ -534,7 +546,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
               >
                 <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
 
-              <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+              <label>{t("studentNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
 
               <label>{t("dobLabel")}<Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
 
@@ -552,7 +564,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
       <DataTable<Student>
         columns={[
           { header: t("admissionNumberCol"), render: (s) => s.admission_number },
-          { header: t("nameLabel"), render: (s) => s.name },
+          { header: t("studentNameLabel"), render: (s) => s.name },
           { header: t("dobCol"), render: (s) => s.date_of_birth },
           { header: t("portalCol"), render: (s) => s.portal_enabled ? t("enabledLabel") : t("disabledLabel") },
           { header: t("statusCol"), render: (s) => s.status },
@@ -587,6 +599,7 @@ function StudentDetail({
   const [payments, setPayments] = useState<Payment[]>([]);
   const [categories, setCategories] = useState<PaymentCategory[]>([]);
   const [feeForm, setFeeForm] = useState({ category_id: "", amount: "", payment_date: "" });
+  const [showFeeModal, setShowFeeModal] = useState(false);
   const [error, setError] = useState("");
 
   const load = async () => {
@@ -640,37 +653,49 @@ function StudentDetail({
               </div>
             ))}
           </div>
-          <form
-            className="inlineForm"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setError("");
-              try {
-                await financeApi.createPayment({
-                  student_id: student.id,
-                  category_id: feeForm.category_id,
-                  amount: Number(feeForm.amount),
-                  payment_date: feeForm.payment_date,
-                });
-                setFeeForm({ category_id: "", amount: "", payment_date: "" });
-                await load();
-              } catch (err: any) {
-                setError(err.response?.data?.detail ?? t("failedRecordPayment"));
-              }
-            }}
-          >
-            <label>
-              {t("categoryCol")}
-              <Select required value={feeForm.category_id} onChange={(e) => setFeeForm({ ...feeForm, category_id: e.target.value })}>
-                <option value="">{t("selectEllipsis")}</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
-            </label>
-            <label>{t("amountCol")}<Input required type="number" value={feeForm.amount} onChange={(e) => setFeeForm({ ...feeForm, amount: e.target.value })} /></label>
-            <label>{t("dateCol")}<Input required type="date" value={feeForm.payment_date} onChange={(e) => setFeeForm({ ...feeForm, payment_date: e.target.value })} /></label>
-            <div className="formActions"><Button className="primaryAction" type="submit"><Plus size={16} /> {t("recordFeeBtn")}</Button></div>
-          </form>
-          {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+          </div>
+          <div className="formActions" style={{ marginTop: "1rem" }}>
+            <Button className="primaryAction" type="button" onClick={() => setShowFeeModal(true)}>
+              <Plus size={16} /> {t("recordFeeBtn")}
+            </Button>
+          </div>
+
+          {showFeeModal && (
+            <FormModal
+              title={t("recordFeeBtn")}
+              onClose={() => setShowFeeModal(false)}
+              submitLabel={t("recordFeeBtn")}
+              submitIcon={<Plus size={16} />}
+              error={error}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setError("");
+                try {
+                  await financeApi.createPayment({
+                    student_id: student.id,
+                    category_id: feeForm.category_id,
+                    amount: Number(feeForm.amount),
+                    payment_date: feeForm.payment_date,
+                  });
+                  setFeeForm({ category_id: "", amount: "", payment_date: "" });
+                  await load();
+                  setShowFeeModal(false);
+                } catch (err: any) {
+                  setError(err.response?.data?.detail ?? t("failedRecordPayment"));
+                }
+              }}
+            >
+              <label>
+                {t("categoryCol")}
+                <Select required value={feeForm.category_id} onChange={(e) => setFeeForm({ ...feeForm, category_id: e.target.value })}>
+                  <option value="">{t("selectEllipsis")}</option>
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </label>
+              <label>{t("amountCol")}<Input required type="number" value={feeForm.amount} onChange={(e) => setFeeForm({ ...feeForm, amount: e.target.value })} /></label>
+              <label>{t("dateCol")}<Input required type="date" value={feeForm.payment_date} onChange={(e) => setFeeForm({ ...feeForm, payment_date: e.target.value })} /></label>
+            </FormModal>
+          )}
         </>
       )}
     </div>
@@ -804,6 +829,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const [donations, setDonations] = useState<Donation[]>([]);
   const [categories, setCategories] = useState<PaymentCategory[]>([]);
   const [donationForm, setDonationForm] = useState({ category_id: "", amount: "", donation_date: "" });
+  const [showDonationModal, setShowDonationModal] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -861,36 +887,50 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
               </div>
             ))}
           </div>
-          {canWrite && <form
-            className="inlineForm"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setError("");
-              try {
-                await financeApi.createDonation({
-                  donor_id: selected.id,
-                  category_id: donationForm.category_id,
-                  amount: Number(donationForm.amount),
-                  donation_date: donationForm.donation_date,
-                });
-                setDonationForm({ category_id: "", amount: "", donation_date: "" });
-                await openDonor(selected);
-              } catch (err: any) {
-                setError(err.response?.data?.detail ?? t("failedRecordPayment"));
-              }
-            }}
-          >
-            <label>
-              {t("categoryCol")}
-              <Select required value={donationForm.category_id} onChange={(e) => setDonationForm({ ...donationForm, category_id: e.target.value })}>
-                <option value="">{t("selectEllipsis")}</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
-            </label>
-            <label>{t("amountCol")}<Input required type="number" value={donationForm.amount} onChange={(e) => setDonationForm({ ...donationForm, amount: e.target.value })} /></label>
-            <label>{t("dateCol")}<Input required type="date" value={donationForm.donation_date} onChange={(e) => setDonationForm({ ...donationForm, donation_date: e.target.value })} /></label>
-            <div className="formActions"><Button className="primaryAction" type="submit"><Plus size={16} /> {t("addDonationBtn")}</Button></div>
-          </form>}
+          {canWrite && (
+            <div className="formActions" style={{ marginTop: "1rem" }}>
+              <Button className="primaryAction" type="button" onClick={() => setShowDonationModal(true)}>
+                <Plus size={16} /> {t("addDonationBtn")}
+              </Button>
+            </div>
+          )}
+
+          {canWrite && showDonationModal && (
+            <FormModal
+              title={t("addDonationBtn")}
+              onClose={() => setShowDonationModal(false)}
+              submitLabel={t("addDonationBtn")}
+              submitIcon={<Plus size={16} />}
+              error={error}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setError("");
+                try {
+                  await financeApi.createDonation({
+                    donor_id: selected.id,
+                    category_id: donationForm.category_id,
+                    amount: Number(donationForm.amount),
+                    donation_date: donationForm.donation_date,
+                  });
+                  setDonationForm({ category_id: "", amount: "", donation_date: "" });
+                  await openDonor(selected);
+                  setShowDonationModal(false);
+                } catch (err: any) {
+                  setError(err.response?.data?.detail ?? t("failedRecordPayment"));
+                }
+              }}
+            >
+              <label>
+                {t("categoryCol")}
+                <Select required value={donationForm.category_id} onChange={(e) => setDonationForm({ ...donationForm, category_id: e.target.value })}>
+                  <option value="">{t("selectEllipsis")}</option>
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </label>
+              <label>{t("amountCol")}<Input required type="number" value={donationForm.amount} onChange={(e) => setDonationForm({ ...donationForm, amount: e.target.value })} /></label>
+              <label>{t("dateCol")}<Input required type="date" value={donationForm.donation_date} onChange={(e) => setDonationForm({ ...donationForm, donation_date: e.target.value })} /></label>
+            </FormModal>
+          )}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
           </div>
         </Modal>

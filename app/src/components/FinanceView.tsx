@@ -438,7 +438,7 @@ function SummaryTab() {
 
   return (
     <>
-      <div className="inlineForm">
+      <div className="moduleToolbar">
         <label>{t("fromLabel")}<Input type="date" value={range.date_from} onChange={(e) => setRange({ ...range, date_from: e.target.value })} /></label>
         <label>{t("toLabel")}<Input type="date" value={range.date_to} onChange={(e) => setRange({ ...range, date_to: e.target.value })} /></label>
         <div className="formActions"><Button className="secondaryAction" type="button" onClick={load}>{t("refreshBtn")}</Button></div>

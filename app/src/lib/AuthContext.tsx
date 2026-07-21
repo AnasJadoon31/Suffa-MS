@@ -17,6 +17,8 @@ export interface Madrasa {
   id: string;
   slug: string;
   name: string;
+  name_en?: string;
+  name_ur?: string;
   address?: string;
   phone?: string;
   email?: string;
@@ -70,6 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setMadrasa(res.data.madrasa ? {
         ...res.data.madrasa,
+        name_en: branding["madrasa.name_en"] || res.data.madrasa.name,
+        name_ur: branding["madrasa.name_ur"] || res.data.madrasa.name,
         address: branding["madrasa.address"],
         phone: branding["madrasa.phone"],
         email: branding["madrasa.email"],

@@ -88,6 +88,7 @@ h3 {
 
 h1 { font-size: 1.5rem; }
 h2 { font-size: 1.15rem; display: flex; align-items: center; gap: 8px; }
+h2 svg { flex-shrink: 0; }
 h3 { font-size: 1rem; }
 
 /* ============================== shell ============================== */
@@ -945,12 +946,19 @@ button:disabled {
 
 /* ============================ tables ============================ */
 
+.tableResponsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .dataTable {
   display: grid;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--surface);
+  min-width: max-content;
 }
 
 .dataRow {
@@ -1074,10 +1082,10 @@ button:disabled {
 }
 
 .moduleToolbar {
-  display: grid;
-  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 14px;
-  align-items: end;
+  align-items: flex-end;
   margin-bottom: 16px;
 }
 
@@ -1125,22 +1133,6 @@ button:disabled {
   color: var(--muted);
   font-weight: 650;
   font-size: 0.86rem;
-}
-
-.inlineForm {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 12px;
-  align-items: end;
-  margin-bottom: 16px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface-2);
-}
-
-.inlineForm > .formActions {
-  grid-column: 1 / -1;
 }
 
 .formFieldsEditor {
@@ -1698,7 +1690,15 @@ button:disabled {
 
 html[dir="rtl"] body {
   font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Segoe UI", sans-serif;
-  line-height: 1.9;
+  line-height: 2.2;
+}
+
+html[dir="rtl"] input,
+html[dir="rtl"] textarea,
+html[dir="rtl"] select,
+html[dir="rtl"] button {
+  font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Segoe UI", sans-serif;
+  line-height: 2.2;
 }
 
 html[dir="rtl"] .navGroupLabel {
@@ -1831,7 +1831,8 @@ html[dir="rtl"] .navGroupLabel {
   }
 
   .moduleToolbar {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .navScroll {
@@ -1907,7 +1908,6 @@ html[dir="rtl"] .navGroupLabel {
   border-inline-end: 1px solid var(--border, #eef2f7);
   padding: 6px 10px;
   text-align: start;
-  white-space: nowrap;
 }
 
 .sheet thead th {
@@ -2116,7 +2116,7 @@ input[type="radio"] {
   font-size: 0.875rem;
 }
 
-.readOnlyView .inlineForm,
+.readOnlyView .moduleToolbar,
 .readOnlyView .tableAction,
 .readOnlyView .iconBtn {
   display: none;

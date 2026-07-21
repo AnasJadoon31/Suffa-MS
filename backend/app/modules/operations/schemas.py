@@ -356,7 +356,7 @@ class AdmissionFormRead(BaseModel):
 
 class AdmissionApplicationCreate(BaseModel):
     applicant_name: str
-    guardian_contact: str
+    guardian_contact: str = ""
     program_id: UUID | None = None
     date_of_birth: date | None = None
     notes: str | None = None
@@ -367,7 +367,7 @@ class AdmissionApplicationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     applicant_name: str
-    guardian_contact: str
+    guardian_contact: str = ""
     program_id: UUID | None
     date_of_birth: date | None
     notes: str | None

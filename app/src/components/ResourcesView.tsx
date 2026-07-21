@@ -292,45 +292,37 @@ export function ResourcesView() {
       />
 
       {editing && (
-        <Modal
+        <FormModal
           title={t("editResourceHeading")}
           onClose={() => setEditing(null)}
+          submitLabel={t("editBtn")}
+          error={editError}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!editing) return;
+            setEditError("");
+            try {
+              await operationsApi.updateResource(editing.id, {
+                category_id: editing.category_id, title: editing.title, description: editing.description ?? undefined,
+                visibility_scope: editAudience,
+              });
+              setEditing(null);
+              await refreshAll();
+            } catch (err: any) {
+              setEditError(err.response?.data?.detail ?? t("failedUpdateResource"));
+            }
+          }}
         >
-          <form
-            className="inlineForm"
-            style={{ gridTemplateColumns: "1fr", border: "none", padding: 0 }}
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!editing) return;
-              setEditError("");
-              try {
-                await operationsApi.updateResource(editing.id, {
-                  category_id: editing.category_id, title: editing.title, description: editing.description ?? undefined,
-                  visibility_scope: editAudience,
-                });
-                setEditing(null);
-                await refreshAll();
-              } catch (err: any) {
-                setEditError(err.response?.data?.detail ?? t("failedUpdateResource"));
-              }
-            }}
-          >
-            <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
-            <label>
-              {t("categoryCol")}
-              <Select value={editing.category_id} onChange={(e) => setEditing({ ...editing, category_id: e.target.value })}>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
-            </label>
-            <label>{t("descriptionLabel")}<Input value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
-            <AudiencePicker value={editAudience} onChange={setEditAudience} />
-            {editError && <p className="notice" style={{ color: "var(--rose)" }}>{editError}</p>}
-            <div className="formActions" style={{ justifyContent: "flex-end" }}>
-              <Button type="button" onClick={() => setEditing(null)}>{t("cancelBtn")}</Button>
-              <Button className="primaryAction" type="submit">{t("editBtn")}</Button>
-            </div>
-          </form>
-        </Modal>
+          <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
+          <label>
+            {t("categoryCol")}
+            <Select value={editing.category_id} onChange={(e) => setEditing({ ...editing, category_id: e.target.value })}>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </label>
+          <label>{t("descriptionLabel")}<Input value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
+          <AudiencePicker value={editAudience} onChange={setEditAudience} />
+        </FormModal>
       )}
     </PageSection>
   );
