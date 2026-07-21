@@ -46,3 +46,36 @@ def test_category_migration_backfills_legacy_admission_forms(monkeypatch):
     assert any(action == "execute" and "SET category = 'General'" in payload for action, payload in operations)
     assert category_changes
     assert category_changes[-1][1]["nullable"] is False
+
+
+def test_principal_delegate_migration_defaults_legacy_teachers(monkeypatch):
+    migration_path = (
+        Path(__file__).parents[1]
+        / "alembic"
+        / "versions"
+        / "66eb6a081f25_add_is_principal_delegate_to_teacher_.py"
+    )
+    spec = spec_from_file_location("principal_delegate_migration", migration_path)
+    assert spec and spec.loader
+    migration = module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    added_columns = []
+
+    def add_column(table_name, column):
+        if table_name == "teacher_profiles":
+            assert column.nullable or column.server_default is not None, (
+                "legacy teacher_profiles would contain NULL is_principal_delegate values"
+            )
+        added_columns.append((table_name, column))
+
+    monkeypatch.setattr(migration.op, "add_column", add_column)
+    monkeypatch.setattr(migration.op, "drop_index", lambda *args, **kwargs: None)
+    monkeypatch.setattr(migration.op, "create_index", lambda *args, **kwargs: None)
+    monkeypatch.setattr(migration.op, "create_foreign_key", lambda *args, **kwargs: None)
+    monkeypatch.setattr(migration.op, "f", lambda name: name)
+
+    migration.upgrade()
+
+    delegate_column = next(column for table, column in added_columns if table == "teacher_profiles")
+    assert delegate_column.server_default is not None

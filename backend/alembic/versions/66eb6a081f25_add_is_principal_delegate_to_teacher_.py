@@ -25,7 +25,10 @@ def upgrade() -> None:
     op.add_column('exam_types', sa.Column('class_id', sa.Uuid(), nullable=True))
     op.create_index(op.f('ix_exam_types_class_id'), 'exam_types', ['class_id'], unique=False)
     op.create_foreign_key(None, 'exam_types', 'classes', ['class_id'], ['id'])
-    op.add_column('teacher_profiles', sa.Column('is_principal_delegate', sa.Boolean(), nullable=False))
+    op.add_column(
+        'teacher_profiles',
+        sa.Column('is_principal_delegate', sa.Boolean(), nullable=False, server_default=sa.false()),
+    )
     # ### end Alembic commands ###
 
 

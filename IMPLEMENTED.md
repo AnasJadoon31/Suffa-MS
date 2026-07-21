@@ -8,8 +8,11 @@ Running log of completed work (newest first). Design rationale lives in
 - Fixed the backend startup migration for existing installations: the new
   admission-form category is now added nullable, legacy rows are backfilled as
   `General`, and only then is the column made required.
+- Fixed the following principal-delegate migration to give all existing teacher
+  profiles a database-level `false` default before enforcing `NOT NULL`; audited
+  the rest of the pending migration chain for the same legacy-row hazard.
 - Added a migration regression that reproduces PostgreSQL's legacy-row failure.
-  Alembic retains one head and the complete backend suite passes (157 tests).
+  Alembic retains one head and the complete backend suite passes.
 
 ## 2026-07-21 — Issues.pdf closeout (31 reported portal issues)
 
