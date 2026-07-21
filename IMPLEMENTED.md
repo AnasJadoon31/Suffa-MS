@@ -3,6 +3,14 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-22 — Admission-form migration deployment fix
+
+- Fixed the backend startup migration for existing installations: the new
+  admission-form category is now added nullable, legacy rows are backfilled as
+  `General`, and only then is the column made required.
+- Added a migration regression that reproduces PostgreSQL's legacy-row failure.
+  Alembic retains one head and the complete backend suite passes (157 tests).
+
 ## 2026-07-21 — Issues.pdf closeout (31 reported portal issues)
 
 - Completed and re-verified the full 31-item report across People, Applications,
