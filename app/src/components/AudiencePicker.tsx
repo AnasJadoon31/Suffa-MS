@@ -59,14 +59,18 @@ export function AudiencePicker({
       const assigned = new Set(slots.map((slot) => slot.course_id));
       setCourses(user?.role === "teacher" ? rows.filter((course) => assigned.has(course.id)) : rows);
     }).catch(() => setCourses([]));
-    void Promise.all([peopleApi.listTeachers(), peopleApi.listStudents()])
-      .then(([teachers, students]) => {
-        setPeople([
-          ...teachers.map((t) => ({ id: t.id, user_id: t.user_id, name: t.name, role: "teacher" as const })),
-          ...students.map((s) => ({ id: s.id, user_id: s.user_id, name: s.name, role: "student" as const })),
-        ]);
-      })
-      .catch(() => setPeople([]));
+    if (user?.role !== "teacher") {
+      void Promise.all([peopleApi.listTeachers(), peopleApi.listStudents()])
+        .then(([teachers, students]) => {
+          setPeople([
+            ...teachers.map((t) => ({ id: t.id, user_id: t.user_id, name: t.name, role: "teacher" as const })),
+            ...students.map((s) => ({ id: s.id, user_id: s.user_id, name: s.name, role: "student" as const })),
+          ]);
+        })
+        .catch(() => setPeople([]));
+    } else {
+      setPeople([]);
+    }
   }, [user?.role]);
 
   const emptyScope: Scope = { all: false, roles: [], classes: [], sections: [], courses: [], users: [] };

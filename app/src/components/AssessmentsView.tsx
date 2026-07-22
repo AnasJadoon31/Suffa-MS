@@ -68,10 +68,16 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
         const taughtCourseIds = ownSlots ? new Set(ownSlots.map((slot) => slot.course_id)) : null;
         const unique = new Map(allCourses.map((course) => [course.id, course]));
         setCourses([...unique.values()].filter((course) => !taughtCourseIds || taughtCourseIds.has(course.id)));
-        try {
-          setStudents(await peopleApi.listStudents());
-        } catch {
-          setStudents([]); // teachers without students.view still get the rest
+        if (hasPermission("students.view")) {
+          try {
+            setStudents(await peopleApi.listStudents());
+          } catch {
+            setStudents([]);
+          }
+        } else {
+          // Submission payloads already include student_name. Avoid an
+          // optional directory request that a scoped teacher cannot access.
+          setStudents([]);
         }
         if (hasPermission("assignments.manage_all")) {
           try {

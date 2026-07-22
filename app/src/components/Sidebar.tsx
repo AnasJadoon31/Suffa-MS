@@ -19,7 +19,7 @@ export function initialsOf(name: string): string {
 
 export function RoleBadge({ role }: Readonly<{ role: string }>) {
   const { t } = useTranslation();
-  const labelKey = { principal: "rolePrincipal", teacher: "roleTeacher", student: "roleStudent" }[role] ?? role;
+  const labelKey = { principal: "rolePrincipal", teacher: "roleTeacher", student: "roleStudent", parent: "roleParent" }[role] ?? role;
   return <span className={`roleBadge role-${role}`}>{t(labelKey)}</span>;
 }
 

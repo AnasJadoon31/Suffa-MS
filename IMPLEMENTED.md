@@ -3,6 +3,52 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-22 — Live role and release qualification
+
+The previously open `PDF-02`, `PDF-05`, `PDF-08`, `PDF-11`, `PDF-14`,
+`PDF-16`, `PDF-23`, and `PDF-28..31` rows now have authenticated live-API
+evidence. The browser suite uses principal, delegated-teacher, ordinary
+teacher, student, and guardian accounts across both English and Urdu and both
+1440×1000 and 390×844 viewports.
+
+- The browser—not the seed helper—submits the all-role teacher form, creates a
+  student with a selected existing guardian and verifies the persisted link,
+  uploads a teacher resource through presigned object storage, exercises an
+  application confirmation dialog and delayed mutation state, downloads the
+  student's result card, verifies the submitted-assignment download endpoint,
+  edits/reloads the configured madrasa name, and saves/reloads a teacher remark.
+- Live verification exposed and fixed two optional-request permission defects:
+  Assessments and the teacher Audience Picker no longer request People
+  directories the role cannot access. Guardian Forms navigation now follows
+  the server-issued Forms feature instead of excluding the parent role.
+- Student creation now loads existing guardians, submits `guardian_ids`, and
+  shows translated English/Urdu linking controls. Parent role badges are
+  translated, long configured madrasa names wrap cleanly, and checkbox/radio
+  minimum sizing prevents shared input styles from stretching them.
+- Verification scripts require an explicit disposable-environment confirmation
+  and explicit API/tenant/principal settings. PostgreSQL test reset additionally
+  requires `TEST_DATABASE_ALLOW_RESET=1` and a database name containing `test`.
+
+Release evidence:
+
+- Backend SQLite suite: `179 passed, 2 skipped` in 49.28 seconds.
+- Full PostgreSQL API suite: `180 passed, 1 skipped` in 17:04; the separately
+  migrated non-owner RLS test passed and proved no-context isolation plus
+  tenant-A/tenant-B row separation.
+- A populated legacy PostgreSQL database upgraded through the admission-form
+  category and principal-delegate `NOT NULL` revisions to Alembic head
+  `84d3b7e91a20`, with zero remaining nulls.
+- Production TypeScript/Vite PWA build passed; static i18n audit passed with
+  913 keys; the admission-builder and scripted current-issue browser suites
+  passed.
+- `npm run test:live-seed` generated isolated PostgreSQL/Redis/MinIO fixtures
+  and verified principal, teacher, and student result PDFs. `npm run
+  test:live-roles` passed the five-role language/viewport matrix and all named
+  browser journeys without an HTTP error.
+- The deployed Compose services `backend`, `worker`, `app`, and `web` were up;
+  backend `/readyz`, app health, and web health returned success. Named live
+  screenshots under `app/artifacts/issue-verification/` were visually reviewed.
+
 ## 2026-07-22 — Verified CURRENT-01 through 20 implementation
 
 All twenty issues in the current report now have both an automated regression

@@ -564,6 +564,8 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [admissionForms, setAdmissionForms] = useState<AdmissionForm[]>([]);
   const [admissionFormId, setAdmissionFormId] = useState("");
   const [admissionAnswers, setAdmissionAnswers] = useState<Record<string, unknown>>({});
+  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [guardianIds, setGuardianIds] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [justCreated, setJustCreated] = useState<Student | null>(null);
@@ -616,6 +618,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
       setClassOptions(rows.map((row) => ({ id: row.id ?? row.class_id, name: row.name ?? row.class_name })));
     }).catch(() => setClassOptions([]));
     void operationsApi.listAdmissionForms().then(setAdmissionForms).catch(() => setAdmissionForms([]));
+    if (canCreate) void peopleApi.listGuardians().then(setGuardians).catch(() => setGuardians([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination]);
 
@@ -644,12 +647,14 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
         address: form.address || undefined,
         admission_form_id: admissionFormId,
         admission_answers: admissionAnswers,
+        guardian_ids: guardianIds,
       });
       setNotice(t("createdSetPasswordLink", { code: created.admission_number, url: created.set_password_url }));
       setJustCreated(created);
       setForm({ username: "", name: "", date_of_birth: "", b_form_number: "", address: "" });
       setAdmissionFormId("");
       setAdmissionAnswers({});
+      setGuardianIds([]);
       setShowCreate(false);
       await load();
     } catch (err: any) {
@@ -721,6 +726,22 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
               <label>{t("bFormLabel")}<Input value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
 
               <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+              <fieldset className="choiceField">
+                <legend>{t("linkGuardiansLabel")}</legend>
+                <small className="notice">{t("linkGuardiansHint")}</small>
+                {guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
+                {guardians.map((guardian) => (
+                  <label className="checkboxLabel" key={guardian.id}>
+                    <Checkbox
+                      checked={guardianIds.includes(guardian.id)}
+                      onChange={(event) => setGuardianIds(event.target.checked
+                        ? [...guardianIds, guardian.id]
+                        : guardianIds.filter((id) => id !== guardian.id))}
+                    />
+                    <span>{guardian.name} · {guardian.relationship} · {guardian.phone_numbers}</span>
+                  </label>
+                ))}
+              </fieldset>
               {admissionForms.find((item) => item.id === admissionFormId)?.fields_definition.map((field) => {
                 if (field.type === "label") return <p className="formSectionLabel" key={field.key}>{field.label}</p>;
                 if (field.type === "textarea") return <label key={field.key}>{field.label}<Textarea required={field.required} value={String(admissionAnswers[field.key] ?? "")} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.value })} /></label>;

@@ -172,11 +172,13 @@ h3 { font-size: 1rem; }
 }
 
 .brandText strong {
-  display: block;
+  display: -webkit-box;
   font-size: 0.98rem;
-  white-space: nowrap;
+  line-height: 1.2;
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .brandText small {
@@ -2080,6 +2082,9 @@ input[type="checkbox"],
 input[type="radio"] {
   width: 1rem;
   height: 1rem;
+  min-width: 1rem;
+  min-height: 1rem;
+  padding: 0;
 }
 
 /* ------------------------------------------------------- Settings page (§7) */

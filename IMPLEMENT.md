@@ -12,6 +12,23 @@ reporting}`), SQLAlchemy + Alembic, React/Vite SPA in `app/` (portal) and `web/`
 (marketing site), i18next, existing `UserPermission` + `PermissionRegistry`
 permission system, roles `principal | teacher | student`.
 
+## 2026-07-22 live qualification decisions
+
+- Live-role verification is a disposable release fixture, not a production
+  seeder. It requires an explicit confirmation token plus API, tenant, and
+  principal settings; generated role credentials are stored only in an ignored,
+  mode-0600 state file and the isolated services are removed after qualification.
+- A visible requirement is exercised through the browser whenever the user
+  action is material. Direct API seeding only establishes prerequisites; the
+  browser performs and asserts student/guardian creation, form submission,
+  resource upload, mutation loading, and result/submission downloads.
+- Release role coverage is a five-role × two-language × two-viewport smoke
+  matrix, followed by focused role journeys and named screenshots. Any HTTP
+  response at or above 400 fails the browser run.
+- PostgreSQL reset-based tests require both a clearly test-named database and an
+  explicit reset opt-in. RLS is tested separately through a temporary non-owner
+  login because PostgreSQL table owners bypass row-level security.
+
 ## 2026-07-22 approved issue-resolution architecture
 
 The current implementation follows the domain definitions in `CONTEXT.md` and

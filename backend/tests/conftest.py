@@ -4,6 +4,7 @@ The whole app schema is created per test (PortableJSONB keeps the models
 sqlite-compatible), so endpoint tests exercise the real routers, dependency
 graph, and middleware stack — the layer where the production 500s lived.
 """
+import os
 from datetime import date
 from types import SimpleNamespace
 from uuid import UUID
@@ -12,8 +13,9 @@ import pytest
 from fastapi import Request
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from app.core.dependencies import ensure_request_context_writable, get_current_user
 from app.db.base import Base
@@ -36,15 +38,34 @@ from app.modules.operations.models import TimetableSlot
 
 @pytest.fixture
 async def engine():
-    # StaticPool: every session shares the single in-memory sqlite connection.
-    engine = create_async_engine(
-        "sqlite+aiosqlite://",
-        poolclass=StaticPool,
-        connect_args={"check_same_thread": False},
-    )
+    postgres_url = os.getenv("TEST_DATABASE_URL")
+    if postgres_url:
+        database_name = make_url(postgres_url).database or ""
+        if os.getenv("TEST_DATABASE_ALLOW_RESET") != "1" or "test" not in database_name.lower():
+            pytest.fail(
+                "PostgreSQL tests drop and recreate all tables; use a database whose name contains "
+                "'test' and set TEST_DATABASE_ALLOW_RESET=1 explicitly"
+            )
+        # AnyIO gives each test its own event loop. asyncpg connections are
+        # loop-bound, so a queue pool can hand a later test a connection from
+        # a closed/different loop. NullPool keeps the production dialect while
+        # making the per-test engine deterministic.
+        engine = create_async_engine(postgres_url, poolclass=NullPool)
+    else:
+        # StaticPool: every session shares the single in-memory sqlite connection.
+        engine = create_async_engine(
+            "sqlite+aiosqlite://",
+            poolclass=StaticPool,
+            connect_args={"check_same_thread": False},
+        )
     async with engine.begin() as conn:
+        if postgres_url:
+            await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield engine
+    if postgres_url:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
 

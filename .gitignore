@@ -11,3 +11,4 @@ coverage/
 uploads/
 *.tsbuildinfo
 backend/uvicorn.log
+app/artifacts/live-verification-state.json
