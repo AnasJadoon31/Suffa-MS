@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import re
 import secrets
 from uuid import UUID
@@ -13,6 +15,17 @@ from app.modules.auth.models import User, UserRole, UserStatus
 
 class UsernameTakenError(ValueError):
     pass
+
+
+def set_password_token_version(user: User) -> str:
+    """Bind a set-password token to the password state that issued it.
+
+    Changing the password changes this value, so a successfully used token
+    cannot be replayed. HMAC keeps the stored password hash out of the JWT.
+    """
+    return hmac.new(
+        settings.secret_key.encode(), user.password_hash.encode(), hashlib.sha256
+    ).hexdigest()
 
 
 async def generate_unique_username(session: AsyncSession, base: str) -> str:
@@ -64,7 +77,7 @@ async def provision_login(
     token = issue_token(
         str(user.id),
         minutes=settings.set_password_token_hours * 60,
-        extra={"purpose": "set-password"},
+        extra={"purpose": "set-password", "password_version": set_password_token_version(user)},
     )
     set_password_url = f"/set-password?token={token}"
 
@@ -96,7 +109,7 @@ def reissue_set_password_link(
     token = issue_token(
         str(user.id),
         minutes=settings.set_password_token_hours * 60,
-        extra={"purpose": "set-password"},
+        extra={"purpose": "set-password", "password_version": set_password_token_version(user)},
     )
     record_audit(
         session,

@@ -1,3 +1,4 @@
+import hmac
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -22,7 +23,7 @@ from app.core.dependencies import (
 )
 from app.db.session import get_session
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
-from app.modules.auth.service import UsernameTakenError, provision_login
+from app.modules.auth.service import UsernameTakenError, provision_login, set_password_token_version
 from app.modules.academics.models import AcademicClass, AcademicSession, Madrasa, Section
 from app.modules.operations.models import MadrasaSetting, TimetableSlot
 from app.modules.people.models import TeacherProfile
@@ -244,9 +245,20 @@ async def set_password(
     except (KeyError, ValueError):
         raise HTTPException(status_code=400, detail="Invalid link")
 
-    user = await session.get(User, user_id)
-    if user is None or user.status != UserStatus.invited:
-        # Also blocks replaying an already-used link (FR-AUTH-03: one-time).
+    user = await session.scalar(select(User).where(User.id == user_id).with_for_update())
+    if user is None or user.status == UserStatus.disabled:
+        raise HTTPException(status_code=400, detail="This link has already been used or is invalid")
+
+    token_version = token_payload.get("password_version")
+    if token_version is None:
+        # Preserve unexpired pre-deployment invitation links. Legacy tokens
+        # cannot reset an already-active account because they have no replay
+        # binding.
+        if user.status != UserStatus.invited:
+            raise HTTPException(status_code=400, detail="This link has already been used or is invalid")
+    elif not isinstance(token_version, str) or not hmac.compare_digest(
+        token_version, set_password_token_version(user)
+    ):
         raise HTTPException(status_code=400, detail="This link has already been used or is invalid")
 
     user.password_hash = await hash_password(payload.password)

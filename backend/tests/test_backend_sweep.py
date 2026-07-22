@@ -104,6 +104,11 @@ async def test_guardian_login_provision_and_reissue(client, seed, db_sessionmake
     )
     assert first.status_code == 200
     assert first.json()["set_password_url"].startswith("/set-password?token=")
+    initial_token = first.json()["set_password_url"].split("token=", 1)[1]
+    activated = await client.post(
+        "/api/v1/auth/set-password", json={"token": initial_token, "password": "first-password"}
+    )
+    assert activated.status_code == 200
 
     async with db_sessionmaker() as db:
         stored = await db.get(Guardian, guardian_id)
@@ -113,6 +118,22 @@ async def test_guardian_login_provision_and_reissue(client, seed, db_sessionmake
     again = await client.post(f"/api/v1/people/guardians/{guardian_id}/credentials-link", json={})
     assert again.status_code == 200
     assert again.json()["username"] == "abu-student"
+    fresh_token = again.json()["set_password_url"].split("token=", 1)[1]
+    reset = await client.post(
+        "/api/v1/auth/set-password", json={"token": fresh_token, "password": "replacement-password"}
+    )
+    assert reset.status_code == 200, reset.text
+
+    replay = await client.post(
+        "/api/v1/auth/set-password", json={"token": fresh_token, "password": "replayed-password"}
+    )
+    assert replay.status_code == 400
+
+    async with db_sessionmaker() as db:
+        stored = await db.get(Guardian, guardian_id)
+        user = await db.get(User, stored.user_id)
+        assert await verify_password("replacement-password", user.password_hash)
+        assert not await verify_password("replayed-password", user.password_hash)
 
 
 # -------------------------------------------------------------- holidays
