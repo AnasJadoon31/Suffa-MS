@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.dependencies import get_context_session, get_current_madrasa, get_current_user, require_permission, user_has_permission
 from app.core.error_codes import ErrorCode
 from app.core.pdf import load_report_branding, render_table_pdf
 from app.core.teaching_scope import taught_pairs, teacher_teaches
@@ -28,7 +28,7 @@ from app.modules.auth.models import User, UserRole
 from app.modules.finance.models import Donation, Donor, Payment, PaymentCategory
 from app.modules.operations.models import Announcement, Resource
 from app.modules.operations.routes import _active_session_id, _visible
-from app.modules.people.models import StudentProfile, TeacherProfile
+from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 
 router = APIRouter()
 
@@ -37,13 +37,110 @@ router = APIRouter()
 async def dashboard(
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
+    context_session: AcademicSession = Depends(get_context_session),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, object]:
+    dashboard_session_id = current_user.selected_session_id or context_session.id
     if current_user.role == UserRole.teacher:
         return await _teacher_dashboard(session, madrasa, current_user)
     if current_user.role == UserRole.student:
-        return await _student_dashboard(session, madrasa, current_user)
+        return await _student_dashboard(session, madrasa, current_user, dashboard_session_id)
+    if current_user.role == UserRole.parent:
+        return await _parent_dashboard(session, madrasa, current_user, dashboard_session_id)
     return await _principal_dashboard(session, madrasa)
+
+
+async def _parent_dashboard(
+    session: AsyncSession,
+    madrasa: Madrasa,
+    current_user: User,
+    session_id: UUID,
+) -> dict[str, object]:
+    children = (
+        await session.execute(
+            select(StudentProfile)
+            .join(StudentGuardian, StudentGuardian.student_id == StudentProfile.id)
+            .join(Guardian, Guardian.id == StudentGuardian.guardian_id)
+            .where(
+                Guardian.user_id == current_user.id,
+                Guardian.madrasa_id == madrasa.id,
+                StudentProfile.madrasa_id == madrasa.id,
+            )
+            .distinct()
+            .order_by(StudentProfile.name, StudentProfile.id)
+        )
+    ).scalars().all()
+
+    child_dashboards: list[dict[str, object]] = []
+    for student in children:
+        child_portal_data = await _student_dashboard_for_profile(
+            session,
+            madrasa,
+            student,
+            session_id=session_id,
+            audience_role=UserRole.parent,
+        )
+        latest_result = child_portal_data.get("latest_result")
+        if isinstance(latest_result, dict):
+            course_results = latest_result.get("course_results", [])
+            course_ids = [UUID(row["course_id"]) for row in course_results]
+            course_names = dict(
+                (
+                    await session.execute(
+                        select(Course.id, Course.name).where(
+                            Course.madrasa_id == madrasa.id,
+                            Course.id.in_(course_ids),
+                        )
+                    )
+                ).all()
+            ) if course_ids else {}
+            for row in course_results:
+                row["course_name"] = course_names.get(UUID(row["course_id"]))
+        payment_rows = (
+            await session.execute(
+                select(Payment, PaymentCategory.name)
+                .join(PaymentCategory, PaymentCategory.id == Payment.category_id)
+                .where(
+                    Payment.madrasa_id == madrasa.id,
+                    Payment.student_id == student.id,
+                )
+                .order_by(Payment.payment_date.desc(), Payment.created_at.desc())
+            )
+        ).all()
+        payments = [
+            {
+                "id": str(payment.id),
+                "category": category_name,
+                "amount": float(payment.amount),
+                "currency": payment.currency,
+                "payment_date": str(payment.payment_date),
+                "note": payment.note,
+            }
+            for payment, category_name in payment_rows
+        ]
+        payment_totals: dict[str, float] = {}
+        for payment, _category_name in payment_rows:
+            payment_totals[payment.currency] = payment_totals.get(payment.currency, 0) + float(payment.amount)
+        child_dashboards.append(
+            {
+                "id": str(student.id),
+                "name": student.name,
+                "admission_number": student.admission_number,
+                "current_class": student.current_class,
+                **{key: value for key, value in child_portal_data.items() if key != "role"},
+                "fee_summary": {
+                    "totals": [
+                        {"currency": currency, "amount": amount}
+                        for currency, amount in sorted(payment_totals.items())
+                    ],
+                },
+                "payments": payments,
+            }
+        )
+    return {
+        "role": "parent",
+        "children": child_dashboards,
+    }
 
 
 async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[str, object]:
@@ -295,18 +392,39 @@ async def _teacher_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
     }
 
 
-async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_user: User) -> dict[str, object]:
+async def _student_dashboard(
+    session: AsyncSession,
+    madrasa: Madrasa,
+    current_user: User,
+    session_id: UUID,
+) -> dict[str, object]:
     student = await _student_profile(session, current_user, madrasa.id)
     if student is None:
         return {"role": "student", "today_timetable": [], "latest_result": None, "due_assignments": [], "resources": [], "announcements": []}
 
-    active_session_id = await _active_session_id(session, madrasa.id)
+    return await _student_dashboard_for_profile(
+        session,
+        madrasa,
+        student,
+        session_id=session_id,
+        audience_role=UserRole.student,
+    )
+
+
+async def _student_dashboard_for_profile(
+    session: AsyncSession,
+    madrasa: Madrasa,
+    student: StudentProfile,
+    *,
+    session_id: UUID,
+    audience_role: UserRole,
+) -> dict[str, object]:
     enrollment = None
-    if active_session_id is not None:
+    if session_id is not None:
         enrollment = (
             await session.execute(
                 select(Enrollment)
-                .where(Enrollment.student_id == student.id, Enrollment.session_id == active_session_id)
+                .where(Enrollment.student_id == student.id, Enrollment.session_id == session_id)
                 .where(Enrollment.ended_on.is_(None))
                 .order_by(Enrollment.created_at.desc())
             )
@@ -323,12 +441,12 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
         published = (
             await session.execute(
                 select(ResultPublication).where(
-                    ResultPublication.student_id == student.id, ResultPublication.session_id == active_session_id
+                    ResultPublication.student_id == student.id, ResultPublication.session_id == session_id
                 )
             )
         ).scalar_one_or_none()
         if published is not None:
-            result = await _build_session_result(session, madrasa.id, student.id, active_session_id)
+            result = await _build_session_result(session, madrasa.id, student.id, session_id)
             latest_result = result.model_dump(mode="json")
 
         submitted_submissions = (
@@ -377,7 +495,7 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
     # Own attendance for the calendar view (last ~2 months of statuses).
     my_attendance: dict[str, str] = {}
     my_attendance_periods: list[dict[str, object]] = []
-    if active_session_id is not None:
+    if session_id is not None:
         from datetime import timedelta
 
         window_start = datetime.now(timezone.utc).date() - timedelta(days=62)
@@ -396,7 +514,7 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
                 .where(
                     StudentAttendance.madrasa_id == madrasa.id,
                     StudentAttendance.student_id == student.id,
-                    StudentAttendance.session_id == active_session_id,
+                    StudentAttendance.session_id == session_id,
                     StudentAttendance.attendance_date >= window_start,
                 )
             )
@@ -432,7 +550,7 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
     resources = [
         {"id": str(r.id), "title": r.title}
         for r in resource_rows
-        if _visible(r.visibility_scope, viewer_class_id, current_user.role.value)
+        if _visible(r.visibility_scope, viewer_class_id, audience_role.value)
     ]
 
     now = datetime.now(timezone.utc)
@@ -442,7 +560,7 @@ async def _student_dashboard(session: AsyncSession, madrasa: Madrasa, current_us
     announcements = [
         {"id": str(a.id), "title": a.title, "body": a.body}
         for a in announcement_rows
-        if _visible(a.audience_scope, viewer_class_id, current_user.role.value) and (a.expires_at is None or a.expires_at >= now)
+        if _visible(a.audience_scope, viewer_class_id, audience_role.value) and (a.expires_at is None or a.expires_at >= now)
     ]
 
     return {

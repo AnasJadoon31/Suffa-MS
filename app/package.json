@@ -13,6 +13,7 @@
     "test:visual-issues": "node scripts/verify-current-issues.mjs",
     "test:live-seed": "node scripts/seed-live-verification.mjs",
     "test:live-roles": "node scripts/verify-live-roles.mjs",
+    "test:guardian-dashboard": "node scripts/verify-guardian-dashboard.mjs",
     "test:drawer": "npm run build && node scripts/check-drawer.mjs",
     "preview": "vite preview --host 0.0.0.0"
   },

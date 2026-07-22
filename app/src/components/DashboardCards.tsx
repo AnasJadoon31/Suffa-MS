@@ -13,6 +13,8 @@ import { MetricGrid, MetricCard } from "./ui/Card";
 
 import {
   type DashboardData,
+  type ParentChildDashboard,
+  type ParentDashboard,
   type PrincipalDashboard,
   type StudentDashboard,
   type TeacherDashboard,
@@ -84,10 +86,221 @@ export function DashboardCards({ onNavigate }: DashboardCardsProps) {
         <TeacherDashboardCards data={data} onNavigate={onNavigate} readOnly={readOnly} />
       ) : data.role === "student" ? (
         <StudentDashboardCards data={data} readOnly={readOnly} />
+      ) : data.role === "parent" ? (
+        <ParentDashboardCards data={data} />
       ) : (
         <PrincipalDashboardCards data={data} />
       )}
     </>
+  );
+}
+
+function ParentDashboardCards({ data }: Readonly<{ data: ParentDashboard }>) {
+  const { t } = useTranslation();
+  const [selectedChildId, setSelectedChildId] = useState(data.children[0]?.id ?? "");
+  const child = data.children.find((candidate) => candidate.id === selectedChildId) ?? data.children[0];
+
+  if (!child) {
+    return (
+      <PageSection>
+        <PageHeader title={t("myChildrenHeading")} />
+        <p className="emptyState">{t("noLinkedChildren")}</p>
+      </PageSection>
+    );
+  }
+
+  const statuses = child.my_attendance as StudentDayStatus;
+  const attendanceCounts = Object.values(statuses).reduce(
+    (counts, status) => ({ ...counts, [status]: (counts[status] ?? 0) + 1 }),
+    {} as Record<string, number>,
+  );
+  const paymentTotals = child.fee_summary.totals
+    .map((total) => `${total.amount.toLocaleString()} ${total.currency}`)
+    .join(" · ") || "—";
+
+  return (
+    <>
+      <PageSection>
+        <PageHeader title={t("myChildrenHeading")} notice={t("guardianDashboardHint")} />
+        <div className="guardianChildSwitcher" role="tablist" aria-label={t("childSwitcherLabel")}>
+          {data.children.map((candidate) => (
+            <Button
+              key={candidate.id}
+              type="button"
+              role="tab"
+              aria-selected={candidate.id === child.id}
+              className={candidate.id === child.id ? "primaryAction" : "secondaryAction"}
+              onClick={() => setSelectedChildId(candidate.id)}
+            >
+              <GraduationCap size={18} />
+              <span>
+                <strong>{candidate.name}</strong>
+                <small>{candidate.current_class ?? t("notAssignedLabel")}</small>
+              </span>
+            </Button>
+          ))}
+        </div>
+      </PageSection>
+
+      <MetricGrid aria-label={t("dashboardSummaryLabel")}>
+        <MetricCard
+          title={t("classLabel")}
+          value={child.current_class ?? "—"}
+          trend={<small>{t("admissionNumberCol")}: {child.admission_number}</small>}
+        />
+        <MetricCard
+          title={t("attendance")}
+          value={`${attendanceCounts.present ?? 0} / ${Object.keys(statuses).length || "—"}`}
+          trend={<small>{t("attendanceSummaryLine", { absent: attendanceCounts.absent ?? 0, leave: attendanceCounts.leave ?? 0 })}</small>}
+        />
+        <MetricCard
+          title={t("overallScoreLabel")}
+          value={child.latest_result?.overall_score ?? "—"}
+          trend={<small>{child.latest_result ? t("publishedLabel") : t("notPublishedLabel")}</small>}
+        />
+        <MetricCard
+          title={t("feesPaidLabel")}
+          value={paymentTotals}
+          trend={<small>{t("paymentCount", { count: child.payments.length })}</small>}
+        />
+      </MetricGrid>
+
+      <div className="dashboardColumns guardianDashboardColumns">
+        <StudentAttendancePanel
+          title={t("attendanceForStudentLabel", { name: child.name })}
+          statuses={statuses}
+          periods={child.my_attendance_periods}
+        />
+
+        <div>
+          <ParentResults child={child} />
+
+          <PageSection>
+            <PageHeader title={t("feeHistoryHeading")} />
+            {child.payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
+            <div className="dataTable">
+              {child.payments.map((payment) => (
+                <div className="dataRow guardianPaymentRow" key={payment.id}>
+                  <span><strong>{payment.category}</strong><small>{payment.note}</small></span>
+                  <span>{payment.payment_date}</span>
+                  <span><strong>{payment.amount.toLocaleString()} {payment.currency}</strong></span>
+                </div>
+              ))}
+            </div>
+          </PageSection>
+
+          <PageSection>
+            <PageHeader title={t("todaysTimetableHeading")} />
+            {child.today_timetable.length === 0 && <p className="emptyState">{t("noPeriodsToday")}</p>}
+            <div className="dataTable">
+              {child.today_timetable.map((slot, index) => (
+                <div className="dataRow" key={`${slot.course_id}-${slot.period}-${index}`}>
+                  <span><strong>{t("periodLabel", { period: slot.period })}</strong></span>
+                  <span>{slot.start_time} – {slot.end_time}</span>
+                </div>
+              ))}
+            </div>
+          </PageSection>
+
+          <PageSection>
+            <PageHeader title={t("dueAssignmentsHeading")} />
+            {child.due_assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
+            <div className="dataTable">
+              {child.due_assignments.map((assignment) => (
+                <div className="dataRow" key={assignment.id}>
+                  <span><strong>{assignment.title}</strong></span>
+                  <span>{assignment.due_date.slice(0, 10)}</span>
+                </div>
+              ))}
+            </div>
+          </PageSection>
+
+          <PageSection>
+            <PageHeader title={t("announcements")} />
+            {child.announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsYet")}</p>}
+            <div className="dataTable">
+              {child.announcements.map((announcement) => (
+                <div className="dataRow" key={announcement.id}>
+                  <span><strong>{announcement.title}</strong><small>{announcement.body}</small></span>
+                </div>
+              ))}
+            </div>
+          </PageSection>
+
+          <PageSection>
+            <PageHeader title={t("resources")} />
+            {child.resources.length === 0 && <p className="emptyState">{t("noResourcesShared")}</p>}
+            <div className="dataTable">
+              {child.resources.map((resource) => (
+                <div className="dataRow" key={resource.id}>
+                  <span><strong>{resource.title}</strong></span>
+                </div>
+              ))}
+            </div>
+          </PageSection>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ParentResults({ child }: Readonly<{ child: ParentChildDashboard }>) {
+  const { t } = useTranslation();
+  const results = child.latest_result?.course_results ?? [];
+  return (
+    <PageSection>
+      <PageHeader title={t("latestResultsHeading")} />
+      {results.length === 0 && <p className="emptyState">{t("noPublishedResults")}</p>}
+      <div className="dataTable">
+        {results.map((result) => (
+          <div className="dataRow" key={result.course_id}>
+            <span><strong>{result.course_name ?? t("courseLabel")}</strong></span>
+            <span>{result.raw_score == null ? "—" : `${result.raw_score}%`}</span>
+            <span className="statusPill">{result.band ?? "—"}</span>
+          </div>
+        ))}
+      </div>
+    </PageSection>
+  );
+}
+
+function StudentAttendancePanel({
+  title,
+  statuses,
+  periods,
+}: Readonly<{
+  title: string;
+  statuses: StudentDayStatus;
+  periods: StudentDashboard["my_attendance_periods"];
+}>) {
+  const { t } = useTranslation();
+  const [month, setMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(toDateKey(new Date()));
+  const selectedPeriods = periods.filter((entry) => entry.date === selectedDate);
+  return (
+    <PageSection>
+      <PageHeader title={title} />
+      <AttendanceCalendar
+        month={month}
+        onMonthChange={setMonth}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        mode="student"
+        studentDayStatus={statuses}
+      />
+      {selectedDate && (
+        <div className="dataTable dashboardPeriodAttendance">
+          {selectedPeriods.length === 0 && <p className="emptyState">{t("noAttendanceHistory")}</p>}
+          {selectedPeriods.map((entry, index) => (
+            <div className="dataRow" key={entry.timetable_slot_id ?? `${entry.date}-legacy-${index}`}>
+              <span><strong>{entry.legacy_general ? t("legacyGeneralAttendance") : entry.course_name}</strong></span>
+              <span>{entry.legacy_general ? "—" : t("periodLabel", { period: entry.period })}</span>
+              <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </PageSection>
   );
 }
 
@@ -369,15 +582,12 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
 
 function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashboard; readOnly: boolean }>) {
   const { t } = useTranslation();
-  const [month, setMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string | null>(toDateKey(new Date()));
 
   const statuses = (data.my_attendance ?? {}) as StudentDayStatus;
   const counts = Object.values(statuses).reduce(
     (acc, status) => ({ ...acc, [status]: (acc[status] ?? 0) + 1 }),
     {} as Record<string, number>
   );
-  const selectedPeriods = (data.my_attendance_periods ?? []).filter((entry) => entry.date === selectedDate);
 
   return (
     <>
@@ -414,29 +624,11 @@ function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashb
       </MetricGrid>
 
       <div className="dashboardColumns">
-        <PageSection>
-          <PageHeader title={t("myAttendanceHeading")} />
-          <AttendanceCalendar
-            month={month}
-            onMonthChange={setMonth}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            mode="student"
-            studentDayStatus={statuses}
-          />
-          {selectedDate && (
-            <div className="dataTable dashboardPeriodAttendance">
-              {selectedPeriods.length === 0 && <p className="emptyState">{t("noAttendanceHistory")}</p>}
-              {selectedPeriods.map((entry, index) => (
-                <div className="dataRow" key={entry.timetable_slot_id ?? `${entry.date}-legacy-${index}`}>
-                  <span><strong>{entry.legacy_general ? t("legacyGeneralAttendance") : entry.course_name}</strong></span>
-                  <span>{entry.legacy_general ? "—" : t("periodLabel", { period: entry.period })}</span>
-                  <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </PageSection>
+        <StudentAttendancePanel
+          title={t("myAttendanceHeading")}
+          statuses={statuses}
+          periods={data.my_attendance_periods ?? []}
+        />
 
         <div>
           <PageSection>

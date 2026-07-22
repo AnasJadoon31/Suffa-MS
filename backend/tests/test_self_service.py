@@ -10,9 +10,13 @@ import pytest
 from sqlalchemy import select
 
 from app.main import app as fastapi_app
+from app.modules.academics.models import AcademicSession, Enrollment
+from app.modules.assessments.models import ExamType, GradingScheme, Mark, ResultPublication
 from app.modules.attendance.models import AttendanceStatus, StudentAttendance
-from app.modules.auth.models import User, UserPermission
+from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
+from app.modules.finance.models import Payment, PaymentCategory
 from app.modules.operations.models import TimetableSlot
+from app.modules.people.models import Guardian, StudentGuardian
 from tests.conftest import _make_client
 
 
@@ -24,6 +28,177 @@ async def student_client(db_sessionmaker, seed):
     async with async_client:
         yield async_client
     fastapi_app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def parent_client(db_sessionmaker, seed):
+    async with db_sessionmaker() as db:
+        parent_user = User(
+            madrasa_id=seed.madrasa.id,
+            username="parent1",
+            password_hash="x",
+            role=UserRole.parent,
+            status=UserStatus.active,
+        )
+        db.add(parent_user)
+        await db.flush()
+        guardian = Guardian(
+            madrasa_id=seed.madrasa.id,
+            user_id=parent_user.id,
+            name="Parent One",
+            relationship="father",
+            phone_numbers="+923001234567",
+        )
+        db.add(guardian)
+        await db.flush()
+        db.add_all(
+            [
+                StudentGuardian(student_id=student.id, guardian_id=guardian.id)
+                for student in seed.students
+            ]
+        )
+        fee_category = PaymentCategory(madrasa_id=seed.madrasa.id, name="Monthly fee")
+        db.add(fee_category)
+        await db.flush()
+        db.add_all(
+            [
+                Payment(
+                    madrasa_id=seed.madrasa.id,
+                    student_id=student.id,
+                    category_id=fee_category.id,
+                    amount=1000 + index * 500,
+                    currency="PKR",
+                    payment_date=date(2026, 7, index),
+                    note=f"Child {index}",
+                    recorded_by_id=seed.principal.id,
+                )
+                for index, student in enumerate(seed.students, start=1)
+            ]
+        )
+        grading_scheme = GradingScheme(
+            madrasa_id=seed.madrasa.id,
+            name="Guardian portal grading",
+            bands=[
+                {"label": "A", "min_score": 80, "max_score": 100},
+                {"label": "F", "min_score": 0, "max_score": 79.99},
+            ],
+        )
+        db.add(grading_scheme)
+        await db.flush()
+        exam = ExamType(
+            madrasa_id=seed.madrasa.id,
+            course_id=seed.course.id,
+            name="Final",
+            weightage=1,
+            grading_scheme_id=grading_scheme.id,
+        )
+        db.add(exam)
+        await db.flush()
+        today = datetime.now(UTC)
+        for index, (student, status, score) in enumerate(
+            zip(seed.students, [AttendanceStatus.present, AttendanceStatus.absent], [85, 40]),
+            start=1,
+        ):
+            db.add_all(
+                [
+                    StudentAttendance(
+                        madrasa_id=seed.madrasa.id,
+                        student_id=student.id,
+                        session_id=seed.old_session.id,
+                        attendance_date=today.date(),
+                        status=status,
+                        marked_at=today,
+                        marked_by_id=seed.principal.id,
+                        idempotency_key=f"guardian-dashboard-{index}",
+                    ),
+                    Mark(exam_type_id=exam.id, student_id=student.id, score=score),
+                    ResultPublication(
+                        madrasa_id=seed.madrasa.id,
+                        student_id=student.id,
+                        session_id=seed.old_session.id,
+                        published_by_id=seed.principal.id,
+                    ),
+                ]
+            )
+        await db.commit()
+
+    async_client = _make_client(db_sessionmaker, seed, parent_user)
+    async with async_client:
+        yield async_client
+    fastapi_app.dependency_overrides.clear()
+
+
+async def test_parent_dashboard_returns_all_linked_children_without_admin_data(parent_client, seed):
+    response = await parent_client.get("/api/v1/reporting/dashboard")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["role"] == "parent"
+    assert [child["id"] for child in body["children"]] == [str(student.id) for student in seed.students]
+    assert [child["name"] for child in body["children"]] == ["Student 1", "Student 2"]
+    assert [child["current_class"] for child in body["children"]] == ["Class 1", "Class 1"]
+    assert [child["fee_summary"]["totals"] for child in body["children"]] == [
+        [{"currency": "PKR", "amount": 1500}],
+        [{"currency": "PKR", "amount": 2000}],
+    ]
+    assert [child["payments"][0]["note"] for child in body["children"]] == ["Child 1", "Child 2"]
+    today = str(datetime.now(UTC).date())
+    assert [child["my_attendance"][today] for child in body["children"]] == ["present", "absent"]
+    assert [child["latest_result"]["overall_score"] for child in body["children"]] == [85, 40]
+    assert [child["latest_result"]["course_results"][0]["course_name"] for child in body["children"]] == [
+        "Nazra",
+        "Nazra",
+    ]
+    assert "counts" not in body
+    assert "finance" not in body
+    assert "activity" not in body
+
+
+async def test_parent_dashboard_uses_selected_session(parent_client, db_sessionmaker, seed):
+    async with db_sessionmaker() as db:
+        parent = (await db.execute(select(User).where(User.username == "parent1"))).scalar_one()
+        archived = AcademicSession(
+            madrasa_id=seed.madrasa.id,
+            name="Archived",
+            gregorian_start=date(2023, 4, 1),
+            gregorian_end=date(2024, 3, 31),
+            hijri_span="1444-45",
+            is_active=False,
+        )
+        db.add(archived)
+        await db.flush()
+        db.add(
+            Enrollment(
+                madrasa_id=seed.madrasa.id,
+                student_id=seed.students[0].id,
+                session_id=archived.id,
+                program_id=seed.program.id,
+                class_id=seed.class_a.id,
+                section_id=seed.sections.a1.id,
+                started_on=archived.gregorian_start,
+            )
+        )
+        now = datetime.now(UTC)
+        db.add(
+            StudentAttendance(
+                madrasa_id=seed.madrasa.id,
+                student_id=seed.students[0].id,
+                session_id=archived.id,
+                attendance_date=now.date(),
+                status=AttendanceStatus.leave,
+                marked_at=now,
+                marked_by_id=seed.principal.id,
+                idempotency_key="guardian-dashboard-archived",
+            )
+        )
+        parent.selected_session_id = archived.id
+        await db.commit()
+
+    response = await parent_client.get("/api/v1/reporting/dashboard")
+
+    assert response.status_code == 200
+    first_child = response.json()["children"][0]
+    assert first_child["my_attendance"][str(datetime.now(UTC).date())] == "leave"
 
 
 async def test_teacher_sees_own_salary_record_and_payments(client, teacher_client, seed):

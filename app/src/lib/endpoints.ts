@@ -476,7 +476,25 @@ export interface StudentDashboard {
   resources: { id: string; title: string }[];
   announcements: { id: string; title: string; body: string }[];
 }
-export type DashboardData = PrincipalDashboard | TeacherDashboard | StudentDashboard;
+export interface ParentChildDashboard extends Omit<StudentDashboard, "role" | "latest_result"> {
+  id: string;
+  name: string;
+  admission_number: string;
+  current_class: string | null;
+  latest_result: (Omit<SessionResult, "course_results"> & {
+    course_results: (CourseResult & { course_name?: string | null })[];
+  }) | null;
+  fee_summary: { totals: { amount: number; currency: string }[] };
+  payments: {
+    id: string; category: string; amount: number; currency: string;
+    payment_date: string; note: string | null;
+  }[];
+}
+export interface ParentDashboard {
+  role: "parent";
+  children: ParentChildDashboard[];
+}
+export type DashboardData = PrincipalDashboard | TeacherDashboard | StudentDashboard | ParentDashboard;
 
 async function downloadReport(path: string, params: Record<string, string>, format: "csv" | "pdf"): Promise<void> {
   const response = await api.get(path, { params: { ...params, format }, responseType: "blob" });

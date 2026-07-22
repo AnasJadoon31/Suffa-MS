@@ -2334,9 +2334,46 @@ input[type="radio"] {
   align-items: start;
 }
 
+.guardianChildSwitcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.guardianChildSwitcher button {
+  min-width: 180px;
+  justify-content: flex-start;
+  text-align: start;
+}
+
+.guardianChildSwitcher button span {
+  display: grid;
+  gap: 2px;
+}
+
+.guardianChildSwitcher button small,
+.guardianPaymentRow small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.guardianChildSwitcher button[aria-selected="true"] small {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.guardianPaymentRow {
+  grid-template-columns: minmax(150px, 1fr) auto auto;
+}
+
 @media (max-width: 900px) {
   .dashboardColumns {
     grid-template-columns: 1fr;
+  }
+
+  .guardianChildSwitcher button {
+    min-width: min(100%, 240px);
+    flex: 1 1 180px;
   }
 }
 
