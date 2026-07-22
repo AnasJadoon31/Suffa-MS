@@ -879,6 +879,23 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
   failure and verify the complete merge path plus index creation. Full backend
   suite: 151 tests passing.
 
+## 2026-07-22 — Finance filters and responsive record layout
+
+- Rebuilt the Finance navigation and record controls as responsive toolbars so
+  category, donor, and record actions no longer split into awkward orphan rows.
+- Added contribution and donation search plus class/donor, category, and date
+  filters, with one-click clearing. Donation filters use the existing server
+  query contract; free-text matching covers names, categories, notes, amounts,
+  and currencies.
+- Guarded filter requests against out-of-order responses and kept donor-list
+  failures visible independently from donation-list loading.
+- Made receipt actions fit the desktop table and added semantic field labels to
+  the mobile contribution/donation cards.
+- Extended the authenticated Playwright issue journey to exercise every
+  donation filter and clear/search behavior, assert desktop/tablet/mobile
+  overflow safety, and capture the endpoint layouts in
+  `app/artifacts/issue-verification/`.
+
 ## 2026-07-20 — Public admission form builder
 
 - Public Forms now uses the same custom-field builder as internal Forms while

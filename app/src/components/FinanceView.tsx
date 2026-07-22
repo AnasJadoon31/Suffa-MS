@@ -1,5 +1,5 @@
 import { Button } from "./ui/Button";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileDown, Landmark, MessageCircle, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -53,13 +53,24 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
         title={t("financeTitle")}
         notice={t("financeSubtitle")}
       />
-      <div className="formActions" style={{ marginBottom: 16 }}>
-        <Button className={tab === "contributions" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("contributions")}>{t("contributionsTab")}</Button>
-        <Button className={tab === "donations" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("donations")}>{t("donationsTab")}</Button>
-        <Button className={tab === "summary" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("summary")}>{t("summaryTab")}</Button>
-      </div>
-
-      {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCategory(true)}><Plus size={16} /> {t("addCategoryBtn")}</Button>}
+      <InlineFilter
+        className="financePrimaryToolbar"
+        filters={[{
+          key: "finance-tab", type: "tab", value: tab, ariaLabel: t("financeSectionsLabel"),
+          options: [
+            { value: "contributions", label: t("contributionsTab") },
+            { value: "donations", label: t("donationsTab") },
+            { value: "summary", label: t("summaryTab") },
+          ],
+          onChange: (value) => onTabChange?.(value as FinanceTab),
+        }]}
+      >
+        {canManage && tab !== "summary" && (
+          <Button className="secondaryAction" type="button" onClick={() => setShowCategory(true)}>
+            <Plus size={16} /> {t("addCategoryBtn")}
+          </Button>
+        )}
+      </InlineFilter>
       {canManage && showCategory && (
         <FormModal
                 title={t("addCategoryBtn")} onClose={() => setShowCategory(false)}
@@ -103,26 +114,34 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [studentSearch, setStudentSearch] = useState("");
+  const [recordSearch, setRecordSearch] = useState("");
   const [filters, setFilters] = useState({ class_id: "", category_id: "", date_from: "", date_to: "" });
   const [form, setForm] = useState({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const paymentLoadSequence = useRef(0);
 
   const load = async () => {
+    const requestId = ++paymentLoadSequence.current;
     setIsLoading(true);
     try {
-      setPayments(await financeApi.listPayments({
+      const nextPayments = await financeApi.listPayments({
         class_id: filters.class_id || undefined,
         category_id: filters.category_id || undefined,
         date_from: filters.date_from || undefined,
         date_to: filters.date_to || undefined,
-      }));
-      setError("");
+      });
+      if (requestId === paymentLoadSequence.current) {
+        setPayments(nextPayments);
+        setError("");
+      }
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? t("failedLoadContributions"));
+      if (requestId === paymentLoadSequence.current) {
+        setError(err.response?.data?.detail ?? t("failedLoadContributions"));
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === paymentLoadSequence.current) setIsLoading(false);
     }
   };
   useEffect(() => {
@@ -141,16 +160,27 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
       student.name.toLowerCase().includes(query) || student.admission_number.toLowerCase().includes(query)
     ));
   }, [studentSearch, students]);
+  const visiblePayments = useMemo(() => {
+    const query = recordSearch.trim().toLowerCase();
+    if (!query) return payments;
+    return payments.filter((payment) => [
+      payment.student_name, payment.category_name, payment.note, payment.amount, payment.currency,
+    ].some((value) => String(value ?? "").toLowerCase().includes(query)));
+  }, [payments, recordSearch]);
+  const hasFilters = Boolean(recordSearch || filters.class_id || filters.category_id || filters.date_from || filters.date_to);
 
   return (
     <>
-      <InlineFilter filters={[
-        { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
-        { key: "category", type: "select", value: filters.category_id, placeholder: t("allCategories"), options: categories.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
-        { key: "date-from", type: "input", inputType: "date", value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
-        { key: "date-to", type: "input", inputType: "date", value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
-      ]} />
-      {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("recordPaymentBtn")}</Button>}
+      <InlineFilter className="financeRecordToolbar" filters={[
+        { key: "search", type: "input", inputType: "search", value: recordSearch, ariaLabel: t("searchContributionsLabel"), placeholder: t("searchContributionsPlaceholder"), onChange: setRecordSearch },
+        { key: "class", type: "select", value: filters.class_id, ariaLabel: t("classCol"), placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
+        { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
+        { key: "date-from", type: "input", inputType: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
+        { key: "date-to", type: "input", inputType: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
+      ]}>
+        {hasFilters && <Button className="secondaryAction" type="button" onClick={() => { setRecordSearch(""); setFilters({ class_id: "", category_id: "", date_from: "", date_to: "" }); }}>{t("clearFiltersBtn")}</Button>}
+        {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("recordPaymentBtn")}</Button>}
+      </InlineFilter>
       {canManage && showCreate && (
         <FormModal
                 title={t("recordPaymentBtn")} onClose={() => setShowCreate(false)}
@@ -208,18 +238,18 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
               </FormModal>
       )}
       {!isLoading && error && <ErrorState message={error} />}
-      <div className="dataTable">
+      <div className="tableResponsive"><div className="dataTable financeTable">
         <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("dateCol")}</span><span>{t("notesLabel")}</span><span>{t("receiptCol")}</span></div>
         {isLoading && <LoadingState />}
-        {!isLoading && !error && payments.length === 0 && <p className="emptyState">{t("noContributionsYet")}</p>}
-        {!isLoading && !error && payments.map((p) => (
+        {!isLoading && !error && visiblePayments.length === 0 && <p className="emptyState">{t("noContributionsYet")}</p>}
+        {!isLoading && !error && visiblePayments.map((p) => (
           <div className="dataRow" key={p.id}>
-            <span>{p.student_name ?? t("unknownPersonLabel")}</span>
-            <span>{p.category_name ?? t("unknownLabel")}</span>
-            <span>{p.currency} {p.amount}</span>
-            <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
-            <span>{p.note ?? "—"}</span>
-            <span>
+            <span data-label={t("studentCol")}>{p.student_name ?? t("unknownPersonLabel")}</span>
+            <span data-label={t("categoryCol")}>{p.category_name ?? t("unknownLabel")}</span>
+            <span data-label={t("amountCol")}>{p.currency} {p.amount}</span>
+            <span data-label={t("dateCol")}>{p.payment_date}<HijriTag date={p.payment_date} /></span>
+            <span data-label={t("notesLabel")}>{p.note ?? "—"}</span>
+            <span data-label={t("receiptCol")} className="financeReceiptActions">
               <Button className="tableAction" type="button" onClick={() => financeApi.downloadPaymentReceipt(p.id)}>
                 <FileDown size={14} /> PDF
               </Button>
@@ -242,7 +272,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
             </span>
           </div>
         ))}
-      </div>
+      </div></div>
     </>
   );
 }
@@ -253,27 +283,53 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
   const [donations, setDonations] = useState<Donation[]>([]);
   const [donorForm, setDonorForm] = useState({ name: "", contact: "" });
   const [donorSearch, setDonorSearch] = useState("");
+  const [recordSearch, setRecordSearch] = useState("");
+  const [filters, setFilters] = useState({ donor_id: "", category_id: "", date_from: "", date_to: "" });
   const [form, setForm] = useState({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
   const [error, setError] = useState("");
+  const [donorLoadError, setDonorLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [createModal, setCreateModal] = useState<"donor" | "donation" | null>(null);
+  const donationLoadSequence = useRef(0);
 
-  const load = async () => {
-    setIsLoading(true);
+  const loadDonors = async () => {
     try {
       setDonors(await financeApi.listDonors());
-      setDonations(await financeApi.listDonations());
-      setError("");
+      setDonorLoadError("");
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? t("failedLoadDonations"));
+      setDonorLoadError(err.response?.data?.detail ?? t("failedLoadDonors"));
+    }
+  };
+  const loadDonations = async () => {
+    const requestId = ++donationLoadSequence.current;
+    setIsLoading(true);
+    try {
+      const nextDonations = await financeApi.listDonations({
+        donor_id: filters.donor_id || undefined,
+        category_id: filters.category_id || undefined,
+        date_from: filters.date_from || undefined,
+        date_to: filters.date_to || undefined,
+      });
+      if (requestId === donationLoadSequence.current) {
+        setDonations(nextDonations);
+        setError("");
+      }
+    } catch (err: any) {
+      if (requestId === donationLoadSequence.current) {
+        setError(err.response?.data?.detail ?? t("failedLoadDonations"));
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === donationLoadSequence.current) setIsLoading(false);
     }
   };
   useEffect(() => {
-    void load();
+    void loadDonors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    void loadDonations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.donor_id, filters.category_id, filters.date_from, filters.date_to]);
 
   const matchingDonors = useMemo(() => {
     const query = donorSearch.trim().toLowerCase();
@@ -282,10 +338,28 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
       donor.name.toLowerCase().includes(query) || donor.contact.toLowerCase().includes(query)
     ));
   }, [donorSearch, donors]);
+  const visibleDonations = useMemo(() => {
+    const query = recordSearch.trim().toLowerCase();
+    if (!query) return donations;
+    return donations.filter((donation) => [
+      donation.donor_name, donation.category_name, donation.note, donation.amount, donation.currency,
+    ].some((value) => String(value ?? "").toLowerCase().includes(query)));
+  }, [donations, recordSearch]);
+  const hasFilters = Boolean(recordSearch || filters.donor_id || filters.category_id || filters.date_from || filters.date_to);
 
   return (
     <>
-      {canManage && <div className="formActions"><Button className="primaryAction" type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</Button><Button className="primaryAction" type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</Button></div>}
+      <InlineFilter className="financeRecordToolbar" filters={[
+        { key: "search", type: "input", inputType: "search", value: recordSearch, ariaLabel: t("searchDonationsLabel"), placeholder: t("searchDonationsPlaceholder"), onChange: setRecordSearch },
+        { key: "donor", type: "select", value: filters.donor_id, ariaLabel: t("donorCol"), placeholder: t("allDonors"), options: donors.map((donor) => ({ value: donor.id, label: donor.name })), onChange: (value) => setFilters({ ...filters, donor_id: value }) },
+        { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((category) => ({ value: category.id, label: category.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
+        { key: "date-from", type: "input", inputType: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
+        { key: "date-to", type: "input", inputType: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
+      ]}>
+        {hasFilters && <Button className="secondaryAction" type="button" onClick={() => { setRecordSearch(""); setFilters({ donor_id: "", category_id: "", date_from: "", date_to: "" }); }}>{t("clearFiltersBtn")}</Button>}
+        {canManage && <Button className="secondaryAction" type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</Button>}
+        {canManage && <Button className="primaryAction" type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</Button>}
+      </InlineFilter>
       {canManage && createModal === "donor" && (
         <FormModal
                 title={t("addDonorBtn")} onClose={() => setCreateModal(null)}
@@ -297,7 +371,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
                             await financeApi.createDonor(donorForm);
                             setDonorForm({ name: "", contact: "" });
                             setCreateModal(null);
-                            await load();
+                            await Promise.all([loadDonors(), loadDonations()]);
                           } catch (err: any) {
                             setError(err.response?.data?.detail ?? t("failedAddDonor"));
                           }
@@ -324,7 +398,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
                             setForm({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
                             setDonorSearch("");
                             setCreateModal(null);
-                            await load();
+                            await loadDonations();
                           } catch (err: any) {
                             setError(err.response?.data?.detail ?? t("failedRecordPayment"));
                           }
@@ -367,19 +441,20 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
               <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
               </FormModal>
       )}
+      {donorLoadError && <ErrorState message={donorLoadError} />}
       {!isLoading && error && <ErrorState message={error} />}
-      <div className="dataTable">
+      <div className="tableResponsive"><div className="dataTable financeTable">
         <div className="dataRow header"><span>{t("donorCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("dateCol")}</span><span>{t("notesLabel")}</span><span>{t("receiptCol")}</span></div>
         {isLoading && <LoadingState />}
-        {!isLoading && !error && donations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
-        {!isLoading && !error && donations.map((d) => (
+        {!isLoading && !error && visibleDonations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
+        {!isLoading && !error && visibleDonations.map((d) => (
           <div className="dataRow" key={d.id}>
-            <span>{d.donor_name ?? t("unknownPersonLabel")}</span>
-            <span>{d.category_name ?? t("unknownLabel")}</span>
-            <span>{d.currency} {d.amount}</span>
-            <span>{d.donation_date}<HijriTag date={d.donation_date} /></span>
-            <span>{d.note ?? "—"}</span>
-            <span>
+            <span data-label={t("donorCol")}>{d.donor_name ?? t("unknownPersonLabel")}</span>
+            <span data-label={t("categoryCol")}>{d.category_name ?? t("unknownLabel")}</span>
+            <span data-label={t("amountCol")}>{d.currency} {d.amount}</span>
+            <span data-label={t("dateCol")}>{d.donation_date}<HijriTag date={d.donation_date} /></span>
+            <span data-label={t("notesLabel")}>{d.note ?? "—"}</span>
+            <span data-label={t("receiptCol")} className="financeReceiptActions">
               <Button className="tableAction" type="button" onClick={() => financeApi.downloadDonationReceipt(d.id)}>
                 <FileDown size={14} /> PDF
               </Button>
@@ -402,7 +477,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
             </span>
           </div>
         ))}
-      </div>
+      </div></div>
     </>
   );
 }

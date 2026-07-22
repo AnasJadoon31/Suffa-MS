@@ -1999,6 +1999,63 @@ html[dir="rtl"] .navGroupLabel {
   gap: 8px;
 }
 
+.financePrimaryToolbar,
+.financeRecordToolbar {
+  flex-wrap: wrap;
+  overflow: visible;
+  scrollbar-width: auto;
+}
+
+.financePrimaryToolbar {
+  justify-content: space-between;
+  padding-block: 0;
+}
+
+.financePrimaryToolbar .inlineFilterActions,
+.financeRecordToolbar .inlineFilterActions {
+  margin-inline-start: auto;
+}
+
+.financeRecordToolbar {
+  align-items: flex-end;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.financeRecordToolbar .inlineFilterField {
+  flex-basis: 150px;
+  min-width: 140px;
+}
+
+.financeRecordToolbar .inlineFilterField:first-child {
+  flex-basis: 220px;
+}
+
+.financeTable .dataRow {
+  grid-template-columns: minmax(170px, 1.15fr) minmax(140px, 0.9fr) minmax(110px, 0.7fr) minmax(190px, 1fr) minmax(170px, 1fr) minmax(210px, 1fr);
+}
+
+.financeTable {
+  width: 100%;
+  min-width: 940px;
+}
+
+.financeReceiptActions {
+  gap: 8px !important;
+}
+
+@media (max-width: 768px) {
+  .financeTable {
+    width: 100%;
+    min-width: 0;
+  }
+  .financeTable .dataRow {
+    display: flex;
+  }
+}
+
 .filterBar select,
 .filterBar input {
   min-width: 140px;
@@ -2353,6 +2410,35 @@ input[type="radio"] {
   .formStack, .inlineForm { gap: 16px; padding: 18px 16px 20px; }
   .inlineFilter { overflow-x: auto; }
   .inlineFilterField { flex-basis: 160px; min-width: 160px; }
+  .financePrimaryToolbar,
+  .financeRecordToolbar {
+    overflow: visible;
+  }
+  .financePrimaryToolbar .inlineFilterTabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .financePrimaryToolbar .inlineFilterTabs > button,
+  .financePrimaryToolbar .inlineFilterActions,
+  .financePrimaryToolbar .inlineFilterActions > button {
+    width: 100%;
+  }
+  .financeRecordToolbar .inlineFilterField,
+  .financeRecordToolbar .inlineFilterField:first-child {
+    flex-basis: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+  .financeRecordToolbar .inlineFilterActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    margin-inline-start: 0;
+  }
+  .financeRecordToolbar .inlineFilterActions > button {
+    width: 100%;
+  }
 }
 
 .delegateList {

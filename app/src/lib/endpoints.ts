@@ -792,8 +792,8 @@ export const financeApi = {
   listDonors: (params?: { q?: string }) => getAllPages<Donor>("/api/v1/finance/donors", params),
   createDonor: (payload: { name: string; contact: string }) => api.post<Donor>("/api/v1/finance/donors", payload).then((r) => r.data),
   updateDonor: (id: string, payload: Partial<Omit<Donor, "id">>) => api.put<Donor>(`/api/v1/finance/donors/${id}`, payload).then((r) => r.data),
-  listDonations: (donorId?: string) =>
-    getAllPages<Donation>("/api/v1/finance/donations", { donor_id: donorId }),
+  listDonations: (params?: { donor_id?: string; category_id?: string; date_from?: string; date_to?: string }) =>
+    getAllPages<Donation>("/api/v1/finance/donations", params),
   createDonation: (payload: {
     donor_id: string; category_id: string; amount: number; currency?: string; donation_date: string; note?: string;
   }) => api.post<Donation>("/api/v1/finance/donations", payload).then((r) => r.data),

@@ -53,6 +53,12 @@ const timetableSlots = [
   { id: "slot-2", session_id: "session-1", class_id: "class-1", section_id: "section-1", course_id: "course-2", teacher_id: "teacher-1", day_of_week: 1, period: 2, start_time: "09:15:00", end_time: "10:00:00", class_name: "Hifz Level 1", section_name: "A", course_name: "Tajweed", teacher_name: "Ustad Ahmad" },
 ];
 const donor = { id: "donor-1", name: "Abdul Kareem", contact: "0300 1234567", created_at: "2026-07-01T00:00:00Z" };
+const paymentCategory = { id: "category-1", name: "Sadaqah" };
+const donation = {
+  id: "donation-1", donor_id: donor.id, category_id: paymentCategory.id, amount: 7500, currency: "PKR",
+  donation_date: "2026-07-22", note: "General fund", recorded_by_id: "principal-1",
+  donor_name: donor.name, category_name: paymentCategory.name,
+};
 const portalForm = {
   id: "portal-form-1", title: "Parent consent", description: "Annual trip permission", category: "Consent",
   fields_definition: [{ key: "consent", label: "I give consent", type: "radio", required: true, options: ["Yes", "No"] }],
@@ -110,7 +116,8 @@ function responseFor(pathname, request, persona = "principal") {
   if (pathname === "/api/v1/operations/forms") return [portalForm];
   if (pathname === `/api/v1/operations/forms/${portalForm.id}/responses`) return [portalResponse];
   if (pathname === "/api/v1/finance/donors") return [donor];
-  if (pathname === "/api/v1/finance/donations" || pathname === "/api/v1/finance/payment-categories") return [];
+  if (pathname === "/api/v1/finance/donations") return [donation];
+  if (pathname === "/api/v1/finance/categories" || pathname === "/api/v1/finance/payment-categories") return [paymentCategory];
   if (pathname === "/api/v1/reporting/dashboard" && persona === "teacher") return {
     role: "teacher", my_classes: [{ class_id: "class-1", section_id: "section-1", course_id: "course-1", class_name: "Hifz Level 1", section_name: "A", course_name: "Quran Memorization" }],
     pending_submissions: 2, today_timetable: [{ course_id: "course-1", period: 1, start_time: "08:00", end_time: "09:00" }], today_attendance: null,
@@ -242,6 +249,37 @@ async function desktopJourneys(browser) {
   await page.getByText("Abdul Kareem").waitFor();
   await shot(page, "CURRENT-06_donor-search_desktop.png", page.locator(".modulePanel").first());
 
+  await open(page, "/finance/donations");
+  await page.getByLabel("Search donations").waitFor();
+  await page.getByLabel("Donor").selectOption(donor.id);
+  await page.getByLabel("Category").selectOption(paymentCategory.id);
+  await page.getByLabel("From").fill("2026-07-01");
+  const filteredResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === "/api/v1/finance/donations"
+      && url.searchParams.get("donor_id") === donor.id
+      && url.searchParams.get("category_id") === paymentCategory.id
+      && url.searchParams.get("date_from") === "2026-07-01"
+      && url.searchParams.get("date_to") === "2026-07-31";
+  });
+  await page.getByLabel("To").fill("2026-07-31");
+  await filteredResponse;
+  await page.getByRole("button", { name: "Clear filters" }).waitFor();
+  const donorCell = page.locator('.financeTable .dataRow:not(.header) span[data-label="Donor"]');
+  await page.getByLabel("Search donations").fill("not present");
+  await donorCell.waitFor({ state: "hidden" });
+  await page.getByLabel("Search donations").fill("Abdul");
+  await donorCell.waitFor();
+  const financePanel = page.locator(".modulePanel").first();
+  const financeOverflow = await financePanel.evaluate((element) => element.scrollWidth - element.clientWidth);
+  if (financeOverflow > 1) throw new Error(`Finance desktop panel overflows by ${financeOverflow}px`);
+  await shot(page, "CURRENT-21_finance-filters_desktop.png", financePanel);
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  for (const label of ["Search donations", "Donor", "Category", "From", "To"]) {
+    const value = await page.getByLabel(label).inputValue();
+    if (value !== "") throw new Error(`Clear filters left ${label} set to ${value}`);
+  }
+
   await open(page, "/forms");
   await page.getByRole("button", { name: "Open" }).click();
   dialog = page.getByRole("dialog", { name: "Parent consent" });
@@ -290,11 +328,46 @@ async function mobileUrduJourneys(browser) {
   return errors;
 }
 
+async function mobileFinanceJourney(browser) {
+  const { context, page, errors } = await newPage(browser, { width: 390, height: 844 });
+  await open(page, "/finance/donations");
+  await page.getByLabel("Search donations").waitFor();
+  const toolbar = page.locator(".financeRecordToolbar");
+  const geometry = await toolbar.evaluate((element) => ({
+    left: element.getBoundingClientRect().left,
+    right: element.getBoundingClientRect().right,
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  if (geometry.left < 0 || geometry.right > 390 || geometry.scrollWidth > geometry.clientWidth + 1) {
+    throw new Error(`Finance mobile toolbar geometry failed: ${JSON.stringify(geometry)}`);
+  }
+  await page.locator('.financeTable .dataRow:not(.header) span[data-label="Donor"]').waitFor();
+  await shot(page, "CURRENT-21_finance-filters_mobile.png");
+  await context.close();
+  return errors;
+}
+
+async function tabletFinanceJourney(browser) {
+  const { context, page, errors } = await newPage(browser, { width: 700, height: 900 });
+  await open(page, "/finance/donations");
+  await page.getByLabel("Search donations").waitFor();
+  const geometry = await page.locator(".tableResponsive").evaluate((element) => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  if (geometry.scrollWidth > geometry.clientWidth + 1) {
+    throw new Error(`Finance tablet table clips: ${JSON.stringify(geometry)}`);
+  }
+  await context.close();
+  return errors;
+}
+
 await mkdir(outputDir, { recursive: true });
 await ensureServer();
 const browser = await chromium.launch({ headless: true });
 try {
-  const errors = [...await desktopJourneys(browser), ...await teacherJourneys(browser), ...await mobileUrduJourneys(browser)];
+  const errors = [...await desktopJourneys(browser), ...await teacherJourneys(browser), ...await mobileUrduJourneys(browser), ...await mobileFinanceJourney(browser), ...await tabletFinanceJourney(browser)];
   if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
   console.log("visual issue verification: all scripted journeys passed");
 } finally {

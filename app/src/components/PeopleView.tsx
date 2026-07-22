@@ -1524,7 +1524,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const openDonor = async (donor: Donor) => {
     setSelected(donor);
     setEditForm({ name: donor.name, contact: donor.contact });
-    setDonations(await financeApi.listDonations(donor.id));
+    setDonations(await financeApi.listDonations({ donor_id: donor.id }));
   };
 
   return (
