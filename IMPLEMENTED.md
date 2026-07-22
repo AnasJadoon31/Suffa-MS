@@ -896,6 +896,17 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
   overflow safety, and capture the endpoint layouts in
   `app/artifacts/issue-verification/`.
 
+## 2026-07-22 — Authenticated `/login` redirect
+
+- Fixed successful login from the explicit `/login` URL leaving an
+  authenticated user stranded on that unmatched route. Principals, teachers,
+  students, and guardians now continue to `/dashboard`; platform
+  administrators continue to `/platform`.
+- Added an authenticated browser regression that starts at `/login`, completes
+  the token/profile exchange, and requires the dashboard route and heading.
+- Production hotpatch builds are verified against `VITE_API_BASE` before
+  deployment so a development `localhost` API URL cannot be shipped again.
+
 ## 2026-07-20 — Public admission form builder
 
 - Public Forms now uses the same custom-field builder as internal Forms while

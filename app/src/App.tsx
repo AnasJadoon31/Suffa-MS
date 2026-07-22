@@ -223,6 +223,10 @@ function Workspace() {
     return <LoginScreen />;
   }
 
+  if (location.pathname === "/login") {
+    return <Navigate to={user?.role === "super_admin" ? "/platform" : "/dashboard"} replace />;
+  }
+
   if (user?.role === "super_admin") {
     return (
       <Routes>

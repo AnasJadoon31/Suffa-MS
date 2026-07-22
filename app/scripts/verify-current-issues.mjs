@@ -132,16 +132,20 @@ function responseFor(pathname, request, persona = "principal") {
   return [];
 }
 
-async function mockApi(context, preferredLanguage = "en", persona = "principal") {
+async function mockApi(context, preferredLanguage = "en", persona = "principal", seedToken = true) {
   await context.addInitScript(({ language }) => {
-    localStorage.setItem("mms_token", "visual-issues-token");
     localStorage.setItem("mms_tenant", "suffa");
     localStorage.setItem("i18nextLng", language);
   }, { language: preferredLanguage });
+  if (seedToken) {
+    await context.addInitScript(() => localStorage.setItem("mms_token", "visual-issues-token"));
+  }
   await context.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
-    let body = responseFor(pathname, request, persona);
+    let body = pathname === "/api/v1/auth/token"
+      ? { access_token: "visual-issues-token", token_type: "bearer" }
+      : responseFor(pathname, request, persona);
     if (pathname === "/api/v1/auth/me" && request.method() === "GET") body = { ...body, user: { ...body.user, preferred_language: preferredLanguage } };
     await route.fulfill({
       status: 200, contentType: "application/json",
@@ -363,11 +367,25 @@ async function tabletFinanceJourney(browser) {
   return errors;
 }
 
+async function loginRedirectJourney(browser) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: "block" });
+  await mockApi(context, "en", "principal", false);
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="text"]').nth(1).fill("admin");
+  await page.locator('input[type="password"]').fill("diagnostic-password");
+  await page.locator('form.login-form button[type="submit"]').click();
+  await page.waitForURL(`${baseUrl}/dashboard`, { timeout: 10_000 });
+  await page.getByRole("heading", { name: "Dashboard" }).waitFor();
+  await context.close();
+  return [];
+}
+
 await mkdir(outputDir, { recursive: true });
 await ensureServer();
 const browser = await chromium.launch({ headless: true });
 try {
-  const errors = [...await desktopJourneys(browser), ...await teacherJourneys(browser), ...await mobileUrduJourneys(browser), ...await mobileFinanceJourney(browser), ...await tabletFinanceJourney(browser)];
+  const errors = [...await desktopJourneys(browser), ...await teacherJourneys(browser), ...await mobileUrduJourneys(browser), ...await mobileFinanceJourney(browser), ...await tabletFinanceJourney(browser), ...await loginRedirectJourney(browser)];
   if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
   console.log("visual issue verification: all scripted journeys passed");
 } finally {
