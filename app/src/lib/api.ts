@@ -33,6 +33,34 @@ export async function getAllPages<T>(url: string, params?: object): Promise<T[]>
   }
 }
 
+function validationIssueMessage(issue: unknown): string | null {
+  if (typeof issue === "string") return issue;
+  if (!issue || typeof issue !== "object") return null;
+
+  const candidate = issue as { loc?: unknown; msg?: unknown };
+  if (typeof candidate.msg !== "string") return null;
+  if (!Array.isArray(candidate.loc)) return candidate.msg;
+
+  const location = candidate.loc
+    .filter((part, index) => index > 0 || !["body", "query", "path"].includes(String(part)))
+    .filter((part): part is string | number => typeof part === "string" || typeof part === "number")
+    .join(".");
+  return location ? `${location}: ${candidate.msg}` : candidate.msg;
+}
+
+export function formatApiErrorDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.map(validationIssueMessage).filter((message): message is string => Boolean(message));
+    if (messages.length) return messages.join("; ");
+  }
+  if (detail && typeof detail === "object" && "message" in detail) {
+    const message = (detail as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return fallback;
+}
+
 // Academic-session context header. Held in memory (not localStorage) so two
 // logins on the same browser can't clobber each other; the server-side
 // preference (users.selected_session_id) is the durable source of truth.
@@ -79,6 +107,8 @@ api.interceptors.response.use(
       };
       if (typeof body.detail === "string" && localizedErrors[body.detail]) {
         body.detail = i18next.t(localizedErrors[body.detail]);
+      } else if (typeof body.detail !== "string") {
+        body.detail = formatApiErrorDetail(body.detail, String(i18next.t("genericError")));
       }
     }
     if (error.response?.status === 401) {
