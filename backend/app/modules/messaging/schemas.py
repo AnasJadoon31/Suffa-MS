@@ -1,4 +1,5 @@
 from uuid import UUID
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -16,6 +17,26 @@ class WhatsAppLinkResponse(BaseModel):
     normalised_number: str
     url: str = ""
     direct_sent: bool = False
+
+
+WhatsAppConnectionState = Literal["open", "close", "connecting", "refused", "not_created", "unknown"]
+
+
+class WhatsAppConnectionStatus(BaseModel):
+    instance_name: str
+    state: WhatsAppConnectionState
+    connected: bool
+
+
+class WhatsAppPairingRequest(BaseModel):
+    phone_number: str
+    replace_existing: bool = False
+
+
+class WhatsAppPairingResponse(BaseModel):
+    instance_name: str
+    state: WhatsAppConnectionState
+    pairing_code: str
 
 
 class SendReportRequest(BaseModel):

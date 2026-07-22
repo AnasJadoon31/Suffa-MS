@@ -854,6 +854,12 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
 - Added optional Evolution API v2 document delivery for WhatsApp result cards
   and receipts, with the existing text-link flow retained when direct delivery
   is not configured.
+- Added a tenant-bound WhatsApp connection card to administrator Settings.
+  Principals can pair the configured Evolution API v2 instance without a
+  camera by entering its phone number, copying the generated pairing code, and
+  watching the connection status update automatically. Disconnected sessions
+  reconnect without deletion, recreated sessions preserve any webhook, and
+  Evolution credentials remain server-side.
 - Added targeted regressions in `test_reported_portal_issues.py`. Validation:
   147 backend tests pass, Python compile succeeds, Alembic has one head, and the
   frontend TypeScript/Vite production build succeeds.

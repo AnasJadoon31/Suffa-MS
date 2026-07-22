@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     evolution_api_url: str = ""
     evolution_api_key: str = ""
     evolution_instance: str = ""
+    # The single configured Evolution instance belongs only to this tenant.
+    # Empty falls back to DEFAULT_TENANT for single-tenant deployments.
+    evolution_tenant_slug: str = ""
 
     @field_validator("upload_allowed_content_types", mode="before")
     @classmethod

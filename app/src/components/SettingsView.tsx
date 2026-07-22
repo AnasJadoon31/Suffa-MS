@@ -1,9 +1,9 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
-import { Check, Pencil, Settings as SettingsIcon, Upload } from "lucide-react";
+import { Check, Copy, MessageCircle, Pencil, RefreshCw, Settings as SettingsIcon, Upload, Wifi, WifiOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { filesApi, operationsApi, type TypedSetting } from "../lib/endpoints";
+import { filesApi, messagingApi, operationsApi, type TypedSetting, type WhatsAppConnectionStatus } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
@@ -23,6 +23,25 @@ export function SettingsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppConnectionStatus | null>(null);
+  const [whatsAppLoading, setWhatsAppLoading] = useState(false);
+  const [pairingOpen, setPairingOpen] = useState(false);
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingCode, setPairingCode] = useState("");
+  const [pairingError, setPairingError] = useState("");
+  const [replacePairingPending, setReplacePairingPending] = useState(false);
+
+  const loadWhatsAppStatus = async () => {
+    if (!canManage) return;
+    setWhatsAppLoading(true);
+    try {
+      setWhatsAppStatus(await messagingApi.whatsappConnection());
+    } catch (err: any) {
+      setPairingError(err.response?.data?.detail ?? t("whatsappStatusFailed"));
+    } finally {
+      setWhatsAppLoading(false);
+    }
+  };
 
   const load = async () => setSettings(await operationsApi.settingsCatalog());
   useEffect(() => {
@@ -39,6 +58,18 @@ export function SettingsView() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (canManage) void loadWhatsAppStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManage]);
+
+  useEffect(() => {
+    if (!pairingOpen || !pairingCode || whatsAppStatus?.connected) return;
+    const timer = window.setInterval(() => void loadWhatsAppStatus(), 3000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pairingOpen, pairingCode, whatsAppStatus?.connected]);
 
   const categories = useMemo(() => {
     const grouped = new Map<string, TypedSetting[]>();
@@ -92,10 +123,94 @@ export function SettingsView() {
     }
   };
 
+  const generatePairingCode = async (replaceExisting = false) => {
+    setPairingError("");
+    setWhatsAppLoading(true);
+    try {
+      const response = await messagingApi.requestWhatsAppPairingCode(pairingPhone, replaceExisting);
+      setPairingCode(response.pairing_code);
+      setReplacePairingPending(false);
+      setWhatsAppStatus({ instance_name: response.instance_name, state: response.state, connected: false });
+    } catch (err: any) {
+      if (err.response?.status === 428) {
+        setReplacePairingPending(true);
+      } else {
+        setPairingError(err.response?.data?.detail ?? t("whatsappPairingCodeFailedError"));
+      }
+    } finally {
+      setWhatsAppLoading(false);
+    }
+  };
+
+  const requestPairingCode = (event: React.FormEvent) => {
+    event.preventDefault();
+    void generatePairingCode(false);
+  };
+
+  const whatsAppStateLabel = whatsAppStatus
+    ? (whatsAppStatus.connected ? t("connectedLabel") : t("disconnectedLabel"))
+    : (whatsAppLoading ? t("checkingStatusLabel") : t("statusUnavailableLabel"));
+
   return (
     <PageSection>
       <PageHeader title={t("settingsTitle")} icon={<SettingsIcon size={18} />} notice={t("settingsSubtitle")} />
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+
+      {canManage && (
+        <PageSection className="whatsappConnectionCard">
+          <div className="whatsappConnectionHeader">
+            <div>
+              <h3><MessageCircle size={18} /> {t("whatsappConnectionTitle")}</h3>
+              <p className="notice">{t("whatsappConnectionDescription")}</p>
+            </div>
+            <span className={`whatsappConnectionState ${whatsAppStatus?.connected ? "connected" : "disconnected"}`}>
+              {whatsAppStatus?.connected ? <Wifi size={15} /> : (whatsAppLoading ? <RefreshCw size={15} /> : <WifiOff size={15} />)}
+              {whatsAppStateLabel}
+            </span>
+          </div>
+          {pairingError && <p className="notice" style={{ color: "var(--rose)" }}>{pairingError}</p>}
+          <div className="whatsappConnectionActions">
+            <Button type="button" onClick={() => { setPairingOpen(true); setPairingCode(""); setPairingError(""); setReplacePairingPending(false); }} disabled={whatsAppLoading || !whatsAppStatus || whatsAppStatus.connected}>
+              <MessageCircle size={15} /> {t("connectWhatsAppBtn")}
+            </Button>
+            <Button className="secondaryAction" type="button" onClick={() => void loadWhatsAppStatus()} disabled={whatsAppLoading}>
+              <RefreshCw size={15} /> {t("refreshStatusBtn")}
+            </Button>
+          </div>
+        </PageSection>
+      )}
+
+      {pairingOpen && (
+        <Modal title={t("connectWhatsAppTitle")} onClose={() => { setPairingOpen(false); setPairingCode(""); }}>
+          {!pairingCode ? (
+            <form className="whatsappPairingForm" onSubmit={requestPairingCode}>
+              <p className="notice">{t("whatsappPhoneHelp")}</p>
+              <label>{t("whatsappPhoneLabel")}<Input autoFocus required inputMode="tel" placeholder={t("whatsappPhonePlaceholder")} value={pairingPhone} onChange={(event) => setPairingPhone(event.target.value)} /></label>
+              {pairingError && <p className="notice" style={{ color: "var(--rose)" }}>{pairingError}</p>}
+              {replacePairingPending ? (
+                <div className="whatsappPairingWarning" role="alert">
+                  <p>{t("whatsappReplacePairingWarning")}</p>
+                  <div className="whatsappConnectionActions">
+                    <Button type="button" onClick={() => void generatePairingCode(true)} disabled={whatsAppLoading}>{t("replacePairingBtn")}</Button>
+                    <Button className="secondaryAction" type="button" onClick={() => setReplacePairingPending(false)}>{t("cancelBtn")}</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button type="submit" disabled={whatsAppLoading}>{whatsAppLoading ? t("generatingCodeLabel") : t("generatePairingCodeBtn")}</Button>
+              )}
+            </form>
+          ) : whatsAppStatus?.connected ? (
+            <div className="whatsappPairingSuccess"><Wifi size={30} /><h3>{t("whatsappConnectedTitle")}</h3><p className="notice">{t("whatsappConnectedDescription")}</p></div>
+          ) : (
+            <div className="whatsappPairingCode">
+              <p>{t("whatsappPairingInstructions")}</p>
+              <div className="pairingCodeValue" aria-label={t("whatsappPairingCodeLabel")}>{pairingCode}</div>
+              <Button className="secondaryAction" type="button" onClick={() => void navigator.clipboard.writeText(pairingCode.replace("-", ""))}><Copy size={15} /> {t("copyCodeBtn")}</Button>
+              <p className="notice">{t("whatsappWaitingForConnection")}</p>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}

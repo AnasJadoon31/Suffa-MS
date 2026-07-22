@@ -1,10 +1,12 @@
 """Regression checks for the teacher/admin issues reported in Issues.pdf."""
 
 import pytest
+import httpx
 from fastapi import HTTPException
 from sqlalchemy import func, select
 
 from app.core.config import settings
+from app.core.error_codes import ErrorCode
 from app.core.pdf import render_result_card_pdf
 from app.modules.messaging.models import MessageLog, MessageTemplate
 from app.modules.messaging.routes import render_and_dispatch
@@ -223,6 +225,7 @@ async def test_whatsapp_pdf_requires_direct_delivery_and_does_not_false_log(
     monkeypatch.setattr(settings, "evolution_api_url", "")
     monkeypatch.setattr(settings, "evolution_api_key", "")
     monkeypatch.setattr(settings, "evolution_instance", "")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
     async with db_sessionmaker() as db:
         db.add(MessageTemplate(
             madrasa_id=seed.madrasa.id,
@@ -246,6 +249,95 @@ async def test_whatsapp_pdf_requires_direct_delivery_and_does_not_false_log(
                 attachment_bytes=b"%PDF-test",
             )
         assert exc_info.value.status_code == 503
+        assert await db.scalar(select(func.count()).select_from(MessageLog)) == 0
+
+
+async def test_whatsapp_pdf_reports_deleted_evolution_instance_as_unavailable(
+    db_sessionmaker, seed, monkeypatch,
+):
+    monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "test-key")
+    monkeypatch.setattr(settings, "evolution_instance", "deleted-instance")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/instance/connectionState/deleted-instance"
+        return httpx.Response(
+            404,
+            request=request,
+            json={
+                "status": 404,
+                "error": "Not Found",
+                "response": {"message": ["The deleted-instance instance does not exist"]},
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=transport, **kwargs),
+    )
+
+    async with db_sessionmaker() as db:
+        db.add(MessageTemplate(
+            madrasa_id=seed.madrasa.id,
+            code="test_deleted_instance_pdf",
+            name="Test deleted instance PDF",
+            content={"en": "Report for {name}"},
+        ))
+        await db.commit()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await render_and_dispatch(
+                db,
+                madrasa=seed.madrasa,
+                current_user=seed.principal,
+                template_code="test_deleted_instance_pdf",
+                language="en",
+                variables={"name": "Student"},
+                recipient_type="teacher",
+                recipient_id=seed.teacher.id,
+                phone_number=seed.teacher.whatsapp_number,
+                attachment_bytes=b"%PDF-test",
+            )
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.detail == ErrorCode.WHATSAPP_INSTANCE_UNAVAILABLE
+        assert await db.scalar(select(func.count()).select_from(MessageLog)) == 0
+
+
+async def test_whatsapp_pdf_cannot_use_another_tenants_instance(
+    db_sessionmaker, seed, monkeypatch,
+):
+    monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "test-key")
+    monkeypatch.setattr(settings, "evolution_instance", "suffa-ms")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "another-madrasa")
+
+    async with db_sessionmaker() as db:
+        db.add(MessageTemplate(
+            madrasa_id=seed.madrasa.id,
+            code="test_cross_tenant_pdf",
+            name="Test cross-tenant PDF",
+            content={"en": "Report for {name}"},
+        ))
+        await db.commit()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await render_and_dispatch(
+                db,
+                madrasa=seed.madrasa,
+                current_user=seed.principal,
+                template_code="test_cross_tenant_pdf",
+                language="en",
+                variables={"name": "Student"},
+                recipient_type="teacher",
+                recipient_id=seed.teacher.id,
+                phone_number=seed.teacher.whatsapp_number,
+                attachment_bytes=b"%PDF-test",
+            )
+        assert exc_info.value.status_code == 403
         assert await db.scalar(select(func.count()).select_from(MessageLog)) == 0
 
 

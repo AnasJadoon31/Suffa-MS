@@ -1,5 +1,6 @@
 import base64
 from datetime import UTC, datetime
+import logging
 from urllib.parse import quote
 from uuid import UUID
 
@@ -22,12 +23,250 @@ from app.modules.messaging.schemas import (
     MessageTemplateRead,
     SendCredentialsRequest,
     SendReportRequest,
+    WhatsAppConnectionStatus,
     WhatsAppLinkRequest,
     WhatsAppLinkResponse,
+    WhatsAppPairingRequest,
+    WhatsAppPairingResponse,
 )
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _evolution_error_message(response: httpx.Response) -> str:
+    """Extract Evolution v2's useful nested error without exposing request data."""
+    try:
+        body = response.json()
+    except ValueError:
+        return response.text[:500]
+
+    candidate = body.get("response", {}).get("message") if isinstance(body, dict) else None
+    if isinstance(candidate, list):
+        return "; ".join(str(item) for item in candidate)[:500]
+    if candidate:
+        return str(candidate)[:500]
+    if isinstance(body, dict):
+        return str(body.get("message") or body.get("error") or body)[:500]
+    return str(body)[:500]
+
+
+def _evolution_config() -> tuple[str, str, str]:
+    if not (settings.evolution_api_url and settings.evolution_api_key and settings.evolution_instance):
+        raise HTTPException(status_code=503, detail=ErrorCode.WHATSAPP_DELIVERY_NOT_CONFIGURED)
+    return (
+        settings.evolution_api_url.rstrip("/"),
+        settings.evolution_api_key,
+        quote(settings.evolution_instance, safe=""),
+    )
+
+
+def _require_evolution_tenant(madrasa: Madrasa) -> None:
+    configured_tenant = settings.evolution_tenant_slug or settings.default_tenant
+    if madrasa.slug != configured_tenant:
+        raise HTTPException(status_code=403, detail=ErrorCode.PERMISSION_REQUIRED)
+
+
+def _evolution_state(response: httpx.Response) -> str:
+    body = response.json()
+    instance_body = body.get("instance", body) if isinstance(body, dict) else {}
+    state = str(instance_body.get("state") or instance_body.get("status") or "unknown").lower()
+    return state if state in {"open", "close", "connecting", "refused"} else "unknown"
+
+
+def _pairing_code_value(response: httpx.Response) -> str | None:
+    body = response.json()
+    qrcode = body.get("qrcode", body) if isinstance(body, dict) else {}
+    raw_code = str(qrcode.get("pairingCode") or "").replace("-", "")
+    return (f"{raw_code[:4]}-{raw_code[4:]}" if len(raw_code) > 4 else raw_code) or None
+
+
+def _pairing_code(response: httpx.Response) -> str:
+    pairing_code = _pairing_code_value(response)
+    if pairing_code is None:
+        logger.warning("Evolution returned phone-pairing data without a pairing code")
+        raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_PAIRING_CODE_FAILED)
+    return pairing_code
+
+
+def _webhook_payload(body: object) -> dict[str, object] | None:
+    if not isinstance(body, dict) or not body.get("url"):
+        return None
+    return {
+        "webhook": {
+            "enabled": body.get("enabled", True),
+            "url": body["url"],
+            "headers": body.get("headers") or {},
+            "base64": body.get("webhookBase64", body.get("base64", False)),
+            "byEvents": body.get("webhookByEvents", body.get("byEvents", False)),
+            "events": body.get("events") or [],
+        }
+    }
+
+
+def _raise_evolution_pairing_failure(response: httpx.Response) -> None:
+    logger.warning(
+        "Evolution phone pairing failed status=%s error=%s",
+        response.status_code,
+        _evolution_error_message(response),
+    )
+    raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_PAIRING_CODE_FAILED)
+
+
+@router.get("/whatsapp/connection", response_model=WhatsAppConnectionStatus)
+async def whatsapp_connection_status(
+    current_user: User = Depends(require_permission("settings.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+) -> WhatsAppConnectionStatus:
+    _require_evolution_tenant(madrasa)
+    base_url, api_key, instance = _evolution_config()
+    headers = {"apikey": api_key}
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(
+                f"{base_url}/instance/connectionState/{instance}", headers=headers
+            )
+    except httpx.RequestError as exc:
+        logger.warning("Evolution connection status request failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_PAIRING_CODE_FAILED) from exc
+
+    if response.status_code == 404:
+        return WhatsAppConnectionStatus(
+            instance_name=settings.evolution_instance, state="not_created", connected=False
+        )
+    if response.is_error:
+        _raise_evolution_pairing_failure(response)
+    state = _evolution_state(response)
+    return WhatsAppConnectionStatus(
+        instance_name=settings.evolution_instance,
+        state=state,
+        connected=state == "open",
+    )
+
+
+@router.post("/whatsapp/connection/pairing-code", response_model=WhatsAppPairingResponse)
+async def request_whatsapp_pairing_code(
+    payload: WhatsAppPairingRequest,
+    current_user: User = Depends(require_permission("settings.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+) -> WhatsAppPairingResponse:
+    _require_evolution_tenant(madrasa)
+    phone_number = "".join(character for character in payload.phone_number if character.isdigit())
+    if not 8 <= len(phone_number) <= 15:
+        raise HTTPException(status_code=422, detail=ErrorCode.WHATSAPP_PHONE_INVALID)
+    base_url, api_key, instance = _evolution_config()
+    headers = {"apikey": api_key, "Content-Type": "application/json"}
+    pairing_response: httpx.Response
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            state_response = await client.get(
+                f"{base_url}/instance/connectionState/{instance}", headers=headers
+            )
+            if state_response.status_code != 404:
+                if state_response.is_error:
+                    _raise_evolution_pairing_failure(state_response)
+                state = _evolution_state(state_response)
+                if state == "open":
+                    raise HTTPException(
+                        status_code=409, detail=ErrorCode.WHATSAPP_INSTANCE_ALREADY_CONNECTED
+                    )
+                if state in {"close", "connecting"}:
+                    pairing_response = await client.get(
+                        f"{base_url}/instance/connect/{instance}",
+                        headers=headers,
+                        params={"number": phone_number},
+                    )
+                    if pairing_response.is_error:
+                        _raise_evolution_pairing_failure(pairing_response)
+                    existing_code = _pairing_code_value(pairing_response)
+                    if existing_code is not None:
+                        return WhatsAppPairingResponse(
+                            instance_name=settings.evolution_instance,
+                            state="connecting",
+                            pairing_code=existing_code,
+                        )
+                    if state == "close":
+                        raise HTTPException(
+                            status_code=502, detail=ErrorCode.WHATSAPP_PAIRING_CODE_FAILED
+                        )
+                    if not payload.replace_existing:
+                        raise HTTPException(
+                            status_code=428,
+                            detail=ErrorCode.WHATSAPP_PAIRING_REPLACE_REQUIRED,
+                        )
+
+                if state not in {"connecting", "refused"}:
+                    logger.warning("Evolution instance cannot enter phone pairing state=%s", state)
+                    raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_PAIRING_CODE_FAILED)
+
+                webhook_response = await client.get(
+                    f"{base_url}/webhook/find/{instance}", headers=headers
+                )
+                if webhook_response.is_error and webhook_response.status_code != 404:
+                    _raise_evolution_pairing_failure(webhook_response)
+                try:
+                    webhook_body = webhook_response.json()
+                except ValueError:
+                    webhook_body = None
+                saved_webhook = (
+                    _webhook_payload(webhook_body) if not webhook_response.is_error else None
+                )
+                delete_response = await client.delete(f"{base_url}/instance/delete/{instance}", headers=headers)
+                if delete_response.is_error and delete_response.status_code != 404:
+                    _raise_evolution_pairing_failure(delete_response)
+            else:
+                saved_webhook = None
+
+            pairing_response = await client.post(
+                f"{base_url}/instance/create", headers=headers,
+                json={"instanceName": settings.evolution_instance, "integration": "WHATSAPP-BAILEYS", "qrcode": True, "number": phone_number},
+            )
+            if pairing_response.is_error:
+                _raise_evolution_pairing_failure(pairing_response)
+            if saved_webhook is not None:
+                webhook_set_response = await client.post(
+                    f"{base_url}/webhook/set/{instance}", headers=headers, json=saved_webhook
+                )
+                if webhook_set_response.is_error:
+                    _raise_evolution_pairing_failure(webhook_set_response)
+    except httpx.RequestError as exc:
+        logger.warning("Evolution phone pairing request failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_PAIRING_CODE_FAILED) from exc
+
+    return WhatsAppPairingResponse(
+        instance_name=settings.evolution_instance,
+        state="connecting",
+        pairing_code=_pairing_code(pairing_response),
+    )
+
+
+async def _require_open_evolution_instance(client: httpx.AsyncClient, headers: dict[str, str]) -> None:
+    instance = quote(settings.evolution_instance, safe="")
+    endpoint = f"{settings.evolution_api_url.rstrip('/')}/instance/connectionState/{instance}"
+    try:
+        response = await client.get(endpoint, headers=headers)
+    except httpx.RequestError as exc:
+        logger.warning("Evolution connection-state request failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_MEDIA_DELIVERY_FAILED) from exc
+
+    if response.is_error:
+        logger.warning(
+            "Evolution instance check failed status=%s error=%s",
+            response.status_code,
+            _evolution_error_message(response),
+        )
+        detail = (
+            ErrorCode.WHATSAPP_INSTANCE_UNAVAILABLE
+            if response.status_code == 404
+            else ErrorCode.WHATSAPP_MEDIA_DELIVERY_FAILED
+        )
+        raise HTTPException(status_code=503 if response.status_code == 404 else 502, detail=detail)
+
+    state = _evolution_state(response)
+    if state != "open":
+        logger.warning("Evolution instance is unavailable state=%s", state or "unknown")
+        raise HTTPException(status_code=503, detail=ErrorCode.WHATSAPP_INSTANCE_UNAVAILABLE)
 
 
 def normalise_phone_number(value: str) -> str:
@@ -76,9 +315,11 @@ async def render_and_dispatch(
 
     result = WhatsAppLinkResponse(normalised_number=number, url=f"https://wa.me/{number}?text={quote(message)}")
     if attachment_bytes is not None:
+        _require_evolution_tenant(madrasa)
         if not (settings.evolution_api_url and settings.evolution_api_key and settings.evolution_instance):
             raise HTTPException(status_code=503, detail=ErrorCode.WHATSAPP_DELIVERY_NOT_CONFIGURED)
-        endpoint = f"{settings.evolution_api_url.rstrip('/')}/message/sendMedia/{settings.evolution_instance}"
+        instance = quote(settings.evolution_instance, safe="")
+        endpoint = f"{settings.evolution_api_url.rstrip('/')}/message/sendMedia/{instance}"
         payload = {
             "number": number,
             "mediatype": "document",
@@ -87,13 +328,20 @@ async def render_and_dispatch(
             "fileName": attachment_name,
             "caption": message,
         }
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                endpoint,
-                headers={"apikey": settings.evolution_api_key, "Content-Type": "application/json"},
-                json=payload,
-            )
+        headers = {"apikey": settings.evolution_api_key, "Content-Type": "application/json"}
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                await _require_open_evolution_instance(client, headers)
+                response = await client.post(endpoint, headers=headers, json=payload)
+        except httpx.RequestError as exc:
+            logger.warning("Evolution media delivery request failed: %s", type(exc).__name__)
+            raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_MEDIA_DELIVERY_FAILED) from exc
         if response.is_error:
+            logger.warning(
+                "Evolution media delivery failed status=%s error=%s",
+                response.status_code,
+                _evolution_error_message(response),
+            )
             raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_MEDIA_DELIVERY_FAILED)
         result = WhatsAppLinkResponse(normalised_number=number, direct_sent=True)
 

@@ -2110,6 +2110,86 @@ input[type="radio"] {
   font-size: 0.92rem;
 }
 
+.whatsappConnectionCard {
+  margin-bottom: 16px;
+}
+
+.whatsappConnectionHeader,
+.whatsappConnectionActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.whatsappConnectionHeader h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+
+.whatsappConnectionActions {
+  justify-content: flex-start;
+  margin-top: 14px;
+}
+
+.whatsappConnectionState {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.whatsappConnectionState.connected {
+  color: var(--brand-deep);
+  background: var(--brand-soft);
+}
+
+.whatsappConnectionState.disconnected {
+  color: var(--rose);
+  background: color-mix(in srgb, var(--rose) 10%, transparent);
+}
+
+.whatsappPairingForm,
+.whatsappPairingCode,
+.whatsappPairingSuccess {
+  display: grid;
+  gap: 16px;
+}
+
+.whatsappPairingWarning {
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--saffron) 45%, var(--line));
+  border-radius: var(--radius);
+  background: var(--saffron-soft);
+}
+
+.whatsappPairingWarning p {
+  margin: 0;
+}
+
+.whatsappPairingSuccess,
+.whatsappPairingCode {
+  justify-items: center;
+  text-align: center;
+}
+
+.pairingCodeValue {
+  padding: 16px 22px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: clamp(1.7rem, 7vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
+}
+
 .settingFileControl {
   display: flex;
   align-items: center;
@@ -2132,6 +2212,23 @@ input[type="radio"] {
 .secondaryAction.disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+@media (max-width: 640px) {
+  .settingsRow {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settingsRow .notice,
+  .settingsRow .settingsLabel {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .settingsRow .tableAction {
+    width: fit-content;
+  }
 }
 
 .savedTick {

@@ -104,6 +104,13 @@ api.interceptors.response.use(
         timetable_self_service_only: "timetableSelfServiceOnlyError",
         assignment_not_assigned: "assignmentNotAssignedError",
         teachers_self_attendance_only: "teachersSelfAttendanceOnlyError",
+        whatsapp_delivery_not_configured: "whatsappDeliveryNotConfiguredError",
+        whatsapp_instance_unavailable: "whatsappInstanceUnavailableError",
+        whatsapp_instance_already_connected: "whatsappInstanceAlreadyConnectedError",
+        whatsapp_pairing_code_failed: "whatsappPairingCodeFailedError",
+        whatsapp_pairing_replace_required: "whatsappPairingReplaceRequiredError",
+        whatsapp_phone_invalid: "whatsappPhoneInvalidError",
+        whatsapp_media_delivery_failed: "whatsappMediaDeliveryFailedError",
       };
       if (typeof body.detail === "string" && localizedErrors[body.detail]) {
         body.detail = i18next.t(localizedErrors[body.detail]);

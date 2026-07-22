@@ -191,12 +191,19 @@ export const peopleApi = {
 // -------------------------------------------------------------------- Messaging
 
 export interface WhatsAppLink { normalised_number: string; url: string; direct_sent: boolean }
+export type WhatsAppConnectionState = "open" | "close" | "connecting" | "refused" | "not_created" | "unknown";
+export interface WhatsAppConnectionStatus { instance_name: string; state: WhatsAppConnectionState; connected: boolean }
+export interface WhatsAppPairingResponse { instance_name: string; state: WhatsAppConnectionState; pairing_code: string }
 
 export const messagingApi = {
   sendCredentials: (payload: { subject_type: "student" | "teacher"; subject_id: string; set_password_url: string }) =>
     api.post<WhatsAppLink>("/api/v1/messaging/send-credentials", payload).then((r) => r.data),
   sendReport: (payload: { student_id: string; result_link?: string }) =>
     api.post<WhatsAppLink>("/api/v1/messaging/send-report", payload).then((r) => r.data),
+  whatsappConnection: () =>
+    api.get<WhatsAppConnectionStatus>("/api/v1/messaging/whatsapp/connection").then((r) => r.data),
+  requestWhatsAppPairingCode: (phoneNumber: string, replaceExisting = false) =>
+    api.post<WhatsAppPairingResponse>("/api/v1/messaging/whatsapp/connection/pairing-code", { phone_number: phoneNumber, replace_existing: replaceExisting }).then((r) => r.data),
 };
 
 // ---------------------------------------------------------------- Attendance
