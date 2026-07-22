@@ -30,6 +30,8 @@ services:
     networks:
       - default
       - coolify
+    labels:
+      - "traefik.docker.network=coolify"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read()\""]
