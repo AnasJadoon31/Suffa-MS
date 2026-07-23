@@ -697,152 +697,20 @@ async def list_guardian_students(
 
 # ---------------------------------------------------------------- Guardian Portal
 
+# Guardian portal endpoints (ISS3-028/029) have been moved to
+# backend/app/modules/operations/guardian_portal.py to avoid circular dependencies.
+# The following endpoints were removed from this file:
+# - GET /guardians/me/forms (uses FormDef from operations.schemas)
+# - GET /guardians/me/announcements (uses AnnouncementRead from operations.schemas)
+
 @router.get("/guardians/me/forms")
-async def list_guardian_forms(
-    current_user: User = Depends(get_current_user),
-    madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session),
-) -> list[FormDef]:
-    """ISS3-028/029: List forms visible to the authenticated guardian.
-    
-    Guardian visibility is derived through linked wards:
-    - Forms targeted to the guardian's role (parent)
-    - Forms targeted to any of the guardian's wards' classes/sections
-    - Forms targeted to specific persons including the guardian
-    """
-    if current_user.role != UserRole.parent:
-        raise HTTPException(status_code=403, detail="Only guardians can access this endpoint")
-
-    # Get guardian profile
-    guardian = (
-        await session.execute(
-            select(Guardian).where(Guardian.user_id == current_user.id, Guardian.madrasa_id == madrasa.id)
-        )
-    ).scalar_one_or_none()
-    if guardian is None:
-        raise HTTPException(status_code=404, detail="Guardian profile not found")
-
-    # Get guardian's wards
-    ward_ids = (
-        await session.execute(
-            select(StudentGuardian.student_id).where(StudentGuardian.guardian_id == guardian.id)
-        )
-    ).scalars().all()
-
-    # Get wards' class enrollments
-    ward_class_ids: set[str] = set()
-    ward_section_ids: set[str] = set()
-    if ward_ids:
-        enrollments = (
-            await session.execute(
-                select(Enrollment.class_id, Enrollment.section_id)
-                .where(Enrollment.student_id.in_(ward_ids), Enrollment.ended_on.is_(None))
-            )
-        ).all()
-        for enrollment in enrollments:
-            ward_class_ids.add(str(enrollment.class_id))
-            if enrollment.section_id:
-                ward_section_ids.add(str(enrollment.section_id))
-
-    # Get all forms for this madrasa
-    all_forms = (
-        await session.execute(
-            select(Form).where(Form.madrasa_id == madrasa.id)
-        )
-    ).scalars().all()
-
-    # Filter forms visible to guardian
-    visible_forms: list[FormDef] = []
-    for form in all_forms:
-        scope = form.visibility_scope or {}
-        if scope.get("all"):
-            visible_forms.append(form)
-            continue
-        if "parent" in scope.get("roles", []):
-            visible_forms.append(form)
-            continue
-        if str(guardian.user_id) in [str(u) for u in scope.get("users", [])]:
-            visible_forms.append(form)
-            continue
-        if ward_class_ids.intersection({str(c) for c in scope.get("classes", [])}):
-            visible_forms.append(form)
-            continue
-        if ward_section_ids.intersection({str(s) for s in scope.get("sections", [])}):
-            visible_forms.append(form)
-            continue
-
-    return [FormDef.model_validate(f) for f in visible_forms]
-
-
-@router.get("/guardians/me/announcements", response_model=list[AnnouncementRead])
-async def list_guardian_announcements(
-    current_user: User = Depends(get_current_user),
-    madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session),
-) -> list[AnnouncementRead]:
-    """ISS3-029: List announcements visible to the authenticated guardian."""
-    if current_user.role != UserRole.parent:
-        raise HTTPException(status_code=403, detail="Only guardians can access this endpoint")
-
-    guardian = (
-        await session.execute(
-            select(Guardian).where(Guardian.user_id == current_user.id, Guardian.madrasa_id == madrasa.id)
-        )
-    ).scalar_one_or_none()
-    if guardian is None:
-        raise HTTPException(status_code=404, detail="Guardian profile not found")
-
-    ward_ids = (
-        await session.execute(
-            select(StudentGuardian.student_id).where(StudentGuardian.guardian_id == guardian.id)
-        )
-    ).scalars().all()
-
-    ward_class_ids: set[str] = set()
-    ward_section_ids: set[str] = set()
-    if ward_ids:
-        enrollments = (
-            await session.execute(
-                select(Enrollment.class_id, Enrollment.section_id)
-                .where(Enrollment.student_id.in_(ward_ids), Enrollment.ended_on.is_(None))
-            )
-        ).all()
-        for enrollment in enrollments:
-            ward_class_ids.add(str(enrollment.class_id))
-            if enrollment.section_id:
-                ward_section_ids.add(str(enrollment.section_id))
-
-    all_announcements = (
-        await session.execute(
-            select(Announcement)
-            .where(Announcement.madrasa_id == madrasa.id)
-            .order_by(Announcement.created_at.desc())
-        )
-    ).scalars().all()
-
-    visible_announcements: list[AnnouncementRead] = []
-    for announcement in all_announcements:
-        scope = announcement.audience_scope or {}
-        if scope.get("all"):
-            visible_announcements.append(AnnouncementRead.model_validate(announcement))
-            continue
-        if "parent" in scope.get("roles", []):
-            visible_announcements.append(AnnouncementRead.model_validate(announcement))
-            continue
-        if str(guardian.user_id) in [str(u) for u in scope.get("users", [])]:
-            visible_announcements.append(AnnouncementRead.model_validate(announcement))
-            continue
-        if ward_class_ids.intersection({str(c) for c in scope.get("classes", [])}):
-            visible_announcements.append(AnnouncementRead.model_validate(announcement))
-            continue
-        if ward_section_ids.intersection({str(s) for s in scope.get("sections", [])}):
-            visible_announcements.append(AnnouncementRead.model_validate(announcement))
-            continue
-
-    return visible_announcements
+async def list_guardian_forms_placeholder():
+    """Placeholder - endpoint moved to operations/guardian_portal.py"""
+    raise HTTPException(status_code=501, detail="Endpoint moved to operations router")
 
 async def _get_or_404(session: AsyncSession, model, record_id: UUID, madrasa_id: UUID):
     record = await session.get(model, record_id)
     if record is None or record.madrasa_id != madrasa_id:
         raise HTTPException(status_code=404, detail=f"{model.__name__} not found")
     return record
+
