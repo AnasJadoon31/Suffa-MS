@@ -20,8 +20,7 @@ from app.modules.people.models import (
     TeacherProfile,
 )
 from app.modules.operations.admissions import validate_admission_answers
-from app.modules.operations.models import AdmissionForm, Announcement, Form
-from app.modules.operations.schemas import AnnouncementRead, FormDef
+from app.modules.operations.models import AdmissionForm
 from app.modules.people.schemas import (
     GuardianCreate,
     GuardianCredentialsRequest,
@@ -698,7 +697,7 @@ async def list_guardian_students(
 
 # ---------------------------------------------------------------- Guardian Portal
 
-@router.get("/guardians/me/forms", response_model=list[FormDef])
+@router.get("/guardians/me/forms")
 async def list_guardian_forms(
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
