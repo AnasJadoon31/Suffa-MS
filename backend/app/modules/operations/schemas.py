@@ -262,7 +262,15 @@ class FormResponseRead(BaseModel):
     form_id: UUID
     student_id: UUID | None = None
     student_name: str | None = None
+    teacher_id: UUID | None = None
+    teacher_name: str | None = None
+    guardian_id: UUID | None = None
+    guardian_name: str | None = None
+    ward_id: UUID | None = None
+    ward_name: str | None = None
     submitted_by_id: UUID
+    submitted_by_name: str | None = None
+    submitted_by_role: str | None = None
     response_data: dict
     created_at: datetime
 

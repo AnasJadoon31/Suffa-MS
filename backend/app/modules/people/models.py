@@ -80,11 +80,17 @@ class Guardian(Base, IdMixin, TenantMixin, TimestampMixin):
     preferred_language: Mapped[str] = mapped_column(String(8), default="ur")
 
 
-class StudentGuardian(Base, IdMixin, TimestampMixin):
+class StudentGuardian(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "student_guardians"
+    __table_args__ = (
+        UniqueConstraint("student_id", "guardian_id", name="uq_student_guardian"),
+    )
 
     student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"))
     guardian_id: Mapped[UUID] = mapped_column(ForeignKey("guardians.id"))
+    relationship: Mapped[str] = mapped_column(String(80), default="guardian")
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    portal_access: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class StudentAdmissionRecord(Base, IdMixin, TenantMixin, TimestampMixin):
