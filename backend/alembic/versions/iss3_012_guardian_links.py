@@ -19,38 +19,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add TenantMixin columns to student_guardians if not present
-    op.add_column("student_guardians", sa.Column("madrasa_id", sa.UUID(), nullable=True))
-    op.add_column("student_guardians", sa.Column("created_at", sa.DateTime(), nullable=True))
-    op.add_column("student_guardians", sa.Column("updated_at", sa.DateTime(), nullable=True))
-    
-    # Add relationship and access control columns
+    # Add relationship column (does not exist yet)
     op.add_column("student_guardians", sa.Column("relationship", sa.String(80), nullable=True, server_default="guardian"))
+    
+    # Add is_primary column
     op.add_column("student_guardians", sa.Column("is_primary", sa.Boolean(), nullable=True, server_default=sa.text("false")))
+    
+    # Add portal_access column
     op.add_column("student_guardians", sa.Column("portal_access", sa.Boolean(), nullable=True, server_default=sa.text("true")))
     
     # Create unique constraint
     op.create_unique_constraint("uq_student_guardian", "student_guardians", ["student_id", "guardian_id"])
     
-    # Backfill madrasa_id from student_profiles
+    # Backfill madrasa_id from student_profiles (if madrasa_id was added by TenantMixin but not backfilled)
     op.execute("""
         UPDATE student_guardians sg
         SET madrasa_id = sp.madrasa_id
         FROM student_profiles sp
-        WHERE sg.student_id = sp.id
+        WHERE sg.student_id = sp.id AND sg.madrasa_id IS NULL
     """)
-    
-    # Set created_at/updated_at for existing rows
-    op.execute("""
-        UPDATE student_guardians
-        SET created_at = NOW(), updated_at = NOW()
-        WHERE created_at IS NULL
-    """)
-    
-    # Make madrasa_id NOT NULL after backfill
-    op.alter_column("student_guardians", "madrasa_id", nullable=False)
-    op.alter_column("student_guardians", "created_at", nullable=False)
-    op.alter_column("student_guardians", "updated_at", nullable=False)
 
 
 def downgrade() -> None:
@@ -58,6 +45,3 @@ def downgrade() -> None:
     op.drop_column("student_guardians", "portal_access")
     op.drop_column("student_guardians", "is_primary")
     op.drop_column("student_guardians", "relationship")
-    op.drop_column("student_guardians", "updated_at")
-    op.drop_column("student_guardians", "created_at")
-    op.drop_column("student_guardians", "madrasa_id")
