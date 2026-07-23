@@ -30,14 +30,6 @@ def upgrade() -> None:
     
     # Create unique constraint
     op.create_unique_constraint("uq_student_guardian", "student_guardians", ["student_id", "guardian_id"])
-    
-    # Backfill madrasa_id from student_profiles (if madrasa_id was added by TenantMixin but not backfilled)
-    op.execute("""
-        UPDATE student_guardians sg
-        SET madrasa_id = sp.madrasa_id
-        FROM student_profiles sp
-        WHERE sg.student_id = sp.id AND sg.madrasa_id IS NULL
-    """)
 
 
 def downgrade() -> None:
