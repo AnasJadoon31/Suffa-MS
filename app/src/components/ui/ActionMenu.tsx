@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export interface ActionMenuItem {
@@ -22,18 +22,28 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const menuId = useRef(`action-menu-${crypto.randomUUID()}`);
+
+  const enabledIndexes = items
+    .map((item, index) => item.disabled ? -1 : index)
+    .filter((index) => index >= 0);
+
+  const closeAndRestoreFocus = () => {
+    setIsOpen(false);
+    buttonRef.current?.focus();
+  };
 
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        closeAndRestoreFocus();
       }
     };
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsOpen(false);
-        buttonRef.current?.focus();
+        closeAndRestoreFocus();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -45,8 +55,12 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
   }, [isOpen]);
 
   useEffect(() => {
-    if (isOpen) setActiveIndex(-1);
-  }, [isOpen]);
+    if (isOpen) setActiveIndex(enabledIndexes[0] ?? -1);
+  }, [isOpen, items]);
+
+  useEffect(() => {
+    if (isOpen && activeIndex >= 0) itemRefs.current[activeIndex]?.focus();
+  }, [activeIndex, isOpen]);
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (!isOpen) {
@@ -59,24 +73,29 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
-        setActiveIndex((i) => (i + 1) % items.length);
+        setActiveIndex((current) => {
+          const position = enabledIndexes.indexOf(current);
+          return enabledIndexes[(position + 1) % enabledIndexes.length] ?? -1;
+        });
         break;
       case "ArrowUp":
         event.preventDefault();
-        setActiveIndex((i) => (i - 1 + items.length) % items.length);
+        setActiveIndex((current) => {
+          const position = enabledIndexes.indexOf(current);
+          return enabledIndexes[(position - 1 + enabledIndexes.length) % enabledIndexes.length] ?? -1;
+        });
         break;
       case "Enter":
       case " ":
         event.preventDefault();
         if (activeIndex >= 0 && activeIndex < items.length) {
-          items[activeIndex].onClick();
+          void items[activeIndex].onClick();
           setIsOpen(false);
         }
         break;
       case "Escape":
         event.preventDefault();
-        setIsOpen(false);
-        buttonRef.current?.focus();
+        closeAndRestoreFocus();
         break;
       case "Tab":
         setIsOpen(false);
@@ -93,13 +112,14 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
         aria-label={ariaLabel ?? t("actionsCol")}
         aria-haspopup="menu"
         aria-expanded={isOpen}
+        aria-controls={isOpen ? menuId.current : undefined}
         onClick={() => setIsOpen((v) => !v)}
         onKeyDown={handleKeyDown}
       >
         {children ?? <MoreVertical size={16} />}
       </button>
       {isOpen && (
-        <ul className="actionMenuDropdown" role="menu" aria-orientation="vertical">
+        <ul id={menuId.current} className="actionMenuDropdown" role="menu" aria-orientation="vertical" onKeyDown={handleKeyDown}>
           {items.map((item, index) => (
             <li key={index} role="none">
               <button
@@ -108,8 +128,9 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
                 className={`actionMenuItem${item.destructive ? " destructive" : ""}${item.disabled ? " disabled" : ""}`}
                 disabled={item.disabled}
                 tabIndex={activeIndex === index ? 0 : -1}
+                ref={(element) => { itemRefs.current[index] = element; }}
                 onClick={() => {
-                  item.onClick();
+                  void item.onClick();
                   setIsOpen(false);
                 }}
                 onFocus={() => setActiveIndex(index)}

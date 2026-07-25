@@ -31,9 +31,12 @@ class TeacherProfile(Base, IdMixin, TenantMixin, TimestampMixin):
 
 class StudentProfile(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "student_profiles"
+    __table_args__ = (
+        UniqueConstraint("madrasa_id", "admission_number", name="uq_student_admission_number_tenant"),
+    )
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
-    admission_number: Mapped[str] = mapped_column(String(40), unique=True)
+    admission_number: Mapped[str] = mapped_column(String(40))
     name: Mapped[str] = mapped_column(String(160))
     date_of_birth: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(24), default="active")
@@ -42,6 +45,8 @@ class StudentProfile(Base, IdMixin, TenantMixin, TimestampMixin):
     # Formal-record fields (§11).
     b_form_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    is_independent: Mapped[bool] = mapped_column(Boolean, default=False)
     photo_file_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("file_objects.id"), nullable=True)
 
     @declared_attr

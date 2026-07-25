@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.teaching_scope import taught_pairs
 from app.modules.academics.models import AcademicSession, ClassCourse, Enrollment
 from app.modules.auth.models import User, UserRole
-from app.modules.people.models import StudentProfile, TeacherProfile
+from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 
 
 @dataclass(frozen=True)
@@ -93,6 +93,49 @@ async def get_viewer_context(db: AsyncSession, user: User, madrasa_id: UUID) -> 
                 class_ids=frozenset(pair.class_id for pair in pairs),
                 section_ids=frozenset(pair.section_id for pair in pairs if pair.section_id),
                 course_ids=frozenset(pair.course_id for pair in pairs),
+            )
+
+    if user.role == UserRole.parent and active_session_id is not None:
+        guardian = (
+            await db.execute(
+                select(Guardian).where(
+                    Guardian.user_id == user.id,
+                    Guardian.madrasa_id == madrasa_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if guardian is not None:
+            enrollments = (
+                await db.execute(
+                    select(Enrollment)
+                    .join(StudentGuardian, StudentGuardian.student_id == Enrollment.student_id)
+                    .where(
+                        StudentGuardian.guardian_id == guardian.id,
+                        StudentGuardian.madrasa_id == madrasa_id,
+                        StudentGuardian.portal_access.is_(True),
+                        Enrollment.session_id == active_session_id,
+                        Enrollment.ended_on.is_(None),
+                    )
+                )
+            ).scalars().all()
+            class_ids = {enrollment.class_id for enrollment in enrollments}
+            course_ids = set()
+            if class_ids:
+                course_ids = set(
+                    (
+                        await db.execute(
+                            select(ClassCourse.course_id).where(
+                                ClassCourse.class_id.in_(class_ids)
+                            )
+                        )
+                    ).scalars().all()
+                )
+            return ViewerContext(
+                role=user.role.value,
+                user_id=user.id,
+                class_ids=frozenset(class_ids),
+                section_ids=frozenset(enrollment.section_id for enrollment in enrollments),
+                course_ids=frozenset(course_ids),
             )
 
     return ViewerContext(role=user.role.value, user_id=user.id)

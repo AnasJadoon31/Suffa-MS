@@ -1,6 +1,6 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import { Building2, Plus, ToggleLeft } from "lucide-react";
+import { Building2, Copy, Plus, ToggleLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { platformApi, type FeatureFlag, type PlatformMadrasa } from "../lib/endpoints";
@@ -20,6 +20,7 @@ export function PlatformView() {
   const [features, setFeatures] = useState<FeatureFlag[]>([]);
   const [form, setForm] = useState({ name: "", slug: "", principal_username: "" });
   const [notice, setNotice] = useState("");
+  const [principalSetupUrl, setPrincipalSetupUrl] = useState("");
   const [showOnboard, setShowOnboard] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -73,7 +74,8 @@ export function PlatformView() {
                                 setNotice("");
                                 try {
                                   const created = await platformApi.createMadrasa(form);
-                                  setNotice(t("onboardSuccess", { slug: created.slug, url: created.set_password_url }));
+                                  setNotice(t("onboardSuccess", { slug: created.slug }));
+                                  setPrincipalSetupUrl(`${window.location.origin}${created.set_password_url}`);
                                   setForm({ name: "", slug: "", principal_username: "" });
                                   setShowOnboard(false);
                                   await load();
@@ -92,6 +94,14 @@ export function PlatformView() {
                   </FormModal>}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
           {notice && <p className="notice">{notice}</p>}
+          {principalSetupUrl && (
+            <div className="credentialDeliveryActions" role="status" aria-label={t("credentialsReadyLabel")}>
+              <span>{t("credentialsReadyLabel")}</span>
+              <Button className="secondaryAction" type="button" onClick={() => void navigator.clipboard.writeText(principalSetupUrl)}>
+                <Copy size={15} /> {t("copyLinkBtn")}
+              </Button>
+            </div>
+          )}
         </PageSection>
 
         <PageSection style={{ marginTop: 16 }}>

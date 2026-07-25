@@ -2,7 +2,7 @@ from typing import Optional
 from enum import StrEnum
 from uuid import UUID
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String
+from sqlalchemy import Boolean, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, TimestampMixin
@@ -26,10 +26,13 @@ class UserStatus(StrEnum):
 
 class User(Base, IdMixin, TimestampMixin):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("madrasa_id", "username", name="uq_user_username_tenant"),
+    )
 
     # NULL for super admins, who operate at platform scope, above any tenant.
     madrasa_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("madaris.id"), index=True, nullable=True)
-    username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    username: Mapped[str] = mapped_column(String(80), index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole))
     preferred_language: Mapped[str] = mapped_column(String(8), default="en")

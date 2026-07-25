@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import func, select, exc, or_ as sqlalchemy_or
+from sqlalchemy import func, select, exc, or_ as sqlalchemy_or, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, get_current_user, require_permission
@@ -39,6 +39,23 @@ from app.modules.people.schemas import (
 )
 
 router = APIRouter()
+
+
+@router.get("/username-proposal")
+async def username_proposal(
+    name: str = Query(min_length=1, max_length=160),
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    del current_user
+    return {
+        "username": await generate_unique_username(
+            session,
+            name=name,
+            madrasa_id=madrasa.id,
+        )
+    }
 
 
 async def _student_read(session: AsyncSession, student: StudentProfile) -> StudentRead:
@@ -87,14 +104,33 @@ async def _student_read(session: AsyncSession, student: StudentProfile) -> Stude
 
 
 async def _next_code(session: AsyncSession, madrasa_id: UUID, model, prefix: str) -> str:
-    # Sequential per-tenant default (count + 1). A concurrent double-submit
-    # could in theory race for the same number; the unique DB constraint on
-    # the code column still guarantees no duplicate is ever persisted, it
-    # would just surface as a 409 to retry rather than silently colliding.
-    count = (
-        await session.execute(select(func.count()).select_from(model).where(model.madrasa_id == madrasa_id))
-    ).scalar_one()
-    return f"{prefix}-{count + 1:04d}"
+    # Serialize number allocation per tenant on PostgreSQL. The tenant-unique
+    # database constraint remains the final atomic guard.
+    if session.get_bind().dialect.name == "postgresql":
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:allocation_key))"),
+            {"allocation_key": f"{madrasa_id}:{model.__tablename__}:{prefix}"},
+        )
+    code_column = (
+        getattr(model, "admission_number", None)
+        or getattr(model, "employee_code", None)
+    )
+    if code_column is None:
+        raise RuntimeError(f"{model.__tablename__} does not expose an allocatable code column")
+    existing_codes = (
+        await session.execute(
+            select(code_column).where(
+                model.madrasa_id == madrasa_id,
+                code_column.like(f"{prefix}-%"),
+            )
+        )
+    ).scalars().all()
+    max_suffix = 0
+    for code in existing_codes:
+        suffix = str(code).removeprefix(f"{prefix}-")
+        if suffix.isdigit():
+            max_suffix = max(max_suffix, int(suffix))
+    return f"{prefix}-{max_suffix + 1:04d}"
 
 
 # ---------------------------------------------------------------- Teachers
@@ -313,6 +349,8 @@ async def create_student(
         portal_enabled=payload.portal_enabled if payload.portal_enabled is not None else True,
         b_form_number=payload.b_form_number,
         address=payload.address,
+        phone=payload.phone,
+        is_independent=payload.is_independent,
         photo_file_id=payload.photo_file_id,
     )
     session.add(profile)
@@ -322,7 +360,14 @@ async def create_student(
         guardian = await session.get(Guardian, guardian_id)
         if guardian is None or guardian.madrasa_id != madrasa.id:
             raise HTTPException(status_code=404, detail=f"Guardian {guardian_id} not found")
-        session.add(StudentGuardian(student_id=profile.id, guardian_id=guardian_id))
+        session.add(
+            StudentGuardian(
+                madrasa_id=madrasa.id,
+                student_id=profile.id,
+                guardian_id=guardian_id,
+                relationship=guardian.relationship,
+            )
+        )
 
     if admission_form is not None:
         session.add(
@@ -388,8 +433,42 @@ async def update_student(
     session: AsyncSession = Depends(get_session),
 ) -> StudentRead:
     student = await _get_or_404(session, StudentProfile, student_id, madrasa.id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    admission_answers = updates.pop("admission_answers", None)
+    resulting_independent = updates.get("is_independent", student.is_independent)
+    resulting_phone = updates.get("phone", student.phone)
+    resulting_portal = updates.get("portal_enabled", student.portal_enabled)
+    if resulting_independent and resulting_portal and not resulting_phone:
+        raise HTTPException(
+            status_code=422,
+            detail="An independent student with portal access requires a phone",
+        )
+    if resulting_independent:
+        linked_guardian = await session.scalar(
+            select(StudentGuardian.id).where(
+                StudentGuardian.madrasa_id == madrasa.id,
+                StudentGuardian.student_id == student.id,
+            )
+        )
+        if linked_guardian is not None:
+            raise HTTPException(
+                status_code=422,
+                detail="Unlink guardians before marking the student independent",
+            )
+    for field, value in updates.items():
         setattr(student, field, value)
+    if admission_answers is not None:
+        admission_record = await session.scalar(
+            select(StudentAdmissionRecord).where(
+                StudentAdmissionRecord.student_id == student.id,
+                StudentAdmissionRecord.madrasa_id == madrasa.id,
+            )
+        )
+        if admission_record is None:
+            raise HTTPException(status_code=404, detail="Student admission information not found")
+        # Merge instead of replace so fields hidden by a later template version
+        # remain intact.
+        admission_record.answers = {**(admission_record.answers or {}), **admission_answers}
     try:
         await session.commit()
     except exc.IntegrityError as e:
@@ -454,7 +533,14 @@ async def create_guardian(
         student = await session.get(StudentProfile, student_id)
         if student is None or student.madrasa_id != madrasa.id:
             raise HTTPException(status_code=404, detail=f"Student {student_id} not found")
-        session.add(StudentGuardian(student_id=student_id, guardian_id=guardian.id))
+        session.add(
+            StudentGuardian(
+                madrasa_id=madrasa.id,
+                student_id=student_id,
+                guardian_id=guardian.id,
+                relationship=guardian.relationship,
+            )
+        )
 
     await session.commit()
     await session.refresh(guardian)
@@ -577,11 +663,14 @@ async def search_guardians(
 
 @router.get("/guardians/duplicates", response_model=list[GuardianRead])
 async def find_duplicate_guardians(
+    response: Response,
     current_user: User = Depends(require_permission("students.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     phone: str | None = Query(default=None, description="Phone number to check"),
     cnic: str | None = Query(default=None, description="CNIC to check"),
+    limit: int = Query(default=10, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[GuardianRead]:
     """ISS3-011: Find potential duplicate guardians by phone or CNIC.
     
@@ -598,8 +687,14 @@ async def find_duplicate_guardians(
     if conditions:
         stmt = stmt.where(sqlalchemy_or(*conditions))
     
-    rows = await session.execute(stmt.order_by(Guardian.name).limit(10))
-    return [GuardianRead.model_validate(row) for row in rows.scalars().all()]
+    rows = await paginate_scalars(
+        session,
+        stmt.order_by(Guardian.name),
+        limit=limit,
+        offset=offset,
+        response=response,
+    )
+    return [GuardianRead.model_validate(row) for row in rows]
 
 
 @router.post("/guardians/{guardian_id}/students/{student_id}", response_model=dict)
@@ -620,7 +715,12 @@ async def link_student_guardian(
         .limit(1)
     )
     if not exists:
-        link = StudentGuardian(student_id=student_id, guardian_id=guardian_id)
+        link = StudentGuardian(
+            madrasa_id=madrasa.id,
+            student_id=student_id,
+            guardian_id=guardian_id,
+            relationship=guardian.relationship,
+        )
         session.add(link)
         await session.commit()
     return {"status": "success"}
@@ -713,4 +813,3 @@ async def _get_or_404(session: AsyncSession, model, record_id: UUID, madrasa_id:
     if record is None or record.madrasa_id != madrasa_id:
         raise HTTPException(status_code=404, detail=f"{model.__name__} not found")
     return record
-

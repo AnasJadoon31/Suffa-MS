@@ -14,6 +14,8 @@ interface SelectedPerson {
   user_id: string;
   name: string;
   role: "teacher" | "student" | "guardian";
+  class_id?: string;
+  section_id?: string;
 }
 
 /**
@@ -72,19 +74,28 @@ export function StagedAudiencePicker({
     }).catch(() => setClasses([]));
   }, [user?.role]);
 
-  // Load persons based on role
+  // Async person search based on the selected role. The API caps/pages the
+  // result rather than rendering a tenant-wide checkbox wall.
   useEffect(() => {
+    const timer = window.setTimeout(() => {
     setIsLoading(true);
     const loadPersons = async () => {
       try {
         if (roleMode === "teachers") {
-          const teachers = await peopleApi.listTeachers();
+          const teachers = await peopleApi.listTeachers(searchQuery || undefined);
           setAllPersons(teachers.map((t) => ({ id: t.id, user_id: t.user_id, name: t.name, role: "teacher" as const })));
         } else if (roleMode === "students") {
-          const students = await peopleApi.listStudents();
-          setAllPersons(students.map((s) => ({ id: s.id, user_id: s.user_id, name: s.name, role: "student" as const })));
+          const students = await peopleApi.listStudents(searchQuery || undefined);
+          setAllPersons(students.map((s) => ({
+            id: s.id,
+            user_id: s.user_id,
+            name: s.name,
+            role: "student" as const,
+            class_id: s.active_enrollment?.class_id,
+            section_id: s.active_enrollment?.section_id,
+          })));
         } else if (roleMode === "guardians") {
-          const guardians = await peopleApi.listGuardians();
+          const guardians = await peopleApi.listGuardians(searchQuery || undefined);
           setAllPersons(guardians.map((g) => ({ id: g.id, user_id: g.user_id ?? "", name: g.name, role: "guardian" as const })));
         }
       } catch {
@@ -94,12 +105,19 @@ export function StagedAudiencePicker({
       }
     };
     void loadPersons();
-  }, [roleMode]);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [roleMode, searchQuery]);
 
   // Filter persons based on search and class/section
   const filteredPersons = allPersons.filter((p) => {
     if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    // TODO: Filter by class/section if narrowMode is classes/sections
+    if (p.role === "student" && narrowMode === "classes" && selectedClassId) {
+      if (p.class_id !== selectedClassId) return false;
+    }
+    if (p.role === "student" && narrowMode === "sections" && selectedSectionId) {
+      if (p.section_id !== selectedSectionId) return false;
+    }
     return true;
   });
 
@@ -119,7 +137,7 @@ export function StagedAudiencePicker({
     const userIds = persons.map((p) => p.user_id).filter(Boolean);
     const scope: Scope = {
       all: false,
-      roles: [],
+      roles: [roleMode === "guardians" ? "parent" : roleMode.slice(0, -1)],
       classes: [],
       sections: [],
       courses: [],
@@ -127,6 +145,19 @@ export function StagedAudiencePicker({
     };
     onChange(scope);
   };
+
+  useEffect(() => {
+    if (selectedPersons.length > 0) return;
+    const role = roleMode === "guardians" ? "parent" : roleMode.slice(0, -1);
+    onChange({
+      all: false,
+      roles: [role],
+      classes: narrowMode === "classes" && selectedClassId ? [selectedClassId] : [],
+      sections: narrowMode === "sections" && selectedSectionId ? [selectedSectionId] : [],
+      courses: [],
+      users: [],
+    });
+  }, [narrowMode, onChange, roleMode, selectedClassId, selectedPersons.length, selectedSectionId]);
 
   const removePerson = (personId: string) => {
     const next = selectedPersons.filter((p) => p.id !== personId);
@@ -154,7 +185,7 @@ export function StagedAudiencePicker({
           <option value="classes">{t("classesLabel", "Classes")}</option>
           <option value="sections">{t("sectionsCol", "Sections")}</option>
         </Select>
-        {narrowMode === "classes" && (
+        {(narrowMode === "classes" || narrowMode === "sections") && (
           <Select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}>
             <option value="">{t("allClasses", "All classes")}</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

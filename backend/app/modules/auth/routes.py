@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from jose import JWTError, jwt
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -85,7 +85,15 @@ async def login(
     lockout_key = f"login_lockout:{tenant.slug}:{payload.username}"
     await assert_not_locked_out(lockout_key, LOGIN_MAX_ATTEMPTS)
 
-    stmt = select(User).where(User.username == payload.username, User.status == UserStatus.active)
+    stmt = (
+        select(User)
+        .outerjoin(Madrasa, Madrasa.id == User.madrasa_id)
+        .where(
+            User.username == payload.username,
+            User.status == UserStatus.active,
+            or_(User.role == UserRole.super_admin, Madrasa.slug == tenant.slug),
+        )
+    )
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
 

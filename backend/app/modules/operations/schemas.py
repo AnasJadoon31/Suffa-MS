@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from app.core.phone import PakistanPhone
 from app.modules.people.schemas import GuardianRead, StudentRead
 
 
@@ -183,7 +184,7 @@ class ResourceRead(BaseModel):
 # ------------------------------------------------------------------ Forms
 
 FormFieldText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-FormFieldType = Literal["label", "text", "textarea", "radio", "checkbox_group", "dropdown"]
+FormFieldType = Literal["label", "text", "textarea", "radio", "checkbox_group", "dropdown", "phone"]
 OPTION_FIELD_TYPES = {"radio", "checkbox_group", "dropdown"}
 
 
@@ -254,6 +255,7 @@ class FormRead(BaseModel):
 
 class FormResponseCreate(BaseModel):
     response_data: dict
+    ward_id: UUID | None = None
 
 
 class FormResponseRead(BaseModel):
@@ -371,17 +373,17 @@ class AdmissionFormRead(BaseModel):
 
 class AdmissionApplicationCreate(BaseModel):
     applicant_name: str
-    guardian_contact: str = ""
+    guardian_contact: PakistanPhone = ""
     program_id: UUID | None = None
     date_of_birth: date | None = None
     notes: str | None = None
     extra_data: dict | None = None
-    form_id: UUID | None = None
+    form_id: UUID
 
 
 class AdmissionApplicationUpdate(BaseModel):
     applicant_name: str | None = None
-    guardian_contact: str | None = None
+    guardian_contact: PakistanPhone | None = None
     program_id: UUID | None = None
     date_of_birth: date | None = None
     notes: str | None = None
@@ -410,6 +412,8 @@ class AdmissionApplicationRead(BaseModel):
 
 
 class AdmissionApplicationConvertRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     student_username: str = Field(min_length=3, max_length=80)
     guardian_username: str = Field(min_length=3, max_length=80)
     guardian_name: str = Field(min_length=1, max_length=160)
@@ -418,7 +422,6 @@ class AdmissionApplicationConvertRequest(BaseModel):
     guardian_address: str | None = None
     student_preferred_language: str = "ur"
     guardian_preferred_language: str = "ur"
-    admission_number: str | None = Field(default=None, max_length=40)
     session_id: UUID
     class_id: UUID
     section_id: UUID

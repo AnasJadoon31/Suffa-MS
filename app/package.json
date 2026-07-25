@@ -8,6 +8,7 @@
     "dev:host": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "test:i18n": "node scripts/check-i18n-keys.mjs",
+    "test:date-ranges": "node --experimental-strip-types scripts/check-date-ranges.mjs",
     "test:admission-builder": "node scripts/check-admission-form-builder.mjs",
     "test:assessment-errors": "node scripts/check-assessment-errors.mjs",
     "test:visual-issues": "node scripts/verify-current-issues.mjs",

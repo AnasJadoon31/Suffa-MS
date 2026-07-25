@@ -726,7 +726,11 @@ async def enroll_student(
         for guardian in guardians:
             if guardian.user_id is not None:
                 continue
-            username = await generate_unique_username(session, guardian.name or "guardian")
+            username = await generate_unique_username(
+                session,
+                guardian.name or "guardian",
+                madrasa.id,
+            )
             try:
                 guardian_user, set_password_url = await provision_login(
                     session,

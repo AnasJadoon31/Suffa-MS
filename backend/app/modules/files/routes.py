@@ -24,7 +24,12 @@ async def presign_upload(
     madrasa: Madrasa = Depends(get_current_madrasa),
 ) -> PresignUploadResponse:
     try:
-        assert_upload_allowed(payload.content_type, payload.size_bytes)
+        assert_upload_allowed(
+            payload.content_type,
+            payload.size_bytes,
+            filename=payload.filename,
+            category=payload.category,
+        )
     except UploadRejected as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

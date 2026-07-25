@@ -85,7 +85,7 @@ export interface Student {
   id: string; user_id: string; admission_number: string; name: string; date_of_birth: string; status: string;
   portal_enabled: boolean; notes: string | null; created_at: string; set_password_url?: string;
   username?: string | null; current_class?: string | null;
-  b_form_number?: string | null; address?: string | null;
+  b_form_number?: string | null; address?: string | null; phone?: string | null; is_independent: boolean;
   active_enrollment?: {
     id: string; session_id: string; session_name: string; program_id: string; program_name: string;
     class_id: string; class_name: string; section_id: string; section_name: string; started_on: string;
@@ -134,6 +134,8 @@ export const authApi = {
 };
 
 export const peopleApi = {
+  usernameProposal: (name: string) =>
+    api.get<{ username: string }>("/api/v1/people/username-proposal", { params: { name } }).then((r) => r.data.username),
   listTeachers: (search?: string) =>
     getAllPages<Teacher>("/api/v1/people/teachers", { search }),
   listTeachersPage: (params: { search?: string; limit: number; offset: number }) => getPage<Teacher>("/api/v1/people/teachers", params),
@@ -152,9 +154,9 @@ export const peopleApi = {
     getAllPages<Student>("/api/v1/people/students", { search }),
   listStudentsPage: (params: { search?: string; limit: number; offset: number }) => getPage<Student>("/api/v1/people/students", params),
   createStudent: (payload: {
-    username: string; name: string; date_of_birth: string; admission_number?: string;
+    username: string; name: string; date_of_birth: string;
     portal_enabled?: boolean; guardian_ids?: string[]; preferred_language?: string;
-    b_form_number?: string; address?: string; photo_file_id?: string;
+    b_form_number?: string; address?: string; phone?: string; is_independent?: boolean; photo_file_id?: string;
     admission_form_id?: string; admission_answers?: Record<string, unknown>;
   }) =>
     api.post<Student>("/api/v1/people/students", payload).then((r) => r.data),
@@ -407,6 +409,8 @@ export const assessmentsApi = {
     getAllPages<Submission>(`/api/v1/assessments/assignments/${assignmentId}/submissions`),
   submitAssignment: (assignmentId: string, fileKey: string) =>
     api.post<Submission>(`/api/v1/assessments/assignments/${assignmentId}/submissions`, { file_key: fileKey }).then((r) => r.data),
+  removeOwnSubmission: (assignmentId: string) =>
+    api.delete(`/api/v1/assessments/assignments/${assignmentId}/submissions/me`).then((r) => r.data),
   gradeSubmission: (submissionId: string, payload: { mark?: number; feedback?: string }) =>
     api.put<Submission>(`/api/v1/assessments/submissions/${submissionId}/grade`, payload).then((r) => r.data),
 
@@ -570,7 +574,11 @@ export interface FormDef {
   created_by_id: string; created_at: string;
 }
 export interface FormResponse {
-  id: string; form_id: string; student_id: string; student_name: string | null; submitted_by_id: string; response_data: Record<string, unknown>; created_at: string;
+  id: string; form_id: string; student_id: string | null; student_name: string | null;
+  teacher_id: string | null; teacher_name: string | null; guardian_id: string | null; guardian_name: string | null;
+  ward_id: string | null; ward_name: string | null; submitted_by_id: string;
+  submitted_by_name: string | null; submitted_by_role: string | null;
+  response_data: Record<string, unknown>; created_at: string;
 }
 export interface Announcement {
   id: string; title: string; body: string; category: string | null; attachment_link: string | null; audience_scope: Scope;
@@ -646,10 +654,14 @@ export const operationsApi = {
     open_from?: string; open_until?: string; allow_multiple?: boolean;
   }) => api.put<FormDef>(`/api/v1/operations/forms/${id}`, payload).then((r) => r.data),
   deleteForm: (id: string) => api.delete(`/api/v1/operations/forms/${id}`).then((r) => r.data),
-  submitFormResponse: (formId: string, responseData: Record<string, unknown>) =>
-    api.post<FormResponse>(`/api/v1/operations/forms/${formId}/responses`, { response_data: responseData }).then((r) => r.data),
+  submitFormResponse: (formId: string, responseData: Record<string, unknown>, wardId?: string) =>
+    api.post<FormResponse>(`/api/v1/operations/forms/${formId}/responses`, { response_data: responseData, ward_id: wardId }).then((r) => r.data),
   listFormResponses: (formId: string) =>
     getAllPages<FormResponse>(`/api/v1/operations/forms/${formId}/responses`),
+  listAllFormResponses: (params?: {
+    form_id?: string; respondent_role?: string; respondent_user_id?: string; student_id?: string;
+    class_id?: string; section_id?: string; date_from?: string; date_to?: string;
+  }) => getAllPages<FormResponse>("/api/v1/operations/form-responses", params),
 
   listAnnouncements: (params?: { audience?: "teachers" | "students" | "all"; category?: string; q?: string; date_from?: string; date_to?: string }) =>
     getAllPages<Announcement>("/api/v1/operations/announcements", params),
@@ -681,7 +693,7 @@ export const operationsApi = {
   deleteAdmissionForm: (id: string) =>
     api.delete(`/api/v1/operations/admission-forms/${id}`).then((r) => r.data),
   createAdmission: (payload: {
-    applicant_name: string; guardian_contact: string; program_id?: string; date_of_birth?: string; notes?: string;
+    applicant_name: string; guardian_contact: string; form_id: string; program_id?: string; date_of_birth?: string; notes?: string;
     extra_data?: Record<string, string>;
   }) => api.post<AdmissionApplication>("/api/v1/operations/admissions", payload).then((r) => r.data),
   updateAdmission: (id: string, payload: Partial<Pick<AdmissionApplication, "applicant_name" | "guardian_contact" | "program_id" | "date_of_birth" | "notes" | "extra_data">>) =>
@@ -693,7 +705,7 @@ export const operationsApi = {
   convertAdmission: (id: string, payload: {
     student_username: string; guardian_username: string; guardian_name: string; guardian_relationship: string;
     guardian_cnic?: string; guardian_address?: string; student_preferred_language?: string; guardian_preferred_language?: string;
-    admission_number?: string; session_id: string; class_id: string; section_id: string;
+    session_id: string; class_id: string; section_id: string;
   }) => api.post<AdmissionConversion>(`/api/v1/operations/admissions/${id}/convert`, payload).then((r) => r.data),
   listAdminNotifications: () => getAllPages<AdminNotification>("/api/v1/operations/admin-notifications"),
   markAdminNotificationRead: (id: string) => api.post<AdminNotification>(`/api/v1/operations/admin-notifications/${id}/read`).then((r) => r.data),
@@ -772,14 +784,25 @@ export interface Donation {
   donation_date: string; note: string | null; recorded_by_id: string; donor_name: string | null; category_name: string | null;
 }
 export interface FinanceSummary { total_contributions: number; total_donations: number; total: number; by_category: Record<string, number> }
+export interface StudentFinanceProfile {
+  id: string; name: string; admission_number: string; phone: string | null; address: string | null; payments: Payment[];
+}
+export interface DonorFinanceProfile {
+  id: string; name: string; contact: string; donations: Donation[];
+}
 export interface SalaryRecord { id: string; teacher_id: string; amount: number; currency: string; effective_from: string }
 export interface SalaryPayment {
   id: string; teacher_id: string; amount: number; currency: string; payment_date: string;
   period_covered: string; method: string; note: string; recorded_by_id: string; created_at: string;
 }
+export interface SalaryHistory extends SalaryPayment {
+  teacher_name: string; employee_code: string; status: string;
+}
 export interface MySalary { record: SalaryRecord | null; payments: SalaryPayment[] }
 
 export const financeApi = {
+  studentProfile: (id: string) => api.get<StudentFinanceProfile>(`/api/v1/finance/profiles/students/${id}`).then((r) => r.data),
+  donorProfile: (id: string) => api.get<DonorFinanceProfile>(`/api/v1/finance/profiles/donors/${id}`).then((r) => r.data),
   listCategories: () => getAllPages<PaymentCategory>("/api/v1/finance/categories"),
   createCategory: (name: string) => api.post<PaymentCategory>("/api/v1/finance/categories", { name }).then((r) => r.data),
 
@@ -815,8 +838,15 @@ export const financeApi = {
     api.put<SalaryRecord>(`/api/v1/finance/salary/${teacherId}`, payload).then((r) => r.data),
   listSalaryPayments: (teacherId: string) =>
     getAllPages<SalaryPayment>(`/api/v1/finance/salary/${teacherId}/payments`),
+  listSalaryHistory: () =>
+    getAllPages<SalaryHistory>("/api/v1/finance/salary-history"),
   recordSalaryPayment: (teacherId: string, payload: {
     amount: number; currency?: string; payment_date: string; period_covered: string; method: string; note?: string;
   }) => api.post<SalaryPayment>(`/api/v1/finance/salary/${teacherId}/payments`, payload).then((r) => r.data),
+  updateSalaryPayment: (paymentId: string, payload: Partial<{
+    amount: number; currency: string; payment_date: string; period_covered: string; method: string; note: string;
+  }>) => api.put<SalaryPayment>(`/api/v1/finance/salary-payments/${paymentId}`, payload).then((r) => r.data),
+  deleteSalaryPayment: (paymentId: string) =>
+    api.delete(`/api/v1/finance/salary-payments/${paymentId}`).then((r) => r.data),
   getMySalary: () => api.get<MySalary>("/api/v1/finance/salary/me").then((r) => r.data),
 };

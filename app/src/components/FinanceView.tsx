@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FileDown, Landmark, MessageCircle, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { academicsApi, financeApi, type AcademicClass, type Donation, type Donor, type Payment, type PaymentCategory, type FinanceSummary } from "../lib/endpoints";
+import { academicsApi, financeApi, type AcademicClass, type Donation, type Donor, type Payment, type PaymentCategory, type FinanceSummary, type StudentFinanceProfile, type DonorFinanceProfile } from "../lib/endpoints";
 import { peopleApi, type Student } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { HijriTag } from "./HijriTag";
@@ -15,6 +15,7 @@ import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
 import { MetricGrid, MetricCard } from "./ui/Card";
 import { useSessionReadOnly } from "./SessionSwitcher";
+import { ActionMenu } from "./ui/ActionMenu";
 
 
 export type FinanceTab = "contributions" | "donations" | "summary";
@@ -120,6 +121,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [profile, setProfile] = useState<StudentFinanceProfile | null>(null);
   const paymentLoadSequence = useRef(0);
 
   const load = async () => {
@@ -244,35 +246,46 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
         {!isLoading && !error && visiblePayments.length === 0 && <p className="emptyState">{t("noContributionsYet")}</p>}
         {!isLoading && !error && visiblePayments.map((p) => (
           <div className="dataRow" key={p.id}>
-            <span data-label={t("studentCol")}>{p.student_name ?? t("unknownPersonLabel")}</span>
+            <span data-label={t("studentCol")}>
+              <button className="identityLink" type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile)}>
+                {p.student_name ?? t("deletedPersonLabel")}
+              </button>
+            </span>
             <span data-label={t("categoryCol")}>{p.category_name ?? t("unknownLabel")}</span>
             <span data-label={t("amountCol")}>{p.currency} {p.amount}</span>
             <span data-label={t("dateCol")}>{p.payment_date}<HijriTag date={p.payment_date} /></span>
             <span data-label={t("notesLabel")}>{p.note ?? "—"}</span>
             <span data-label={t("receiptCol")} className="financeReceiptActions">
-              <Button className="tableAction" type="button" onClick={() => financeApi.downloadPaymentReceipt(p.id)}>
-                <FileDown size={14} /> PDF
-              </Button>
-              {canManage && (
-                <Button
-                  className="tableAction"
-                  type="button"
-                  onClick={async () => {
+              <ActionMenu items={[
+                { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadPaymentReceipt(p.id) },
+                ...(canManage ? [{
+                  label: t("shareWhatsAppLabel"),
+                  icon: <MessageCircle size={14} />,
+                  onClick: async () => {
                     try {
                       const link = await financeApi.sharePaymentReceipt(p.id);
                       if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
                     } catch (err: any) {
                       setError(err.response?.data?.detail ?? t("failedShareReceipt"));
                     }
-                  }}
-                >
-                  <MessageCircle size={14} /> WhatsApp
-                </Button>
-              )}
+                  },
+                }] : []),
+              ]} ariaLabel={`${t("actionsCol")}: ${p.student_name ?? t("deletedPersonLabel")}`} />
             </span>
           </div>
         ))}
       </div></div>
+      {profile && (
+        <Modal title={profile.name} onClose={() => setProfile(null)}>
+          <dl className="detailGrid">
+            <dt>{t("admissionNumberCol")}</dt><dd>{profile.admission_number}</dd>
+            <dt>{t("phoneCol")}</dt><dd>{profile.phone || "—"}</dd>
+            <dt>{t("addressCol")}</dt><dd>{profile.address || "—"}</dd>
+          </dl>
+          <h4>{t("completePaymentHistoryLabel")}</h4>
+          {profile.payments.map((payment) => <p key={payment.id}>{payment.payment_date} · {payment.currency} {payment.amount} · {payment.category_name}</p>)}
+        </Modal>
+      )}
     </>
   );
 }
@@ -290,6 +303,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
   const [donorLoadError, setDonorLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [createModal, setCreateModal] = useState<"donor" | "donation" | null>(null);
+  const [profile, setProfile] = useState<DonorFinanceProfile | null>(null);
   const donationLoadSequence = useRef(0);
 
   const loadDonors = async () => {
@@ -449,35 +463,42 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
         {!isLoading && !error && visibleDonations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
         {!isLoading && !error && visibleDonations.map((d) => (
           <div className="dataRow" key={d.id}>
-            <span data-label={t("donorCol")}>{d.donor_name ?? t("unknownPersonLabel")}</span>
+            <span data-label={t("donorCol")}>
+              <button className="identityLink" type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile)}>
+                {d.donor_name ?? t("deletedPersonLabel")}
+              </button>
+            </span>
             <span data-label={t("categoryCol")}>{d.category_name ?? t("unknownLabel")}</span>
             <span data-label={t("amountCol")}>{d.currency} {d.amount}</span>
             <span data-label={t("dateCol")}>{d.donation_date}<HijriTag date={d.donation_date} /></span>
             <span data-label={t("notesLabel")}>{d.note ?? "—"}</span>
             <span data-label={t("receiptCol")} className="financeReceiptActions">
-              <Button className="tableAction" type="button" onClick={() => financeApi.downloadDonationReceipt(d.id)}>
-                <FileDown size={14} /> PDF
-              </Button>
-              {canManage && (
-                <Button
-                  className="tableAction"
-                  type="button"
-                  onClick={async () => {
+              <ActionMenu items={[
+                { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadDonationReceipt(d.id) },
+                ...(canManage ? [{
+                  label: t("shareWhatsAppLabel"),
+                  icon: <MessageCircle size={14} />,
+                  onClick: async () => {
                     try {
                       const link = await financeApi.shareDonationReceipt(d.id);
                       if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
                     } catch (err: any) {
                       setError(err.response?.data?.detail ?? t("failedShareReceipt"));
                     }
-                  }}
-                >
-                  <MessageCircle size={14} /> WhatsApp
-                </Button>
-              )}
+                  },
+                }] : []),
+              ]} ariaLabel={`${t("actionsCol")}: ${d.donor_name ?? t("deletedPersonLabel")}`} />
             </span>
           </div>
         ))}
       </div></div>
+      {profile && (
+        <Modal title={profile.name} onClose={() => setProfile(null)}>
+          <dl className="detailGrid"><dt>{t("phoneCol")}</dt><dd>{profile.contact}</dd></dl>
+          <h4>{t("completeDonationHistoryLabel")}</h4>
+          {profile.donations.map((donation) => <p key={donation.id}>{donation.donation_date} · {donation.currency} {donation.amount} · {donation.category_name}</p>)}
+        </Modal>
+      )}
     </>
   );
 }

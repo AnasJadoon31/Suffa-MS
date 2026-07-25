@@ -27,6 +27,8 @@ import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
 import { InlineFilter } from "./ui/InlineFilter";
+import { ActionMenu } from "./ui/ActionMenu";
+import { PhoneInput } from "./ui/PhoneInput";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
@@ -66,10 +68,11 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
   const [applications, setApplications] = useState<AdmissionApplication[]>([]);
   const emptyForm = {
     applicant_name: "", guardian_name: "", guardian_relationship: "", guardian_contact: "", guardian_cnic: "",
-    program_id: "", date_of_birth: "", gender: "", b_form_number: "", address: "", previous_school: "",
+    form_id: "", program_id: "", date_of_birth: "", gender: "", b_form_number: "", address: "", previous_school: "",
     previous_class: "", medical_notes: "", notes: "",
   };
   const [form, setForm] = useState(emptyForm);
+  const [admissionForms, setAdmissionForms] = useState<AdmissionForm[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<AdmissionApplication | null>(null);
   const [notice, setNotice] = useState("");
@@ -94,7 +97,12 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
       setApplications(result.items);
       setTotal(result.total);
       setLoadError("");
-      setNotifications(await operationsApi.listAdminNotifications());
+      const [notificationRows, formRows] = await Promise.all([
+        operationsApi.listAdminNotifications(),
+        canMutate ? operationsApi.listAdmissionForms() : Promise.resolve([]),
+      ]);
+      setNotifications(notificationRows);
+      setAdmissionForms(formRows.filter((item) => item.category === "General" && item.is_open));
     } catch (err: any) {
       setLoadError(err.response?.data?.detail ?? t("failedLoadApplications"));
     } finally {
@@ -137,7 +145,7 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
                       await operationsApi.createAdmission({
                         applicant_name: form.applicant_name,
                         guardian_contact: form.guardian_contact,
-                        program_id: form.program_id || undefined,
+                        form_id: form.form_id,
                         date_of_birth: form.date_of_birth || undefined,
                         notes: form.notes || undefined,
                         extra_data: {
@@ -163,19 +171,31 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
             submitLabel={t("submitApplicationBtn")}
             submitIcon={<Plus size={16} />}
           >
+            <label>
+              {t("admissionFormLabel")}
+              <Select required value={form.form_id} onChange={(e) => {
+                const selected = admissionForms.find((item) => item.id === e.target.value);
+                setForm({ ...form, form_id: e.target.value, program_id: selected?.program_id ?? "" });
+              }}>
+                <option value="">{t("selectEllipsis")}</option>
+                {admissionForms.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </Select>
+            </label>
+            {admissionForms.length === 0 && <p className="notice notice-warning">{t("noOpenAdmissionForms")}</p>}
+
             <label>{t("applicantNameLabel")}<Input required value={form.applicant_name} onChange={(e) => setForm({ ...form, applicant_name: e.target.value })} /></label>
 
           <label>{t("guardianNameLabel")}<Input value={form.guardian_name} onChange={(e) => setForm({ ...form, guardian_name: e.target.value })} /></label>
 
           <label>{t("relationshipLabel")}<Input value={form.guardian_relationship} onChange={(e) => setForm({ ...form, guardian_relationship: e.target.value })} /></label>
 
-          <label>{t("guardianContactLabel")}<Input value={form.guardian_contact} onChange={(e) => setForm({ ...form, guardian_contact: e.target.value })} /></label>
+          <PhoneInput label={t("guardianContactLabel")} value={form.guardian_contact} onChange={(value) => setForm({ ...form, guardian_contact: value })} />
 
           <label>{t("guardianCnicLabel")}<Input value={form.guardian_cnic} onChange={(e) => setForm({ ...form, guardian_cnic: e.target.value })} /></label>
 
           <label>
                     {t("programLabel")}
-                    <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+                    <Select disabled value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
                       <option value="">{t("selectEllipsis")}</option>
                       {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </Select>
@@ -209,20 +229,14 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
             { header: t("sourceCol"), render: (a) => a.form_id ? t("sourcePublicForm") : t("sourceWalkIn") },
             { header: t("statusCol"), render: (a) => a.status },
             { header: t("actionsCol"), render: (a) => (
-              <>
-                <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(a)}><Eye size={14} /></Button>
-                {canMutate && <Button className="tableAction" type="button" title={t("editBtn")} onClick={() => setEditing(a)}><Edit2 size={14} /></Button>}
-                {canMutate && !a.converted_student_id && (
-                  <>
-                    <Button className="tableAction" type="button" title={t("acceptAndCreatePeopleBtn")} onClick={() => setConverting(a)}>
-                      <CheckCircle2 size={14} />
-                    </Button>
-                  </>
-                )}
-                {canMutate && a.status !== "rejected" && <Button className="tableAction" type="button" title={t("rejectApplicationBtn")} onClick={() => changeStatus(a, "rejected")}><XCircle size={14} /></Button>}
-                {canMutate && a.status !== "pending" && <Button className="tableAction" type="button" title={t("returnToPendingBtn")} onClick={() => changeStatus(a, "pending")}><RotateCcw size={14} /></Button>}
-                {canMutate && a.converted_student_id && a.status !== "accepted" && <Button className="tableAction" type="button" title={t("restoreAcceptedBtn")} onClick={() => changeStatus(a, "accepted")}><CheckCircle2 size={14} /></Button>}
-              </>
+              <ActionMenu items={[
+                { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(a) },
+                ...(canMutate ? [{ label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditing(a) }] : []),
+                ...(canMutate && !a.converted_student_id ? [{ label: t("acceptAndCreatePeopleBtn"), icon: <CheckCircle2 size={14} />, onClick: () => setConverting(a) }] : []),
+                ...(canMutate && a.status !== "rejected" ? [{ label: t("rejectApplicationBtn"), icon: <XCircle size={14} />, destructive: true, onClick: () => changeStatus(a, "rejected") }] : []),
+                ...(canMutate && a.status !== "pending" ? [{ label: t("returnToPendingBtn"), icon: <RotateCcw size={14} />, onClick: () => changeStatus(a, "pending") }] : []),
+                ...(canMutate && a.converted_student_id && a.status !== "accepted" ? [{ label: t("restoreAcceptedBtn"), icon: <CheckCircle2 size={14} />, onClick: () => changeStatus(a, "accepted") }] : []),
+              ]} ariaLabel={`${t("actionsCol")}: ${a.applicant_name}`} />
             )},
           ]}
           data={applications}
@@ -276,20 +290,19 @@ function AdmissionConversionModal({ application, programs, onClose, onSuccess }:
   const [form, setForm] = useState({
     student_username: "", guardian_username: "", guardian_name: String(extra.guardian_name ?? ""),
     guardian_relationship: String(extra.guardian_relationship ?? ""), guardian_cnic: String(extra.guardian_cnic ?? ""),
-    guardian_address: String(extra.address ?? ""), admission_number: "", session_id: "", class_id: "", section_id: "",
+    guardian_address: String(extra.address ?? ""), session_id: "", class_id: "", section_id: "",
   });
   const [error, setError] = useState("");
   useEffect(() => { void Promise.all([academicsApi.listSessions(), academicsApi.listClasses()]).then(([sessionRows, classRows]) => { setSessions(sessionRows); setClasses(classRows); }); }, []);
   useEffect(() => { if (!form.class_id) setSections([]); else void academicsApi.listSections(form.class_id).then(setSections); }, [form.class_id]);
   return <FormModal title={t("acceptApplicationHeading")} maxWidth={800} onClose={onClose} submitLabel={t("acceptAndCreatePeopleBtn")} submitIcon={<CheckCircle2 size={16} />} error={error} onSubmit={async () => {
     setError("");
-    try { await operationsApi.convertAdmission(application.id, { ...form, guardian_cnic: form.guardian_cnic || undefined, guardian_address: form.guardian_address || undefined, admission_number: form.admission_number || undefined }); await onSuccess(); }
+    try { await operationsApi.convertAdmission(application.id, { ...form, guardian_cnic: form.guardian_cnic || undefined, guardian_address: form.guardian_address || undefined }); await onSuccess(); }
     catch (err: any) { setError(err.response?.data?.detail ?? t("failedConvertApplication")); }
   }}>
     <p className="notice">{t("acceptApplicationHint", { name: application.applicant_name })}</p>
     <div className="formGridTwo">
       <label>{t("studentUsernameLabel")}<Input required value={form.student_username} onChange={(e) => setForm({ ...form, student_username: e.target.value })} /></label>
-      <label>{t("admissionNumberCol")}<Input value={form.admission_number} onChange={(e) => setForm({ ...form, admission_number: e.target.value })} /></label>
       <label>{t("guardianNameLabel")}<Input required value={form.guardian_name} onChange={(e) => setForm({ ...form, guardian_name: e.target.value })} /></label>
       <label>{t("guardianUsernameLabel")}<Input required value={form.guardian_username} onChange={(e) => setForm({ ...form, guardian_username: e.target.value })} /></label>
       <label>{t("relationshipLabel")}<Input required value={form.guardian_relationship} onChange={(e) => setForm({ ...form, guardian_relationship: e.target.value })} /></label>
@@ -451,37 +464,27 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
           { header: t("fieldsCol"), render: (adm) => adm.fields_definition.length },
           { header: t("statusCol"), render: (adm) => adm.is_open ? t("openLabel") : t("closedLabel") },
           { header: t("actionsCol"), render: (adm) => (
-            <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Button className="tableAction" type="button" onClick={() => copyLink(adm)}>
-                <Copy size={14} /> {copiedId === adm.id ? t("linkCopied") : t("copyPublicLinkBtn")}
-              </Button>
-              {canMutate && <Button
-                className="tableAction"
-                type="button"
-                aria-label={`${t("editBtn")} ${adm.title}`}
-                onClick={() => {
+            <ActionMenu items={[
+              { label: copiedId === adm.id ? t("linkCopied") : t("copyPublicLinkBtn"), icon: <Copy size={14} />, onClick: () => copyLink(adm) },
+              ...(canMutate ? [{
+                label: t("editBtn"),
+                icon: <Edit2 size={14} />,
+                onClick: () => {
                   setEditing({ ...adm });
                   setEditFields(adm.fields_definition.map((field) => ({ ...field, options: [...field.options] })));
                   setError("");
-                }}
-              >
-                <Edit2 size={14} /> {t("editBtn")}
-              </Button>}
-              {canMutate && <Button
-                className="tableAction"
-                type="button"
-                onClick={async () => {
+                },
+              }, {
+                label: adm.is_open ? t("closeFormBtn") : t("reopenFormBtn"),
+                onClick: async () => {
                   await operationsApi.updateAdmissionForm(adm.id, { is_open: !adm.is_open });
                   await load();
-                }}
-              >
-                {adm.is_open ? t("closeFormBtn") : t("reopenFormBtn")}
-              </Button>}
-              {canMutate && <Button
-                className="tableAction danger"
-                type="button"
-                aria-label={t("deleteAdmissionFormBtn")}
-                onClick={async () => {
+                },
+              }, {
+                label: t("deleteBtn"),
+                icon: <Trash2 size={14} />,
+                destructive: true,
+                onClick: async () => {
                   if (!(await confirm(t("deleteAdmissionFormConfirm")))) return;
                   try {
                     await operationsApi.deleteAdmissionForm(adm.id);
@@ -489,11 +492,9 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
                   } catch (err: any) {
                     setError(err.response?.data?.detail ?? t("failedDeleteAdmissionForm"));
                   }
-                }}
-              >
-                <Trash2 size={14} /> {t("deleteBtn")}
-              </Button>}
-            </span>
+                },
+              }] : []),
+            ]} ariaLabel={`${t("actionsCol")}: ${adm.title}`} />
           )},
         ]}
         data={forms}

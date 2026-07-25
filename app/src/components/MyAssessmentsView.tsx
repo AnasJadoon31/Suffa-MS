@@ -1,5 +1,5 @@
 import { Button } from "./ui/Button";
-import { FileDown, Upload } from "lucide-react";
+import { FileDown, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,11 +9,13 @@ import { PageSection, PageHeader } from "./ui/Layout";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { Input } from "./ui/Field";
+import { useDialog } from "../lib/DialogContext";
 
 export function MyAssessmentsView() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const readOnly = useSessionReadOnly();
+  const dialog = useDialog();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [result, setResult] = useState<SessionResult | null>(null);
   const [sessionId, setSessionId] = useState("");
@@ -64,6 +66,25 @@ export function MyAssessmentsView() {
     }
   };
 
+  const removeSubmission = async (assignment: Assignment) => {
+    if (readOnly || !(await dialog.confirm(t("removeSubmissionConfirm")))) return;
+    setError("");
+    try {
+      await assessmentsApi.removeOwnSubmission(assignment.id);
+      setAssignments((current) => current.map((item) => item.id === assignment.id ? {
+        ...item, submission_file_key: null, submission_mark: null,
+        submission_feedback: null, submitted_at: null,
+      } : item));
+      setSubmitted((current) => {
+        const next = new Set(current);
+        next.delete(assignment.id);
+        return next;
+      });
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedRemoveSubmission"));
+    }
+  };
+
   return (
     <PageSection>
       <PageHeader title={t("myAssessments")} notice={t("descMyAssessments")} />
@@ -86,12 +107,16 @@ export function MyAssessmentsView() {
       )}
       {!loading && assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
       <div className="dataTable">
+        <div className="dataRow header assessmentStudentRow">
+          <span>{t("assignmentLabel")}</span><span>{t("dueDateLabel")}</span>
+          <span>{t("instructionsLabel")}</span><span>{t("submissionActionsLabel")}</span>
+        </div>
         {assignments.map((assignment) => (
-          <div className="dataRow" key={assignment.id}>
-            <span><strong>{assignment.title}</strong><small>{assignment.course_name ?? "—"}</small></span>
-            <span>{new Date(assignment.due_date).toLocaleString()}</span>
-            <span>{assignment.instructions}</span>
-            <span>
+          <div className="dataRow assessmentStudentRow" key={assignment.id}>
+            <span data-label={t("assignmentLabel")}><strong>{assignment.title}</strong><small>{assignment.course_name ?? "—"}</small></span>
+            <span data-label={t("dueDateLabel")}>{new Date(assignment.due_date).toLocaleString()}</span>
+            <span data-label={t("instructionsLabel")}>{assignment.instructions || "—"}</span>
+            <span data-label={t("submissionActionsLabel")}>
               {(assignment.submission_file_key || submitted.has(assignment.id)) ? (
                 <span className="submissionSummary">
                   <span>{t("submittedLabel")}</span>
@@ -106,6 +131,17 @@ export function MyAssessmentsView() {
                     }}>
                       <FileDown size={14} /> {t("downloadBtn")}
                     </Button>
+                  )}
+                  {!readOnly && new Date() <= new Date(assignment.due_date) && (
+                    <>
+                      <Input aria-label={t("replacementFileLabel")} type="file" onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
+                      <Button className="tableAction" type="button" disabled={!files[assignment.id]} onClick={() => submit(assignment)}>
+                        <Upload size={14} /> {t("replaceSubmissionBtn")}
+                      </Button>
+                      <Button className="tableAction dangerAction" type="button" onClick={() => removeSubmission(assignment)}>
+                        <Trash2 size={14} /> {t("removeSubmissionBtn")}
+                      </Button>
+                    </>
                   )}
                 </span>
               ) : (

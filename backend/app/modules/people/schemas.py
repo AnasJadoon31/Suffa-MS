@@ -1,13 +1,15 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.core.phone import PakistanPhone
 
 
 class TeacherCreate(BaseModel):
     username: str = Field(min_length=3, max_length=80)
     name: str
-    whatsapp_number: str = ""
+    whatsapp_number: PakistanPhone = ""
     qualifications: str | None = None
     join_date: date | None = None
     employee_code: str | None = None
@@ -21,7 +23,7 @@ class TeacherCreate(BaseModel):
 
 class TeacherUpdate(BaseModel):
     name: str | None = None
-    whatsapp_number: str | None = None
+    whatsapp_number: PakistanPhone | None = None
     qualifications: str | None = None
     join_date: date | None = None
     notes: str | None = None
@@ -56,29 +58,44 @@ class TeacherProvisionedRead(TeacherRead):
 
 
 class StudentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     username: str = Field(min_length=3, max_length=80)
     name: str
     date_of_birth: date
-    admission_number: str | None = None
     portal_enabled: bool | None = None
     guardian_ids: list[UUID] = Field(default_factory=list)
     preferred_language: str = "ur"
     b_form_number: str | None = None
     address: str | None = None
+    phone: PakistanPhone | None = None
+    is_independent: bool = False
     photo_file_id: UUID | None = None
     admission_form_id: UUID | None = None
     admission_answers: dict = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def validate_independent_student(self) -> "StudentCreate":
+        if self.is_independent and self.guardian_ids:
+            raise ValueError("an independent student cannot have guardian links")
+        if self.is_independent and self.portal_enabled is not False and not self.phone:
+            raise ValueError("an independent student with portal access requires a phone")
+        return self
+
 
 class StudentUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = None
     date_of_birth: date | None = None
-    admission_number: str | None = None
     portal_enabled: bool | None = None
     notes: str | None = None
     b_form_number: str | None = None
     address: str | None = None
+    phone: PakistanPhone | None = None
+    is_independent: bool | None = None
     photo_file_id: UUID | None = None
+    admission_answers: dict | None = None
 
 
 class StudentAdmissionRecordRead(BaseModel):
@@ -119,6 +136,8 @@ class StudentRead(BaseModel):
     current_class: str | None = None
     b_form_number: str | None = None
     address: str | None = None
+    phone: str | None = None
+    is_independent: bool = False
     photo_file_id: UUID | None = None
     admission_record: StudentAdmissionRecordRead | None = None
     active_enrollment: StudentEnrollmentRead | None = None
@@ -132,7 +151,7 @@ class StudentProvisionedRead(StudentRead):
 class GuardianCreate(BaseModel):
     name: str
     relationship: str
-    phone_numbers: str
+    phone_numbers: PakistanPhone
     cnic: str | None = None
     address: str | None = None
     preferred_language: str = "ur"
@@ -141,7 +160,7 @@ class GuardianCreate(BaseModel):
 class GuardianUpdate(BaseModel):
     name: str | None = None
     relationship: str | None = None
-    phone_numbers: str | None = None
+    phone_numbers: PakistanPhone | None = None
     cnic: str | None = None
     address: str | None = None
     preferred_language: str | None = None

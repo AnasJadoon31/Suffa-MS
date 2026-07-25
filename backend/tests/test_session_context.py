@@ -101,3 +101,33 @@ async def test_permission_protected_writes_are_blocked_in_archived_context(
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "session_view_only"
+
+
+async def test_admission_application_submission_is_blocked_in_archived_context(
+    client, seed, archived_session, db_sessionmaker
+):
+    form = await client.post(
+        "/api/v1/operations/admission-forms",
+        json={
+            "program_id": str(seed.program.id),
+            "title": "Archived session intake",
+            "fields": [],
+        },
+    )
+    assert form.status_code == 200, form.text
+
+    async with db_sessionmaker() as db:
+        principal = await db.get(User, seed.principal.id)
+        principal.selected_session_id = archived_session.id
+        await db.commit()
+
+    response = await client.post(
+        "/api/v1/operations/admissions",
+        json={
+            "applicant_name": "Archived Applicant",
+            "guardian_contact": "+923001110006",
+            "form_id": form.json()["id"],
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "session_view_only"

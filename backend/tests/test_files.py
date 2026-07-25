@@ -1,5 +1,9 @@
 from uuid import uuid4
 
+import pytest
+
+from app.core.storage import UploadRejected, assert_upload_allowed
+
 
 async def test_upload_requires_a_declared_file_size(client):
     response = await client.post(
@@ -46,3 +50,31 @@ async def test_download_rejects_another_madrasas_object_key(client, monkeypatch)
 
     assert response.status_code == 403
     assert storage_called is False
+
+
+@pytest.mark.parametrize(
+    ("filename", "content_type"),
+    [
+        ("lesson.pdf", "application/pdf"),
+        ("notes.md", "text/markdown"),
+        ("sheet.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        ("slides.odp", "application/vnd.oasis.opendocument.presentation"),
+        ("data.csv", "text/csv"),
+    ],
+)
+def test_document_upload_policy_allows_supported_family(filename, content_type):
+    assert_upload_allowed(content_type, 128, filename=filename, category="submissions")
+
+
+@pytest.mark.parametrize(
+    ("filename", "content_type"),
+    [
+        ("script.js", "text/plain"),
+        ("page.html", "text/plain"),
+        ("disguised.pdf", "text/plain"),
+        ("archive.zip", "application/pdf"),
+    ],
+)
+def test_document_upload_policy_rejects_unsafe_or_disguised_files(filename, content_type):
+    with pytest.raises(UploadRejected):
+        assert_upload_allowed(content_type, 128, filename=filename, category="resources")

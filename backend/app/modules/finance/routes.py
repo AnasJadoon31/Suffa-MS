@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import Response
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -22,13 +22,17 @@ from app.modules.finance.schemas import (
     DonorRead,
     DonorUpdate,
     FinanceSummary,
+    DonorFinanceProfile,
     PaymentCategoryCreate,
     PaymentCategoryRead,
     PaymentCreate,
     PaymentRead,
+    StudentFinanceProfile,
     MySalaryRead,
     SalaryPaymentCreate,
+    SalaryHistoryRead,
     SalaryPaymentRead,
+    SalaryPaymentUpdate,
     SalaryRecordRead,
     SalaryRecordSet,
 )
@@ -75,6 +79,58 @@ async def _donation_reads(session: AsyncSession, rows: list[Donation]) -> list[D
         donor_name=donor_names.get(row.donor_id),
         category_name=category_names.get(row.category_id),
     ) for row in rows]
+
+
+@router.get("/profiles/students/{student_id}", response_model=StudentFinanceProfile)
+async def student_finance_profile(
+    student_id: UUID,
+    current_user: User = Depends(require_permission("finance.reports.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> StudentFinanceProfile:
+    student = await session.get(StudentProfile, student_id)
+    if student is None or student.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Student not found")
+    payments = (
+        await session.execute(
+            select(Payment)
+            .where(Payment.madrasa_id == madrasa.id, Payment.student_id == student.id)
+            .order_by(Payment.payment_date.desc())
+        )
+    ).scalars().all()
+    return StudentFinanceProfile(
+        id=student.id,
+        name=student.name,
+        admission_number=student.admission_number,
+        phone=student.phone,
+        address=student.address,
+        payments=await _payment_reads(session, list(payments)),
+    )
+
+
+@router.get("/profiles/donors/{donor_id}", response_model=DonorFinanceProfile)
+async def donor_finance_profile(
+    donor_id: UUID,
+    current_user: User = Depends(require_permission("finance.reports.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> DonorFinanceProfile:
+    donor = await session.get(Donor, donor_id)
+    if donor is None or donor.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Donor not found")
+    donations = (
+        await session.execute(
+            select(Donation)
+            .where(Donation.madrasa_id == madrasa.id, Donation.donor_id == donor.id)
+            .order_by(Donation.donation_date.desc())
+        )
+    ).scalars().all()
+    return DonorFinanceProfile(
+        id=donor.id,
+        name=donor.name,
+        contact=donor.contact,
+        donations=await _donation_reads(session, list(donations)),
+    )
 
 
 async def _receipt_context(
@@ -493,6 +549,39 @@ async def finance_summary(
 
 # -------------------------------------------------------------------- Salary
 
+@router.get("/salary-history", response_model=list[SalaryHistoryRead])
+async def list_salary_history(
+    response: Response,
+    current_user: User = Depends(require_permission("teachers.salary.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> list[SalaryHistoryRead]:
+    stmt = (
+        select(SalaryPayment, TeacherProfile.name, TeacherProfile.employee_code)
+        .join(TeacherProfile, TeacherProfile.id == SalaryPayment.teacher_id)
+        .where(
+            SalaryPayment.madrasa_id == madrasa.id,
+            TeacherProfile.madrasa_id == madrasa.id,
+        )
+        .order_by(SalaryPayment.payment_date.desc(), SalaryPayment.created_at.desc())
+    )
+    total = await session.scalar(
+        select(func.count()).select_from(SalaryPayment).where(SalaryPayment.madrasa_id == madrasa.id)
+    )
+    response.headers["X-Total-Count"] = str(total or 0)
+    rows = (await session.execute(stmt.limit(limit).offset(offset))).all()
+    return [
+        SalaryHistoryRead(
+            **SalaryPaymentRead.model_validate(payment).model_dump(),
+            teacher_name=teacher_name,
+            employee_code=employee_code,
+        )
+        for payment, teacher_name, employee_code in rows
+    ]
+
+
 @router.put("/salary/{teacher_id}", response_model=SalaryRecordRead)
 async def set_salary(
     teacher_id: UUID,
@@ -583,6 +672,82 @@ async def get_salary(
     if record is None:
         raise HTTPException(status_code=404, detail="No salary record set for this teacher")
     return SalaryRecordRead.model_validate(record)
+
+
+async def _get_salary_payment_or_404(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    payment_id: UUID,
+) -> SalaryPayment:
+    payment = await session.get(SalaryPayment, payment_id)
+    if payment is None or payment.madrasa_id != madrasa_id:
+        raise HTTPException(status_code=404, detail="Salary payment not found")
+    teacher = await session.get(TeacherProfile, payment.teacher_id)
+    if teacher is None or teacher.madrasa_id != madrasa_id:
+        raise HTTPException(status_code=404, detail="Salary payment not found")
+    return payment
+
+
+@router.put("/salary-payments/{payment_id}", response_model=SalaryPaymentRead)
+async def update_salary_payment(
+    payment_id: UUID,
+    payload: SalaryPaymentUpdate,
+    current_user: User = Depends(require_permission("teachers.salary.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> SalaryPaymentRead:
+    payment = await _get_salary_payment_or_404(session, madrasa.id, payment_id)
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        return SalaryPaymentRead.model_validate(payment)
+    old_values = {
+        key: str(getattr(payment, key))
+        for key in updates
+    }
+    for field, value in updates.items():
+        setattr(payment, field, value)
+    record_audit(
+        session,
+        madrasa_id=madrasa.id,
+        actor_id=current_user.id,
+        action="finance.salary_payment_update",
+        entity_name="salary_payment",
+        entity_id=str(payment.id),
+        old_values=old_values,
+        new_values={key: str(value) for key, value in updates.items()},
+    )
+    await session.commit()
+    await session.refresh(payment)
+    return SalaryPaymentRead.model_validate(payment)
+
+
+@router.delete("/salary-payments/{payment_id}")
+async def delete_salary_payment(
+    payment_id: UUID,
+    current_user: User = Depends(require_permission("teachers.salary.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    payment = await _get_salary_payment_or_404(session, madrasa.id, payment_id)
+    old_values = {
+        "teacher_id": str(payment.teacher_id),
+        "amount": str(payment.amount),
+        "payment_date": str(payment.payment_date),
+        "period_covered": payment.period_covered,
+    }
+    record_audit(
+        session,
+        madrasa_id=madrasa.id,
+        actor_id=current_user.id,
+        action="finance.salary_payment_delete",
+        entity_name="salary_payment",
+        entity_id=str(payment.id),
+        old_values=old_values,
+        new_values={},
+    )
+    await session.delete(payment)
+    await session.commit()
+    return {"status": "deleted"}
 
 
 @router.post("/salary/{teacher_id}/payments", response_model=SalaryPaymentRead)

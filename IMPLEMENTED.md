@@ -3,6 +3,57 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-26 — ISS3 implementation tranche and verification refresh
+
+This tranche moves the July 23 Issues 3 programme forward across shared UI,
+identity/admissions, phones, forms, finance, reports, assignments, attendance,
+uploads, and timetable. It is not a blanket closeout: `TO_IMPLEMENT.md` remains
+the strict checklist, and most rows stay WIP until their full role/screenshot
+matrix is complete.
+
+- Added the shared row `ActionMenu` and migrated the main People, Admissions,
+  Admission Forms, Assessments, Forms, Finance, and Salary table actions to it.
+  The browser evidence scripts now exercise the Action menu paths rather than
+  old direct row buttons.
+- Replaced remaining `window.alert/confirm/prompt` usage with app dialogs,
+  mounted a translated snackbar provider, and added a lightweight navigation
+  guard used by Attendance so unsaved roster marks warn before in-app navigation
+  or scope changes.
+- Added canonical Pakistan mobile normalization/input (`+92` fixed prefix),
+  Pydantic validation where phone semantics are required, WhatsApp delivery
+  normalization, and a reversible identity migration for tenant-scoped usernames,
+  admission numbers, student phone, and independent-student fields.
+- Strengthened admissions and identity: admission numbers are server-generated
+  and immutable in normal APIs, username proposals are tenant-aware, internal
+  application submission must choose an open Admission Form, archived-session
+  admission writes are rejected, guardian links are tenant-safe many-to-many,
+  and Add Student supports existing guardian, new guardian, or independent
+  student paths.
+- Removed raw credential URLs from normal create/reissue UI states and replaced
+  them with compact copy/send controls.
+- Added Finance person profile endpoints/modals, salary-history default table
+  with edit/delete actions, report quick date ranges, phone custom fields, Forms
+  and Responses tabs, staged audience picking, guardian/ward response context,
+  expanded document upload policy, student submission replace/remove, stricter
+  assignment teaching scope, and clearer My Timetable labels/class switching.
+- Updated the visual evidence scripts for the renamed **General form**, Action
+  menus, Attendance class cards, and the Forms Responses tab.
+
+Evidence:
+
+- Backend full suite: `240 passed, 2 skipped`.
+- Focused backend: admission conversion `10 passed`; session context `7 passed`;
+  attendance period/enrollment history `6 passed`; phone/files/self-service/
+  category scoping and assessments slices passed during the tranche.
+- Frontend: production TypeScript/Vite build passed; i18n audit passed
+  (`1027 keys checked`); date-range boundary checks passed.
+- Browser/scripted UI: admission form builder create/edit/render/submit passed;
+  assessment 422 rendering passed; visual issue verification passed and captured
+  updated screenshots under `app/artifacts/issue-verification/`.
+- Static/migration gates: no `window.alert/confirm/prompt` source hits,
+  `git diff --check` passed, and Alembic has one head
+  `iss3_028_guardian_forms`.
+
 ## 2026-07-22 — Live role and release qualification
 
 The previously open `PDF-02`, `PDF-05`, `PDF-08`, `PDF-11`, `PDF-14`,

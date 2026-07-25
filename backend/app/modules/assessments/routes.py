@@ -143,12 +143,12 @@ async def _require_class_course_scope(
     section_id: UUID | None = None,
     bypass_permission: str | None = None,
 ) -> None:
-    """Enforces FR-RBAC-03: a teacher may only act on a class+course they are
-    actually assigned to for the active session, unless they hold a
-    supervisory/global permission that explicitly bypasses scope."""
+    """A timetable assignment is mandatory for teachers.
+
+    Generic delegated permissions deliberately do not widen teaching scope;
+    only the principal role is an explicit supervisory bypass.
+    """
     if current_user.role == UserRole.principal:
-        return
-    if bypass_permission and await user_has_permission(current_user, bypass_permission, session):
         return
 
     teacher = await _teacher_profile(session, current_user)
@@ -702,6 +702,32 @@ async def submit_assignment(
     result = SubmissionRead.model_validate(submission)
     result.is_late = now > due_date
     return result
+
+
+@router.delete("/assignments/{assignment_id}/submissions/me")
+async def remove_own_submission(
+    assignment_id: UUID,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
+    student = await _require_student_assignment_access(session, current_user, madrasa.id, assignment)
+    if datetime.now(UTC) > _aware(assignment.due_date):
+        raise HTTPException(status_code=400, detail="Submission removal is only allowed until the due date")
+    submission = (
+        await session.execute(
+            select(Submission).where(
+                Submission.assignment_id == assignment_id,
+                Submission.student_id == student.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if submission is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    await session.delete(submission)
+    await session.commit()
+    return {"status": "deleted"}
 
 
 @router.get("/assignments/{assignment_id}/submissions", response_model=list[SubmissionRead])

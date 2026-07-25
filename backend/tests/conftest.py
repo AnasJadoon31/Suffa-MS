@@ -75,6 +75,12 @@ async def db_sessionmaker(engine):
 
 
 @pytest.fixture
+async def db_session(db_sessionmaker):
+    async with db_sessionmaker() as session:
+        yield session
+
+
+@pytest.fixture
 async def seed(db_sessionmaker):
     """One madrasa: two classes (each with sections Alif/Bay), one shared
     course, a principal, a teacher assigned to class A, and two students
@@ -133,7 +139,7 @@ async def seed(db_sessionmaker):
         teacher = TeacherProfile(
             madrasa_id=mid, user_id=teacher_user.id, name="Ustad",
             employee_code="T1", status="active",
-            whatsapp_number="+920000000000", join_date=date(2020, 1, 1),
+            whatsapp_number="+923001234567", join_date=date(2020, 1, 1),
         )
         db.add(teacher)
         await db.flush()

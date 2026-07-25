@@ -2,6 +2,7 @@
 
 from fastapi import HTTPException
 
+from app.core.phone import normalize_pakistan_phone
 from app.modules.operations.schemas import FormFieldDefinition
 
 
@@ -21,6 +22,11 @@ def validate_admission_answers(fields_definition: list, answers: dict) -> None:
             continue
         if field.type in {"text", "textarea"} and not isinstance(value, str):
             raise HTTPException(status_code=422, detail=f"Form field must be text: {key}")
+        if field.type == "phone":
+            try:
+                answers[key] = normalize_pakistan_phone(value)
+            except ValueError as error:
+                raise HTTPException(status_code=422, detail=f"Invalid phone field: {key}") from error
         if field.type in {"radio", "dropdown"} and value not in field.options:
             raise HTTPException(status_code=422, detail=f"Invalid option for form field: {key}")
         if field.type == "checkbox_group":

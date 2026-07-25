@@ -4,8 +4,8 @@ import { Edit2, Eye, FileText, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
 
-import { operationsApi, type FormDef, type FormFieldDefinition, type FormResponse, type Scope } from "../lib/endpoints";
-import { AudiencePicker } from "./AudiencePicker";
+import { operationsApi, reportingApi, type FormDef, type FormFieldDefinition, type FormResponse, type ParentDashboard, type Scope } from "../lib/endpoints";
+import { StagedAudiencePicker } from "./StagedAudiencePicker";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
@@ -15,6 +15,8 @@ import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
 import { InlineFilter } from "./ui/InlineFilter";
+import { ActionMenu } from "./ui/ActionMenu";
+import { PhoneInput } from "./ui/PhoneInput";
 
 export function FormsView() {
   const { t } = useTranslation();
@@ -25,9 +27,13 @@ export function FormsView() {
   const canManageAll = hasPermission("forms.manage_all");
   const canViewResponses = hasPermission("forms.responses.view");
   const [forms, setForms] = useState<FormDef[]>([]);
+  const [activeTab, setActiveTab] = useState<"forms" | "responses">("forms");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [selected, setSelected] = useState<FormDef | null>(null);
   const [responses, setResponses] = useState<FormResponse[]>([]);
+  const [responseFilters, setResponseFilters] = useState({ form_id: "", respondent_role: "", student_id: "", date_from: "", date_to: "" });
+  const [wards, setWards] = useState<ParentDashboard["children"]>([]);
+  const [selectedWardId, setSelectedWardId] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -70,12 +76,31 @@ export function FormsView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryFilter]);
 
+  useEffect(() => {
+    if (user?.role !== "parent") return;
+    void reportingApi.dashboard().then((dashboard) => {
+      if (dashboard.role !== "parent") return;
+      setWards(dashboard.children);
+      setSelectedWardId((current) => current || dashboard.children[0]?.id || "");
+    });
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (activeTab !== "responses" || !canViewResponses) return;
+    void operationsApi.listAllFormResponses({
+      form_id: responseFilters.form_id || undefined,
+      respondent_role: responseFilters.respondent_role || undefined,
+      student_id: responseFilters.student_id || undefined,
+      date_from: responseFilters.date_from || undefined,
+      date_to: responseFilters.date_to || undefined,
+    }).then(setResponses).catch(() => setResponses([]));
+  }, [activeTab, canViewResponses, responseFilters]);
+
   const openForm = async (form: FormDef) => {
     setSelected(form);
     setAnswers({});
     setNotice("");
     setError("");
-    if (canViewResponses) setResponses(await operationsApi.listFormResponses(form.id));
   };
 
   const canEditForm = (form: FormDef) => !readOnly && (canManageAll || form.created_by_id === user?.id);
@@ -88,6 +113,12 @@ export function FormsView() {
         notice={t("descForms")}
       />
 
+      <div className="tabs" role="tablist" aria-label={t("forms")}>
+        <Button className={activeTab === "forms" ? "primaryAction" : "secondaryAction"} type="button" role="tab" aria-selected={activeTab === "forms"} onClick={() => setActiveTab("forms")}>{t("formsTabLabel")}</Button>
+        {canViewResponses && <Button className={activeTab === "responses" ? "primaryAction" : "secondaryAction"} type="button" role="tab" aria-selected={activeTab === "responses"} onClick={() => setActiveTab("responses")}>{t("responsesTabLabel")}</Button>}
+      </div>
+
+      {activeTab === "forms" && (<>
       {canCreate && <div className="formActions" style={{ marginBottom: 12 }}>
         <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createFormBtn")}</Button>
       </div>}
@@ -132,7 +163,7 @@ export function FormsView() {
                       </label>
                     </div>
 
-          <AudiencePicker value={audience} onChange={setAudience} />
+          <StagedAudiencePicker value={audience} onChange={setAudience} />
 
           <FormFieldsEditor fields={fields} onChange={setFields} />
           </FormModal>}
@@ -154,23 +185,21 @@ export function FormsView() {
           { header: t("categoryFilterLabel"), render: (f) => f.category ?? "—" },
           { header: t("fieldsCol"), render: (f) => f.fields_definition.length },
           { header: t("actionsCol"), render: (f) => (
-            <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Button className="tableAction" type="button" onClick={() => openForm(f)}>{t("openBtn")}</Button>
-              {canEditForm(f) && (
-                <>
-                  <Button
-                    className="iconBtn" type="button" title={t("editBtn") ?? ""}
-                    onClick={() => {
+            <ActionMenu items={[
+              { label: t("openBtn"), onClick: () => openForm(f) },
+              ...(canEditForm(f) ? [{
+                label: t("editBtn"),
+                icon: <Edit2 size={14} />,
+                onClick: () => {
                       setEditing(f);
                       setEditAudience(f.visibility_scope);
                       setEditError("");
-                    }}
-                  >
-                    <Edit2 size={14} />
-                  </Button>
-                  <Button
-                    className="iconBtn" type="button" title={t("deleteBtn") ?? ""}
-                    onClick={async () => {
+                },
+              }, {
+                label: t("deleteBtn"),
+                icon: <Trash2 size={14} />,
+                destructive: true,
+                onClick: async () => {
                       if (!(await confirm(t("deleteFormConfirm") ?? ""))) return;
                       try {
                         await operationsApi.deleteForm(f.id);
@@ -179,13 +208,9 @@ export function FormsView() {
                       } catch (err: any) {
                         await alert(err.response?.data?.detail ?? t("failedDeleteForm"));
                       }
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </>
-              )}
-            </span>
+                },
+              }] : []),
+            ]} ariaLabel={`${t("actionsCol")}: ${f.title}`} />
           )},
         ]}
         data={forms}
@@ -207,7 +232,7 @@ export function FormsView() {
             e.preventDefault();
             setError("");
             try {
-              await operationsApi.submitFormResponse(selected.id, answers);
+              await operationsApi.submitFormResponse(selected.id, answers, user?.role === "parent" ? selectedWardId : undefined);
               setNotice(t("responseSubmitted"));
               setAnswers({});
             } catch (err: any) {
@@ -216,8 +241,14 @@ export function FormsView() {
           }}
         >
           {notice && <p className="notice">{notice}</p>}
+          {user?.role === "parent" && (
+            <label>{t("wardLabel")}<Select required value={selectedWardId} onChange={(event) => setSelectedWardId(event.target.value)}>{wards.map((ward) => <option key={ward.id} value={ward.id}>{ward.name}</option>)}</Select></label>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {selected.fields_definition.map((f) => (
+              f.type === "phone"
+                ? <PhoneInput key={f.key} id={`form-${f.key}`} label={f.label} required={f.required} value={answers[f.key] ?? ""} onChange={(value) => setAnswers({ ...answers, [f.key]: value })} />
+                :
               <label key={f.key}>
                 {f.label}
                 <Input
@@ -229,34 +260,8 @@ export function FormsView() {
                 />
               </label>
             ))}
-          </div>          {canViewResponses && (
-            <div className="dataTable" style={{ marginTop: 16 }}>
-              <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("submittedCol")}</span><span>{t("actionsCol")}</span></div>
-              {responses.length === 0 && <p className="emptyState">{t("noResponsesYet")}</p>}
-              {responses.map((r) => (
-                <div className="dataRow" key={r.id}>
-                  <span>{r.student_name ?? t("unknownPersonLabel")}</span>
-                  <span>{new Date(r.created_at).toLocaleString()}</span>
-                  <span><Button className="tableAction" type="button" title={t("viewResponseBtn")} onClick={() => setSelectedResponse(r)}><Eye size={14} /></Button></span>
-                </div>
-              ))}
-            </div>
-          )}
+          </div>
         </FormModal>
-      )}
-
-      {selectedResponse && selected && (
-        <Modal title={t("responseDetailsHeading")} onClose={() => setSelectedResponse(null)}>
-          <dl className="responseDetails">
-            <dt>{t("studentCol")}</dt><dd>{selectedResponse.student_name ?? t("unknownPersonLabel")}</dd>
-            <dt>{t("submittedCol")}</dt><dd>{new Date(selectedResponse.created_at).toLocaleString()}</dd>
-            {selected.fields_definition.map((field) => {
-              const value = selectedResponse.response_data[field.key];
-              const display = Array.isArray(value) ? value.join(", ") : value && typeof value === "object" ? JSON.stringify(value) : String(value ?? "—");
-              return <div key={field.key} className="responseDetailRow"><dt>{field.label}</dt><dd>{display}</dd></div>;
-            })}
-          </dl>
-        </Modal>
       )}
 
       {editing && (
@@ -285,8 +290,47 @@ export function FormsView() {
           <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
           <label>{t("descriptionLabel")}<Input value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
           <label>{t("formCategoryLabel")}<Input value={editing.category ?? ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })} list="form-categories" /></label>
-          <AudiencePicker value={editAudience} onChange={setEditAudience} />
+          <StagedAudiencePicker value={editAudience} onChange={setEditAudience} />
         </FormModal>
+      )}
+      </>)}
+
+      {activeTab === "responses" && canViewResponses && (
+        <>
+          <InlineFilter filters={[
+            { key: "response-form", type: "select", value: responseFilters.form_id, placeholder: t("allFormsLabel"), options: forms.map((form) => ({ value: form.id, label: form.title })), onChange: (value) => setResponseFilters({ ...responseFilters, form_id: value }) },
+            { key: "response-role", type: "select", value: responseFilters.respondent_role, placeholder: t("allRolesLabel"), options: [{ value: "student", label: t("students") }, { value: "teacher", label: t("teachers") }, { value: "parent", label: t("guardians") }], onChange: (value) => setResponseFilters({ ...responseFilters, respondent_role: value }) },
+            { key: "response-student", type: "input", value: responseFilters.student_id, placeholder: t("studentIdFilterPlaceholder"), onChange: (value) => setResponseFilters({ ...responseFilters, student_id: value }) },
+            { key: "response-from", type: "input", inputType: "date", value: responseFilters.date_from, ariaLabel: t("fromLabel"), onChange: (value) => setResponseFilters({ ...responseFilters, date_from: value }) },
+            { key: "response-to", type: "input", inputType: "date", value: responseFilters.date_to, ariaLabel: t("toLabel"), onChange: (value) => setResponseFilters({ ...responseFilters, date_to: value }) },
+          ]} />
+          <DataTable<FormResponse>
+            columns={[
+              { header: t("formLabel"), render: (response) => forms.find((form) => form.id === response.form_id)?.title ?? "—" },
+              { header: t("respondentLabel"), render: (response) => response.submitted_by_name ?? t("deletedPersonLabel") },
+              { header: t("wardLabel"), render: (response) => response.ward_name ?? response.student_name ?? "—" },
+              { header: t("submittedCol"), render: (response) => new Date(response.created_at).toLocaleString() },
+              { header: t("actionsCol"), render: (response) => <ActionMenu items={[{ label: t("viewResponseBtn"), icon: <Eye size={14} />, onClick: () => setSelectedResponse(response) }]} /> },
+            ]}
+            data={responses}
+            keyExtractor={(response) => response.id}
+            emptyMessage={t("noResponsesYet")}
+          />
+        </>
+      )}
+      {selectedResponse && (
+        <Modal title={t("responseDetailsHeading")} onClose={() => setSelectedResponse(null)}>
+          <dl className="responseDetails">
+            <dt>{t("respondentLabel")}</dt><dd>{selectedResponse.submitted_by_name ?? t("deletedPersonLabel")}</dd>
+            <dt>{t("wardLabel")}</dt><dd>{selectedResponse.ward_name ?? selectedResponse.student_name ?? "—"}</dd>
+            <dt>{t("submittedCol")}</dt><dd>{new Date(selectedResponse.created_at).toLocaleString()}</dd>
+            {(forms.find((form) => form.id === selectedResponse.form_id)?.fields_definition ?? []).map((field) => {
+              const value = selectedResponse.response_data[field.key];
+              const display = Array.isArray(value) ? value.join(", ") : value && typeof value === "object" ? JSON.stringify(value) : String(value ?? "—");
+              return <div key={field.key} className="responseDetailRow"><dt>{field.label}</dt><dd>{display}</dd></div>;
+            })}
+          </dl>
+        </Modal>
       )}
     </PageSection>
   );

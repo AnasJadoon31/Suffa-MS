@@ -4,7 +4,7 @@ import re
 import secrets
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import exc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -28,7 +28,7 @@ def set_password_token_version(user: User) -> str:
     ).hexdigest()
 
 
-async def generate_unique_username(session: AsyncSession, base: str) -> str:
+async def generate_unique_username(session: AsyncSession, base: str, madrasa_id: UUID) -> str:
     """Derives a login username from a display name for flows with no
     interactive username prompt (e.g. guardian auto-provisioning at
     enrolment time, B7-k). Usernames are unique across the whole platform
@@ -37,7 +37,9 @@ async def generate_unique_username(session: AsyncSession, base: str) -> str:
     candidate = slug
     suffix = 1
     while True:
-        existing = await session.execute(select(User.id).where(User.username == candidate))
+        existing = await session.execute(
+            select(User.id).where(User.madrasa_id == madrasa_id, User.username == candidate)
+        )
         if existing.scalar_one_or_none() is None:
             return candidate
         suffix += 1
@@ -58,7 +60,9 @@ async def provision_login(
     returns it alongside a one-time set-password link (FR-AUTH-01/03). The
     account is unusable — a random, never-transmitted password — until the
     link is completed via POST /auth/set-password."""
-    existing = await session.execute(select(User).where(User.username == username))
+    existing = await session.execute(
+        select(User).where(User.madrasa_id == madrasa_id, User.username == username)
+    )
     if existing.scalar_one_or_none() is not None:
         raise UsernameTakenError(f"Username '{username}' already exists")
 
@@ -72,7 +76,11 @@ async def provision_login(
         portal_enabled=portal_enabled,
     )
     session.add(user)
-    await session.flush()
+    try:
+        await session.flush()
+    except exc.IntegrityError as error:
+        await session.rollback()
+        raise UsernameTakenError(f"Username '{username}' already exists") from error
 
     token = issue_token(
         str(user.id),

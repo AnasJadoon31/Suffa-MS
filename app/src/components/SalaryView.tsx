@@ -1,10 +1,11 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Plus } from "lucide-react";
+import { Banknote, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDialog } from "../lib/DialogContext";
 
 import { useAuth } from "../lib/AuthContext";
-import { financeApi, type MySalary, type SalaryPayment, type SalaryRecord } from "../lib/endpoints";
+import { financeApi, type MySalary, type SalaryHistory, type SalaryPayment, type SalaryRecord } from "../lib/endpoints";
 import { peopleApi, type Teacher } from "../lib/endpoints";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { HijriTag } from "./HijriTag";
@@ -14,6 +15,7 @@ import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { InlineFilter } from "./ui/InlineFilter";
+import { ActionMenu } from "./ui/ActionMenu";
 
 /** Read-only self-view for teachers without teachers.salary.manage — own
  * salary record + payment history only, no ability to browse other teachers. */
@@ -67,24 +69,32 @@ function MySalaryView() {
 
 function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const { t } = useTranslation();
+  const { confirm } = useDialog();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [teacherId, setTeacherId] = useState("");
   const [teacherSearch, setTeacherSearch] = useState("");
   const [record, setRecord] = useState<SalaryRecord | null>(null);
   const [payments, setPayments] = useState<SalaryPayment[]>([]);
+  const [history, setHistory] = useState<SalaryHistory[]>([]);
   const [salaryForm, setSalaryForm] = useState({ amount: "", effective_from: "" });
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
+  const [paymentEditForm, setPaymentEditForm] = useState({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [editModal, setEditModal] = useState<"salary" | "payment" | null>(null);
+  const [editingPayment, setEditingPayment] = useState<SalaryPayment | null>(null);
 
   useEffect(() => {
     void (async () => {
       setIsLoading(true);
       try {
-        setTeachers(await peopleApi.listTeachers());
+        const [teacherRows, historyRows] = await Promise.all([
+          peopleApi.listTeachers(), financeApi.listSalaryHistory(),
+        ]);
+        setTeachers(teacherRows);
+        setHistory(historyRows);
         setLoadError("");
       } catch (err: any) {
         setLoadError(err.response?.data?.detail ?? t("failedLoadTeachers"));
@@ -109,6 +119,43 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
     setPayments(await financeApi.listSalaryPayments(id));
   };
 
+  const refreshHistory = async () => {
+    setHistory(await financeApi.listSalaryHistory());
+  };
+
+  const refreshSelectedTeacher = async () => {
+    if (teacherId) {
+      setPayments(await financeApi.listSalaryPayments(teacherId));
+    }
+  };
+
+  const startEditPayment = (payment: SalaryPayment) => {
+    setPaymentEditForm({
+      amount: String(payment.amount),
+      payment_date: payment.payment_date,
+      period_covered: payment.period_covered,
+      method: payment.method,
+      note: payment.note || "",
+    });
+    setEditingPayment(payment);
+    setError("");
+  };
+
+  const deletePayment = async (payment: SalaryPayment) => {
+    if (!(await confirm(t("deleteSalaryPaymentConfirm"), {
+      title: t("deleteBtn"),
+      confirmLabel: t("deleteBtn"),
+    }))) return;
+    setError("");
+    try {
+      await financeApi.deleteSalaryPayment(payment.id);
+      await Promise.all([refreshHistory(), refreshSelectedTeacher()]);
+      setNotice(t("salaryPaymentDeleted"));
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? t("failedDelete"));
+    }
+  };
+
   const matchingTeachers = useMemo(() => {
     const query = teacherSearch.trim().toLowerCase();
     if (!query) return teachers;
@@ -123,6 +170,39 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
 
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
+
+      {!isLoading && !loadError && (
+        <div className="dataTable salaryHistoryTable">
+          <div className="dataRow header">
+            <span>{t("teacherLabel")}</span><span>{t("amountCol")}</span>
+            <span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span>
+            <span>{t("methodCol")}</span><span>{t("statusCol")}</span><span>{t("actionsCol")}</span>
+          </div>
+          {history.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
+          {history.map((payment) => (
+            <div className="dataRow" key={payment.id}>
+              <span><strong>{payment.teacher_name}</strong><small>{payment.employee_code}</small></span>
+              <span>{payment.currency} {payment.amount}</span>
+              <span>{payment.payment_date}</span><span>{payment.period_covered}</span>
+              <span>{payment.method}</span><span className="badge success">{payment.status}</span>
+              <span><ActionMenu ariaLabel={t("actionsCol")} items={[
+                {
+                  label: t("viewBtn"),
+                  onClick: () => {
+                    const teacher = teachers.find((row) => row.id === payment.teacher_id);
+                    setTeacherSearch(teacher ? `${teacher.name} (${teacher.employee_code})` : payment.teacher_name);
+                    void loadTeacher(payment.teacher_id);
+                  },
+                },
+                ...(canWrite ? [
+                  { label: t("editBtn"), icon: <Pencil size={14} />, onClick: () => startEditPayment(payment) },
+                  { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => deletePayment(payment) },
+                ] : []),
+              ]} /></span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <InlineFilter filters={[]}>
         <SearchDropdown
@@ -205,7 +285,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
                                   });
                                   setPaymentForm({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
                                   setEditModal(null);
-                                  setPayments(await financeApi.listSalaryPayments(teacherId));
+                                  await Promise.all([refreshHistory(), refreshSelectedTeacher()]);
                                 } catch (err: any) {
                                   setError(err.response?.data?.detail ?? t("failedRecordPayment"));
                                 }
@@ -232,7 +312,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
                   </FormModal>}
 
           <div className="dataTable">
-            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span></div>
+            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span><span>{t("actionsCol")}</span></div>
             {payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
             {payments.map((p) => (
               <div className="dataRow" key={p.id}>
@@ -241,11 +321,54 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
                 <span>{p.currency} {p.amount}</span>
                 <span>{p.method}</span>
                 <span>{p.note || "—"}</span>
+                <span>
+                  <ActionMenu ariaLabel={t("actionsCol")} items={[
+                    { label: t("editBtn"), icon: <Pencil size={14} />, disabled: !canWrite, onClick: () => startEditPayment(p) },
+                    { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: !canWrite, onClick: () => deletePayment(p) },
+                  ]} />
+                </span>
               </div>
             ))}
           </div>
         </>
       )}
+
+      {canWrite && editingPayment && <FormModal
+        title={t("editSalaryPaymentHeading")}
+        onClose={() => setEditingPayment(null)}
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setError("");
+          try {
+            await financeApi.updateSalaryPayment(editingPayment.id, {
+              amount: Number(paymentEditForm.amount),
+              payment_date: paymentEditForm.payment_date,
+              period_covered: paymentEditForm.period_covered,
+              method: paymentEditForm.method,
+              note: paymentEditForm.note,
+            });
+            setEditingPayment(null);
+            await Promise.all([refreshHistory(), refreshSelectedTeacher()]);
+            setNotice(t("salaryPaymentSaved"));
+          } catch (err: any) {
+            setError(err.response?.data?.detail ?? t("failedUpdate"));
+          }
+        }}
+        submitLabel={t("saveBtn")}
+      >
+        <label>{t("amountCol")}<Input required type="number" min={0} value={paymentEditForm.amount} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, amount: e.target.value })} /></label>
+        <label>{t("dateCol")}<Input required type="date" value={paymentEditForm.payment_date} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, payment_date: e.target.value })} /></label>
+        <label>{t("periodCoveredCol")}<Input required value={paymentEditForm.period_covered} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, period_covered: e.target.value })} /></label>
+        <label>
+          {t("methodCol")}
+          <Select value={paymentEditForm.method} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, method: e.target.value })}>
+            <option value="cash">{t("methodCash")}</option>
+            <option value="bank_transfer">{t("methodBank")}</option>
+            <option value="cheque">{t("methodCheque")}</option>
+          </Select>
+        </label>
+        <label>{t("notesLabel")}<Input value={paymentEditForm.note} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, note: e.target.value })} /></label>
+      </FormModal>}
     </PageSection>
   );
 }

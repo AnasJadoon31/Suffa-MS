@@ -3,12 +3,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.phone import PakistanPhone
+
 
 class WhatsAppLinkRequest(BaseModel):
     template_code: str
     recipient_type: str = Field(pattern="^(student|teacher|guardian)$")
     recipient_id: UUID
-    phone_number: str
+    phone_number: PakistanPhone
     language: str = "ur"
     variables: dict[str, str] = {}
 

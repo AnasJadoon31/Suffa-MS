@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_madrasa, require_permission
 from app.core.config import settings
+from app.core.phone import evolution_number, normalize_pakistan_phone
 from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
@@ -152,8 +153,9 @@ async def request_whatsapp_pairing_code(
     madrasa: Madrasa = Depends(get_current_madrasa),
 ) -> WhatsAppPairingResponse:
     _require_evolution_tenant(madrasa)
-    phone_number = "".join(character for character in payload.phone_number if character.isdigit())
-    if not 8 <= len(phone_number) <= 15:
+    try:
+        phone_number = evolution_number(payload.phone_number)
+    except ValueError as exc:
         raise HTTPException(status_code=422, detail=ErrorCode.WHATSAPP_PHONE_INVALID)
     base_url, api_key, instance = _evolution_config()
     headers = {"apikey": api_key, "Content-Type": "application/json"}
@@ -270,12 +272,7 @@ async def _require_open_evolution_instance(client: httpx.AsyncClient, headers: d
 
 
 def normalise_phone_number(value: str) -> str:
-    digits = "".join(ch for ch in value if ch.isdigit())
-    if digits.startswith("0"):
-        return "92" + digits[1:]
-    if len(digits) == 10 and digits.startswith("3"):
-        return "92" + digits
-    return digits
+    return evolution_number(value)
 
 
 def render_variables(template_text: str, variables: dict[str, str]) -> str:

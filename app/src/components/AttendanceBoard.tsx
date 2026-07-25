@@ -8,7 +8,7 @@ import {
   Save,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
@@ -44,6 +44,8 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Input } from "./ui/Field";
 import { DataTable } from "./ui/DataTable";
 import { InlineFilter } from "./ui/InlineFilter";
+import { useDialog } from "../lib/DialogContext";
+import { useNavigationGuard } from "../lib/NavigationGuardContext";
 
 
 const attendanceOptions = ["present", "absent", "leave"] as const;
@@ -264,6 +266,8 @@ function AttendanceHistoryTable({
 
 export function AttendanceBoard({}: AttendanceBoardProps) {
   const { t } = useTranslation();
+  const { confirm, prompt } = useDialog();
+  const { setNavigationGuard } = useNavigationGuard();
   const { user, hasPermission } = useAuth();
   const readOnly = useSessionReadOnly();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -320,13 +324,47 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setSelectedStudentId(searchParams.get("student") ?? "");
   }, [searchParams]);
 
+  const confirmDiscardUnsavedMarks = useCallback(async (): Promise<boolean> => {
+    if (!hasUnsavedMarks) return true;
+    const approved = await confirm(t("unsavedAttendanceWarning"), {
+      title: t("unsavedAttendanceTitle"),
+      confirmLabel: t("discardChangesBtn"),
+    });
+    if (approved) setHasUnsavedMarks(false);
+    return approved;
+  }, [confirm, hasUnsavedMarks, t]);
+
+  useEffect(() => {
+    setNavigationGuard(hasUnsavedMarks ? confirmDiscardUnsavedMarks : null);
+    return () => setNavigationGuard(null);
+  }, [confirmDiscardUnsavedMarks, hasUnsavedMarks, setNavigationGuard]);
+
   async function handleOverride(entry: (typeof lockedEntries)[number]): Promise<void> {
-    const reason = window.prompt(t("overrideReasonPrompt"));
+    const reason = await prompt(t("overrideReasonPrompt"), {
+      title: t("overrideAttendanceTitle"),
+      placeholder: t("overrideReasonPlaceholder"),
+      confirmLabel: t("saveBtn"),
+    });
     if (!reason) return;
     await overrideEntry(entry, reason);
   }
 
-  function selectClass(classId: string, sectionId: string): void {
+  function clearAttendanceSelection(): void {
+    setSelectedClassId(null);
+    setSelectedSectionId(null);
+    setSelectedCourseId("");
+    setSelectedSlotId("");
+    setTimetableSlots([]);
+    setActiveTab("calendar");
+    setClassHistory(null);
+    setStudentHistory(null);
+    setSelectedStudentId("");
+    setHasUnsavedMarks(false);
+    setSaveMessage("");
+  }
+
+  async function selectClass(classId: string, sectionId: string): Promise<void> {
+    if (!(await confirmDiscardUnsavedMarks())) return;
     setSelectedClassId(classId);
     setSelectedSectionId(sectionId);
     setSelectedCourseId("");
@@ -346,18 +384,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setSearchParams({ class: classId, section: sectionId, view: "calendar" });
   }
 
-  function returnToClasses(): void {
-    setSelectedClassId(null);
-    setSelectedSectionId(null);
-    setSelectedCourseId("");
-    setSelectedSlotId("");
-    setTimetableSlots([]);
-    setActiveTab("calendar");
-    setClassHistory(null);
-    setStudentHistory(null);
-    setSelectedStudentId("");
-    setHasUnsavedMarks(false);
-    setSaveMessage("");
+  async function returnToClasses(): Promise<void> {
+    if (!(await confirmDiscardUnsavedMarks())) return;
+    clearAttendanceSelection();
     setSearchParams({});
   }
 
@@ -375,7 +404,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         const pendingSection = pendingClass?.sections.find((section) => section.id === pending?.sectionId)
           ?? pendingClass?.sections[0];
         if (pendingClass && pendingSection) {
-          selectClass(pendingClass.id, pendingSection.id);
+          void selectClass(pendingClass.id, pendingSection.id);
         }
       } catch (err: any) {
         setError(err.response?.data?.detail ?? t("failedLoadAttendanceClasses"));
@@ -436,6 +465,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         );
         setRoster(data);
         setSessionId(data.session_id);
+        setMarked(Object.fromEntries(data.students.map((student) => [student.id, "present" as AttendanceStatus])));
+        setHasUnsavedMarks(data.students.length > 0);
       } catch (err: any) {
         setRoster(null);
         setSessionId(null);
@@ -445,6 +476,16 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       }
     })();
   }, [selectedClassId, selectedSectionId, selectedCourseId, selectedSlotId, t]);
+
+  useEffect(() => {
+    if (!hasUnsavedMarks) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [hasUnsavedMarks]);
 
   useEffect(() => {
     if (!selectedClassId || !selectedSectionId || !selectedCourseId) return;
@@ -604,7 +645,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </div>
         {selectedClassId && (
           <div className="headerActions">
-            <Button className="secondaryAction" type="button" onClick={returnToClasses}>
+            <Button className="secondaryAction" type="button" onClick={() => void returnToClasses()}>
               <ArrowLeft size={17} />
               {t("classesHeading")}
             </Button>
@@ -643,7 +684,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           <Button
             className={attendanceMode === "students" ? "primaryAction" : "secondaryAction"}
             type="button"
-            onClick={() => {
+            onClick={async () => {
+              if (!(await confirmDiscardUnsavedMarks())) return;
               setAttendanceMode("students");
               setSearchParams({});
             }}
@@ -653,9 +695,10 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           <Button
             className={attendanceMode === "teachers" ? "primaryAction" : "secondaryAction"}
             type="button"
-            onClick={() => {
+            onClick={async () => {
+              if (!(await confirmDiscardUnsavedMarks())) return;
               setAttendanceMode("teachers");
-              returnToClasses();
+              clearAttendanceSelection();
               setSearchParams({ mode: "teachers" });
             }}
           >
@@ -669,7 +712,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       {attendanceMode === "students" && !selectedClassId && (
         <div className="attendanceClassGrid" aria-label={t("chooseAttendanceClass")}>
           {classes.flatMap((item) => item.sections.map((section) => (
-            <Button className="attendanceClassButton" key={section.id} type="button" onClick={() => selectClass(item.id, section.id)}>
+            <Button className="attendanceClassButton" key={section.id} type="button" onClick={() => void selectClass(item.id, section.id)}>
               <span className="attendanceClassIcon" aria-hidden="true"><BookOpen size={18} /></span>
               <span className="attendanceClassBody">
                 <strong>{item.name} / {section.name}</strong>
@@ -696,7 +739,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               key: "course", type: "select", label: t("courseLabel"), value: selectedCourseId,
               placeholder: t("selectCoursePrompt"),
               options: (selectedClass?.courses ?? []).map((course) => ({ value: course.id, label: course.name })),
-              onChange: (value) => {
+              onChange: async (value) => {
+                if (!(await confirmDiscardUnsavedMarks())) return;
                 setSelectedCourseId(value);
                 setSelectedSlotId("");
                 setRoster(null);
@@ -710,7 +754,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 value: slot.id,
                 label: t("scheduledPeriodOption", { day: t(attendanceDayKeys[slot.day_of_week] ?? "dayMon"), period: slot.period, start: formatTime(slot.start_time), end: formatTime(slot.end_time) }),
               })),
-              onChange: (value) => {
+              onChange: async (value) => {
+                if (!(await confirmDiscardUnsavedMarks())) return;
                 setSelectedSlotId(value);
                 setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: value, view: activeTab === "studentHistory" ? "history" : "calendar" });
               },
@@ -721,7 +766,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           <Button
             className={activeTab === "calendar" ? "primaryAction" : "secondaryAction"}
             type="button"
-            onClick={() => {
+            onClick={async () => {
+              if (!(await confirmDiscardUnsavedMarks())) return;
               setActiveTab("calendar");
               setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "calendar" });
             }}
@@ -731,7 +777,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           <Button
             className={activeTab === "studentHistory" ? "primaryAction" : "secondaryAction"}
             type="button"
-            onClick={() => {
+            onClick={async () => {
+              if (!(await confirmDiscardUnsavedMarks())) return;
               setActiveTab("studentHistory");
               setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
             }}

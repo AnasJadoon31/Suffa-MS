@@ -55,7 +55,13 @@ async def test_enrollment_provisions_guardian_login_when_portal_disabled(client,
         )
         db.add(guardian)
         await db.flush()
-        db.add(StudentGuardian(student_id=student.id, guardian_id=guardian.id))
+        db.add(
+            StudentGuardian(
+                madrasa_id=seed.madrasa.id,
+                student_id=student.id,
+                guardian_id=guardian.id,
+            )
+        )
         await db.commit()
         guardian_id = guardian.id
 

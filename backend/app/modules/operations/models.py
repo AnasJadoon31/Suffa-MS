@@ -94,6 +94,8 @@ class FormResponse(Base, IdMixin, TenantMixin, TimestampMixin):
 
     form_id: Mapped[UUID] = mapped_column(ForeignKey("forms.id"), index=True)
     student_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("student_profiles.id"), index=True, nullable=True)
+    guardian_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("guardians.id"), index=True, nullable=True)
+    ward_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("student_profiles.id"), index=True, nullable=True)
     submitted_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     response_data: Mapped[dict] = mapped_column(PortableJSONB)
 

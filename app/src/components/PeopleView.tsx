@@ -1,6 +1,6 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import { Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X, Edit2, Pencil, UserMinus } from "lucide-react";
+import { Copy, Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X, Edit2, Pencil, UserMinus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useDialog } from "../lib/DialogContext";
@@ -36,6 +36,8 @@ import { DelegateModal } from "./DelegateButton";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
+import { PhoneInput } from "./ui/PhoneInput";
+import { ActionMenu } from "./ui/ActionMenu";
 
 function SendCredentialsButton({
   subjectType,
@@ -45,6 +47,8 @@ function SendCredentialsButton({
   const { t } = useTranslation();
   const readOnly = useSessionReadOnly();
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const fullUrl = `${window.location.origin}${setPasswordUrl}`;
 
   const send = async () => {
     setError("");
@@ -52,7 +56,7 @@ function SendCredentialsButton({
       const link = await messagingApi.sendCredentials({
         subject_type: subjectType,
         subject_id: subjectId,
-        set_password_url: setPasswordUrl,
+        set_password_url: fullUrl,
       });
       if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
     } catch (err: any) {
@@ -61,12 +65,24 @@ function SendCredentialsButton({
   };
 
   return (
-    <>
+    <div className="credentialDeliveryActions" role="status" aria-label={t("credentialsReadyLabel")}>
+      <span>{t("credentialsReadyLabel")}</span>
+      <Button
+        className="secondaryAction"
+        type="button"
+        onClick={async () => {
+          await navigator.clipboard.writeText(fullUrl);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 3000);
+        }}
+      >
+        <Copy size={15} /> {copied ? t("linkCopied") : t("copyLinkBtn")}
+      </Button>
       <Button className="secondaryAction" type="button" disabled={readOnly} onClick={() => send()}>
         {t("sendCredentialsBtn")}
       </Button>
       {error && <span className="notice" style={{ color: "var(--rose)" }}>{error}</span>}
-    </>
+    </div>
   );
 }
 
@@ -169,6 +185,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
     username: "", name: "", whatsapp_number: "", qualifications: "", join_date: "",
     cnic: "", address: "", emergency_contact: "", is_principal_delegate: false,
   });
+  const [usernameEdited, setUsernameEdited] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [justCreated, setJustCreated] = useState<Teacher | null>(null);
@@ -176,6 +193,32 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
+
+  const reissueCredentials = async (teacher: Teacher) => {
+    const result = await peopleApi.reissueTeacherCredentials(teacher.id);
+    const fullUrl = `${window.location.origin}${result.set_password_url}`;
+    await navigator.clipboard.writeText(fullUrl);
+    try {
+      await messagingApi.sendCredentials({
+        subject_type: "teacher",
+        subject_id: teacher.id,
+        set_password_url: fullUrl,
+      });
+      setNotice(t("credentialsSentLabel"));
+    } catch {
+      setNotice(t("linkCopied"));
+    }
+  };
+
+  useEffect(() => {
+    if (usernameEdited || !form.name.trim()) return;
+    const timer = window.setTimeout(() => {
+      void peopleApi.usernameProposal(form.name).then((username) => {
+        setForm((current) => ({ ...current, username }));
+      });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [form.name, usernameEdited]);
 
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [editForm, setEditForm] = useState({
@@ -242,9 +285,10 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
         emergency_contact: form.emergency_contact || undefined,
         is_principal_delegate: form.is_principal_delegate,
       });
-      setNotice(t("createdSetPasswordLink", { code: created.employee_code, url: created.set_password_url }));
+      setNotice(t("createdAccountReady", { code: created.employee_code }));
       setJustCreated(created);
       setForm({ username: "", name: "", whatsapp_number: "", qualifications: "", join_date: "", cnic: "", address: "", emergency_contact: "", is_principal_delegate: false });
+      setUsernameEdited(false);
       setShowCreate(false);
       await load();
     } catch (err: any) {
@@ -296,11 +340,11 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
                 submitLabel={t("addTeacherBtn")}
                 submitIcon={<UserPlus size={16} />}
               >
-                <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
+                <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => { setUsernameEdited(true); setForm({ ...form, username: e.target.value }); }} /></label>
 
               <label>{t("fullNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
 
-              <label>{t("whatsappNumberLabel")}<Input value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} /></label>
+              <PhoneInput id="teacher-whatsapp" label={t("whatsappNumberLabel")} value={form.whatsapp_number} onChange={(value) => setForm({ ...form, whatsapp_number: value })} />
 
               <label>{t("qualificationsLabel")}<Input value={form.qualifications} onChange={(e) => setForm({ ...form, qualifications: e.target.value })} /></label>
 
@@ -327,7 +371,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           submitIcon={<Edit2 size={16} />}
         >
           <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
-          <label>{t("whatsappNumberLabel")}<Input required value={editForm.whatsapp_number} onChange={(e) => setEditForm({ ...editForm, whatsapp_number: e.target.value })} /></label>
+          <PhoneInput id="teacher-whatsapp-edit" required label={t("whatsappNumberLabel")} value={editForm.whatsapp_number} onChange={(value) => setEditForm({ ...editForm, whatsapp_number: value })} />
           <label>{t("qualificationsLabel")}<Input value={editForm.qualifications} onChange={(e) => setEditForm({ ...editForm, qualifications: e.target.value })} /></label>
           <label>{t("joinDateLabel")}<Input type="date" value={editForm.join_date} onChange={(e) => setEditForm({ ...editForm, join_date: e.target.value })} /></label>
           <label>{t("cnicLabel")}<Input value={editForm.cnic} onChange={(e) => setEditForm({ ...editForm, cnic: e.target.value })} /></label>
@@ -352,9 +396,11 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           { header: t("whatsappCol"), render: (teacher) => teacher.whatsapp_number || "—" },
           { header: t("statusCol"), render: (teacher) => teacher.status },
           { header: t("actionsCol"), render: (teacher) => (
-            <>
-              {canCreate && (
-                <Button className="tableAction" type="button" title={t("editBtn", "Edit")} onClick={() => {
+            <ActionMenu items={[
+              ...(canCreate ? [{
+                label: t("editBtn"),
+                icon: <Edit2 size={14} />,
+                onClick: () => {
                   setEditingTeacher(teacher);
                   setEditForm({
                     name: teacher.name,
@@ -366,15 +412,11 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
                     emergency_contact: teacher.emergency_contact || "",
                     is_principal_delegate: teacher.is_principal_delegate || false,
                   });
-                }}>
-                  <Edit2 size={14} />
-                </Button>
-              )}
-              <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(teacher)}>
-                <Eye size={14} />
-              </Button>
-              <ReissueCredentialsButton subjectType="teacher" subjectId={teacher.id} />
-            </>
+                },
+              }] : []),
+              { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(teacher) },
+              { label: t("loginLinkBtn"), icon: <KeyRound size={14} />, onClick: () => reissueCredentials(teacher) },
+            ]} ariaLabel={`${t("actionsCol")}: ${teacher.name}`} />
           )},
         ]}
         data={teachers}
@@ -538,7 +580,7 @@ function TeacherDetail({
           }}
         >
           <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
-          <label>{t("whatsappCol")}<Input required value={editForm.whatsapp_number} onChange={(e) => setEditForm({ ...editForm, whatsapp_number: e.target.value })} /></label>
+          <PhoneInput id="teacher-detail-whatsapp-edit" required label={t("whatsappCol")} value={editForm.whatsapp_number} onChange={(value) => setEditForm({ ...editForm, whatsapp_number: value })} />
           <label>{t("qualificationsLabel")}<Input value={editForm.qualifications} onChange={(e) => setEditForm({ ...editForm, qualifications: e.target.value })} /></label>
           <label>{t("joinDateLabel")}<Input type="date" value={editForm.join_date} onChange={(e) => setEditForm({ ...editForm, join_date: e.target.value })} /></label>
           <label>{t("cnicLabel")}<Input value={editForm.cnic} onChange={(e) => setEditForm({ ...editForm, cnic: e.target.value })} placeholder="12345-1234567-1" /></label>
@@ -560,12 +602,16 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [classFilter, setClassFilter] = useState("");
   const [classStudentIds, setClassStudentIds] = useState<Set<string> | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ username: "", name: "", date_of_birth: "", b_form_number: "", address: "" });
+  const [form, setForm] = useState({ username: "", name: "", date_of_birth: "", b_form_number: "", address: "", phone: "" });
+  const [usernameEdited, setUsernameEdited] = useState(false);
   const [admissionForms, setAdmissionForms] = useState<AdmissionForm[]>([]);
   const [admissionFormId, setAdmissionFormId] = useState("");
   const [admissionAnswers, setAdmissionAnswers] = useState<Record<string, unknown>>({});
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [guardianIds, setGuardianIds] = useState<string[]>([]);
+  const [guardianMode, setGuardianMode] = useState<"link" | "create" | "independent">("link");
+  const [guardianSearch, setGuardianSearch] = useState("");
+  const [newGuardian, setNewGuardian] = useState({ name: "", relationship: "", phone_numbers: "" });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [justCreated, setJustCreated] = useState<Student | null>(null);
@@ -573,6 +619,32 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
+
+  const reissueCredentials = async (student: Student) => {
+    const result = await peopleApi.reissueStudentCredentials(student.id);
+    const fullUrl = `${window.location.origin}${result.set_password_url}`;
+    await navigator.clipboard.writeText(fullUrl);
+    try {
+      await messagingApi.sendCredentials({
+        subject_type: "student",
+        subject_id: student.id,
+        set_password_url: fullUrl,
+      });
+      setNotice(t("credentialsSentLabel"));
+    } catch {
+      setNotice(t("linkCopied"));
+    }
+  };
+
+  useEffect(() => {
+    if (usernameEdited || !form.name.trim()) return;
+    const timer = window.setTimeout(() => {
+      void peopleApi.usernameProposal(form.name).then((username) => {
+        setForm((current) => ({ ...current, username }));
+      });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [form.name, usernameEdited]);
 
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [assignClassStudent, setAssignClassStudent] = useState<Student | null>(null);
@@ -639,22 +711,33 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
     setError("");
     setNotice("");
     try {
+      let selectedGuardianIds = guardianMode === "link" ? guardianIds : [];
+      if (guardianMode === "create") {
+        const guardian = await peopleApi.createGuardian(newGuardian);
+        selectedGuardianIds = [guardian.id];
+      }
       const created = await peopleApi.createStudent({
         username: form.username,
         name: form.name,
         date_of_birth: form.date_of_birth,
         b_form_number: form.b_form_number || undefined,
         address: form.address || undefined,
+        phone: form.phone || undefined,
+        is_independent: guardianMode === "independent",
         admission_form_id: admissionFormId,
         admission_answers: admissionAnswers,
-        guardian_ids: guardianIds,
+        guardian_ids: selectedGuardianIds,
       });
-      setNotice(t("createdSetPasswordLink", { code: created.admission_number, url: created.set_password_url }));
+      setNotice(t("createdAccountReady", { code: created.admission_number }));
       setJustCreated(created);
-      setForm({ username: "", name: "", date_of_birth: "", b_form_number: "", address: "" });
+      setForm({ username: "", name: "", date_of_birth: "", b_form_number: "", address: "", phone: "" });
+      setUsernameEdited(false);
       setAdmissionFormId("");
       setAdmissionAnswers({});
       setGuardianIds([]);
+      setGuardianMode("link");
+      setGuardianSearch("");
+      setNewGuardian({ name: "", relationship: "", phone_numbers: "" });
       setShowCreate(false);
       await load();
     } catch (err: any) {
@@ -717,7 +800,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                     {admissionForms.map((item) => <option value={item.id} key={item.id}>{item.title} · {item.is_open ? t("openStatusLabel") : t("closedStatusLabel")}</option>)}
                   </Select>
                 </label>
-                <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
+                <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => { setUsernameEdited(true); setForm({ ...form, username: e.target.value }); }} /></label>
 
               <label>{t("studentNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
 
@@ -726,22 +809,58 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
               <label>{t("bFormLabel")}<Input value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
 
               <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-              <fieldset className="choiceField">
-                <legend>{t("linkGuardiansLabel")}</legend>
-                <small className="notice">{t("linkGuardiansHint")}</small>
-                {guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
-                {guardians.map((guardian) => (
-                  <label className="checkboxLabel" key={guardian.id}>
-                    <Checkbox
-                      checked={guardianIds.includes(guardian.id)}
-                      onChange={(event) => setGuardianIds(event.target.checked
-                        ? [...guardianIds, guardian.id]
-                        : guardianIds.filter((id) => id !== guardian.id))}
-                    />
-                    <span>{guardian.name} · {guardian.relationship} · {guardian.phone_numbers}</span>
-                  </label>
-                ))}
-              </fieldset>
+              <label>
+                {t("guardianHandlingLabel")}
+                <Select value={guardianMode} onChange={(event) => setGuardianMode(event.target.value as typeof guardianMode)}>
+                  <option value="link">{t("linkExistingGuardianLabel")}</option>
+                  <option value="create">{t("createNewGuardianLabel")}</option>
+                  <option value="independent">{t("independentStudentLabel")}</option>
+                </Select>
+              </label>
+              {guardianMode === "link" && (
+                <fieldset className="choiceField">
+                  <legend>{t("linkGuardiansLabel")}</legend>
+                  <SearchDropdown
+                    id="existing-guardian-search"
+                    label={t("searchGuardiansLabel")}
+                    value={guardianSearch}
+                    items={guardians.filter((guardian) => !guardianIds.includes(guardian.id))}
+                    getKey={(guardian) => guardian.id}
+                    getLabel={(guardian) => guardian.name}
+                    getDescription={(guardian) => `${guardian.relationship} · ${guardian.phone_numbers}`}
+                    onQueryChange={(query) => {
+                      setGuardianSearch(query);
+                      void peopleApi.listGuardians(query).then(setGuardians);
+                    }}
+                    onSelect={(guardian) => {
+                      setGuardianIds((current) => [...new Set([...current, guardian.id])]);
+                      setGuardianSearch("");
+                    }}
+                    emptyLabel={t("noGuardiansYet")}
+                  />
+                  <div className="selectionChips">
+                    {guardianIds.map((guardianId) => {
+                      const guardian = guardians.find((item) => item.id === guardianId);
+                      return guardian ? (
+                        <Button key={guardian.id} className="secondaryAction" type="button" onClick={() => setGuardianIds((current) => current.filter((id) => id !== guardian.id))}>
+                          {guardian.name} <X size={14} />
+                        </Button>
+                      ) : null;
+                    })}
+                  </div>
+                </fieldset>
+              )}
+              {guardianMode === "create" && (
+                <fieldset className="choiceField">
+                  <legend>{t("createNewGuardianLabel")}</legend>
+                  <label>{t("guardianNameLabel")}<Input required value={newGuardian.name} onChange={(event) => setNewGuardian({ ...newGuardian, name: event.target.value })} /></label>
+                  <label>{t("relationshipLabel")}<Input required value={newGuardian.relationship} onChange={(event) => setNewGuardian({ ...newGuardian, relationship: event.target.value })} /></label>
+                  <PhoneInput id="new-student-guardian-phone" required label={t("phoneCol")} value={newGuardian.phone_numbers} onChange={(value) => setNewGuardian({ ...newGuardian, phone_numbers: value })} />
+                </fieldset>
+              )}
+              {guardianMode === "independent" && (
+                <PhoneInput id="independent-student-phone" required label={t("studentPhoneLabel")} value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} />
+              )}
               {admissionForms.find((item) => item.id === admissionFormId)?.fields_definition.map((field) => {
                 if (field.type === "label") return <p className="formSectionLabel" key={field.key}>{field.label}</p>;
                 if (field.type === "textarea") return <label key={field.key}>{field.label}<Textarea required={field.required} value={String(admissionAnswers[field.key] ?? "")} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.value })} /></label>;
@@ -783,9 +902,11 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           { header: t("portalCol"), render: (s) => s.portal_enabled ? t("enabledLabel") : t("disabledLabel") },
           { header: t("statusCol"), render: (s) => s.status },
           { header: t("actionsCol"), render: (s) => (
-            <>
-              {canCreate && (
-                <Button className="tableAction" type="button" title={t("editBtn", "Edit")} onClick={() => {
+            <ActionMenu items={[
+              ...(canCreate ? [{
+                label: t("editBtn"),
+                icon: <Edit2 size={14} />,
+                onClick: () => {
                   setEditingStudent(s);
                   setEditForm({
                     name: s.name,
@@ -793,18 +914,20 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                     b_form_number: s.b_form_number || "",
                     address: s.address || "",
                   });
-                }}>
-                  <Edit2 size={14} />
-                </Button>
-              )}
-              {!s.active_enrollment && !s.current_class && <Button className="tableAction" type="button" title={t("assignClassBtn", "Assign Class")} onClick={() => setAssignClassStudent(s)}>
-                <GraduationCap size={14} />
-              </Button>}
-              <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(s)}>
-                <Eye size={14} />
-              </Button>
-              {s.portal_enabled && <ReissueCredentialsButton subjectType="student" subjectId={s.id} />}
-            </>
+                },
+              }] : []),
+              ...(!s.active_enrollment && !s.current_class ? [{
+                label: t("assignClassBtn"),
+                icon: <GraduationCap size={14} />,
+                onClick: () => setAssignClassStudent(s),
+              }] : []),
+              { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(s) },
+              ...(s.portal_enabled ? [{
+                label: t("loginLinkBtn"),
+                icon: <KeyRound size={14} />,
+                onClick: () => reissueCredentials(s),
+              }] : []),
+            ]} ariaLabel={`${t("actionsCol")}: ${s.name}`} />
           )},
         ]}
         data={visible}
@@ -846,9 +969,10 @@ function StudentDetail({
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({
-    name: student.name, date_of_birth: student.date_of_birth, admission_number: student.admission_number ?? "",
+    name: student.name, date_of_birth: student.date_of_birth,
     portal_enabled: student.portal_enabled,
-    b_form_number: student.b_form_number ?? "", address: student.address ?? "", notes: student.notes ?? ""
+    b_form_number: student.b_form_number ?? "", address: student.address ?? "", phone: student.phone ?? "",
+    is_independent: student.is_independent, notes: student.notes ?? ""
   });
   const { hasPermission } = useAuth();
   const canEdit = hasPermission("students.edit");
@@ -900,6 +1024,8 @@ function StudentDetail({
           <h4>{t("studentIdentityHeading")}</h4>
           <dl className="detailGrid">
             <dt>{t("admissionNumberCol")}</dt><dd>{student.admission_number}</dd>
+            <dt>{t("studentPhoneLabel")}</dt><dd>{student.phone || "—"}</dd>
+            <dt>{t("studentTypeLabel")}</dt><dd>{student.is_independent ? t("independentStudentLabel") : t("guardianLinkedStudentLabel")}</dd>
             <dt>{t("dobCol")}</dt><dd>{student.date_of_birth}</dd>
             <dt>{t("bFormLabel")}</dt><dd>{student.b_form_number || "—"}</dd>
             <dt>{t("addressLabel")}</dt><dd>{student.address || "—"}</dd>
@@ -1024,10 +1150,11 @@ function StudentDetail({
               await peopleApi.updateStudent(student.id, {
                 name: editForm.name,
                 date_of_birth: editForm.date_of_birth,
-                admission_number: editForm.admission_number || undefined,
                 portal_enabled: editForm.portal_enabled,
                 b_form_number: editForm.b_form_number || undefined,
                 address: editForm.address || undefined,
+                phone: editForm.phone || undefined,
+                is_independent: editForm.is_independent,
                 notes: editForm.notes || undefined,
               });
               setShowEdit(false);
@@ -1039,9 +1166,10 @@ function StudentDetail({
         >
           <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
           <label>{t("dobCol")}<Input type="date" required value={editForm.date_of_birth} onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })} /></label>
-          <label>{t("admissionNumberCol")}<Input value={editForm.admission_number} onChange={(e) => setEditForm({ ...editForm, admission_number: e.target.value })} /></label>
           <label>{t("bFormNumberCol")}<Input value={editForm.b_form_number} onChange={(e) => setEditForm({ ...editForm, b_form_number: e.target.value })} placeholder="12345-1234567-1" /></label>
           <label>{t("addressCol")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
+          <PhoneInput id="student-phone-edit" label={t("studentPhoneLabel")} required={editForm.is_independent && editForm.portal_enabled} value={editForm.phone} onChange={(value) => setEditForm({ ...editForm, phone: value })} />
+          <label className="checkboxLabel"><Input type="checkbox" checked={editForm.is_independent} onChange={(e) => setEditForm({ ...editForm, is_independent: e.target.checked })} />{t("independentStudentLabel")}</label>
           <label>{t("notesLabel")}<Input value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>
           <label className="checkboxLabel"><Input type="checkbox" checked={editForm.portal_enabled} onChange={(e) => setEditForm({ ...editForm, portal_enabled: e.target.checked })} />{t("portalEnabledLabel")}</label>
         </FormModal>
@@ -1144,6 +1272,7 @@ function GuardiansTab({
   canSendCredentials,
 }: Readonly<{ canCreate: boolean; canSendCredentials: boolean }>) {
   const { t } = useTranslation();
+  const { prompt } = useDialog();
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [form, setForm] = useState({ name: "", relationship: "", phone_numbers: "", cnic: "", address: "" });
   const [search, setSearch] = useState("");
@@ -1192,7 +1321,13 @@ function GuardiansTab({
     try {
       let username: string | undefined;
       if (!guardian.user_id) {
-        username = window.prompt(t("guardianUsernamePrompt")) ?? undefined;
+        username = (
+          await prompt(t("guardianUsernamePrompt"), {
+            title: t("createGuardianLoginTitle"),
+            placeholder: t("usernamePlaceholder"),
+            confirmLabel: t("createLoginBtn"),
+          })
+        ) ?? undefined;
         if (!username) return;
       }
       const result = await peopleApi.guardianCredentialsLink(guardian.id, username);
@@ -1240,7 +1375,7 @@ function GuardiansTab({
 
               <label>{t("relationshipLabel")}<Input required value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} placeholder={t("relationshipPlaceholder")} /></label>
 
-              <label>{t("phoneCol")}<Input required value={form.phone_numbers} onChange={(e) => setForm({ ...form, phone_numbers: e.target.value })} /></label>
+              <PhoneInput id="guardian-phone" required label={t("phoneCol")} value={form.phone_numbers} onChange={(value) => setForm({ ...form, phone_numbers: value })} />
 
               <label>{t("cnicLabel")}<Input value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} placeholder="12345-1234567-1" /></label>
 
@@ -1281,16 +1416,14 @@ function GuardiansTab({
           { header: t("phoneCol"), render: (g) => g.phone_numbers },
           { header: t("portalCol"), render: (g) => g.user_id ? t("enabledLabel") : t("disabledLabel") },
           { header: t("actionsCol"), render: (g) => (
-            <>
-              <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setDetail(g)}>
-                <Eye size={14} />
-              </Button>
-              {canSendCredentials && (
-                <Button className="tableAction" type="button" onClick={() => provisionLogin(g)}>
-                  <KeyRound size={14} /> {t("loginLinkBtn")}
-                </Button>
-              )}
-            </>
+            <ActionMenu items={[
+              { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(g) },
+              ...(canSendCredentials ? [{
+                label: t("loginLinkBtn"),
+                icon: <KeyRound size={14} />,
+                onClick: () => provisionLogin(g),
+              }] : []),
+            ]} ariaLabel={`${t("actionsCol")}: ${g.name}`} />
           )},
         ]}
         data={guardians}
@@ -1475,7 +1608,7 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
         >
           <label>{t("fullNameLabel")}<Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
           <label>{t("relationshipLabel")}<Input required value={editForm.relationship} onChange={(e) => setEditForm({ ...editForm, relationship: e.target.value })} /></label>
-          <label>{t("phoneCol")}<Input required value={editForm.phone_numbers} onChange={(e) => setEditForm({ ...editForm, phone_numbers: e.target.value })} /></label>
+          <PhoneInput id="guardian-phone-edit" required label={t("phoneCol")} value={editForm.phone_numbers} onChange={(value) => setEditForm({ ...editForm, phone_numbers: value })} />
           <label>{t("cnicLabel")}<Input value={editForm.cnic} onChange={(e) => setEditForm({ ...editForm, cnic: e.target.value })} placeholder="12345-1234567-1" /></label>
           <label>{t("addressCol")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
         </FormModal>

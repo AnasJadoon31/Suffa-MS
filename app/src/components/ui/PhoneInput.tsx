@@ -92,8 +92,15 @@ export function formatPhoneDisplay(e164: string): string {
  * Validate Pakistan phone number
  */
 export function isValidPakistanPhone(input: string): boolean {
-  if (!input) return false;
-  return /^\+923\d{9}$/.test(input);
+  return normalizePakistanPhone(input) !== "";
+}
+
+function subscriberDigits(input: string): string {
+  const digits = input.replace(/\D/g, "");
+  if (digits.startsWith("0092")) return digits.slice(4);
+  if (digits.startsWith("92")) return digits.slice(2);
+  if (digits.startsWith("0")) return digits.slice(1);
+  return digits;
 }
 
 export function PhoneInput({
@@ -116,9 +123,9 @@ export function PhoneInput({
     if (value) {
       // Show in local format for editing (without +92 prefix)
       if (value.startsWith("+92")) {
-        setDisplayValue("0" + value.substring(3));
+        setDisplayValue(value.substring(3));
       } else {
-        setDisplayValue(value);
+        setDisplayValue(subscriberDigits(value));
       }
     } else {
       setDisplayValue("");
@@ -128,9 +135,9 @@ export function PhoneInput({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value;
     
-    // Allow only digits, spaces, and common phone characters
-    const filtered = input.replace(/[^\d\s+\-()]/g, "");
-    
+    // The country prefix is rendered separately. Pasted local/E.164 values
+    // are reduced to the ten subscriber digits so +92 is never doubled.
+    const filtered = subscriberDigits(input).slice(0, 10);
     setDisplayValue(filtered);
     setTouched(true);
 
@@ -172,6 +179,7 @@ export function PhoneInput({
           dir="ltr"
           inputMode="tel"
           autoComplete="tel"
+          maxLength={10}
           aria-invalid={!!error && touched}
           aria-describedby={error && touched ? `${id}-error` : undefined}
         />

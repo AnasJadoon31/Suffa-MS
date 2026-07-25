@@ -11,6 +11,23 @@ from app.core.config import settings
 # filename, and only a short known-safe extension charset.
 _SAFE_SEGMENT = re.compile(r"[^a-zA-Z0-9_-]+")
 _SAFE_EXTENSION = re.compile(r"^[a-zA-Z0-9]{1,10}$")
+DOCUMENT_UPLOAD_CATEGORIES = {"assignments", "resources", "submissions"}
+DOCUMENT_MIME_BY_EXTENSION: dict[str, set[str]] = {
+    "pdf": {"application/pdf"},
+    "doc": {"application/msword"},
+    "docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    "xls": {"application/vnd.ms-excel"},
+    "xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    "ppt": {"application/vnd.ms-powerpoint"},
+    "pptx": {"application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+    "odt": {"application/vnd.oasis.opendocument.text"},
+    "ods": {"application/vnd.oasis.opendocument.spreadsheet"},
+    "odp": {"application/vnd.oasis.opendocument.presentation"},
+    "txt": {"text/plain"},
+    "csv": {"text/csv", "application/csv"},
+    "rtf": {"application/rtf", "text/rtf"},
+    "md": {"text/markdown", "text/plain"},
+}
 
 
 class StorageNotConfigured(RuntimeError):
@@ -46,7 +63,13 @@ def object_key_belongs_to_madrasa(object_key: str, madrasa_id: uuid.UUID) -> boo
     return object_key.startswith(f"madrasas/{madrasa_id}/")
 
 
-def assert_upload_allowed(content_type: str, size_bytes: int) -> None:
+def assert_upload_allowed(
+    content_type: str,
+    size_bytes: int,
+    *,
+    filename: str = "",
+    category: str = "",
+) -> None:
     """Validates the declared content-type/size against the configured
     allowlist/cap before a presigned URL is minted (OWASP A04/A08)."""
     if content_type not in settings.upload_allowed_content_types:
@@ -55,6 +78,15 @@ def assert_upload_allowed(content_type: str, size_bytes: int) -> None:
         raise UploadRejected(
             f"File exceeds the maximum allowed size of {settings.upload_max_size_bytes} bytes"
         )
+    if category in DOCUMENT_UPLOAD_CATEGORIES:
+        extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        expected_mimes = DOCUMENT_MIME_BY_EXTENSION.get(extension)
+        if expected_mimes is None:
+            raise UploadRejected(f"File extension '.{extension or 'none'}' is not an allowed document type")
+        if content_type not in expected_mimes:
+            raise UploadRejected(
+                f"Declared content type '{content_type}' does not match '.{extension}'"
+            )
 
 
 def presign_upload_url(

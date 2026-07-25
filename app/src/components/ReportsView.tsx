@@ -8,6 +8,7 @@ import { academicsApi, operationsApi, type AcademicClass, type AcademicSession, 
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter, type InlineFilterConfig } from "./ui/InlineFilter";
+import { DateRangeFilter } from "./DateRangeFilter";
 
 function ReportCard({
   title,
@@ -53,16 +54,19 @@ export function ReportsView() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [timezone, setTimezone] = useState("Asia/Karachi");
 
   useEffect(() => {
     void (async () => {
       setIsLoading(true);
       try {
-        const [classList, sessionRows, slots] = await Promise.all([
+        const [classList, sessionRows, slots, settings] = await Promise.all([
           academicsApi.listClasses(),
           academicsApi.listSessions(),
           isTeacher ? operationsApi.listMyTimetable() : Promise.resolve([]),
+          operationsApi.listSettings(),
         ]);
+        setTimezone(settings.find((setting) => setting.key === "regional.timezone")?.value || "Asia/Karachi");
         setTeacherSlots(slots);
         const taughtClassIds = new Set(slots.map((slot) => slot.class_id));
         setClasses(isTeacher ? classList.filter((item) => taughtClassIds.has(item.id)) : classList);
@@ -113,10 +117,12 @@ export function ReportsView() {
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
 
-      <InlineFilter filters={[
-        { key: "from", type: "input", inputType: "date", label: t("fromLabel"), value: startDate, onChange: setStartDate },
-        { key: "to", type: "input", inputType: "date", label: t("toLabel"), value: endDate, onChange: setEndDate },
-      ]} />
+      <DateRangeFilter
+        from={startDate}
+        to={endDate}
+        timezone={timezone}
+        onChange={(range) => { setStartDate(range.from); setEndDate(range.to); }}
+      />
 
       <ReportCard
         title={t("attendanceReportHeading")}

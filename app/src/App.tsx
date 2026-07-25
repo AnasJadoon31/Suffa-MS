@@ -11,6 +11,7 @@ import { NotFoundView } from "./components/NotFoundView";
 import { LoadingState } from "./components/ui/AsyncState";
 import { useAuth } from "./lib/AuthContext";
 import { academicsApi } from "./lib/endpoints";
+import { useNavigationGuard } from "./lib/NavigationGuardContext";
 import {
   isNavItemAccessible,
   isPortalRouteAccessible,
@@ -80,15 +81,20 @@ function Workspace() {
   const { isAuthenticated, isLoading, user, madrasa, hasPermission, hasFeature, updateProfile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { confirmNavigation } = useNavigationGuard();
   const [navOpen, setNavOpen] = useState(false);
   const [today, setToday] = useState<{ gregorian: string; hijri: string } | null>(null);
   const isUrdu = i18n.language === "ur";
+
+  const guardedNavigate = async (to: string) => {
+    if (await confirmNavigation()) navigate(to);
+  };
 
   const navigateToView = (view: ViewId) => {
     const item = navItems.find((candidate) => candidate.id === view);
     if (!item || !isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate)) return;
     setNavOpen(false);
-    navigate(resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate));
+    void guardedNavigate(resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate));
   };
 
   useEffect(() => {
@@ -116,43 +122,43 @@ function Workspace() {
   function renderRoute(route: PortalRoute) {
     switch (route.key) {
       case "academicPrograms":
-        return <AcademicsView tab="programs" onTabChange={(tab) => navigate(`/academics/${tab}`)} />;
+        return <AcademicsView tab="programs" onTabChange={(tab) => void guardedNavigate(`/academics/${tab}`)} />;
       case "academicClasses":
-        return <AcademicsView tab="classes" onTabChange={(tab) => navigate(`/academics/${tab}`)} />;
+        return <AcademicsView tab="classes" onTabChange={(tab) => void guardedNavigate(`/academics/${tab}`)} />;
       case "academicCourses":
-        return <AcademicsView tab="courses" onTabChange={(tab) => navigate(`/academics/${tab}`)} />;
+        return <AcademicsView tab="courses" onTabChange={(tab) => void guardedNavigate(`/academics/${tab}`)} />;
       case "academicSessions":
-        return <AcademicsView tab="sessions" onTabChange={(tab) => navigate(`/academics/${tab}`)} />;
+        return <AcademicsView tab="sessions" onTabChange={(tab) => void guardedNavigate(`/academics/${tab}`)} />;
       case "timetableGrid":
-        return <TimetableView mode="grid" onModeChange={(mode) => navigate(`/timetable/${mode}`)} />;
+        return <TimetableView mode="grid" onModeChange={(mode) => void guardedNavigate(`/timetable/${mode}`)} />;
       case "timetableList":
-        return <TimetableView mode="list" onModeChange={(mode) => navigate(`/timetable/${mode}`)} />;
+        return <TimetableView mode="list" onModeChange={(mode) => void guardedNavigate(`/timetable/${mode}`)} />;
       case "timetableTeachers":
-        return <TimetableView mode="teachers" onModeChange={(mode) => navigate(`/timetable/${mode}`)} />;
+        return <TimetableView mode="teachers" onModeChange={(mode) => void guardedNavigate(`/timetable/${mode}`)} />;
       case "timetableImport":
-        return <TimetableView mode="import" onModeChange={(mode) => navigate(`/timetable/${mode}`)} />;
+        return <TimetableView mode="import" onModeChange={(mode) => void guardedNavigate(`/timetable/${mode}`)} />;
       case "assessmentAssignments":
-        return <AssessmentsView tab="assignments" onTabChange={(tab) => navigate(`/assessments/${tab}`)} />;
+        return <AssessmentsView tab="assignments" onTabChange={(tab) => void guardedNavigate(`/assessments/${tab}`)} />;
       case "assessmentGrading":
-        return <AssessmentsView tab="grading" onTabChange={(tab) => navigate(`/assessments/${tab}`)} />;
+        return <AssessmentsView tab="grading" onTabChange={(tab) => void guardedNavigate(`/assessments/${tab}`)} />;
       case "assessmentSetup":
-        return <AssessmentsView tab="setup" onTabChange={(tab) => navigate(`/assessments/${tab}`)} />;
+        return <AssessmentsView tab="setup" onTabChange={(tab) => void guardedNavigate(`/assessments/${tab}`)} />;
       case "assessmentResults":
-        return <AssessmentsView tab="results" onTabChange={(tab) => navigate(`/assessments/${tab}`)} />;
+        return <AssessmentsView tab="results" onTabChange={(tab) => void guardedNavigate(`/assessments/${tab}`)} />;
       case "peopleStudents":
-        return <PeopleView initialTab="students" onTabChange={(tab) => navigate(`/people/${tab}`)} />;
+        return <PeopleView initialTab="students" onTabChange={(tab) => void guardedNavigate(`/people/${tab}`)} />;
       case "peopleTeachers":
-        return <PeopleView initialTab="teachers" onTabChange={(tab) => navigate(`/people/${tab}`)} />;
+        return <PeopleView initialTab="teachers" onTabChange={(tab) => void guardedNavigate(`/people/${tab}`)} />;
       case "peopleGuardians":
-        return <PeopleView initialTab="guardians" onTabChange={(tab) => navigate(`/people/${tab}`)} />;
+        return <PeopleView initialTab="guardians" onTabChange={(tab) => void guardedNavigate(`/people/${tab}`)} />;
       case "peopleDonators":
-        return <PeopleView initialTab="donators" onTabChange={(tab) => navigate(`/people/${tab}`)} />;
+        return <PeopleView initialTab="donators" onTabChange={(tab) => void guardedNavigate(`/people/${tab}`)} />;
       case "financeContributions":
-        return <FinanceView tab="contributions" onTabChange={(tab) => navigate(`/finance/${tab}`)} />;
+        return <FinanceView tab="contributions" onTabChange={(tab) => void guardedNavigate(`/finance/${tab}`)} />;
       case "financeDonations":
-        return <FinanceView tab="donations" onTabChange={(tab) => navigate(`/finance/${tab}`)} />;
+        return <FinanceView tab="donations" onTabChange={(tab) => void guardedNavigate(`/finance/${tab}`)} />;
       case "financeSummary":
-        return <FinanceView tab="summary" onTabChange={(tab) => navigate(`/finance/${tab}`)} />;
+        return <FinanceView tab="summary" onTabChange={(tab) => void guardedNavigate(`/finance/${tab}`)} />;
     }
 
     switch (route.view) {

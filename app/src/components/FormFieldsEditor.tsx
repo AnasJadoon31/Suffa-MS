@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { FormFieldDefinition } from "../lib/endpoints";
 import { Input, Select, Checkbox } from "./ui/Field";
 
-const FIELD_TYPES = ["text", "textarea", "radio", "checkbox_group", "dropdown", "label"];
+const FIELD_TYPES = ["text", "textarea", "phone", "radio", "checkbox_group", "dropdown", "label"];
 const OPTION_FIELD_TYPES = new Set(["radio", "checkbox_group", "dropdown"]);
 
 export const emptyFormField = (): FormFieldDefinition => ({

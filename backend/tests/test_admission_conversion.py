@@ -1,11 +1,11 @@
 """HTTP-contract tests for admission snapshots and application conversion."""
 
+from datetime import date
 from pathlib import Path
 from sqlalchemy import func, select
 from uuid import UUID
 
-from app.modules.academics.models import Enrollment
-from app.modules.academics.models import Madrasa
+from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
 from app.modules.operations.models import AdmissionApplication, AdminNotification
 from app.modules.operations.models import AdmissionForm
 from app.modules.auth.models import UserPermission
@@ -40,6 +40,19 @@ async def _create_form(client, seed):
                     "options": [],
                 }
             ],
+        },
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+async def _create_open_form_without_required_fields(client, seed):
+    response = await client.post(
+        "/api/v1/operations/admission-forms",
+        json={
+            "program_id": str(seed.program.id),
+            "title": "Walk-in intake 2026",
+            "fields": [],
         },
     )
     assert response.status_code == 200, response.text
@@ -121,17 +134,23 @@ async def test_people_student_creation_saves_an_immutable_admission_form_snapsho
 
 
 async def test_admission_application_can_be_edited_and_status_is_reversible(client, seed):
+    form = await _create_open_form_without_required_fields(client, seed)
     created = await client.post(
         "/api/v1/operations/admissions",
-        json={"applicant_name": "Old Name", "guardian_contact": "+92000"},
+        json={
+            "applicant_name": "Old Name",
+            "guardian_contact": "+923001110000",
+            "form_id": form["id"],
+        },
     )
+    assert created.status_code == 200, created.text
     application_id = created.json()["id"]
 
     edited = await client.put(
         f"/api/v1/operations/admissions/{application_id}",
         json={
             "applicant_name": "Correct Name",
-            "guardian_contact": "+92111",
+            "guardian_contact": "+923001110001",
             "program_id": str(seed.program.id),
             "date_of_birth": "2017-01-02",
             "notes": "Bring documents",
@@ -157,6 +176,31 @@ async def test_admission_application_can_be_edited_and_status_is_reversible(clie
     )
     assert history.status_code == 200
     assert [event["status"] for event in history.json()] == ["pending", "rejected", "pending"]
+
+
+async def test_internal_admission_submission_requires_an_open_form(client, seed):
+    missing_form = await client.post(
+        "/api/v1/operations/admissions",
+        json={"applicant_name": "No Form", "guardian_contact": "+923001110004"},
+    )
+    assert missing_form.status_code == 422
+
+    form = await _create_open_form_without_required_fields(client, seed)
+    closed = await client.put(
+        f"/api/v1/operations/admission-forms/{form['id']}",
+        json={"is_open": False},
+    )
+    assert closed.status_code == 200, closed.text
+
+    rejected = await client.post(
+        "/api/v1/operations/admissions",
+        json={
+            "applicant_name": "Closed Form",
+            "guardian_contact": "+923001110005",
+            "form_id": form["id"],
+        },
+    )
+    assert rejected.status_code == 403
 
 
 async def test_accept_conversion_is_atomic_idempotent_and_notifies_admin(client, seed, db_sessionmaker):
@@ -238,16 +282,54 @@ async def test_accept_conversion_is_atomic_idempotent_and_notifies_admin(client,
     assert marked.json()["is_read"] is True
 
 
+async def test_admission_conversion_allocates_after_highest_existing_number(
+    client, seed, db_sessionmaker
+):
+    async with db_sessionmaker() as db:
+        existing = await db.get(StudentProfile, seed.students[0].id)
+        existing.admission_number = "ADM-0099"
+        await db.commit()
+
+    form = await _create_form(client, seed)
+    submitted = await client.post(
+        f"/api/v1/public/admission-forms/{form['public_token']}",
+        json={
+            "applicant_name": "Next Number Child",
+            "guardian_contact": "+923001110007",
+            "date_of_birth": "2017-05-01",
+            "extra_data": {"previous_school": "High Suffix School"},
+        },
+    )
+    assert submitted.status_code == 200, submitted.text
+
+    converted = await client.post(
+        f"/api/v1/operations/admissions/{submitted.json()['id']}/convert",
+        json={
+            "student_username": "next.number.child",
+            "guardian_username": "next.number.parent",
+            "guardian_name": "Next Number Parent",
+            "guardian_relationship": "father",
+            "session_id": str(seed.old_session.id),
+            "class_id": str(seed.class_a.id),
+            "section_id": str(seed.sections.a1.id),
+        },
+    )
+    assert converted.status_code == 200, converted.text
+    assert converted.json()["student"]["admission_number"] == "ADM-0100"
+
+
 async def test_failed_conversion_rolls_back_all_provisioned_records(client, seed, db_sessionmaker):
+    form = await _create_open_form_without_required_fields(client, seed)
     created = await client.post(
         "/api/v1/operations/admissions",
         json={
             "applicant_name": "Rollback Child",
-            "guardian_contact": "+92300",
-            "program_id": str(seed.program.id),
+            "guardian_contact": "+923001110003",
             "date_of_birth": "2017-04-05",
+            "form_id": form["id"],
         },
     )
+    assert created.status_code == 200, created.text
     application_id = created.json()["id"]
 
     failed = await client.post(
@@ -272,6 +354,48 @@ async def test_failed_conversion_rolls_back_all_provisioned_records(client, seed
         assert await db.scalar(select(func.count()).select_from(Guardian).where(Guardian.name == "Rollback Parent")) == 0
 
 
+async def test_admission_conversion_rejects_archived_session_target(client, seed, db_sessionmaker):
+    form = await _create_open_form_without_required_fields(client, seed)
+    submitted = await client.post(
+        "/api/v1/operations/admissions",
+        json={
+            "applicant_name": "Archived Target Child",
+            "guardian_contact": "+923001110007",
+            "date_of_birth": "2017-04-05",
+            "form_id": form["id"],
+        },
+    )
+    assert submitted.status_code == 200, submitted.text
+
+    async with db_sessionmaker() as db:
+        archived = AcademicSession(
+            madrasa_id=seed.madrasa.id,
+            name="2023-24",
+            gregorian_start=date(2023, 4, 1),
+            gregorian_end=date(2024, 3, 31),
+            hijri_span="1444-45",
+            is_active=False,
+        )
+        db.add(archived)
+        await db.commit()
+        archived_id = archived.id
+
+    response = await client.post(
+        f"/api/v1/operations/admissions/{submitted.json()['id']}/convert",
+        json={
+            "student_username": "archived.target.child",
+            "guardian_username": "archived.target.parent",
+            "guardian_name": "Archived Target Parent",
+            "guardian_relationship": "father",
+            "session_id": str(archived_id),
+            "class_id": str(seed.class_a.id),
+            "section_id": str(seed.sections.a1.id),
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "session_view_only"
+
+
 async def test_admission_applications_and_notifications_do_not_cross_tenant_boundary(
     client, seed, db_sessionmaker
 ):
@@ -282,7 +406,7 @@ async def test_admission_applications_and_notifications_do_not_cross_tenant_boun
         application = AdmissionApplication(
             madrasa_id=other.id,
             applicant_name="Other Tenant Child",
-            guardian_contact="+92000",
+            guardian_contact="+923001110002",
         )
         notification = AdminNotification(
             madrasa_id=other.id,

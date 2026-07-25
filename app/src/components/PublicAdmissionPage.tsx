@@ -6,6 +6,7 @@ import { useParams } from "react-router-dom";
 import { publicApi, type PublicAdmissionForm } from "../lib/endpoints";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { Input, Select, Checkbox, Radio } from "./ui/Field";
+import { PhoneInput } from "./ui/PhoneInput";
 
 export function PublicAdmissionPage() {
   const { token = "" } = useParams();
@@ -63,11 +64,12 @@ export function PublicAdmissionPage() {
           }
         }}>
           <label>{t("applicantNameLabel")}<Input required value={form.applicant_name} onChange={(event) => setForm({ ...form, applicant_name: event.target.value })} /></label>
-          <label>{t("guardianContactLabel")}<Input value={form.guardian_contact} onChange={(event) => setForm({ ...form, guardian_contact: event.target.value })} /></label>
+          <PhoneInput id="public-guardian-contact" label={t("guardianContactLabel")} value={form.guardian_contact} onChange={(value) => setForm({ ...form, guardian_contact: value })} />
           <label>{t("dobLabel")}<Input type="date" value={form.date_of_birth} onChange={(event) => setForm({ ...form, date_of_birth: event.target.value })} /></label>
           {definition.fields_definition.map((field) => {
             if (field.type === "label") return <p key={field.key}>{field.label}</p>;
             if (field.type === "textarea") return <label key={field.key}>{field.label}<textarea required={field.required} value={String(extra[field.key] ?? "")} onChange={(event) => setExtra({ ...extra, [field.key]: event.target.value })} /></label>;
+            if (field.type === "phone") return <PhoneInput key={field.key} id={`public-${field.key}`} label={field.label} required={field.required} value={String(extra[field.key] ?? "")} onChange={(value) => setExtra({ ...extra, [field.key]: value })} />;
             if (field.type === "dropdown") return <label key={field.key}>{field.label}<Select required={field.required} value={String(extra[field.key] ?? "")} onChange={(event) => setExtra({ ...extra, [field.key]: event.target.value })}><option value="">{t("selectEllipsis")}</option>{field.options.map((option) => <option key={option} value={option}>{option}</option>)}</Select></label>;
             if (field.type === "radio") return <fieldset key={field.key}><legend>{field.label}</legend>{field.options.map((option) => <label className="checkboxLabel" key={option}><Radio  name={field.key} required={field.required} checked={extra[field.key] === option} onChange={() => setExtra({ ...extra, [field.key]: option })} />{option}</label>)}</fieldset>;
             if (field.type === "checkbox_group") return <fieldset key={field.key}><legend>{field.label}</legend>{field.options.map((option) => {

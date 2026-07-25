@@ -3,7 +3,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 class PaymentCategoryCreate(BaseModel):
     name: str
 
@@ -77,6 +76,22 @@ class DonationRead(BaseModel):
     category_name: str | None = None
 
 
+class StudentFinanceProfile(BaseModel):
+    id: UUID
+    name: str
+    admission_number: str
+    phone: str | None = None
+    address: str | None = None
+    payments: list[PaymentRead]
+
+
+class DonorFinanceProfile(BaseModel):
+    id: UUID
+    name: str
+    contact: str
+    donations: list[DonationRead]
+
+
 class FinanceSummary(BaseModel):
     total_contributions: float
     total_donations: float
@@ -108,6 +123,15 @@ class SalaryPaymentCreate(BaseModel):
     note: str = ""
 
 
+class SalaryPaymentUpdate(BaseModel):
+    amount: float | None = Field(default=None, gt=0)
+    currency: str | None = None
+    payment_date: date | None = None
+    period_covered: str | None = None
+    method: str | None = None
+    note: str | None = None
+
+
 class SalaryPaymentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
@@ -120,6 +144,12 @@ class SalaryPaymentRead(BaseModel):
     note: str
     recorded_by_id: UUID
     created_at: datetime
+
+
+class SalaryHistoryRead(SalaryPaymentRead):
+    teacher_name: str
+    employee_code: str
+    status: str = "paid"
 
 
 class MySalaryRead(BaseModel):

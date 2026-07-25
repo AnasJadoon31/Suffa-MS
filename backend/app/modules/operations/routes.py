@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -1306,6 +1306,160 @@ async def list_forms(
     return [FormRead.model_validate(row) for row in page]
 
 
+async def _form_response_reads(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    rows: list[FormResponse],
+) -> list[FormResponseRead]:
+    if not rows:
+        return []
+    user_ids = {row.submitted_by_id for row in rows}
+    users = {
+        user.id: user
+        for user in (
+            await session.execute(
+                select(User).where(User.id.in_(user_ids), User.madrasa_id == madrasa_id)
+            )
+        ).scalars().all()
+    }
+    student_ids = {
+        identifier
+        for row in rows
+        for identifier in (row.student_id, row.ward_id)
+        if identifier is not None
+    }
+    students = {
+        student.id: student
+        for student in (
+            await session.execute(
+                select(StudentProfile).where(
+                    StudentProfile.id.in_(student_ids),
+                    StudentProfile.madrasa_id == madrasa_id,
+                )
+            )
+        ).scalars().all()
+    } if student_ids else {}
+    guardian_ids = {row.guardian_id for row in rows if row.guardian_id is not None}
+    guardians = {
+        guardian.id: guardian
+        for guardian in (
+            await session.execute(
+                select(Guardian).where(
+                    Guardian.id.in_(guardian_ids),
+                    Guardian.madrasa_id == madrasa_id,
+                )
+            )
+        ).scalars().all()
+    } if guardian_ids else {}
+    teacher_profiles = {
+        teacher.user_id: teacher
+        for teacher in (
+            await session.execute(
+                select(TeacherProfile).where(
+                    TeacherProfile.user_id.in_(user_ids),
+                    TeacherProfile.madrasa_id == madrasa_id,
+                )
+            )
+        ).scalars().all()
+    }
+
+    result: list[FormResponseRead] = []
+    for row in rows:
+        user = users.get(row.submitted_by_id)
+        student = students.get(row.student_id) if row.student_id else None
+        ward = students.get(row.ward_id) if row.ward_id else None
+        guardian = guardians.get(row.guardian_id) if row.guardian_id else None
+        teacher = teacher_profiles.get(row.submitted_by_id)
+        result.append(
+            FormResponseRead(
+                **FormResponseRead.model_validate(row).model_dump(
+                    exclude={
+                        "student_name",
+                        "teacher_id",
+                        "teacher_name",
+                        "guardian_name",
+                        "ward_name",
+                        "submitted_by_name",
+                        "submitted_by_role",
+                    }
+                ),
+                student_name=student.name if student else None,
+                teacher_id=teacher.id if teacher else None,
+                teacher_name=teacher.name if teacher else None,
+                guardian_name=guardian.name if guardian else None,
+                ward_name=ward.name if ward else None,
+                submitted_by_name=(
+                    guardian.name if guardian else teacher.name if teacher else student.name if student else None
+                ),
+                submitted_by_role=user.role.value if user else None,
+            )
+        )
+    return result
+
+
+@router.get("/form-responses", response_model=list[FormResponseRead])
+async def list_all_form_responses(
+    response: Response,
+    current_user: User = Depends(require_permission("forms.responses.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    form_id: UUID | None = None,
+    respondent_role: UserRole | None = None,
+    respondent_user_id: UUID | None = None,
+    student_id: UUID | None = None,
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> list[FormResponseRead]:
+    stmt = select(FormResponse).where(FormResponse.madrasa_id == madrasa.id)
+    if form_id:
+        stmt = stmt.where(FormResponse.form_id == form_id)
+    if respondent_user_id:
+        stmt = stmt.where(FormResponse.submitted_by_id == respondent_user_id)
+    if respondent_role:
+        stmt = stmt.join(User, User.id == FormResponse.submitted_by_id).where(
+            User.role == respondent_role
+        )
+    if student_id:
+        stmt = stmt.where(
+            or_(
+                FormResponse.student_id == student_id,
+                FormResponse.ward_id == student_id,
+            )
+        )
+    if class_id or section_id:
+        enrollment_stmt = select(Enrollment.student_id).where(
+            Enrollment.madrasa_id == madrasa.id,
+            Enrollment.ended_on.is_(None),
+        )
+        if class_id:
+            enrollment_stmt = enrollment_stmt.where(Enrollment.class_id == class_id)
+        if section_id:
+            enrollment_stmt = enrollment_stmt.where(Enrollment.section_id == section_id)
+        scoped_students = (await session.execute(enrollment_stmt)).scalars().all()
+        stmt = stmt.where(
+            or_(
+                FormResponse.student_id.in_(scoped_students),
+                FormResponse.ward_id.in_(scoped_students),
+            )
+        )
+    if date_from:
+        stmt = stmt.where(FormResponse.created_at >= datetime.combine(date_from, datetime.min.time(), tzinfo=UTC))
+    if date_to:
+        stmt = stmt.where(FormResponse.created_at <= datetime.combine(date_to, datetime.max.time(), tzinfo=UTC))
+    rows = await paginate_scalars(
+        session,
+        stmt.order_by(FormResponse.created_at.desc()),
+        limit=limit,
+        offset=offset,
+        response=response,
+    )
+    return await _form_response_reads(session, madrasa.id, list(rows))
+
+
 @router.get("/forms/{form_id}", response_model=FormRead)
 async def get_form(
     form_id: UUID,
@@ -1326,6 +1480,7 @@ async def submit_form_response(
     session: AsyncSession = Depends(get_session),
 ) -> FormResponseRead:
     form = await _get_form_or_404(session, form_id, madrasa.id)
+    validate_admission_answers(form.fields_definition or [], payload.response_data)
 
     now = datetime.now(UTC)
     if form.open_from and now < form.open_from:
@@ -1336,6 +1491,14 @@ async def submit_form_response(
     student = (
         await session.execute(select(StudentProfile).where(StudentProfile.user_id == current_user.id))
     ).scalar_one_or_none()
+    guardian = (
+        await session.execute(
+            select(Guardian).where(
+                Guardian.user_id == current_user.id,
+                Guardian.madrasa_id == madrasa.id,
+            )
+        )
+    ).scalar_one_or_none()
     
     is_admin = await _form_admin(current_user, session)
     ctx = await get_viewer_context(session, current_user, madrasa.id)
@@ -1344,6 +1507,21 @@ async def submit_form_response(
         raise HTTPException(status_code=403, detail="You do not have permission to submit this form")
 
     student_id = student.id if student else None
+    ward_id = None
+    if guardian is not None:
+        if payload.ward_id is None:
+            raise HTTPException(status_code=422, detail="Select the ward this response concerns")
+        ward_link = await session.scalar(
+            select(StudentGuardian.id).where(
+                StudentGuardian.madrasa_id == madrasa.id,
+                StudentGuardian.guardian_id == guardian.id,
+                StudentGuardian.student_id == payload.ward_id,
+                StudentGuardian.portal_access.is_(True),
+            )
+        )
+        if ward_link is None:
+            raise HTTPException(status_code=403, detail="Ward is not linked to this guardian")
+        ward_id = payload.ward_id
 
     if not form.allow_multiple:
         existing_query = select(FormResponse).where(FormResponse.form_id == form_id)
@@ -1360,13 +1538,15 @@ async def submit_form_response(
         madrasa_id=madrasa.id,
         form_id=form_id,
         student_id=student_id,
+        guardian_id=guardian.id if guardian else None,
+        ward_id=ward_id,
         submitted_by_id=current_user.id,
         response_data=payload.response_data,
     )
     session.add(response)
     await session.commit()
     await session.refresh(response)
-    return FormResponseRead.model_validate(response)
+    return (await _form_response_reads(session, madrasa.id, [response]))[0]
 
 
 @router.get("/forms/{form_id}/responses", response_model=list[FormResponseRead])
@@ -1385,17 +1565,7 @@ async def list_form_responses(
         select(FormResponse).where(FormResponse.form_id == form_id).order_by(FormResponse.created_at),
         limit=limit, offset=offset, response=response,
     )
-    student_ids = {r.student_id for r in responses}
-    names: dict[UUID, str] = {}
-    if student_ids:
-        rows = await session.execute(
-            select(StudentProfile.id, StudentProfile.name).where(StudentProfile.id.in_(student_ids))
-        )
-        names = dict(rows.all())
-    return [
-        FormResponseRead(**FormResponseRead.model_validate(row).model_dump(exclude={"student_name"}), student_name=names.get(row.student_id))
-        for row in responses
-    ]
+    return await _form_response_reads(session, madrasa.id, list(responses))
 
 
 async def _get_form_or_404(session: AsyncSession, form_id: UUID, madrasa_id: UUID) -> Form:
@@ -1747,24 +1917,20 @@ async def create_admission_application(
 ) -> AdmissionApplicationRead:
     data = payload.model_dump()
     form_id = data.pop("form_id")
-    form = None
-    if form_id is not None:
-        form = await session.get(AdmissionForm, form_id)
-        if form is None or form.madrasa_id != madrasa.id:
-            raise HTTPException(status_code=404, detail="Admission form not found")
-        validate_admission_answers(form.fields_definition or [], data.get("extra_data") or {})
-        if data.get("program_id") is not None and data["program_id"] != form.program_id:
-            raise HTTPException(status_code=422, detail="Program does not match the admission form")
-        data["program_id"] = form.program_id
-    elif data.get("program_id") is not None:
-        program = await session.get(Program, data["program_id"])
-        if program is None or program.madrasa_id != madrasa.id:
-            raise HTTPException(status_code=404, detail="Program not found")
+    form = await session.get(AdmissionForm, form_id)
+    if form is None or form.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Admission form not found")
+    if not form.is_open:
+        raise HTTPException(status_code=403, detail="This admission form is closed")
+    validate_admission_answers(form.fields_definition or [], data.get("extra_data") or {})
+    if data.get("program_id") is not None and data["program_id"] != form.program_id:
+        raise HTTPException(status_code=422, detail="Program does not match the admission form")
+    data["program_id"] = form.program_id
     application = AdmissionApplication(
         madrasa_id=madrasa.id,
-        form_id=form.id if form is not None else None,
-        form_title_snapshot=form.title if form is not None else None,
-        fields_definition_snapshot=(form.fields_definition or []) if form is not None else [],
+        form_id=form.id,
+        form_title_snapshot=form.title,
+        fields_definition_snapshot=form.fields_definition or [],
         status_history=[{
             "status": "pending",
             "changed_at": datetime.now(UTC).isoformat(),
@@ -1946,17 +2112,7 @@ async def convert_admission_application(
     if application.date_of_birth is None:
         raise HTTPException(status_code=422, detail="Application date_of_birth is required for conversion")
 
-    admission_number = payload.admission_number or await _next_admission_number(
-        session, madrasa.id
-    )
-    clash = await session.scalar(
-        select(StudentProfile.id).where(
-            StudentProfile.madrasa_id == madrasa.id,
-            StudentProfile.admission_number == admission_number,
-        ).limit(1)
-    )
-    if clash is not None:
-        raise HTTPException(status_code=409, detail="Admission number already in use")
+    admission_number = await _next_admission_number(session, madrasa.id)
 
     try:
         student_user, student_link = await provision_login(
@@ -2002,7 +2158,12 @@ async def convert_admission_application(
     await session.flush()
     session.add_all(
         [
-            StudentGuardian(student_id=student.id, guardian_id=guardian.id),
+            StudentGuardian(
+                madrasa_id=madrasa.id,
+                student_id=student.id,
+                guardian_id=guardian.id,
+                relationship=guardian.relationship,
+            ),
             Enrollment(
                 madrasa_id=madrasa.id,
                 student_id=student.id,
@@ -2070,10 +2231,25 @@ async def convert_admission_application(
 
 
 async def _next_admission_number(session: AsyncSession, madrasa_id: UUID) -> str:
-    count = await session.scalar(
-        select(func.count()).select_from(StudentProfile).where(StudentProfile.madrasa_id == madrasa_id)
-    )
-    return f"ADM-{(count or 0) + 1:04d}"
+    if session.get_bind().dialect.name == "postgresql":
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:allocation_key))"),
+            {"allocation_key": f"{madrasa_id}:student_profiles:ADM"},
+        )
+    existing_numbers = (
+        await session.execute(
+            select(StudentProfile.admission_number).where(
+                StudentProfile.madrasa_id == madrasa_id,
+                StudentProfile.admission_number.like("ADM-%"),
+            )
+        )
+    ).scalars().all()
+    max_suffix = 0
+    for admission_number in existing_numbers:
+        suffix = str(admission_number).removeprefix("ADM-")
+        if suffix.isdigit():
+            max_suffix = max(max_suffix, int(suffix))
+    return f"ADM-{max_suffix + 1:04d}"
 
 
 def _notification_read(notification: AdminNotification, current_user: User) -> AdminNotificationRead:

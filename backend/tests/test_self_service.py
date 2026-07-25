@@ -5,16 +5,18 @@ POST /auth/change-password endpoints directly (already covered elsewhere);
 this file covers the one new minimal addition — GET /finance/salary/me.
 """
 from datetime import UTC, date, datetime
+from uuid import UUID
 
 import pytest
 from sqlalchemy import select
 
+from app.db.core_models import AuditLog
 from app.main import app as fastapi_app
 from app.modules.academics.models import AcademicSession, Enrollment
 from app.modules.assessments.models import ExamType, GradingScheme, Mark, ResultPublication
 from app.modules.attendance.models import AttendanceStatus, StudentAttendance
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
-from app.modules.finance.models import Payment, PaymentCategory
+from app.modules.finance.models import Payment, PaymentCategory, SalaryPayment
 from app.modules.operations.models import TimetableSlot
 from app.modules.people.models import Guardian, StudentGuardian
 from tests.conftest import _make_client
@@ -53,7 +55,11 @@ async def parent_client(db_sessionmaker, seed):
         await db.flush()
         db.add_all(
             [
-                StudentGuardian(student_id=student.id, guardian_id=guardian.id)
+                    StudentGuardian(
+                        madrasa_id=seed.madrasa.id,
+                        student_id=student.id,
+                        guardian_id=guardian.id,
+                    )
                 for student in seed.students
             ]
         )
@@ -226,6 +232,51 @@ async def test_teacher_sees_own_salary_record_and_payments(client, teacher_clien
     assert body["record"]["amount"] == 45000.0
     assert len(body["payments"]) == 1
     assert body["payments"][0]["period_covered"] == "April 2024"
+
+
+async def test_salary_payment_history_can_be_edited_and_deleted_with_audit(client, seed, db_sessionmaker):
+    created = await client.post(
+        f"/api/v1/finance/salary/{seed.teacher.id}/payments",
+        json={
+            "amount": 45000, "currency": "PKR", "payment_date": "2024-05-01",
+            "period_covered": "April 2024", "method": "cash", "note": "",
+        },
+    )
+    assert created.status_code == 200, created.text
+    payment_id = created.json()["id"]
+    payment_uuid = UUID(payment_id)
+
+    edited = await client.put(
+        f"/api/v1/finance/salary-payments/{payment_id}",
+        json={"amount": 45500, "method": "bank_transfer", "note": "Corrected"},
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["amount"] == 45500.0
+    assert edited.json()["method"] == "bank_transfer"
+
+    history = await client.get("/api/v1/finance/salary-history")
+    assert history.status_code == 200, history.text
+    assert history.json()[0]["id"] == payment_id
+    assert history.json()[0]["teacher_name"] == seed.teacher.name
+    assert history.json()[0]["status"] == "paid"
+
+    deleted = await client.delete(f"/api/v1/finance/salary-payments/{payment_id}")
+    assert deleted.status_code == 200, deleted.text
+
+    async with db_sessionmaker() as db:
+        assert await db.get(SalaryPayment, payment_uuid) is None
+        actions = (
+            await db.execute(
+                select(AuditLog.action)
+                .where(AuditLog.entity_id == payment_id)
+                .order_by(AuditLog.action_time)
+            )
+        ).scalars().all()
+    assert actions == [
+        "finance.salary_payment_create",
+        "finance.salary_payment_update",
+        "finance.salary_payment_delete",
+    ]
 
 
 async def test_teacher_with_no_salary_record_gets_empty_response(client, teacher_client, seed):

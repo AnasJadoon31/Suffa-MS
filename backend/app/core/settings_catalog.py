@@ -26,6 +26,7 @@ CATALOG: tuple[SettingDef, ...] = (
     SettingDef("madrasa.email", "profile", "string", "", "Email address"),
     SettingDef("madrasa.website", "profile", "string", "", "Website"),
     SettingDef("madrasa.logo_file_id", "profile", "file", "", "Logo"),
+    SettingDef("regional.timezone", "profile", "string", "Asia/Karachi", "Timezone"),
     # Security.
     SettingDef("security.idle_timeout_minutes_principal", "security", "int", "60", "Idle timeout — principal (minutes)"),
     SettingDef("security.idle_timeout_minutes_teacher", "security", "int", "60", "Idle timeout — teacher (minutes)"),

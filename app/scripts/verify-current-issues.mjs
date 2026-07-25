@@ -114,6 +114,7 @@ function responseFor(pathname, request, persona = "principal") {
   if (pathname === "/api/v1/operations/admin-notifications") return [{ id: "notification-1", event_type: "admission.converted", title: "Admission ready for review", message: "Ali Noor can now be converted to Student and Guardian records.", entity_type: "admission_application", entity_id: application.id, is_read: false, created_at: "2026-07-22T07:00:00Z" }];
   if (pathname === "/api/v1/operations/announcements") return [{ id: "announcement-1", title: "Parent meeting", body: "Meeting after Asr prayer.", category: "General", attachment_link: null, audience_scope: { all: true }, publish_at: "2026-07-22T00:00:00Z", expires_at: null, created_at: "2026-07-20T00:00:00Z" }];
   if (pathname === "/api/v1/operations/forms") return [portalForm];
+  if (pathname === "/api/v1/operations/form-responses") return [portalResponse];
   if (pathname === `/api/v1/operations/forms/${portalForm.id}/responses`) return [portalResponse];
   if (pathname === "/api/v1/finance/donors") return [donor];
   if (pathname === "/api/v1/finance/donations") return [donation];
@@ -191,7 +192,7 @@ async function desktopJourneys(browser) {
   const chooser = page.getByRole("dialog", { name: "Choose admission form type" });
   await chooser.waitFor();
   await shot(page, "CURRENT-08_admission-form-type-chooser_desktop.png", chooser);
-  await chooser.getByRole("button", { name: "General public form" }).click();
+  await chooser.getByRole("button", { name: "General form" }).click();
   const builder = page.getByRole("dialog", { name: "Create form" });
   await builder.getByRole("button", { name: "Add field" }).click();
   await builder.getByLabel(/^Type/).nth(1).selectOption("radio");
@@ -210,7 +211,7 @@ async function desktopJourneys(browser) {
   await shot(page, "CURRENT-13_grading-plan_desktop.png", page.locator(".gradingSetupLayout"));
 
   await open(page, "/attendance");
-  await page.getByRole("button", { name: /Hifz Level 1 \/ A/ }).click();
+  await page.locator(".attendanceClassButton").first().click();
   await page.locator(".attendancePeriodFilter").waitFor();
   await page.getByLabel("Course").selectOption("course-1");
   await page.getByLabel("Period").selectOption("slot-1");
@@ -224,7 +225,8 @@ async function desktopJourneys(browser) {
   await dialog.getByLabel("Previous madrasa").waitFor();
   await shot(page, "CURRENT-20_add-student-admission-template_desktop.png", dialog);
   await dialog.getByRole("button", { name: "Close" }).click();
-  await page.getByTitle("View").first().click();
+  await page.getByRole("button", { name: "Actions: Ali Noor" }).click();
+  await page.getByRole("menuitem", { name: "View" }).click();
   dialog = page.getByRole("dialog", { name: "Student details" });
   await dialog.getByText("Hifz Level 1 / A").waitFor();
   if (await dialog.getByRole("button", { name: /^Assign class$/i }).count()) throw new Error("Active enrollment still exposes Assign class in Student details");
@@ -238,11 +240,13 @@ async function desktopJourneys(browser) {
   await open(page, "/admissions");
   await page.getByText("Admission ready for review").waitFor();
   await shot(page, "CURRENT-18_application-actions-notification_desktop.png", page.locator(".modulePanel").first());
-  await page.getByTitle("Edit").click();
+  await page.getByRole("button", { name: "Actions: Ali Noor" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
   dialog = page.getByRole("dialog", { name: "Edit application" });
   await shot(page, "CURRENT-18_application-edit-modal_desktop.png", dialog);
   await dialog.getByRole("button", { name: "Close" }).click();
-  await page.getByTitle("Accept and create People").click();
+  await page.getByRole("button", { name: "Actions: Ali Noor" }).click();
+  await page.getByRole("menuitem", { name: "Accept and create people" }).click();
   dialog = page.getByRole("dialog", { name: "Accept application" });
   await dialog.getByLabel("Class").selectOption("class-1");
   await dialog.getByLabel("Section").selectOption("section-1");
@@ -285,9 +289,9 @@ async function desktopJourneys(browser) {
   }
 
   await open(page, "/forms");
-  await page.getByRole("button", { name: "Open" }).click();
-  dialog = page.getByRole("dialog", { name: "Parent consent" });
-  await dialog.getByTitle("View response").click();
+  await page.getByRole("tab", { name: "Responses" }).click();
+  await page.getByRole("button", { name: "Actions" }).click();
+  await page.getByRole("menuitem", { name: "View response" }).click();
   const responseDialog = page.getByRole("dialog", { name: "Submitted response" });
   await responseDialog.getByText("I give consent").waitFor();
   await shot(page, "CURRENT-16_form-response-actions-viewer_desktop.png", responseDialog);

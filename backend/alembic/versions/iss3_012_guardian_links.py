@@ -19,7 +19,32 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add relationship column (does not exist yet)
+    # The original link table already has TimestampMixin columns. Add the
+    # explicit tenant key, backfill it from the student, then enforce it.
+    op.add_column("student_guardians", sa.Column("madrasa_id", sa.UUID(), nullable=True))
+    op.execute(
+        """
+        UPDATE student_guardians AS link
+        SET madrasa_id = student.madrasa_id
+        FROM student_profiles AS student
+        WHERE student.id = link.student_id
+        """
+    )
+    op.alter_column("student_guardians", "madrasa_id", nullable=False)
+    op.create_foreign_key(
+        "fk_student_guardians_madrasa_id",
+        "student_guardians",
+        "madaris",
+        ["madrasa_id"],
+        ["id"],
+    )
+    op.create_index(
+        "ix_student_guardians_madrasa_id",
+        "student_guardians",
+        ["madrasa_id"],
+        unique=False,
+    )
+
     op.add_column("student_guardians", sa.Column("relationship", sa.String(80), nullable=True, server_default="guardian"))
     
     # Add is_primary column
@@ -37,3 +62,6 @@ def downgrade() -> None:
     op.drop_column("student_guardians", "portal_access")
     op.drop_column("student_guardians", "is_primary")
     op.drop_column("student_guardians", "relationship")
+    op.drop_index("ix_student_guardians_madrasa_id", table_name="student_guardians")
+    op.drop_constraint("fk_student_guardians_madrasa_id", "student_guardians", type_="foreignkey")
+    op.drop_column("student_guardians", "madrasa_id")

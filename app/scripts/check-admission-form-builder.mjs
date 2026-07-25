@@ -91,7 +91,7 @@ try {
   const page = await context.newPage();
   await page.goto(`${baseUrl}/admission-forms`, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Create form" }).click();
-  await page.getByRole("dialog", { name: "Choose admission form type" }).getByRole("button", { name: "General public form" }).click();
+  await page.getByRole("dialog", { name: "Choose admission form type" }).getByRole("button", { name: "General form" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Create form" });
   await dialog.getByRole("button", { name: "Add field" }).waitFor();
@@ -119,8 +119,9 @@ try {
     throw new Error(`Admission form fields were not submitted: ${JSON.stringify(createdPayload)}`);
   }
 
-  await page.getByRole("button", { name: "Edit 2027 admissions" }).click();
-  const editDialog = page.getByRole("dialog", { name: "Edit public form" });
+  await page.getByRole("button", { name: "Actions: 2027 admissions" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Edit admission form" });
   await editDialog.getByLabel("Label", { exact: true }).first().fill("Previous madrasa");
   await editDialog.getByRole("button", { name: "Save" }).click();
   await editDialog.waitFor({ state: "hidden" });

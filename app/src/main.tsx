@@ -14,6 +14,8 @@ import { registerSW } from "virtual:pwa-register";
 registerSW({ immediate: true });
 
 import { DialogProvider } from "./lib/DialogContext";
+import { SnackbarProvider } from "./components/ui/Snackbar";
+import { NavigationGuardProvider } from "./lib/NavigationGuardContext";
 
 const queryClient = new QueryClient();
 
@@ -22,9 +24,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <DialogProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
+          <SnackbarProvider>
+            <NavigationGuardProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </NavigationGuardProvider>
+          </SnackbarProvider>
         </DialogProvider>
       </AuthProvider>
     </QueryClientProvider>

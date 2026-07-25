@@ -33,6 +33,7 @@ import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, ty
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { ActionMenu } from "./ui/ActionMenu";
 import { InlineFilter } from "./ui/InlineFilter";
 
 export type AssessmentTab = "assignments" | "grading" | "results" | "setup";
@@ -272,30 +273,25 @@ function AssignmentsTab({
           { header: t("teacherCol"), render: (a) => a.teacher_name ?? "—" },
           { header: t("dueCol"), render: (a) => new Date(a.due_date).toLocaleDateString() },
           { header: t("actionsCol"), render: (a) => (
-            <>
-              {a.attachment_key && (
-                <Button
-                  className="tableAction"
-                  type="button"
-                  onClick={async () => {
+            <ActionMenu items={[
+              ...(a.attachment_key ? [{
+                label: t("downloadBtn"),
+                icon: <FileDown size={14} />,
+                onClick: async () => {
                     const { url } = await filesApi.presignDownload(a.attachment_key!);
                     window.open(url, "_blank", "noreferrer");
-                  }}
-                >
-                  <FileDown size={14} />
-                </Button>
-              )}
-              <Button className="tableAction" type="button" onClick={() => openSubmissions(a)}>{t("submissionsBtn")}</Button>
-              {canCreate && (
-                <>
-                  <Button className="tableAction" type="button" title={t("editBtn")} onClick={() => setEditing(a)}>
-                    <Pencil size={14} />
-                  </Button>
-                  <Button
-                    className="tableAction"
-                    type="button"
-                    title={t("deleteBtn")}
-                    onClick={async () => {
+                },
+              }] : []),
+              { label: t("submissionsBtn"), onClick: () => openSubmissions(a) },
+              ...(canCreate ? [{
+                label: t("editBtn"),
+                icon: <Pencil size={14} />,
+                onClick: () => setEditing(a),
+              }, {
+                label: t("deleteBtn"),
+                icon: <Trash2 size={14} />,
+                destructive: true,
+                onClick: async () => {
                       const wholeBatch = a.batch_id !== null && (await confirm(t("deleteBatchConfirm")));
                       if (a.batch_id === null && !(await confirm(t("deleteConfirm")))) return;
                       try {
@@ -304,13 +300,9 @@ function AssignmentsTab({
                       } catch (err: any) {
                         setError(err.response?.data?.detail ?? t("failedDelete"));
                       }
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </>
-              )}
-            </>
+                },
+              }] : []),
+            ]} ariaLabel={`${t("actionsCol")}: ${a.title}`} />
           )},
         ]}
         data={assignments}
@@ -991,18 +983,24 @@ function GradingSetup({
           { header: t("bandsCol"), render: (s) => s.bands.map((b) => `${b.label} (${b.min_score}-${b.max_score})`).join(", ") },
           { header: t("assignmentsCol"), render: (s) => s.include_assignments ? t("includedLabel") : t("excludedLabel") },
           { header: t("actionsCol"), render: (s) => (
-            <span className="actions">
-              {canCreateScheme && <Button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
+            <ActionMenu items={canCreateScheme ? [{
+              label: t("editBtn"),
+              icon: <Pencil size={15} />,
+              onClick: () => {
                 setEditingScheme(s);
                 setSchemeForm({ name: s.name, bands: s.bands.map((band) => ({ label: band.label, min_score: String(band.min_score), max_score: String(band.max_score) })), include_assignments: s.include_assignments });
                 setShowSchemeForm(true);
-              }}><Pencil size={15} /></Button>}
-              {canCreateScheme && <Button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {
+              },
+            }, {
+              label: t("deleteBtn"),
+              icon: <Trash2 size={15} />,
+              destructive: true,
+              onClick: async () => {
                 if (!(await confirm(t("deleteRecordConfirm")))) return;
                 try { await assessmentsApi.deleteGradingScheme(s.id); await load(); }
                 catch (err: any) { setError(err.response?.data?.detail ?? t("genericError")); }
-              }}><Trash2 size={15} /></Button>}
-            </span>
+              },
+            }] : []} ariaLabel={`${t("actionsCol")}: ${s.name}`} />
           )},
         ]}
         data={schemes}
@@ -1070,18 +1068,24 @@ function GradingSetup({
           { header: t("examCol"), render: (et) => et.name },
           { header: t("weightageCol"), render: (et) => `${et.weightage}%` },
           { header: t("actionsCol"), render: (et) => (
-            <span className="actions">
-              {canCreateExamType && <Button className="iconBtn" type="button" title={t("editBtn")} onClick={() => {
+            <ActionMenu items={canCreateExamType ? [{
+              label: t("editBtn"),
+              icon: <Pencil size={15} />,
+              onClick: () => {
                 setEditingExam(et);
                 setExamForm({ course_id: et.course_id, class_id: et.class_id || "", name: et.name, weightage: String(et.weightage), grading_scheme_id: et.grading_scheme_id });
                 setShowExamForm(true);
-              }}><Pencil size={15} /></Button>}
-              {canCreateExamType && <Button className="iconBtn" type="button" title={t("deleteBtn")} onClick={async () => {
+              },
+            }, {
+              label: t("deleteBtn"),
+              icon: <Trash2 size={15} />,
+              destructive: true,
+              onClick: async () => {
                 if (!(await confirm(t("deleteRecordConfirm")))) return;
                 try { await assessmentsApi.deleteExamType(et.id); await load(); }
                 catch (err: any) { setError(err.response?.data?.detail ?? t("genericError")); }
-              }}><Trash2 size={15} /></Button>}
-            </span>
+              },
+            }] : []} ariaLabel={`${t("actionsCol")}: ${et.name}`} />
           )},
         ]}
         data={examTypes}
