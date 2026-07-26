@@ -61,8 +61,8 @@ class StudentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     username: str = Field(min_length=3, max_length=80)
-    name: str
-    date_of_birth: date
+    name: str | None = None
+    date_of_birth: date | None = None
     portal_enabled: bool | None = None
     guardian_ids: list[UUID] = Field(default_factory=list)
     preferred_language: str = "ur"
@@ -78,8 +78,6 @@ class StudentCreate(BaseModel):
     def validate_independent_student(self) -> "StudentCreate":
         if self.is_independent and self.guardian_ids:
             raise ValueError("an independent student cannot have guardian links")
-        if self.is_independent and self.portal_enabled is not False and not self.phone:
-            raise ValueError("an independent student with portal access requires a phone")
         return self
 
 

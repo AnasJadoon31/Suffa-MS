@@ -17,6 +17,7 @@ import {
   type Section,
   type AdminNotification,
 } from "../lib/endpoints";
+import { AdmissionAnswersFields } from "./AdmissionAnswersFields";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
@@ -25,10 +26,10 @@ import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, ty
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
-import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
+import { cleanFormFields, FormFieldsEditor, validateFormFields } from "./FormFieldsEditor";
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
-import { PhoneInput } from "./ui/PhoneInput";
+import { answerString, BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields, mergeAdmissionBuiltIns } from "../lib/admissionBuiltIns";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
@@ -67,11 +68,10 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
   const { confirm } = useDialog();
   const [applications, setApplications] = useState<AdmissionApplication[]>([]);
   const emptyForm = {
-    applicant_name: "", guardian_name: "", guardian_relationship: "", guardian_contact: "", guardian_cnic: "",
-    form_id: "", program_id: "", date_of_birth: "", gender: "", b_form_number: "", address: "", previous_school: "",
-    previous_class: "", medical_notes: "", notes: "",
+    form_id: "", program_id: "", notes: "",
   };
   const [form, setForm] = useState(emptyForm);
+  const [formAnswers, setFormAnswers] = useState<Record<string, unknown>>({});
   const [admissionForms, setAdmissionForms] = useState<AdmissionForm[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<AdmissionApplication | null>(null);
@@ -125,6 +125,7 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
     await operationsApi.setAdmissionStatus(application.id, status);
     await load();
   };
+  const selectedCreateAdmissionForm = admissionForms.find((item) => item.id === form.form_id);
 
   return (
     <>
@@ -143,24 +144,15 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
                     setNotice("");
                     try {
                       await operationsApi.createAdmission({
-                        applicant_name: form.applicant_name,
-                        guardian_contact: form.guardian_contact,
+                        applicant_name: answerString(formAnswers, BUILT_IN_ADMISSION_KEYS.studentName),
+                        guardian_contact: answerString(formAnswers, BUILT_IN_ADMISSION_KEYS.guardianPhoneNumbers),
                         form_id: form.form_id,
-                        date_of_birth: form.date_of_birth || undefined,
+                        date_of_birth: answerString(formAnswers, BUILT_IN_ADMISSION_KEYS.studentDateOfBirth) || undefined,
                         notes: form.notes || undefined,
-                        extra_data: {
-                          guardian_name: form.guardian_name,
-                          guardian_relationship: form.guardian_relationship,
-                          guardian_cnic: form.guardian_cnic,
-                          gender: form.gender,
-                          b_form_number: form.b_form_number,
-                          address: form.address,
-                          previous_school: form.previous_school,
-                          previous_class: form.previous_class,
-                          medical_notes: form.medical_notes,
-                        },
+                        extra_data: formAnswers,
                       });
                       setForm(emptyForm);
+                      setFormAnswers({});
                       setShowCreate(false);
                       setNotice(t("applicationSubmitted"));
                       await load();
@@ -176,22 +168,13 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
               <Select required value={form.form_id} onChange={(e) => {
                 const selected = admissionForms.find((item) => item.id === e.target.value);
                 setForm({ ...form, form_id: e.target.value, program_id: selected?.program_id ?? "" });
+                setFormAnswers({});
               }}>
                 <option value="">{t("selectEllipsis")}</option>
                 {admissionForms.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
               </Select>
             </label>
             {admissionForms.length === 0 && <p className="notice notice-warning">{t("noOpenAdmissionForms")}</p>}
-
-            <label>{t("applicantNameLabel")}<Input required value={form.applicant_name} onChange={(e) => setForm({ ...form, applicant_name: e.target.value })} /></label>
-
-          <label>{t("guardianNameLabel")}<Input value={form.guardian_name} onChange={(e) => setForm({ ...form, guardian_name: e.target.value })} /></label>
-
-          <label>{t("relationshipLabel")}<Input value={form.guardian_relationship} onChange={(e) => setForm({ ...form, guardian_relationship: e.target.value })} /></label>
-
-          <PhoneInput label={t("guardianContactLabel")} value={form.guardian_contact} onChange={(value) => setForm({ ...form, guardian_contact: value })} />
-
-          <label>{t("guardianCnicLabel")}<Input value={form.guardian_cnic} onChange={(e) => setForm({ ...form, guardian_cnic: e.target.value })} /></label>
 
           <label>
                     {t("programLabel")}
@@ -201,19 +184,7 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
                     </Select>
                   </label>
 
-          <label>{t("dobLabel")}<Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
-
-          <label>{t("genderLabel")}<Select required value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="">{t("selectEllipsis")}</option><option value="male">{t("maleLabel")}</option><option value="female">{t("femaleLabel")}</option></Select></label>
-
-          <label>{t("bFormLabel")}<Input required value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
-
-          <label>{t("addressLabel")}<Input required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-
-          <label>{t("previousSchoolLabel")}<Input value={form.previous_school} onChange={(e) => setForm({ ...form, previous_school: e.target.value })} /></label>
-
-          <label>{t("previousClassLabel")}<Input value={form.previous_class} onChange={(e) => setForm({ ...form, previous_class: e.target.value })} /></label>
-
-          <label>{t("medicalNotesLabel")}<Input value={form.medical_notes} onChange={(e) => setForm({ ...form, medical_notes: e.target.value })} /></label>
+          <AdmissionAnswersFields fields={selectedCreateAdmissionForm?.fields_definition ?? []} answers={formAnswers} onChange={setFormAnswers} idPrefix="walk-in-admission" />
 
           <label>{t("notesLabel")}<Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
           </FormModal>}
@@ -286,27 +257,21 @@ function AdmissionConversionModal({ application, programs, onClose, onSuccess }:
   const [sessions, setSessions] = useState<AcademicSession[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
-  const extra = application.extra_data ?? {};
   const [form, setForm] = useState({
-    student_username: "", guardian_username: "", guardian_name: String(extra.guardian_name ?? ""),
-    guardian_relationship: String(extra.guardian_relationship ?? ""), guardian_cnic: String(extra.guardian_cnic ?? ""),
-    guardian_address: String(extra.address ?? ""), session_id: "", class_id: "", section_id: "",
+    student_username: "", guardian_username: "", session_id: "", class_id: "", section_id: "",
   });
   const [error, setError] = useState("");
   useEffect(() => { void Promise.all([academicsApi.listSessions(), academicsApi.listClasses()]).then(([sessionRows, classRows]) => { setSessions(sessionRows); setClasses(classRows); }); }, []);
   useEffect(() => { if (!form.class_id) setSections([]); else void academicsApi.listSections(form.class_id).then(setSections); }, [form.class_id]);
   return <FormModal title={t("acceptApplicationHeading")} maxWidth={800} onClose={onClose} submitLabel={t("acceptAndCreatePeopleBtn")} submitIcon={<CheckCircle2 size={16} />} error={error} onSubmit={async () => {
     setError("");
-    try { await operationsApi.convertAdmission(application.id, { ...form, guardian_cnic: form.guardian_cnic || undefined, guardian_address: form.guardian_address || undefined }); await onSuccess(); }
+    try { await operationsApi.convertAdmission(application.id, form); await onSuccess(); }
     catch (err: any) { setError(err.response?.data?.detail ?? t("failedConvertApplication")); }
   }}>
     <p className="notice">{t("acceptApplicationHint", { name: application.applicant_name })}</p>
     <div className="formGridTwo">
       <label>{t("studentUsernameLabel")}<Input required value={form.student_username} onChange={(e) => setForm({ ...form, student_username: e.target.value })} /></label>
-      <label>{t("guardianNameLabel")}<Input required value={form.guardian_name} onChange={(e) => setForm({ ...form, guardian_name: e.target.value })} /></label>
       <label>{t("guardianUsernameLabel")}<Input required value={form.guardian_username} onChange={(e) => setForm({ ...form, guardian_username: e.target.value })} /></label>
-      <label>{t("relationshipLabel")}<Input required value={form.guardian_relationship} onChange={(e) => setForm({ ...form, guardian_relationship: e.target.value })} /></label>
-      <label>{t("guardianCnicLabel")}<Input value={form.guardian_cnic} onChange={(e) => setForm({ ...form, guardian_cnic: e.target.value })} /></label>
       <label>{t("sessionLabel")}<Select required value={form.session_id} onChange={(e) => setForm({ ...form, session_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sessions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
       <label>{t("classLabel")}<Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: "" })}><option value="">{t("selectEllipsis")}</option>{classes.filter((item) => !application.program_id || item.program_id === application.program_id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
       <label>{t("sectionLabel")}<Select required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
@@ -321,7 +286,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
   const { confirm } = useDialog();
   const [forms, setForms] = useState<AdmissionForm[]>([]);
   const [form, setForm] = useState({ program_id: "", title: "", description: "", category: "General" });
-  const [fields, setFields] = useState<FormFieldDefinition[]>([emptyFormField()]);
+  const [fields, setFields] = useState<FormFieldDefinition[]>(mergeAdmissionBuiltIns([]));
   const [editing, setEditing] = useState<AdmissionForm | null>(null);
   const [editFields, setEditFields] = useState<FormFieldDefinition[]>([]);
   const [copiedId, setCopiedId] = useState("");
@@ -428,7 +393,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
                         fields: cleanFormFields(fields),
                       });
                       setForm({ program_id: "", title: "", description: "", category: "General" });
-                      setFields([emptyFormField()]);
+                      setFields(mergeAdmissionBuiltIns([]));
                       setShowCreate(false);
                       await load();
                     } catch (err: any) {
@@ -461,7 +426,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
           { header: t("titleCol"), render: (adm) => adm.title },
           { header: t("categoryFilterLabel"), render: (adm) => adm.category ?? "General" },
           { header: t("programLabel"), render: (adm) => adm.program_name ?? "—" },
-          { header: t("fieldsCol"), render: (adm) => adm.fields_definition.length },
+          { header: t("fieldsCol"), render: (adm) => enabledAdmissionFields(adm.fields_definition).length },
           { header: t("statusCol"), render: (adm) => adm.is_open ? t("openLabel") : t("closedLabel") },
           { header: t("actionsCol"), render: (adm) => (
             <ActionMenu items={[
@@ -471,7 +436,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
                 icon: <Edit2 size={14} />,
                 onClick: () => {
                   setEditing({ ...adm });
-                  setEditFields(adm.fields_definition.map((field) => ({ ...field, options: [...field.options] })));
+                  setEditFields(mergeAdmissionBuiltIns(adm.fields_definition.map((field) => ({ ...field, options: [...field.options] }))));
                   setError("");
                 },
               }, {

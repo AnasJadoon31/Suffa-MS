@@ -6,6 +6,13 @@ A reusable, administrator-authored template that defines the questions used to c
 student admission data. A form may be open or closed; both states remain selectable by an
 administrator creating a student directly.
 
+## Built-in Admission Field
+
+A reserved Admission Form question for core Student or Guardian data that the system
+understands during validation and conversion. Built-in fields live in the form schema,
+may be enabled or disabled by the administrator, and are snapshotted like custom fields.
+_Avoid_: hard-coded modal field, separate built-in config
+
 ## Admission Application
 
 A submitted candidate record produced from an Admission Form or entered as a walk-in.

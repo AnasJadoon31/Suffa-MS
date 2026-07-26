@@ -194,6 +194,8 @@ class FormFieldDefinition(BaseModel):
     type: FormFieldType
     required: bool = False
     options: list[FormFieldText] = Field(default_factory=list)
+    built_in: bool = False
+    enabled: bool = True
 
     @model_validator(mode="after")
     def validate_options(self) -> "FormFieldDefinition":
@@ -372,7 +374,7 @@ class AdmissionFormRead(BaseModel):
 
 
 class AdmissionApplicationCreate(BaseModel):
-    applicant_name: str
+    applicant_name: str = ""
     guardian_contact: PakistanPhone = ""
     program_id: UUID | None = None
     date_of_birth: date | None = None
@@ -416,12 +418,12 @@ class AdmissionApplicationConvertRequest(BaseModel):
 
     student_username: str = Field(min_length=3, max_length=80)
     guardian_username: str = Field(min_length=3, max_length=80)
-    guardian_name: str = Field(min_length=1, max_length=160)
-    guardian_relationship: str = Field(min_length=1, max_length=80)
+    guardian_name: str | None = Field(default=None, max_length=160)
+    guardian_relationship: str | None = Field(default=None, max_length=80)
     guardian_cnic: str | None = Field(default=None, max_length=20)
     guardian_address: str | None = None
     student_preferred_language: str = "ur"
-    guardian_preferred_language: str = "ur"
+    guardian_preferred_language: str | None = None
     session_id: UUID
     class_id: UUID
     section_id: UUID

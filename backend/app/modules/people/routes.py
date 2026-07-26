@@ -19,7 +19,12 @@ from app.modules.people.models import (
     StudentProfile,
     TeacherProfile,
 )
-from app.modules.operations.admissions import validate_admission_answers
+from app.modules.operations.admissions import (
+    admission_answer_date,
+    admission_answer_text,
+    normalize_admission_fields,
+    validate_admission_answers,
+)
 from app.modules.operations.models import AdmissionForm
 from app.modules.people.schemas import (
     GuardianCreate,
@@ -313,13 +318,25 @@ async def create_student(
     session: AsyncSession = Depends(get_session),
 ) -> StudentProvisionedRead:
     admission_form = None
+    fields_definition = []
     if payload.admission_form_id is not None:
         admission_form = await session.get(AdmissionForm, payload.admission_form_id)
         if admission_form is None or admission_form.madrasa_id != madrasa.id:
             raise HTTPException(status_code=404, detail="Admission form not found")
-        validate_admission_answers(admission_form.fields_definition or [], payload.admission_answers)
+        fields_definition = normalize_admission_fields(admission_form.fields_definition or [])
+        validate_admission_answers(fields_definition, payload.admission_answers)
     elif payload.admission_answers:
         raise HTTPException(status_code=422, detail="admission_form_id is required with admission_answers")
+
+    student_name = payload.name or admission_answer_text(payload.admission_answers, "student_name")
+    student_dob = payload.date_of_birth or admission_answer_date(payload.admission_answers, "student_date_of_birth")
+    if not student_name:
+        raise HTTPException(status_code=422, detail="Student name is required")
+    if student_dob is None:
+        raise HTTPException(status_code=422, detail="Student date of birth is required")
+    student_phone = payload.phone or admission_answer_text(payload.admission_answers, "student_phone") or None
+    if payload.is_independent and payload.portal_enabled is not False and not student_phone:
+        raise HTTPException(status_code=422, detail="An independent student with portal access requires a phone")
 
     try:
         user, set_password_url = await provision_login(
@@ -344,12 +361,12 @@ async def create_student(
         madrasa_id=madrasa.id,
         user_id=user.id,
         admission_number=admission_number,
-        name=payload.name,
-        date_of_birth=payload.date_of_birth,
+        name=student_name,
+        date_of_birth=student_dob,
         portal_enabled=payload.portal_enabled if payload.portal_enabled is not None else True,
-        b_form_number=payload.b_form_number,
-        address=payload.address,
-        phone=payload.phone,
+        b_form_number=payload.b_form_number or admission_answer_text(payload.admission_answers, "student_b_form_number") or None,
+        address=payload.address or admission_answer_text(payload.admission_answers, "student_address") or None,
+        phone=student_phone,
         is_independent=payload.is_independent,
         photo_file_id=payload.photo_file_id,
     )
@@ -377,7 +394,7 @@ async def create_student(
                 form_id=admission_form.id,
                 application_id=None,
                 form_title=admission_form.title,
-                fields_definition=admission_form.fields_definition or [],
+                fields_definition=fields_definition,
                 answers=payload.admission_answers,
                 created_by_id=current_user.id,
             )

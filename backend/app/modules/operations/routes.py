@@ -34,7 +34,12 @@ from app.modules.academics.models import (
 from app.modules.operations.audience import get_viewer_context, scope_allows
 from app.modules.auth.models import User, UserRole
 from app.modules.auth.service import UsernameTakenError, provision_login
-from app.modules.operations.admissions import validate_admission_answers
+from app.modules.operations.admissions import (
+    admission_answer_date,
+    admission_answer_text,
+    normalize_admission_fields,
+    validate_admission_answers,
+)
 from app.modules.operations.models import (
     AdminNotification,
     AdmissionApplication,
@@ -1795,6 +1800,7 @@ async def _admission_form_read(session: AsyncSession, form: AdmissionForm) -> Ad
 
     program = await session.get(Program, form.program_id)
     data = AdmissionFormRead.model_validate(form).model_dump()
+    data["fields_definition"] = normalize_admission_fields(data["fields_definition"] or [])
     data["program_name"] = program.name if program else None
     return AdmissionFormRead(**data)
 
@@ -1820,7 +1826,7 @@ async def create_admission_form(
         title=payload.title,
         category=payload.category,
         description=payload.description,
-        fields_definition=[field.model_dump() for field in payload.fields],
+        fields_definition=normalize_admission_fields([field.model_dump() for field in payload.fields]),
         public_token=_secrets.token_urlsafe(24),
         created_by_id=current_user.id,
     )
@@ -1870,7 +1876,7 @@ async def update_admission_form(
     updates = payload.model_dump(exclude_unset=True)
     if "fields" in updates:
         fields = updates.pop("fields")
-        form.fields_definition = fields if fields is not None else []
+        form.fields_definition = normalize_admission_fields(fields if fields is not None else [])
     for field, value in updates.items():
         setattr(form, field, value)
     await session.commit()
@@ -1922,7 +1928,12 @@ async def create_admission_application(
         raise HTTPException(status_code=404, detail="Admission form not found")
     if not form.is_open:
         raise HTTPException(status_code=403, detail="This admission form is closed")
-    validate_admission_answers(form.fields_definition or [], data.get("extra_data") or {})
+    answers = data.get("extra_data") or {}
+    fields_definition = normalize_admission_fields(form.fields_definition or [])
+    validate_admission_answers(fields_definition, answers)
+    data["applicant_name"] = admission_answer_text(answers, "student_name") or data.get("applicant_name") or ""
+    data["guardian_contact"] = admission_answer_text(answers, "guardian_phone_numbers") or data.get("guardian_contact") or ""
+    data["date_of_birth"] = admission_answer_date(answers, "student_date_of_birth") or data.get("date_of_birth")
     if data.get("program_id") is not None and data["program_id"] != form.program_id:
         raise HTTPException(status_code=422, detail="Program does not match the admission form")
     data["program_id"] = form.program_id
@@ -1930,7 +1941,7 @@ async def create_admission_application(
         madrasa_id=madrasa.id,
         form_id=form.id,
         form_title_snapshot=form.title,
-        fields_definition_snapshot=form.fields_definition or [],
+        fields_definition_snapshot=fields_definition,
         status_history=[{
             "status": "pending",
             "changed_at": datetime.now(UTC).isoformat(),
@@ -2109,8 +2120,24 @@ async def convert_admission_application(
         raise HTTPException(status_code=404, detail="Section not found")
     if application.program_id is not None and application.program_id != academic_class.program_id:
         raise HTTPException(status_code=422, detail="Class does not belong to the application's program")
-    if application.date_of_birth is None:
+    answers = application.extra_data or {}
+    student_name = admission_answer_text(answers, "student_name") or application.applicant_name
+    student_dob = admission_answer_date(answers, "student_date_of_birth") or application.date_of_birth
+    guardian_name = payload.guardian_name or admission_answer_text(answers, "guardian_name")
+    guardian_relationship = payload.guardian_relationship or admission_answer_text(answers, "guardian_relationship")
+    guardian_phone = admission_answer_text(answers, "guardian_phone_numbers") or application.guardian_contact
+    guardian_cnic = payload.guardian_cnic or admission_answer_text(answers, "guardian_cnic") or None
+    guardian_address = payload.guardian_address or admission_answer_text(answers, "guardian_address") or None
+    guardian_preferred_language = payload.guardian_preferred_language or admission_answer_text(answers, "guardian_preferred_language") or "ur"
+
+    if student_dob is None:
         raise HTTPException(status_code=422, detail="Application date_of_birth is required for conversion")
+    if not guardian_name:
+        raise HTTPException(status_code=422, detail="Guardian name is required for conversion")
+    if not guardian_relationship:
+        raise HTTPException(status_code=422, detail="Guardian relationship is required for conversion")
+    if not guardian_phone:
+        raise HTTPException(status_code=422, detail="Guardian phone number is required for conversion")
 
     admission_number = await _next_admission_number(session, madrasa.id)
 
@@ -2130,7 +2157,7 @@ async def convert_admission_application(
             actor_id=current_user.id,
             username=payload.guardian_username,
             role=UserRole.parent,
-            preferred_language=payload.guardian_preferred_language,
+            preferred_language=guardian_preferred_language,
         )
     except UsernameTakenError as exc:
         await session.rollback()
@@ -2140,19 +2167,22 @@ async def convert_admission_application(
         madrasa_id=madrasa.id,
         user_id=student_user.id,
         admission_number=admission_number,
-        name=application.applicant_name,
-        date_of_birth=application.date_of_birth,
+        name=student_name,
+        date_of_birth=student_dob,
         portal_enabled=academic_class.default_portal_enabled,
+        b_form_number=admission_answer_text(answers, "student_b_form_number") or None,
+        address=admission_answer_text(answers, "student_address") or None,
+        phone=admission_answer_text(answers, "student_phone") or None,
     )
     guardian = Guardian(
         madrasa_id=madrasa.id,
         user_id=guardian_user.id,
-        name=payload.guardian_name,
-        relationship=payload.guardian_relationship,
-        phone_numbers=application.guardian_contact,
-        cnic=payload.guardian_cnic,
-        address=payload.guardian_address,
-        preferred_language=payload.guardian_preferred_language,
+        name=guardian_name,
+        relationship=guardian_relationship,
+        phone_numbers=guardian_phone,
+        cnic=guardian_cnic,
+        address=guardian_address,
+        preferred_language=guardian_preferred_language,
     )
     session.add_all([student, guardian])
     await session.flush()

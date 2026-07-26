@@ -12,6 +12,27 @@ from app.modules.auth.models import UserPermission
 from app.modules.people.models import Guardian, StudentAdmissionRecord, StudentGuardian, StudentProfile
 
 
+def _built_in_answers(
+    *,
+    student_name: str,
+    dob: str = "2017-04-05",
+    guardian_name: str = "Applicant Parent",
+    guardian_relationship: str = "father",
+    guardian_phone: str = "+923001234567",
+    guardian_language: str = "ur",
+    **extra,
+) -> dict:
+    return {
+        "student_name": student_name,
+        "student_date_of_birth": dob,
+        "guardian_name": guardian_name,
+        "guardian_relationship": guardian_relationship,
+        "guardian_phone_numbers": guardian_phone,
+        "guardian_preferred_language": guardian_language,
+        **extra,
+    }
+
+
 def test_admission_conversion_migration_enables_rls_for_new_tenant_tables():
     migration = (
         Path(__file__).parents[1]
@@ -113,14 +134,14 @@ async def test_people_student_creation_saves_an_immutable_admission_form_snapsho
             "name": "New Student",
             "date_of_birth": "2017-02-03",
             "admission_form_id": form["id"],
-            "admission_answers": {"previous_school": "Al Noor School"},
+            "admission_answers": _built_in_answers(student_name="New Student", dob="2017-02-03", previous_school="Al Noor School"),
         },
     )
     assert created.status_code == 200, created.text
     record = created.json()["admission_record"]
     assert record["form_title"] == "Hifz intake 2026"
-    assert record["answers"] == {"previous_school": "Al Noor School"}
-    assert record["fields_definition"][0]["label"] == "Previous school"
+    assert record["answers"]["previous_school"] == "Al Noor School"
+    assert any(field["label"] == "Previous school" for field in record["fields_definition"])
 
     # Later template edits must not rewrite the student's historical record.
     changed = await client.put(
@@ -138,9 +159,8 @@ async def test_admission_application_can_be_edited_and_status_is_reversible(clie
     created = await client.post(
         "/api/v1/operations/admissions",
         json={
-            "applicant_name": "Old Name",
-            "guardian_contact": "+923001110000",
             "form_id": form["id"],
+            "extra_data": _built_in_answers(student_name="Old Name", guardian_phone="+923001110000"),
         },
     )
     assert created.status_code == 200, created.text
@@ -208,10 +228,13 @@ async def test_accept_conversion_is_atomic_idempotent_and_notifies_admin(client,
     submitted = await client.post(
         f"/api/v1/public/admission-forms/{form['public_token']}",
         json={
-            "applicant_name": "Accepted Child",
-            "guardian_contact": "+923001234567",
-            "date_of_birth": "2017-04-05",
-            "extra_data": {"previous_school": "Community School"},
+            "extra_data": _built_in_answers(
+                student_name="Accepted Child",
+                guardian_name="Accepted Parent",
+                guardian_relationship="father",
+                guardian_phone="+923001234567",
+                previous_school="Community School",
+            ),
         },
     )
     assert submitted.status_code == 200, submitted.text
@@ -226,9 +249,6 @@ async def test_accept_conversion_is_atomic_idempotent_and_notifies_admin(client,
     payload = {
         "student_username": "accepted.child",
         "guardian_username": "accepted.parent",
-        "guardian_name": "Accepted Parent",
-        "guardian_relationship": "father",
-        "guardian_cnic": "42101-1234567-1",
         "session_id": str(seed.old_session.id),
         "class_id": str(seed.class_a.id),
         "section_id": str(seed.sections.a1.id),
@@ -244,7 +264,7 @@ async def test_accept_conversion_is_atomic_idempotent_and_notifies_admin(client,
     assert body["student"]["name"] == "Accepted Child"
     assert body["guardian"]["name"] == "Accepted Parent"
     assert body["student"]["admission_record"]["form_title"] == "Hifz intake 2026"
-    assert body["student"]["admission_record"]["fields_definition"][0]["key"] == "previous_school"
+    assert any(field["key"] == "previous_school" for field in body["student"]["admission_record"]["fields_definition"])
     assert body["student_set_password_url"].startswith("/set-password?")
     assert body["guardian_set_password_url"].startswith("/set-password?")
     assert body["already_converted"] is False
@@ -294,10 +314,13 @@ async def test_admission_conversion_allocates_after_highest_existing_number(
     submitted = await client.post(
         f"/api/v1/public/admission-forms/{form['public_token']}",
         json={
-            "applicant_name": "Next Number Child",
-            "guardian_contact": "+923001110007",
-            "date_of_birth": "2017-05-01",
-            "extra_data": {"previous_school": "High Suffix School"},
+            "extra_data": _built_in_answers(
+                student_name="Next Number Child",
+                dob="2017-05-01",
+                guardian_name="Next Number Parent",
+                guardian_phone="+923001110007",
+                previous_school="High Suffix School",
+            ),
         },
     )
     assert submitted.status_code == 200, submitted.text
@@ -307,8 +330,6 @@ async def test_admission_conversion_allocates_after_highest_existing_number(
         json={
             "student_username": "next.number.child",
             "guardian_username": "next.number.parent",
-            "guardian_name": "Next Number Parent",
-            "guardian_relationship": "father",
             "session_id": str(seed.old_session.id),
             "class_id": str(seed.class_a.id),
             "section_id": str(seed.sections.a1.id),
@@ -323,10 +344,13 @@ async def test_failed_conversion_rolls_back_all_provisioned_records(client, seed
     created = await client.post(
         "/api/v1/operations/admissions",
         json={
-            "applicant_name": "Rollback Child",
-            "guardian_contact": "+923001110003",
-            "date_of_birth": "2017-04-05",
             "form_id": form["id"],
+            "extra_data": _built_in_answers(
+                student_name="Rollback Child",
+                guardian_name="Rollback Parent",
+                guardian_relationship="mother",
+                guardian_phone="+923001110003",
+            ),
         },
     )
     assert created.status_code == 200, created.text
@@ -337,8 +361,6 @@ async def test_failed_conversion_rolls_back_all_provisioned_records(client, seed
         json={
             "student_username": "rollback.child",
             "guardian_username": seed.principal.username,
-            "guardian_name": "Rollback Parent",
-            "guardian_relationship": "mother",
             "session_id": str(seed.old_session.id),
             "class_id": str(seed.class_a.id),
             "section_id": str(seed.sections.a1.id),
@@ -359,10 +381,12 @@ async def test_admission_conversion_rejects_archived_session_target(client, seed
     submitted = await client.post(
         "/api/v1/operations/admissions",
         json={
-            "applicant_name": "Archived Target Child",
-            "guardian_contact": "+923001110007",
-            "date_of_birth": "2017-04-05",
             "form_id": form["id"],
+            "extra_data": _built_in_answers(
+                student_name="Archived Target Child",
+                guardian_name="Archived Target Parent",
+                guardian_phone="+923001110007",
+            ),
         },
     )
     assert submitted.status_code == 200, submitted.text
@@ -385,8 +409,6 @@ async def test_admission_conversion_rejects_archived_session_target(client, seed
         json={
             "student_username": "archived.target.child",
             "guardian_username": "archived.target.parent",
-            "guardian_name": "Archived Target Parent",
-            "guardian_relationship": "father",
             "session_id": str(archived_id),
             "class_id": str(seed.class_a.id),
             "section_id": str(seed.sections.a1.id),

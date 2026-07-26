@@ -7,6 +7,7 @@ import { Input, Select, Checkbox } from "./ui/Field";
 
 const FIELD_TYPES = ["text", "textarea", "phone", "radio", "checkbox_group", "dropdown", "label"];
 const OPTION_FIELD_TYPES = new Set(["radio", "checkbox_group", "dropdown"]);
+type EditableFieldType = FormFieldDefinition["type"];
 
 export const emptyFormField = (): FormFieldDefinition => ({
   key: "",
@@ -18,19 +19,20 @@ export const emptyFormField = (): FormFieldDefinition => ({
 
 export function cleanFormFields(fields: FormFieldDefinition[]): FormFieldDefinition[] {
   return fields
-    .filter((field) => field.label.trim())
+    .filter((field) => field.built_in || field.label.trim())
     .map((field) => ({
       ...field,
       label: field.label.trim(),
       // The label is the stable response key. Users should never have to
       // invent or maintain a second, technical field_key value.
-      key: field.label.trim(),
+      key: field.built_in ? field.key : field.label.trim(),
+      enabled: field.built_in ? field.enabled !== false : true,
       options: OPTION_FIELD_TYPES.has(field.type) ? field.options : [],
     }));
 }
 
 export function validateFormFields(fields: FormFieldDefinition[]): "duplicateFieldKeysError" | "fieldOptionsRequiredError" | "duplicateFieldOptionsError" | null {
-  const cleaned = cleanFormFields(fields);
+  const cleaned = cleanFormFields(fields).filter((field) => field.enabled !== false);
   const normalizedKeys = cleaned.map((field) => field.key.toLocaleLowerCase());
   if (new Set(normalizedKeys).size !== normalizedKeys.length) return "duplicateFieldKeysError";
   if (cleaned.some((field) => OPTION_FIELD_TYPES.has(field.type) && field.options.filter((option) => option.trim()).length < 2)) {
@@ -74,14 +76,15 @@ export function FormFieldsEditor({
         {fields.map((field, index) => (
           <div key={index} className="formFieldCard">
             <span className="formFieldNumber">{index + 1}</span>
+            {field.built_in && <span className="formFieldBuiltInBadge">{t("builtInFieldLabel", "Built-in")}</span>}
             <label>
               {t("fieldLabelLabel")}
-              <Input required value={field.label} onChange={(event) => updateField(index, { label: event.target.value })} />
+              <Input required value={field.label} disabled={field.built_in} onChange={(event) => updateField(index, { label: event.target.value })} />
             </label>
             <label>
               {t("fieldTypeLabel")}
-              <Select value={field.type} onChange={(event) => {
-                const type = event.target.value;
+              <Select disabled={field.built_in} value={field.type} onChange={(event) => {
+                const type = event.target.value as EditableFieldType;
                 updateField(index, { type, options: OPTION_FIELD_TYPES.has(type) && field.options.length === 0 ? ["", ""] : field.options });
               }}>
                 {FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
@@ -127,10 +130,17 @@ export function FormFieldsEditor({
               <Input type="checkbox" checked={field.required} onChange={(event) => updateField(index, { required: event.target.checked })} />
               {t("requiredLabel")}
             </label>
+            {field.built_in && (
+              <label className="checkboxLabel formFieldEnabled">
+                <Input type="checkbox" checked={field.enabled !== false} onChange={(event) => updateField(index, { enabled: event.target.checked })} />
+                {t("enabledLabel")}
+              </label>
+            )}
             <Button
               className="iconBtn danger formFieldRemove"
               type="button"
               aria-label={t("removeFieldBtn")}
+              disabled={field.built_in}
               onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}
             >
               <Trash2 size={15} />

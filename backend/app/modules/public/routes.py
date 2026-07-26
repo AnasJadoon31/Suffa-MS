@@ -18,7 +18,12 @@ from app.db.session import get_session
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.modules.academics.models import Madrasa, Program
 from app.modules.operations.models import AdmissionApplication, AdmissionForm, BlogPost, ContactEnquiry
-from app.modules.operations.admissions import validate_admission_answers
+from app.modules.operations.admissions import (
+    admission_answer_date,
+    admission_answer_text,
+    normalize_admission_fields,
+    validate_admission_answers,
+)
 from app.modules.operations.schemas import (
     AdmissionApplicationRead,
     BlogPostRead,
@@ -119,16 +124,16 @@ async def get_public_admission_form(
         title=form.title,
         description=form.description,
         program_name=program.name if program else "",
-        fields_definition=form.fields_definition or [],
+        fields_definition=normalize_admission_fields(form.fields_definition or []),
         is_open=form.is_open,
     )
 
 
 class PublicAdmissionSubmission(BaseModel):
-    applicant_name: str = Field(min_length=2, max_length=160)
+    applicant_name: str = Field(default="", max_length=160)
     guardian_contact: str = Field(default="", max_length=60)
     date_of_birth: str | None = None
-    extra_data: dict = {}
+    extra_data: dict = Field(default_factory=dict)
     website: str = ""  # honeypot
 
 
@@ -150,27 +155,22 @@ async def submit_public_admission(
     if payload.website:
         raise HTTPException(status_code=400, detail="Invalid submission")
 
-    validate_admission_answers(form.fields_definition or [], payload.extra_data)
-
-    from datetime import date as date_type
-
-    dob = None
-    if payload.date_of_birth:
-        try:
-            dob = date_type.fromisoformat(payload.date_of_birth)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="date_of_birth must be YYYY-MM-DD")
+    fields_definition = normalize_admission_fields(form.fields_definition or [])
+    validate_admission_answers(fields_definition, payload.extra_data)
+    dob = admission_answer_date(payload.extra_data, "student_date_of_birth")
+    if dob is None and payload.date_of_birth:
+        dob = admission_answer_date({"student_date_of_birth": payload.date_of_birth}, "student_date_of_birth")
 
     application = AdmissionApplication(
         madrasa_id=form.madrasa_id,
-        applicant_name=payload.applicant_name,
-        guardian_contact=payload.guardian_contact,
+        applicant_name=admission_answer_text(payload.extra_data, "student_name") or payload.applicant_name,
+        guardian_contact=admission_answer_text(payload.extra_data, "guardian_phone_numbers") or payload.guardian_contact,
         program_id=form.program_id,
         date_of_birth=dob,
         form_id=form.id,
         extra_data=payload.extra_data or None,
         form_title_snapshot=form.title,
-        fields_definition_snapshot=form.fields_definition or [],
+        fields_definition_snapshot=fields_definition,
         status_history=[{
             "status": "pending",
             "changed_at": datetime.now(UTC).isoformat(),

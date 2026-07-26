@@ -26,8 +26,10 @@ import {
   operationsApi,
   type AdmissionForm,
 } from "../lib/endpoints";
+import { AdmissionAnswersFields } from "./AdmissionAnswersFields";
+import { answerString, BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields } from "../lib/admissionBuiltIns";
 import { SearchDropdown } from "./SearchDropdown";
-import { Checkbox, Input, Select, Textarea } from "./ui/Field";
+import { Input, Select } from "./ui/Field";
 import { LoadingState } from "./ui/AsyncState";
 import { DataTable, type Column } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
@@ -602,7 +604,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [classFilter, setClassFilter] = useState("");
   const [classStudentIds, setClassStudentIds] = useState<Set<string> | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ username: "", name: "", date_of_birth: "", b_form_number: "", address: "", phone: "" });
+  const [form, setForm] = useState({ username: "" });
   const [usernameEdited, setUsernameEdited] = useState(false);
   const [admissionForms, setAdmissionForms] = useState<AdmissionForm[]>([]);
   const [admissionFormId, setAdmissionFormId] = useState("");
@@ -611,7 +613,6 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [guardianIds, setGuardianIds] = useState<string[]>([]);
   const [guardianMode, setGuardianMode] = useState<"link" | "create" | "independent">("link");
   const [guardianSearch, setGuardianSearch] = useState("");
-  const [newGuardian, setNewGuardian] = useState({ name: "", relationship: "", phone_numbers: "" });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [justCreated, setJustCreated] = useState<Student | null>(null);
@@ -637,14 +638,15 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   };
 
   useEffect(() => {
-    if (usernameEdited || !form.name.trim()) return;
+    const studentName = answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.studentName);
+    if (usernameEdited || !studentName) return;
     const timer = window.setTimeout(() => {
-      void peopleApi.usernameProposal(form.name).then((username) => {
+      void peopleApi.usernameProposal(studentName).then((username) => {
         setForm((current) => ({ ...current, username }));
       });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [form.name, usernameEdited]);
+  }, [admissionAnswers, usernameEdited]);
 
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [assignClassStudent, setAssignClassStudent] = useState<Student | null>(null);
@@ -705,6 +707,8 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   }, [classFilter]);
 
   const visible = classStudentIds ? students.filter((s) => classStudentIds.has(s.id)) : students;
+  const selectedAdmissionForm = admissionForms.find((item) => item.id === admissionFormId);
+  const selectedAdmissionFields = enabledAdmissionFields(selectedAdmissionForm?.fields_definition ?? []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -713,16 +717,18 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
     try {
       let selectedGuardianIds = guardianMode === "link" ? guardianIds : [];
       if (guardianMode === "create") {
-        const guardian = await peopleApi.createGuardian(newGuardian);
+        const guardian = await peopleApi.createGuardian({
+          name: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianName),
+          relationship: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianRelationship),
+          phone_numbers: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianPhoneNumbers),
+          cnic: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianCnic) || undefined,
+          address: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianAddress) || undefined,
+          preferred_language: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianPreferredLanguage) || undefined,
+        });
         selectedGuardianIds = [guardian.id];
       }
       const created = await peopleApi.createStudent({
         username: form.username,
-        name: form.name,
-        date_of_birth: form.date_of_birth,
-        b_form_number: form.b_form_number || undefined,
-        address: form.address || undefined,
-        phone: form.phone || undefined,
         is_independent: guardianMode === "independent",
         admission_form_id: admissionFormId,
         admission_answers: admissionAnswers,
@@ -730,14 +736,13 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
       });
       setNotice(t("createdAccountReady", { code: created.admission_number }));
       setJustCreated(created);
-      setForm({ username: "", name: "", date_of_birth: "", b_form_number: "", address: "", phone: "" });
+      setForm({ username: "" });
       setUsernameEdited(false);
       setAdmissionFormId("");
       setAdmissionAnswers({});
       setGuardianIds([]);
       setGuardianMode("link");
       setGuardianSearch("");
-      setNewGuardian({ name: "", relationship: "", phone_numbers: "" });
       setShowCreate(false);
       await load();
     } catch (err: any) {
@@ -802,13 +807,6 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                 </label>
                 <label>{t("usernameLabel")}<Input required value={form.username} onChange={(e) => { setUsernameEdited(true); setForm({ ...form, username: e.target.value }); }} /></label>
 
-              <label>{t("studentNameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-
-              <label>{t("dobLabel")}<Input required type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></label>
-
-              <label>{t("bFormLabel")}<Input value={form.b_form_number} onChange={(e) => setForm({ ...form, b_form_number: e.target.value })} /></label>
-
-              <label>{t("addressLabel")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
               <label>
                 {t("guardianHandlingLabel")}
                 <Select value={guardianMode} onChange={(event) => setGuardianMode(event.target.value as typeof guardianMode)}>
@@ -851,27 +849,12 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                 </fieldset>
               )}
               {guardianMode === "create" && (
-                <fieldset className="choiceField">
-                  <legend>{t("createNewGuardianLabel")}</legend>
-                  <label>{t("guardianNameLabel")}<Input required value={newGuardian.name} onChange={(event) => setNewGuardian({ ...newGuardian, name: event.target.value })} /></label>
-                  <label>{t("relationshipLabel")}<Input required value={newGuardian.relationship} onChange={(event) => setNewGuardian({ ...newGuardian, relationship: event.target.value })} /></label>
-                  <PhoneInput id="new-student-guardian-phone" required label={t("phoneCol")} value={newGuardian.phone_numbers} onChange={(value) => setNewGuardian({ ...newGuardian, phone_numbers: value })} />
-                </fieldset>
+                <p className="notice">{t("guardianCreatedFromAdmissionFields", "Guardian details will be created from the selected admission form fields.")}</p>
               )}
-              {guardianMode === "independent" && (
-                <PhoneInput id="independent-student-phone" required label={t("studentPhoneLabel")} value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} />
+              {guardianMode === "independent" && !selectedAdmissionFields.some((field) => field.key === BUILT_IN_ADMISSION_KEYS.studentPhone) && (
+                <p className="notice notice-warning">{t("independentStudentPhoneFieldHint", "Enable Student phone on this admission form before creating an independent portal account.")}</p>
               )}
-              {admissionForms.find((item) => item.id === admissionFormId)?.fields_definition.map((field) => {
-                if (field.type === "label") return <p className="formSectionLabel" key={field.key}>{field.label}</p>;
-                if (field.type === "textarea") return <label key={field.key}>{field.label}<Textarea required={field.required} value={String(admissionAnswers[field.key] ?? "")} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.value })} /></label>;
-                if (field.type === "dropdown") return <label key={field.key}>{field.label}<Select required={field.required} value={String(admissionAnswers[field.key] ?? "")} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.value })}><option value="">{t("selectEllipsis")}</option>{field.options.map((option) => <option key={option} value={option}>{option}</option>)}</Select></label>;
-                if (field.type === "radio") return <fieldset className="choiceField" key={field.key}><legend>{field.label}</legend>{field.options.map((option) => <label className="checkboxLabel" key={option}><Input type="radio" name={`admission-${field.key}`} required={field.required} checked={admissionAnswers[field.key] === option} onChange={() => setAdmissionAnswers({ ...admissionAnswers, [field.key]: option })} />{option}</label>)}</fieldset>;
-                if (field.type === "checkbox_group") {
-                  const chosen = Array.isArray(admissionAnswers[field.key]) ? admissionAnswers[field.key] as string[] : [];
-                  return <fieldset className="choiceField" key={field.key}><legend>{field.label}</legend>{field.options.map((option) => <label className="checkboxLabel" key={option}><Checkbox checked={chosen.includes(option)} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.checked ? [...chosen, option] : chosen.filter((item) => item !== option) })} />{option}</label>)}</fieldset>;
-                }
-                return <label key={field.key}>{field.label}<Input required={field.required} value={String(admissionAnswers[field.key] ?? "")} onChange={(event) => setAdmissionAnswers({ ...admissionAnswers, [field.key]: event.target.value })} /></label>;
-              })}
+              <AdmissionAnswersFields fields={selectedAdmissionForm?.fields_definition ?? []} answers={admissionAnswers} onChange={setAdmissionAnswers} idPrefix="student-admission" />
               </FormModal>
       )}
 

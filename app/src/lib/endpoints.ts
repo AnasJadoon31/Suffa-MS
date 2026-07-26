@@ -106,6 +106,16 @@ export interface PermissionGrant {
   granted_by_id: string; created_at: string;
 }
 
+export interface FormFieldDefinition {
+  key: string;
+  label: string;
+  type: "label" | "text" | "textarea" | "radio" | "checkbox_group" | "dropdown" | "phone";
+  required: boolean;
+  options: string[];
+  built_in?: boolean;
+  enabled?: boolean;
+}
+
 export interface PlatformMadrasa { id: string; slug: string; name: string; content_language: string; created_at: string }
 export interface FeatureFlag { key: string; label: string; enabled: boolean }
 
@@ -154,7 +164,7 @@ export const peopleApi = {
     getAllPages<Student>("/api/v1/people/students", { search }),
   listStudentsPage: (params: { search?: string; limit: number; offset: number }) => getPage<Student>("/api/v1/people/students", params),
   createStudent: (payload: {
-    username: string; name: string; date_of_birth: string;
+    username: string; name?: string; date_of_birth?: string;
     portal_enabled?: boolean; guardian_ids?: string[]; preferred_language?: string;
     b_form_number?: string; address?: string; phone?: string; is_independent?: boolean; photo_file_id?: string;
     admission_form_id?: string; admission_answers?: Record<string, unknown>;
@@ -168,7 +178,7 @@ export const peopleApi = {
     getAllPages<Guardian>("/api/v1/people/guardians", { search }),
   listGuardiansPage: (params: { search?: string; limit: number; offset: number }) => getPage<Guardian>("/api/v1/people/guardians", params),
   createGuardian: (payload: {
-    name: string; relationship: string; phone_numbers: string; student_ids?: string[]; cnic?: string; address?: string;
+    name: string; relationship: string; phone_numbers: string; student_ids?: string[]; cnic?: string; address?: string; preferred_language?: string;
   }) =>
     api.post<Guardian>("/api/v1/people/guardians", payload).then((r) => r.data),
   updateGuardian: (id: string, payload: Partial<Omit<Guardian, "id" | "user_id" | "created_at">>) =>
@@ -567,7 +577,6 @@ export interface ResourceItem {
   file_key: string | null; video_url: string | null; visibility_scope: Scope;
   created_by_id: string; owner_name: string | null; created_at: string;
 }
-export interface FormFieldDefinition { key: string; label: string; type: string; required: boolean; options: string[] }
 export interface FormDef {
   id: string; title: string; description: string; category: string | null; fields_definition: FormFieldDefinition[];
   visibility_scope: Scope; open_from: string | null; open_until: string | null; allow_multiple: boolean;
@@ -693,8 +702,8 @@ export const operationsApi = {
   deleteAdmissionForm: (id: string) =>
     api.delete(`/api/v1/operations/admission-forms/${id}`).then((r) => r.data),
   createAdmission: (payload: {
-    applicant_name: string; guardian_contact: string; form_id: string; program_id?: string; date_of_birth?: string; notes?: string;
-    extra_data?: Record<string, string>;
+    applicant_name?: string; guardian_contact?: string; form_id: string; program_id?: string; date_of_birth?: string; notes?: string;
+    extra_data?: Record<string, unknown>;
   }) => api.post<AdmissionApplication>("/api/v1/operations/admissions", payload).then((r) => r.data),
   updateAdmission: (id: string, payload: Partial<Pick<AdmissionApplication, "applicant_name" | "guardian_contact" | "program_id" | "date_of_birth" | "notes" | "extra_data">>) =>
     api.put<AdmissionApplication>(`/api/v1/operations/admissions/${id}`, payload).then((r) => r.data),
@@ -703,7 +712,7 @@ export const operationsApi = {
   admissionStatusHistory: (id: string) =>
     api.get<AdmissionApplication["status_history"]>(`/api/v1/operations/admissions/${id}/status-history`).then((r) => r.data),
   convertAdmission: (id: string, payload: {
-    student_username: string; guardian_username: string; guardian_name: string; guardian_relationship: string;
+    student_username: string; guardian_username: string; guardian_name?: string; guardian_relationship?: string;
     guardian_cnic?: string; guardian_address?: string; student_preferred_language?: string; guardian_preferred_language?: string;
     session_id: string; class_id: string; section_id: string;
   }) => api.post<AdmissionConversion>(`/api/v1/operations/admissions/${id}/convert`, payload).then((r) => r.data),
