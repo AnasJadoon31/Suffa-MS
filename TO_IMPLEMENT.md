@@ -21,7 +21,7 @@ Status legend: **OPEN** not started · **WIP** implementation/test in progress �
 | ID | Pri | Requirement and acceptance criteria | Required verification | Status |
 |---|---:|---|---|---|
 | ISS3-001 | P0 | Create one reusable, accessible row **Action menu** component and replace multi-button action clusters project-wide (People, Applications, Admission Forms, Assessments, Forms, Finance, Salary, and any other table with more than one action). The trigger and menu must fit one row, support keyboard navigation/Escape/outside click, use translated labels, distinguish destructive actions, and remain usable on mobile cards. | U/C menu interaction and focus tests; E2E representative view/edit/delete/download flows on desktop/mobile EN/UR; reviewed screenshots of every migrated table family. | WIP |
-| ISS3-002 | P0 | Rebuild the People → Students header/filter/table layout. Filters and **Add student** stay in one intentional responsive toolbar; Portal/Status columns use content-sized widths; Actions never clip or wrap unpredictably; the table has no page-level horizontal overflow. | E2E at 1440, 768, and 390 px with 10+ rows; geometry assertions; EN/UR screenshots. | OPEN |
+| ISS3-002 | P0 | Rebuild the People → Students header/filter/table layout. Filters and **Add student** stay in one intentional responsive toolbar; Portal/Status columns use content-sized widths; Actions never clip or wrap unpredictably; the table has no page-level horizontal overflow. | E2E at 1440, 768, and 390 px with 10+ rows; geometry assertions; EN/UR screenshots. | WIP |
 | ISS3-003 | P0 | Never render raw set-password/login URLs inline after creating or reissuing credentials. Show a compact success state with copy/send actions; long links must not expand the page. | U/C state test; E2E create/reissue at desktop/mobile; assert token/link text is absent from normal page content. | WIP |
 | ISS3-004 | P1 | Replace every remaining `window.alert`, `window.confirm`, and `window.prompt` with application-owned translated dialogs. Warnings show consequences; destructive confirmation names the target and blocks duplicate submission. | Static source gate plus U/C dialog tests; E2E representative destructive, warning, and text-input confirmations. | WIP |
 | ISS3-005 | P1 | Add one application-level snackbar/toast system for real-time notifications and mutation success/failure/pending status. It must queue rather than overwrite messages, be screen-reader announced, translated, dismissible, and must not replace blocking confirmation dialogs. | U/C queue/timer/ARIA tests; E2E success, API error, offline, and background notification cases. | WIP |
@@ -31,16 +31,16 @@ Status legend: **OPEN** not started · **WIP** implementation/test in progress �
 
 | ID | Pri | Requirement and acceptance criteria | Required verification | Status |
 |---|---:|---|---|---|
-| ISS3-007 | P0 | Student edit must include the complete stored admission information (selected form, program, submitted answers, identity, medical/prior-school data, guardian data where applicable), with permission and active-session enforcement. Editing must preserve fields not present in the chosen template. | API read/update/authorization tests; E2E edit/reopen persistence with custom admission fields; modal screenshots. | OPEN |
+| ISS3-007 | P0 | Student edit must include the complete stored admission information (selected form, program, submitted answers, identity, medical/prior-school data, guardian data where applicable), with permission and active-session enforcement. Editing must preserve fields not present in the chosen template. | API read/update/authorization tests; E2E edit/reopen persistence with custom admission fields; modal screenshots. | WIP |
 | ISS3-008 | P0 | Admission numbers are server-generated, tenant-unique, immutable identifiers. Remove editable admission-number inputs from create, edit, application acceptance, imports, and normal APIs. Concurrent creation must not collide; legacy values remain readable. | PostgreSQL concurrency/uniqueness tests; API rejection of client-supplied changes; E2E create/edit assertions. | WIP |
 | ISS3-009 | P0 | Usernames are proposed automatically from the person’s normalized name using a deterministic tenant-unique suffix strategy for collisions. The proposal is visible and editable before account creation; final uniqueness is enforced atomically server-side for teacher, student, guardian, and principal-managed provisioning. | U/C normalization cases (Urdu, punctuation, duplicate names); PostgreSQL concurrency tests; E2E preview/edit/create. | WIP |
 | ISS3-010 | P0 | **Submit application** starts by choosing an Admission Form. The selected form drives program/defaults, required system sections, and custom questions; submission without a form is impossible. Closed forms may be viewed historically but cannot receive new applications. | API form binding/closed-form tests; E2E choose-form-first, validation, and persisted-answer journey. | WIP |
 | ISS3-011 | P0 | Guardian handling in application/student creation explicitly supports **Link existing**, **Create new**, and **Independent student**. Existing guardians use an async searchable multi-select rather than a checkbox wall; duplicate CNIC/phone matches are surfaced before creating another record. | API duplicate/link/tenant-scope tests; E2E search, select multiple, create new, and independent paths at scale (100+ guardians). | WIP |
 | ISS3-012 | P0 | A student may have zero, one, or multiple guardians, and a guardian may have multiple wards. Linking/unlinking is idempotent and tenant-safe; role/relationship and portal access are stored per guardian/link where appropriate. Correct the existing “multiple guardians assigned to single guardian” ambiguity to this many-to-many contract. | Database constraint/migration tests; API authorization/idempotency tests; E2E both relationship directions and guardian child switcher. | WIP |
 | ISS3-013 | P0 | Applications cannot be submitted, accepted, converted, or otherwise mutated while an archived academic session is selected. Acceptance always targets the active session unless an explicitly authorized migration workflow is later designed. UI hides/disables controls and the API rejects bypasses. | API archived-session mutation tests; E2E session switch and disabled controls; no mutation request emitted. | WIP |
-| ISS3-014 | P0 | Application submission/acceptance exposes explicit portal decisions for the student and every guardian: enabled/disabled, account username proposal, and delivery target. Independent students require their own contact details; disabling a portal must prevent credential issuance. | API provisioning matrix; E2E student-only, guardian-only, both, and neither; audit-log assertions. | OPEN |
+| ISS3-014 | P0 | Application submission/acceptance exposes explicit portal decisions for the student and every guardian: enabled/disabled, account username proposal, and delivery target. Independent students require their own contact details; disabling a portal must prevent credential issuance. | API provisioning matrix; E2E student-only, guardian-only, both, and neither; audit-log assertions. | WIP |
 | ISS3-015 | P1 | Student profiles support an optional normalized phone number independently of guardian contact data. Independent status must be visible in detail/edit views and must not fabricate a guardian relationship. | Schema/API tests; E2E independent student create/edit/view; reports/exports retain the phone safely. | WIP |
-| ISS3-016 | P0 | General admission forms include configurable **Student** and repeatable **Guardian** system sections. Admins may enable/disable system fields without deleting their definitions; `+ Add guardian` supports multiple guardians. Acceptance atomically creates/links the student and all declared guardians, while allowing a valid no-guardian/independent submission. | Builder U/C tests; API schema/versioning and atomic conversion rollback tests; E2E build → submit → accept → verify links. | OPEN |
+| ISS3-016 | P0 | General admission forms include configurable **Student** and repeatable **Guardian** system sections. Admins may enable/disable system fields without deleting their definitions; `+ Add guardian` supports multiple guardians. Acceptance atomically creates/links the student and all declared guardians, while allowing a valid no-guardian/independent submission. | Builder U/C tests; API schema/versioning and atomic conversion rollback tests; E2E build → submit → accept → verify links. | WIP |
 | ISS3-017 | P2 | Rename “General public form” to **General form** everywhere. “Public” describes distribution, not the form’s data model; the same form can be used internally by Add Student and externally by link. | I18N/static key audit and EN/UR chooser screenshots. | DONE |
 
 ### C. Phone numbers, WhatsApp, and credential delivery
@@ -76,7 +76,7 @@ Status legend: **OPEN** not started · **WIP** implementation/test in progress �
 |---|---:|---|---|---|
 | ISS3-030 | P1 | Permit the supported **document** family for assignment/resource uploads, including PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, ODT/ODS/ODP, TXT, CSV, RTF, and Markdown. Validate extension, detected MIME/signature, size, and malware policy; reject executables, scripts, HTML, disguised files, and unsafe archives rather than interpreting “all files” literally. | U/C allow/deny matrix; API content-sniffing tests; E2E `.md` plus Office/PDF upload/download. | WIP |
 | ISS3-031 | P0 | Student My Assessments table/cards have explicit headers/labels (assignment, course, due date, instructions/status, submission/actions). Before the deadline, a student may remove or replace their own submission after confirmation; after the deadline the configured late-submission policy is enforced server-side. | API ownership/deadline/timezone tests; E2E submit → download → replace/remove before deadline and reject after deadline; desktop/mobile screenshots. | WIP |
-| ISS3-032 | P0 | Multi-section assignment creation has one logical batch and exactly one applicable assignment per student/teacher context. Selecting two sections must not produce duplicate cards for the same learner; section copies retain batch identity for edit/delete/reporting. | PostgreSQL uniqueness/idempotency tests; E2E publish to two sections with overlapping fixtures and assert one item per learner. | OPEN |
+| ISS3-032 | P0 | Multi-section assignment creation has one logical batch and exactly one applicable assignment per student/teacher context. Selecting two sections must not produce duplicate cards for the same learner; section copies retain batch identity for edit/delete/reporting. | PostgreSQL uniqueness/idempotency tests; E2E publish to two sections with overlapping fixtures and assert one item per learner. | WIP |
 | ISS3-033 | P0 | Opening an unmarked attendance roster initializes every eligible student as **Present** in the UI. Only an explicit save persists marks; loading historical marks must never overwrite them with defaults, and unsaved navigation warns the user. | U/C initialization/dirty-state tests; API unchanged-before-save assertion; E2E open → exceptions → save/reopen. | WIP |
 | ISS3-034 | P0 | Only a teacher assigned by timetable to the exact session/class/section/course may create or manage that assignment. Principal-created assignments automatically appear to the timetable teacher(s) for the same scope. Permission/delegation alone cannot bypass teaching scope except an explicit principal action. | API authorization matrix and timetable-change tests; E2E principal publish → assigned teacher sees/manages; unassigned teacher receives 403/no UI action. | WIP |
 | ISS3-035 | P1 | My Timetable has explicit column headers/card labels for time, course, section/period, and teacher/location as applicable. Remove the redundant class column when the page is already class-scoped; show the class/section as a heading beneath **My timetable**. Multi-class users get a clear class switcher rather than ambiguous mixed rows. | U/C responsive table labels; E2E single/multi-class teacher/student at desktop/mobile EN/UR; screenshots. | WIP |
@@ -116,6 +116,36 @@ Status legend: **OPEN** not started · **WIP** implementation/test in progress �
       `/readyz` passes, and smoke tests cover login plus the changed role journeys.
 - [ ] Independent review reports no unresolved critical/high finding and the final
       evidence is linked from `IMPLEMENTED.md`.
+
+## Current local evidence (2026-07-26)
+
+These gates were re-run while advancing the Issues 3 backlog. Except where
+explicitly called out as production smoke, they are current local evidence only;
+they do not replace the release gates above for PostgreSQL legacy migration,
+live Evolution API delivery, changed-role production journeys, or the full
+role/language/screenshot matrix.
+
+- **V26-LOCAL** — [2026-07-26 ISS3 evidence refresh](IMPLEMENTED.md#2026-07-26--iss3-evidence-refresh-action-menus-credentials-built-ins-and-gates).
+- **B26-FULL** — backend `.venv/bin/python -m pytest`: **263 passed, 2 skipped**.
+- **B26-CRED** — guardian credential delivery and phone-choice API tests passed,
+  including rejection of unregistered selected numbers.
+- **B26-PHONE** — phone value object and WhatsApp connection suites passed:
+  **23 passed**.
+- **BUILD26 / I18N26 / TYPE26** — production build passed; i18n audit passed
+  with **1067 keys checked**; unsafe-type ratchet passed with baseline
+  `any=135`, `as-any=1`, `ts-suppressions=0`.
+- **UI26-FOUNDATION** — `test:foundation-components` and `test:action-menu`
+  passed after opening row menus in People, Resources, and Holidays.
+- **UI26-ISSUES** — `test:visual-issues` passed with refreshed
+  `CURRENT-*` screenshots after the Admission built-in sections were aligned.
+- **UI26-FOCUSED** — focused Playwright gates passed for students layout, phone
+  inputs, WhatsApp connection, credential links, forms/responses, guardian
+  dashboard, audience picker, salary history, finance profiles, report ranges,
+  document uploads, attendance defaults, My Assessments, My Timetable,
+  assignment batch, and admission builder.
+- **PROD26-SMOKE** — public API `/readyz` returned 200 and browser login through
+  `https://app-suffa.anas31.qzz.io/` reached the dashboard with no critical
+  failed API responses.
 
 ## Previous verified reports (historical, 2026-07-22)
 

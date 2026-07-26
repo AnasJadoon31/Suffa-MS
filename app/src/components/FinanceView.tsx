@@ -247,7 +247,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
         {!isLoading && !error && visiblePayments.map((p) => (
           <div className="dataRow" key={p.id}>
             <span data-label={t("studentCol")}>
-              <button className="identityLink" type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile)}>
+              <button className="identityLink" type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadContributions")))}>
                 {p.student_name ?? t("deletedPersonLabel")}
               </button>
             </span>
@@ -283,7 +283,20 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
             <dt>{t("addressCol")}</dt><dd>{profile.address || "—"}</dd>
           </dl>
           <h4>{t("completePaymentHistoryLabel")}</h4>
-          {profile.payments.map((payment) => <p key={payment.id}>{payment.payment_date} · {payment.currency} {payment.amount} · {payment.category_name}</p>)}
+          <div className="dataTable financeHistoryTable">
+            <div className="dataRow header">
+              <span>{t("dateCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("notesLabel")}</span>
+            </div>
+            {profile.payments.length === 0 && <p className="emptyState">{t("noContributionsYet")}</p>}
+            {profile.payments.map((payment) => (
+              <div className="dataRow" key={payment.id}>
+                <span data-label={t("dateCol")}>{payment.payment_date}</span>
+                <span data-label={t("categoryCol")}>{payment.category_name ?? t("unknownLabel")}</span>
+                <span data-label={t("amountCol")}><strong>{payment.currency} {payment.amount}</strong></span>
+                <span data-label={t("notesLabel")}>{payment.note ?? "—"}</span>
+              </div>
+            ))}
+          </div>
         </Modal>
       )}
     </>
@@ -464,7 +477,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
         {!isLoading && !error && visibleDonations.map((d) => (
           <div className="dataRow" key={d.id}>
             <span data-label={t("donorCol")}>
-              <button className="identityLink" type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile)}>
+              <button className="identityLink" type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDonations")))}>
                 {d.donor_name ?? t("deletedPersonLabel")}
               </button>
             </span>
@@ -496,7 +509,20 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
         <Modal title={profile.name} onClose={() => setProfile(null)}>
           <dl className="detailGrid"><dt>{t("phoneCol")}</dt><dd>{profile.contact}</dd></dl>
           <h4>{t("completeDonationHistoryLabel")}</h4>
-          {profile.donations.map((donation) => <p key={donation.id}>{donation.donation_date} · {donation.currency} {donation.amount} · {donation.category_name}</p>)}
+          <div className="dataTable financeHistoryTable">
+            <div className="dataRow header">
+              <span>{t("dateCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("notesLabel")}</span>
+            </div>
+            {profile.donations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
+            {profile.donations.map((donation) => (
+              <div className="dataRow" key={donation.id}>
+                <span data-label={t("dateCol")}>{donation.donation_date}</span>
+                <span data-label={t("categoryCol")}>{donation.category_name ?? t("unknownLabel")}</span>
+                <span data-label={t("amountCol")}><strong>{donation.currency} {donation.amount}</strong></span>
+                <span data-label={t("notesLabel")}>{donation.note ?? "—"}</span>
+              </div>
+            ))}
+          </div>
         </Modal>
       )}
     </>

@@ -17,7 +17,7 @@ from app.modules.assessments.models import ExamType, GradingScheme, Mark, Result
 from app.modules.attendance.models import AttendanceStatus, StudentAttendance
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
 from app.modules.finance.models import Payment, PaymentCategory, SalaryPayment
-from app.modules.operations.models import TimetableSlot
+from app.modules.operations.models import Form, TimetableSlot
 from app.modules.people.models import Guardian, StudentGuardian
 from tests.conftest import _make_client
 
@@ -158,6 +158,71 @@ async def test_parent_dashboard_returns_all_linked_children_without_admin_data(p
     assert "counts" not in body
     assert "finance" not in body
     assert "activity" not in body
+
+
+async def test_parent_dashboard_exposes_forms_per_linked_child(parent_client, db_sessionmaker, seed):
+    async with db_sessionmaker() as db:
+        parent = (await db.execute(select(User).where(User.username == "parent1"))).scalar_one()
+        db.add_all(
+            [
+                Form(
+                    madrasa_id=seed.madrasa.id,
+                    title="All parent consent",
+                    description="For every guardian",
+                    category="consent",
+                    fields_definition=[{"key": "ok", "label": "OK", "type": "text"}],
+                    visibility_scope={"roles": ["parent"]},
+                    created_by_id=seed.principal.id,
+                ),
+                Form(
+                    madrasa_id=seed.madrasa.id,
+                    title="A1 ward form",
+                    description="For section A1",
+                    category="ward",
+                    fields_definition=[{"key": "note", "label": "Note", "type": "text"}],
+                    visibility_scope={"roles": ["parent"], "sections": [str(seed.sections.a1.id)]},
+                    created_by_id=seed.principal.id,
+                ),
+                Form(
+                    madrasa_id=seed.madrasa.id,
+                    title="A2 ward form",
+                    description="For section A2",
+                    category="ward",
+                    fields_definition=[{"key": "note", "label": "Note", "type": "text"}],
+                    visibility_scope={"roles": ["parent"], "sections": [str(seed.sections.a2.id)]},
+                    created_by_id=seed.principal.id,
+                ),
+                Form(
+                    madrasa_id=seed.madrasa.id,
+                    title="Direct parent form",
+                    description="For this guardian login",
+                    category="direct",
+                    fields_definition=[{"key": "note", "label": "Note", "type": "text"}],
+                    visibility_scope={"users": [str(parent.id)]},
+                    created_by_id=seed.principal.id,
+                ),
+                Form(
+                    madrasa_id=seed.madrasa.id,
+                    title="Teacher-only hidden",
+                    description="Not for guardians",
+                    category="staff",
+                    fields_definition=[{"key": "note", "label": "Note", "type": "text"}],
+                    visibility_scope={"roles": ["teacher"]},
+                    created_by_id=seed.principal.id,
+                ),
+            ]
+        )
+        await db.commit()
+
+    response = await parent_client.get("/api/v1/reporting/dashboard")
+
+    assert response.status_code == 200, response.text
+    forms_by_child = {
+        child["name"]: {form["title"] for form in child["forms"]}
+        for child in response.json()["children"]
+    }
+    assert forms_by_child["Student 1"] == {"All parent consent", "A1 ward form", "Direct parent form"}
+    assert forms_by_child["Student 2"] == {"All parent consent", "A2 ward form", "Direct parent form"}
 
 
 async def test_parent_dashboard_uses_selected_session(parent_client, db_sessionmaker, seed):

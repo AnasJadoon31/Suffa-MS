@@ -1,6 +1,7 @@
 import base64
 from datetime import UTC, datetime
 import logging
+import re
 from urllib.parse import quote
 from uuid import UUID
 
@@ -29,6 +30,7 @@ from app.modules.messaging.schemas import (
     WhatsAppLinkResponse,
     WhatsAppPairingRequest,
     WhatsAppPairingResponse,
+    WhatsAppQrResponse,
 )
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 
@@ -51,6 +53,11 @@ def _evolution_error_message(response: httpx.Response) -> str:
     if isinstance(body, dict):
         return str(body.get("message") or body.get("error") or body)[:500]
     return str(body)[:500]
+
+
+def _redact_setup_links(message: str) -> str:
+    """Do not persist account setup URLs/tokens in message logs."""
+    return re.sub(r"(?:https?://\S+)?/set-password\?token=[^\s]+", "[setup-link-redacted]", message)
 
 
 def _evolution_config() -> tuple[str, str, str]:
@@ -89,6 +96,21 @@ def _pairing_code(response: httpx.Response) -> str:
         logger.warning("Evolution returned phone-pairing data without a pairing code")
         raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_PAIRING_CODE_FAILED)
     return pairing_code
+
+
+def _qr_code_base64_value(response: httpx.Response) -> str | None:
+    body = response.json()
+    qrcode = body.get("qrcode", body) if isinstance(body, dict) else {}
+    raw_qr = qrcode.get("base64") or qrcode.get("code")
+    return str(raw_qr) if raw_qr else None
+
+
+def _qr_code_base64(response: httpx.Response) -> str:
+    qr_code = _qr_code_base64_value(response)
+    if qr_code is None:
+        logger.warning("Evolution returned QR pairing data without a QR code")
+        raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_PAIRING_CODE_FAILED)
+    return qr_code
 
 
 def _webhook_payload(body: object) -> dict[str, object] | None:
@@ -143,6 +165,95 @@ async def whatsapp_connection_status(
         instance_name=settings.evolution_instance,
         state=state,
         connected=state == "open",
+    )
+
+
+@router.post("/whatsapp/connection/qr-code", response_model=WhatsAppQrResponse)
+async def request_whatsapp_qr_code(
+    replace_existing: bool = False,
+    current_user: User = Depends(require_permission("settings.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+) -> WhatsAppQrResponse:
+    _require_evolution_tenant(madrasa)
+    base_url, api_key, instance = _evolution_config()
+    headers = {"apikey": api_key, "Content-Type": "application/json"}
+    qr_response: httpx.Response
+    saved_webhook = None
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            state_response = await client.get(
+                f"{base_url}/instance/connectionState/{instance}", headers=headers
+            )
+            if state_response.status_code != 404:
+                if state_response.is_error:
+                    _raise_evolution_pairing_failure(state_response)
+                state = _evolution_state(state_response)
+                if state == "open":
+                    raise HTTPException(
+                        status_code=409, detail=ErrorCode.WHATSAPP_INSTANCE_ALREADY_CONNECTED
+                    )
+                if state in {"close", "connecting", "refused"}:
+                    qr_response = await client.get(
+                        f"{base_url}/instance/connect/{instance}", headers=headers
+                    )
+                    if qr_response.is_error:
+                        _raise_evolution_pairing_failure(qr_response)
+                    existing_qr = _qr_code_base64_value(qr_response)
+                    if existing_qr is not None:
+                        return WhatsAppQrResponse(
+                            instance_name=settings.evolution_instance,
+                            state="connecting",
+                            qr_code_base64=existing_qr,
+                        )
+                    if not replace_existing:
+                        raise HTTPException(
+                            status_code=428,
+                            detail=ErrorCode.WHATSAPP_PAIRING_REPLACE_REQUIRED,
+                        )
+
+                webhook_response = await client.get(
+                    f"{base_url}/webhook/find/{instance}", headers=headers
+                )
+                if webhook_response.is_error and webhook_response.status_code != 404:
+                    _raise_evolution_pairing_failure(webhook_response)
+                try:
+                    webhook_body = webhook_response.json()
+                except ValueError:
+                    webhook_body = None
+                saved_webhook = (
+                    _webhook_payload(webhook_body) if not webhook_response.is_error else None
+                )
+                delete_response = await client.delete(
+                    f"{base_url}/instance/delete/{instance}", headers=headers
+                )
+                if delete_response.is_error and delete_response.status_code != 404:
+                    _raise_evolution_pairing_failure(delete_response)
+
+            qr_response = await client.post(
+                f"{base_url}/instance/create",
+                headers=headers,
+                json={
+                    "instanceName": settings.evolution_instance,
+                    "integration": "WHATSAPP-BAILEYS",
+                    "qrcode": True,
+                },
+            )
+            if qr_response.is_error:
+                _raise_evolution_pairing_failure(qr_response)
+            if saved_webhook is not None:
+                webhook_set_response = await client.post(
+                    f"{base_url}/webhook/set/{instance}", headers=headers, json=saved_webhook
+                )
+                if webhook_set_response.is_error:
+                    _raise_evolution_pairing_failure(webhook_set_response)
+    except httpx.RequestError as exc:
+        logger.warning("Evolution QR pairing request failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_PAIRING_CODE_FAILED) from exc
+
+    return WhatsAppQrResponse(
+        instance_name=settings.evolution_instance,
+        state="connecting",
+        qr_code_base64=_qr_code_base64(qr_response),
     )
 
 
@@ -295,6 +406,7 @@ async def render_and_dispatch(
     phone_number: str,
     attachment_bytes: bytes | None = None,
     attachment_name: str = "report.pdf",
+    force_direct_text: bool = False,
 ) -> WhatsAppLinkResponse:
     template = (
         await session.execute(
@@ -311,10 +423,34 @@ async def render_and_dispatch(
     number = normalise_phone_number(phone_number)
 
     result = WhatsAppLinkResponse(normalised_number=number, url=f"https://wa.me/{number}?text={quote(message)}")
-    if attachment_bytes is not None:
-        _require_evolution_tenant(madrasa)
+    if attachment_bytes is None and force_direct_text:
         if not (settings.evolution_api_url and settings.evolution_api_key and settings.evolution_instance):
             raise HTTPException(status_code=503, detail=ErrorCode.WHATSAPP_DELIVERY_NOT_CONFIGURED)
+        _require_evolution_tenant(madrasa)
+        instance = quote(settings.evolution_instance, safe="")
+        endpoint = f"{settings.evolution_api_url.rstrip('/')}/message/sendText/{instance}"
+        payload = {"number": number, "text": message}
+        headers = {"apikey": settings.evolution_api_key, "Content-Type": "application/json"}
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                await _require_open_evolution_instance(client, headers)
+                response = await client.post(endpoint, headers=headers, json=payload)
+        except httpx.RequestError as exc:
+            logger.warning("Evolution text delivery request failed: %s", type(exc).__name__)
+            raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_TEXT_DELIVERY_FAILED) from exc
+        if response.is_error:
+            logger.warning(
+                "Evolution text delivery failed status=%s error=%s",
+                response.status_code,
+                _evolution_error_message(response),
+            )
+            raise HTTPException(status_code=502, detail=ErrorCode.WHATSAPP_TEXT_DELIVERY_FAILED)
+        result = WhatsAppLinkResponse(normalised_number=number, direct_sent=True)
+
+    if attachment_bytes is not None:
+        if not (settings.evolution_api_url and settings.evolution_api_key and settings.evolution_instance):
+            raise HTTPException(status_code=503, detail=ErrorCode.WHATSAPP_DELIVERY_NOT_CONFIGURED)
+        _require_evolution_tenant(madrasa)
         instance = quote(settings.evolution_instance, safe="")
         endpoint = f"{settings.evolution_api_url.rstrip('/')}/message/sendMedia/{instance}"
         payload = {
@@ -351,7 +487,7 @@ async def render_and_dispatch(
             recipient_id=recipient_id,
             dispatched_at=datetime.now(UTC),
             sent_by_id=current_user.id,
-            content_sent=message,
+            content_sent=_redact_setup_links(message),
         )
     )
     await session.commit()
@@ -390,6 +526,21 @@ async def _primary_guardian(session: AsyncSession, student_id: UUID) -> Guardian
     if guardian is None:
         raise HTTPException(status_code=404, detail="Student has no guardian on file to message")
     return guardian
+
+
+def _recipient_phone(stored_numbers: str, requested_number: str | None = None) -> str:
+    phones = [part.strip() for part in stored_numbers.replace(";", ",").split(",") if part.strip()]
+    if not phones:
+        raise HTTPException(status_code=422, detail=ErrorCode.WHATSAPP_PHONE_INVALID)
+    normalised = []
+    try:
+        normalised = [normalize_pakistan_phone(phone) for phone in phones]
+        requested = normalize_pakistan_phone(requested_number) if requested_number else normalised[0]
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=ErrorCode.WHATSAPP_PHONE_INVALID) from exc
+    if requested not in normalised:
+        raise HTTPException(status_code=422, detail=ErrorCode.WHATSAPP_PHONE_INVALID)
+    return requested
 
 
 @router.post("/send-report", response_model=WhatsAppLinkResponse)
@@ -485,18 +636,28 @@ async def send_credentials(
             raise HTTPException(status_code=404, detail="Teacher profile not found")
         user = await session.get(User, profile.user_id)
         subject_name = profile.name
-        phone = profile.whatsapp_number
+        phone = _recipient_phone(profile.whatsapp_number, payload.phone_number)
         language = "ur"
         recipient_type = "teacher"
         recipient_id = profile.id
-    else:
+    elif payload.subject_type == "student":
         student = await session.get(StudentProfile, payload.subject_id)
         if student is None or student.madrasa_id != madrasa.id:
             raise HTTPException(status_code=404, detail="Student profile not found")
         user = await session.get(User, student.user_id)
         subject_name = student.name
         guardian = await _primary_guardian(session, student.id)
-        phone = guardian.phone_numbers.split(",")[0].strip()
+        phone = _recipient_phone(guardian.phone_numbers, payload.phone_number)
+        language = guardian.preferred_language
+        recipient_type = "guardian"
+        recipient_id = guardian.id
+    else:
+        guardian = await session.get(Guardian, payload.subject_id)
+        if guardian is None or guardian.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Guardian not found")
+        user = await session.get(User, guardian.user_id)
+        subject_name = guardian.name
+        phone = _recipient_phone(guardian.phone_numbers, payload.phone_number)
         language = guardian.preferred_language
         recipient_type = "guardian"
         recipient_id = guardian.id
@@ -521,6 +682,7 @@ async def send_credentials(
         recipient_type=recipient_type,
         recipient_id=recipient_id,
         phone_number=phone,
+        force_direct_text=True,
     )
 
 

@@ -12,13 +12,23 @@ const classes = [{ id: "class-1", program_id: "program-1", name: "Hifz Level 1",
 const sections = [{ id: "section-1", class_id: "class-1", name: "A" }];
 const courses = [{ id: "course-1", name: "Quran Memorization" }, { id: "course-2", name: "Tajweed" }];
 const sessions = [{ id: "session-1", name: "2026–27", gregorian_start: "2026-07-01", gregorian_end: "2027-06-30", hijri_span: "1448–1449 AH", is_active: true }];
+const admissionFields = [
+  { key: "student_name", label: "Student name", type: "text", required: true, options: [], built_in: true, enabled: true },
+  { key: "student_date_of_birth", label: "Date of birth", type: "text", required: true, options: [], built_in: true, enabled: true },
+  { key: "student_b_form_number", label: "B-Form number", type: "text", required: false, options: [], built_in: true, enabled: true },
+  { key: "student_address", label: "Student address", type: "textarea", required: false, options: [], built_in: true, enabled: true },
+  { key: "student_phone", label: "Student phone", type: "phone", required: false, options: [], built_in: true, enabled: true },
+  { key: "student_portal_enabled", label: "Student portal", type: "dropdown", required: true, options: ["enabled", "disabled"], built_in: true, enabled: true },
+  { key: "guardian_name", label: "Guardian name", type: "text", required: true, options: [], built_in: true, enabled: true },
+  { key: "guardian_relationship", label: "Guardian relationship", type: "text", required: true, options: [], built_in: true, enabled: true },
+  { key: "guardian_phone_numbers", label: "Guardian phone number", type: "phone", required: true, options: [], built_in: true, enabled: true },
+  { key: "previous_madrasa", label: "Previous madrasa", type: "text", required: true, options: [] },
+  { key: "preferred_campus", label: "Preferred campus", type: "radio", required: true, options: ["North", "South"] },
+];
 const admissionForm = {
   id: "form-1", program_id: "program-1", title: "2027 Hifz admission", description: "Complete the learner profile.",
   category: "General", public_token: "public-1", is_open: false, created_at: "2026-07-01T00:00:00Z", program_name: "Hifz Program",
-  fields_definition: [
-    { key: "previous_madrasa", label: "Previous madrasa", type: "text", required: true, options: [] },
-    { key: "preferred_campus", label: "Preferred campus", type: "radio", required: true, options: ["North", "South"] },
-  ],
+  fields_definition: admissionFields,
 };
 const student = {
   id: "student-1", user_id: "student-user-1", username: "ali.noor", admission_number: "ADM-0008", name: "Ali Noor",
@@ -31,7 +41,19 @@ const student = {
   admission_record: {
     id: "record-1", form_id: "form-1", application_id: "application-1", form_title: "2027 Hifz admission", created_at: "2026-07-01T00:00:00Z",
     fields_definition: admissionForm.fields_definition,
-    answers: { previous_madrasa: "Dar-ul-Ilm", preferred_campus: "North" },
+    answers: {
+      student_name: "Ali Noor",
+      student_date_of_birth: "2017-01-12",
+      student_b_form_number: "61101-1234567-3",
+      student_address: "Model Town, Lahore",
+      student_phone: "0300 1112233",
+      student_portal_enabled: "enabled",
+      guardian_name: "Shaikh Noor",
+      guardian_relationship: "Father",
+      guardian_phone_numbers: "0321 1234505",
+      previous_madrasa: "Dar-ul-Ilm",
+      preferred_campus: "North",
+    },
   },
 };
 const guardian = {
@@ -41,7 +63,14 @@ const guardian = {
 const application = {
   id: "application-1", applicant_name: "Ali Noor", guardian_contact: "0321 1234505", program_id: "program-1",
   date_of_birth: "2017-01-12", notes: "Review transport requirement", status: "pending", form_id: "form-1",
-  extra_data: { guardian_name: "Shaikh Noor", guardian_relationship: "Father", guardian_cnic: "35202-1234567-1", address: "Model Town, Lahore" },
+  extra_data: {
+    student_phone: "0300 1112233",
+    guardian_name: "Shaikh Noor",
+    guardian_relationship: "Father",
+    guardian_phone_numbers: "0321 1234505; 0321 1234506",
+    guardian_cnic: "35202-1234567-1",
+    guardian_address: "Model Town, Lahore",
+  },
   created_at: "2026-07-20T00:00:00Z", converted_student_id: null, converted_guardian_id: null, converted_by_id: null, converted_at: null,
 };
 const attendanceClasses = [{
@@ -65,6 +94,8 @@ const portalForm = {
   allow_multiple: false, visibility_scope: { all: true }, created_by_id: "principal-1", created_at: "2026-07-01T00:00:00Z",
 };
 const portalResponse = { id: "response-1", form_id: portalForm.id, student_id: student.id, student_name: student.name, response_data: { consent: "Yes" }, created_at: "2026-07-22T00:00:00Z" };
+const credentialSendPayloads = [];
+const studentUpdatePayloads = [];
 
 async function ensureServer() {
   if (process.env.VISUAL_ISSUES_BASE_URL) return;
@@ -96,6 +127,18 @@ function responseFor(pathname, request, persona = "principal") {
   if (pathname === "/api/v1/academics/classes/class-1/courses" || pathname === "/api/v1/academics/courses") return courses;
   if (pathname === "/api/v1/academics/sessions") return sessions;
   if (pathname === "/api/v1/people/students") return [student];
+  if (pathname === "/api/v1/people/students/student-1" && request.method() === "PUT") {
+    const payload = JSON.parse(request.postData() ?? "{}");
+    studentUpdatePayloads.push(payload);
+    return {
+      ...student,
+      name: payload.admission_answers?.student_name ?? payload.name ?? student.name,
+      admission_record: {
+        ...student.admission_record,
+        answers: { ...student.admission_record.answers, ...(payload.admission_answers ?? {}) },
+      },
+    };
+  }
   if (pathname === "/api/v1/people/guardians") return [guardian];
   if (pathname === "/api/v1/people/students/student-1/guardians") return [guardian];
   if (pathname === "/api/v1/people/guardians/guardian-1/students") return [student];
@@ -111,7 +154,19 @@ function responseFor(pathname, request, persona = "principal") {
   if (pathname === "/api/v1/operations/holidays") return [];
   if (pathname === "/api/v1/operations/admission-forms") return [admissionForm];
   if (pathname === "/api/v1/operations/admissions") return [application];
+  if (pathname === "/api/v1/operations/admissions/application-1/convert" && request.method() === "POST") return {
+    application: { ...application, status: "accepted", converted_student_id: student.id, converted_guardian_id: guardian.id, converted_by_id: "principal-1", converted_at: "2026-07-22T08:00:00Z" },
+    student: { ...student, phone: "0300 1112233" },
+    guardian,
+    student_set_password_url: "/set-password?token=SECRET-CONVERT-STUDENT",
+    guardian_set_password_url: "/set-password?token=SECRET-CONVERT-GUARDIAN",
+    already_converted: false,
+  };
   if (pathname === "/api/v1/operations/admin-notifications") return [{ id: "notification-1", event_type: "admission.converted", title: "Admission ready for review", message: "Ali Noor can now be converted to Student and Guardian records.", entity_type: "admission_application", entity_id: application.id, is_read: false, created_at: "2026-07-22T07:00:00Z" }];
+  if (pathname === "/api/v1/messaging/send-credentials" && request.method() === "POST") {
+    credentialSendPayloads.push(JSON.parse(request.postData() ?? "{}"));
+    return { url: "https://wa.me/923211234505?text=credentials" };
+  }
   if (pathname === "/api/v1/operations/announcements") return [{ id: "announcement-1", title: "Parent meeting", body: "Meeting after Asr prayer.", category: "General", attachment_link: null, audience_scope: { all: true }, publish_at: "2026-07-22T00:00:00Z", expires_at: null, created_at: "2026-07-20T00:00:00Z" }];
   if (pathname === "/api/v1/operations/forms") return [portalForm];
   if (pathname === "/api/v1/operations/form-responses") return [portalResponse];
@@ -195,11 +250,11 @@ async function desktopJourneys(browser) {
   await chooser.getByRole("button", { name: "General form" }).click();
   const builder = page.getByRole("dialog", { name: "Create form" });
   await builder.getByRole("button", { name: "Add field" }).click();
-  await builder.getByLabel(/^Type/).nth(1).selectOption("radio");
-  await builder.getByLabel("Option 1").fill("North campus");
-  await builder.getByLabel("Option 2").fill("South campus");
-  await builder.getByRole("button", { name: "Add option" }).click();
-  await builder.getByLabel("Option 3").fill("Online");
+  await builder.locator('label:has-text("Type") select:not(:disabled)').last().selectOption("radio");
+  await builder.getByRole("textbox", { name: "Option 1" }).last().fill("North campus");
+  await builder.getByRole("textbox", { name: "Option 2" }).last().fill("South campus");
+  await builder.getByRole("button", { name: "Add option" }).last().click();
+  await builder.getByRole("textbox", { name: "Option 3" }).last().fill("Online");
   await shot(page, "CURRENT-09_CURRENT-14_spaced-option-repeater-modal_desktop.png", builder);
 
   await open(page, "/assessments/setup");
@@ -232,7 +287,28 @@ async function desktopJourneys(browser) {
   if (await dialog.getByRole("button", { name: /^Assign class$/i }).count()) throw new Error("Active enrollment still exposes Assign class in Student details");
   await dialog.getByRole("button", { name: /Unassign class/i }).waitFor();
   await shot(page, "CURRENT-03_CURRENT-04_CURRENT-19_student-details-enrollment_desktop.png", dialog);
-  await dialog.getByTitle("View").click();
+  studentUpdatePayloads.length = 0;
+  await dialog.getByRole("button", { name: "Edit" }).click();
+  const editStudentDialog = page.getByRole("dialog", { name: "Edit Student" });
+  await editStudentDialog.getByText("2027 Hifz admission").waitFor();
+  await editStudentDialog.getByLabel("Student name").waitFor();
+  await editStudentDialog.getByLabel("Guardian name").waitFor();
+  await editStudentDialog.getByLabel("Previous madrasa").fill("Updated Dar-ul-Ilm");
+  await shot(page, "CURRENT-19_student-edit-admission-fields_desktop.png", editStudentDialog);
+  await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith("/api/v1/people/students/student-1") && response.request().method() === "PUT"),
+    editStudentDialog.getByRole("button", { name: "Save" }).click(),
+  ]);
+  const [studentUpdate] = studentUpdatePayloads;
+  if (studentUpdate?.admission_answers?.previous_madrasa !== "Updated Dar-ul-Ilm") {
+    throw new Error(`Student edit did not submit admission answers: ${JSON.stringify(studentUpdate)}`);
+  }
+  if (studentUpdate.admission_answers.student_name !== "Ali Noor" || studentUpdate.admission_answers.guardian_name !== "Shaikh Noor") {
+    throw new Error(`Student edit dropped built-in admission fields: ${JSON.stringify(studentUpdate.admission_answers)}`);
+  }
+  await open(page, "/people/guardians");
+  await page.getByRole("button", { name: "Actions: Shaikh Noor" }).click();
+  await page.getByRole("menuitem", { name: "View" }).click();
   dialog = page.getByRole("dialog", { name: "Shaikh Noor" });
   await dialog.getByText("Linked Students").waitFor();
   await shot(page, "CURRENT-05_guardian-details_desktop.png", dialog);
@@ -248,9 +324,31 @@ async function desktopJourneys(browser) {
   await page.getByRole("button", { name: "Actions: Ali Noor" }).click();
   await page.getByRole("menuitem", { name: "Accept and create people" }).click();
   dialog = page.getByRole("dialog", { name: "Accept application" });
+  credentialSendPayloads.length = 0;
+  await dialog.getByLabel("Student username").fill("ali.converted");
+  await dialog.getByLabel("Guardian username").fill("shaikh.converted");
+  await dialog.getByLabel("Student delivery target").selectOption("0300 1112233");
+  await dialog.getByLabel("Guardian delivery target").selectOption("0321 1234506");
+  await dialog.getByLabel("Session").selectOption("session-1");
   await dialog.getByLabel("Class").selectOption("class-1");
   await dialog.getByLabel("Section").selectOption("section-1");
   await shot(page, "CURRENT-18_conversion-review-wizard_desktop.png", dialog);
+  await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith("/api/v1/operations/admissions/application-1/convert") && response.request().method() === "POST"),
+    page.waitForResponse((response) => response.url().endsWith("/api/v1/messaging/send-credentials") && response.request().method() === "POST"),
+    dialog.getByRole("button", { name: "Accept and create people" }).click(),
+  ]);
+  await dialog.getByText("Credential delivery").waitFor();
+  await dialog.getByText("Login link sent successfully").first().waitFor();
+  if (credentialSendPayloads.length !== 2) throw new Error(`Expected two credential sends after conversion, saw ${credentialSendPayloads.length}`);
+  const studentSend = credentialSendPayloads.find((payload) => payload.subject_type === "student");
+  const guardianSend = credentialSendPayloads.find((payload) => payload.subject_type === "guardian");
+  if (studentSend?.phone_number !== "0300 1112233") throw new Error(`Student delivery target was not preserved: ${JSON.stringify(studentSend)}`);
+  if (guardianSend?.phone_number !== "0321 1234506") throw new Error(`Guardian delivery target was not preserved: ${JSON.stringify(guardianSend)}`);
+  const conversionText = await dialog.innerText();
+  if (conversionText.includes("SECRET-CONVERT")) throw new Error("Conversion setup token leaked into visible UI text");
+  await shot(page, "CURRENT-18_conversion-credential-delivery_desktop.png", dialog);
+  await dialog.getByRole("button", { name: "Done" }).click();
 
   await open(page, "/people/donators");
   await page.getByPlaceholder("Search donor name or contact").fill("0300");

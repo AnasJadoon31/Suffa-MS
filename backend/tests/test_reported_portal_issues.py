@@ -1,5 +1,7 @@
 """Regression checks for the teacher/admin issues reported in Issues.pdf."""
 
+import json
+
 import pytest
 import httpx
 from fastapi import HTTPException
@@ -10,7 +12,8 @@ from app.core.error_codes import ErrorCode
 from app.core.pdf import render_result_card_pdf
 from app.modules.messaging.models import MessageLog, MessageTemplate
 from app.modules.messaging.routes import render_and_dispatch
-from app.modules.auth.models import User, UserPermission
+from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
+from app.modules.people.models import Guardian
 
 
 async def _grant_scoped(db_sessionmaker, seed, code: str, class_id) -> None:
@@ -339,6 +342,189 @@ async def test_whatsapp_pdf_cannot_use_another_tenants_instance(
             )
         assert exc_info.value.status_code == 403
         assert await db.scalar(select(func.count()).select_from(MessageLog)) == 0
+
+
+async def test_guardian_credentials_can_be_sent_to_selected_registered_phone(
+    client, seed, db_sessionmaker, monkeypatch,
+):
+    calls: list[tuple[str, str, dict]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content or b"{}") if request.content else {}
+        calls.append((request.method, request.url.path, body))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(200, request=request, json={"instance": {"instanceName": "suffa-ms", "state": "open"}})
+        if request.url.path == "/message/sendText/suffa-ms":
+            return httpx.Response(201, request=request, json={"status": "success"})
+        return httpx.Response(404, request=request, json={"message": "unexpected endpoint"})
+
+    transport = httpx.MockTransport(handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=transport, **kwargs))
+    monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "test-key")
+    monkeypatch.setattr(settings, "evolution_instance", "suffa-ms")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
+
+    async with db_sessionmaker() as db:
+        guardian_user = User(
+            madrasa_id=seed.madrasa.id,
+            username="guardian-credentials",
+            password_hash="x",
+            role=UserRole.parent,
+            status=UserStatus.active,
+        )
+        db.add(guardian_user)
+        await db.flush()
+        guardian = Guardian(
+            madrasa_id=seed.madrasa.id,
+            user_id=guardian_user.id,
+            name="Guardian Credentials",
+            relationship="father",
+            phone_numbers="+923001111111, +923002222222",
+            preferred_language="en",
+        )
+        db.add_all([
+            guardian,
+            MessageTemplate(
+                madrasa_id=seed.madrasa.id,
+                code="credentials",
+                name="Credentials",
+                content={"en": "Login {username} at {setup_link}"},
+            ),
+        ])
+        await db.commit()
+        guardian_id = guardian.id
+
+    response = await client.post(
+        "/api/v1/messaging/send-credentials",
+        json={
+            "subject_type": "guardian",
+            "subject_id": str(guardian_id),
+            "set_password_url": "https://suffa.test/set-password?token=SECRET-GUARDIAN",
+            "phone_number": "+923002222222",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["normalised_number"] == "923002222222"
+    assert body["direct_sent"] is True
+    assert body["url"] == ""
+    assert calls == [
+        ("GET", "/instance/connectionState/suffa-ms", {}),
+        (
+            "POST",
+            "/message/sendText/suffa-ms",
+            {"number": "923002222222", "text": "Login guardian-credentials at https://suffa.test/set-password?token=SECRET-GUARDIAN"},
+        ),
+    ]
+    async with db_sessionmaker() as db:
+        log = (await db.execute(select(MessageLog).where(MessageLog.recipient_id == guardian_id))).scalar_one()
+        assert log.recipient_type == "guardian"
+        assert log.recipient_number == "923002222222"
+        assert "guardian-credentials" in log.content_sent
+        assert "SECRET-GUARDIAN" not in log.content_sent
+        assert "[setup-link-redacted]" in log.content_sent
+
+
+async def test_guardian_credentials_fail_when_direct_delivery_is_not_configured(
+    client, seed, db_sessionmaker, monkeypatch,
+):
+    monkeypatch.setattr(settings, "evolution_api_url", "")
+    monkeypatch.setattr(settings, "evolution_api_key", "")
+    monkeypatch.setattr(settings, "evolution_instance", "")
+    async with db_sessionmaker() as db:
+        guardian_user = User(
+            madrasa_id=seed.madrasa.id,
+            username="guardian-no-evolution",
+            password_hash="x",
+            role=UserRole.parent,
+            status=UserStatus.active,
+        )
+        db.add(guardian_user)
+        await db.flush()
+        guardian = Guardian(
+            madrasa_id=seed.madrasa.id,
+            user_id=guardian_user.id,
+            name="Guardian No Evolution",
+            relationship="father",
+            phone_numbers="+923001111111",
+            preferred_language="en",
+        )
+        db.add_all([
+            guardian,
+            MessageTemplate(
+                madrasa_id=seed.madrasa.id,
+                code="credentials",
+                name="Credentials",
+                content={"en": "Login {username} at {setup_link}"},
+            ),
+        ])
+        await db.commit()
+        guardian_id = guardian.id
+
+    response = await client.post(
+        "/api/v1/messaging/send-credentials",
+        json={
+            "subject_type": "guardian",
+            "subject_id": str(guardian_id),
+            "set_password_url": "https://suffa.test/set-password?token=SECRET-GUARDIAN",
+            "phone_number": "+923001111111",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == ErrorCode.WHATSAPP_DELIVERY_NOT_CONFIGURED
+    async with db_sessionmaker() as db:
+        assert await db.scalar(select(func.count()).select_from(MessageLog).where(MessageLog.recipient_id == guardian_id)) == 0
+
+
+async def test_guardian_credentials_reject_unregistered_phone_choice(
+    client, seed, db_sessionmaker,
+):
+    async with db_sessionmaker() as db:
+        guardian_user = User(
+            madrasa_id=seed.madrasa.id,
+            username="guardian-wrong-phone",
+            password_hash="x",
+            role=UserRole.parent,
+            status=UserStatus.active,
+        )
+        db.add(guardian_user)
+        await db.flush()
+        guardian = Guardian(
+            madrasa_id=seed.madrasa.id,
+            user_id=guardian_user.id,
+            name="Guardian Wrong Phone",
+            relationship="mother",
+            phone_numbers="+923001111111",
+            preferred_language="en",
+        )
+        db.add_all([
+            guardian,
+            MessageTemplate(
+                madrasa_id=seed.madrasa.id,
+                code="credentials",
+                name="Credentials",
+                content={"en": "Login {username} at {setup_link}"},
+            ),
+        ])
+        await db.commit()
+        guardian_id = guardian.id
+
+    response = await client.post(
+        "/api/v1/messaging/send-credentials",
+        json={
+            "subject_type": "guardian",
+            "subject_id": str(guardian_id),
+            "set_password_url": "https://suffa.test/set-password?token=SECRET-GUARDIAN",
+            "phone_number": "+923009999999",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == ErrorCode.WHATSAPP_PHONE_INVALID
 
 
 async def test_form_label_becomes_internal_key_when_key_is_omitted(client):

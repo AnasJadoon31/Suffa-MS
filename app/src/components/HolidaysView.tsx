@@ -14,6 +14,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
+import { ActionMenu } from "./ui/ActionMenu";
 
 type HolidayForm = {
   name: string;
@@ -226,14 +227,22 @@ export function HolidaysView() {
               </Button>
             </>
           ) : (
-            <>
-              <Button className="tableAction" type="button" onClick={() => startEditing(holiday)}>
-                <Pencil size={14} /> {t("editBtn")}
-              </Button>
-              <Button className="tableAction" type="button" onClick={() => deleteHoliday(holiday)}>
-                <Trash2 size={14} /> {t("deleteBtn")}
-              </Button>
-            </>
+            <ActionMenu
+              ariaLabel={`${t("actionsCol")}: ${holiday.name}`}
+              items={[
+                {
+                  label: t("editBtn"),
+                  icon: <Pencil size={14} />,
+                  onClick: () => startEditing(holiday),
+                },
+                {
+                  label: t("deleteBtn"),
+                  icon: <Trash2 size={14} />,
+                  destructive: true,
+                  onClick: () => deleteHoliday(holiday),
+                },
+              ]}
+            />
           ) }] : []),
         ]}
         data={holidays}

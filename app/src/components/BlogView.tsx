@@ -13,6 +13,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { BlogCard } from "./ui/Card";
+import { ActionMenu } from "./ui/ActionMenu";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -138,31 +139,31 @@ export function BlogView() {
             <p>{stripHtml(p.body).slice(0, 220)}{stripHtml(p.body).length > 220 ? "…" : ""}</p>
             <small>{new Date(p.created_at).toLocaleDateString()}</small>
             {canManage && (
-              <div className="formActions">
-                {!p.published && (
-                  <Button
-                    className="tableAction"
-                    type="button"
-                    onClick={async () => { await operationsApi.publishBlogPost(p.id); await load(); }}
-                  >
-                    <CheckCircle2 size={14} /> {t("publishBtn")}
-                  </Button>
-                )}
-                <Button className="tableAction" type="button" onClick={() => startEdit(p)}>
-                  <Pencil size={14} /> {t("editBtn")}
-                </Button>
-                <Button
-                  className="tableAction"
-                  type="button"
-                  onClick={async () => {
-                    if (!(await confirm(t("deletePostConfirm", { title: p.title })))) return;
-                    await operationsApi.deleteBlogPost(p.id);
-                    await load();
-                  }}
-                >
-                  <Trash2 size={14} /> {t("deleteBtn")}
-                </Button>
-              </div>
+              <ActionMenu
+                ariaLabel={`${t("actionsCol")}: ${p.title}`}
+                items={[
+                  ...(!p.published ? [{
+                    label: t("publishBtn"),
+                    icon: <CheckCircle2 size={14} />,
+                    onClick: async () => { await operationsApi.publishBlogPost(p.id); await load(); },
+                  }] : []),
+                  {
+                    label: t("editBtn"),
+                    icon: <Pencil size={14} />,
+                    onClick: () => startEdit(p),
+                  },
+                  {
+                    label: t("deleteBtn"),
+                    icon: <Trash2 size={14} />,
+                    destructive: true,
+                    onClick: async () => {
+                      if (!(await confirm(t("deletePostConfirm", { title: p.title })))) return;
+                      await operationsApi.deleteBlogPost(p.id);
+                      await load();
+                    },
+                  },
+                ]}
+              />
             )}
           </BlogCard>
         ))}

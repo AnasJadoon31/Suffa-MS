@@ -417,11 +417,13 @@ class AdmissionApplicationConvertRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     student_username: str = Field(min_length=3, max_length=80)
-    guardian_username: str = Field(min_length=3, max_length=80)
+    guardian_username: str | None = Field(default=None, min_length=3, max_length=80)
     guardian_name: str | None = Field(default=None, max_length=160)
     guardian_relationship: str | None = Field(default=None, max_length=80)
     guardian_cnic: str | None = Field(default=None, max_length=20)
     guardian_address: str | None = None
+    student_portal_enabled: bool | None = None
+    guardian_portal_enabled: bool | None = None
     student_preferred_language: str = "ur"
     guardian_preferred_language: str | None = None
     session_id: UUID

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, CheckCircle, Info, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { API_NOTIFICATION_EVENT, type ApiNotificationDetail } from "../../lib/apiNotifications";
 
 type SnackbarVariant = "success" | "error" | "warning" | "info";
 
@@ -64,6 +65,16 @@ export function SnackbarProvider({ children }: Readonly<{ children: ReactNode }>
     }),
     [show]
   );
+
+  useEffect(() => {
+    const handleNotification = (event: Event) => {
+      const detail = (event as CustomEvent<ApiNotificationDetail>).detail;
+      if (!detail) return;
+      show(detail.message ?? (detail.messageKey ? t(detail.messageKey) : ""), { variant: detail.variant });
+    };
+    window.addEventListener(API_NOTIFICATION_EVENT, handleNotification);
+    return () => window.removeEventListener(API_NOTIFICATION_EVENT, handleNotification);
+  }, [show, t]);
 
   return (
     <SnackbarContext.Provider value={value}>

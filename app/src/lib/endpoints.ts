@@ -170,7 +170,7 @@ export const peopleApi = {
     admission_form_id?: string; admission_answers?: Record<string, unknown>;
   }) =>
     api.post<Student>("/api/v1/people/students", payload).then((r) => r.data),
-  updateStudent: (id: string, payload: Partial<Omit<Student, "id" | "user_id" | "created_at">>) =>
+  updateStudent: (id: string, payload: Partial<Omit<Student, "id" | "user_id" | "created_at">> & { admission_answers?: Record<string, unknown> }) =>
     api.put<Student>(`/api/v1/people/students/${id}`, payload).then((r) => r.data),
   deactivateStudent: (id: string) => api.post(`/api/v1/people/students/${id}/deactivate`).then((r) => r.data),
 
@@ -206,9 +206,10 @@ export interface WhatsAppLink { normalised_number: string; url: string; direct_s
 export type WhatsAppConnectionState = "open" | "close" | "connecting" | "refused" | "not_created" | "unknown";
 export interface WhatsAppConnectionStatus { instance_name: string; state: WhatsAppConnectionState; connected: boolean }
 export interface WhatsAppPairingResponse { instance_name: string; state: WhatsAppConnectionState; pairing_code: string }
+export interface WhatsAppQrResponse { instance_name: string; state: WhatsAppConnectionState; qr_code_base64: string }
 
 export const messagingApi = {
-  sendCredentials: (payload: { subject_type: "student" | "teacher"; subject_id: string; set_password_url: string }) =>
+  sendCredentials: (payload: { subject_type: "student" | "teacher" | "guardian"; subject_id: string; set_password_url: string; phone_number?: string }) =>
     api.post<WhatsAppLink>("/api/v1/messaging/send-credentials", payload).then((r) => r.data),
   sendReport: (payload: { student_id: string; result_link?: string }) =>
     api.post<WhatsAppLink>("/api/v1/messaging/send-report", payload).then((r) => r.data),
@@ -216,6 +217,8 @@ export const messagingApi = {
     api.get<WhatsAppConnectionStatus>("/api/v1/messaging/whatsapp/connection").then((r) => r.data),
   requestWhatsAppPairingCode: (phoneNumber: string, replaceExisting = false) =>
     api.post<WhatsAppPairingResponse>("/api/v1/messaging/whatsapp/connection/pairing-code", { phone_number: phoneNumber, replace_existing: replaceExisting }).then((r) => r.data),
+  requestWhatsAppQrCode: (replaceExisting = false) =>
+    api.post<WhatsAppQrResponse>("/api/v1/messaging/whatsapp/connection/qr-code", null, { params: { replace_existing: replaceExisting } }).then((r) => r.data),
 };
 
 // ---------------------------------------------------------------- Attendance
@@ -496,6 +499,7 @@ export interface StudentDashboard {
   due_assignments: { id: string; title: string; due_date: string; course_id: string; submitted?: boolean; file_key?: string | null; mark?: number | null; max_marks?: number | null; feedback?: string | null }[];
   resources: { id: string; title: string }[];
   announcements: { id: string; title: string; body: string }[];
+  forms: { id: string; title: string; description: string; category: string | null; open_until: string | null }[];
 }
 export interface ParentChildDashboard extends Omit<StudentDashboard, "role" | "latest_result"> {
   id: string;
@@ -651,7 +655,9 @@ export const operationsApi = {
   }) => api.put<ResourceItem>(`/api/v1/operations/resources/${id}`, payload).then((r) => r.data),
   deleteResource: (id: string) => api.delete(`/api/v1/operations/resources/${id}`).then((r) => r.data),
 
-  listForms: (params?: { category?: string; mine_only?: boolean }) =>
+  listForms: (params?: {
+    category?: string; mine_only?: boolean; audience_role?: string; class_id?: string; section_id?: string; course_id?: string; user_id?: string;
+  }) =>
     getAllPages<FormDef>("/api/v1/operations/forms", params),
   getForm: (id: string) => api.get<FormDef>(`/api/v1/operations/forms/${id}`).then((r) => r.data),
   createForm: (payload: {
@@ -669,7 +675,7 @@ export const operationsApi = {
     getAllPages<FormResponse>(`/api/v1/operations/forms/${formId}/responses`),
   listAllFormResponses: (params?: {
     form_id?: string; respondent_role?: string; respondent_user_id?: string; student_id?: string;
-    class_id?: string; section_id?: string; date_from?: string; date_to?: string;
+    class_id?: string; section_id?: string; course_id?: string; date_from?: string; date_to?: string;
   }) => getAllPages<FormResponse>("/api/v1/operations/form-responses", params),
 
   listAnnouncements: (params?: { audience?: "teachers" | "students" | "all"; category?: string; q?: string; date_from?: string; date_to?: string }) =>
@@ -712,8 +718,9 @@ export const operationsApi = {
   admissionStatusHistory: (id: string) =>
     api.get<AdmissionApplication["status_history"]>(`/api/v1/operations/admissions/${id}/status-history`).then((r) => r.data),
   convertAdmission: (id: string, payload: {
-    student_username: string; guardian_username: string; guardian_name?: string; guardian_relationship?: string;
-    guardian_cnic?: string; guardian_address?: string; student_preferred_language?: string; guardian_preferred_language?: string;
+    student_username: string; guardian_username?: string; guardian_name?: string; guardian_relationship?: string;
+    guardian_cnic?: string; guardian_address?: string; student_portal_enabled?: boolean; guardian_portal_enabled?: boolean;
+    student_preferred_language?: string; guardian_preferred_language?: string;
     session_id: string; class_id: string; section_id: string;
   }) => api.post<AdmissionConversion>(`/api/v1/operations/admissions/${id}/convert`, payload).then((r) => r.data),
   listAdminNotifications: () => getAllPages<AdminNotification>("/api/v1/operations/admin-notifications"),

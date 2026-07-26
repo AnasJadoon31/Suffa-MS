@@ -3,6 +3,83 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-26 — ISS3 evidence refresh: action menus, credentials, built-ins, and gates
+
+This pass tightened the current Issues 3 implementation instead of treating the
+earlier tranche as sufficient. The main outcome is that the repo now has fresh
+automation for the UI surfaces that had visibly regressed, plus backend coverage
+for guardian credential delivery. Items that still require live Evolution API,
+full PostgreSQL legacy migration, or complete role/screenshot matrices remain
+tracked as WIP in `TO_IMPLEMENT.md`.
+
+- Expanded the shared row `ActionMenu` migration beyond People into Resources,
+  Blog, and Holidays, and updated the browser verifier to open the menu and
+  exercise representative view/download/edit/delete actions on desktop and
+  mobile.
+- Added guardian credential delivery support to the messaging API and People UI.
+  Admins can choose a registered guardian phone when multiple numbers exist;
+  teacher/student/guardian credential sends validate the selected phone and do
+  not expose set-password tokens in normal page text.
+- Re-aligned the Admission Form builder regression with the built-in student and
+  guardian sections: built-ins stay present/togglable, custom fields still render
+  and submit, and the verifier now edits the intended custom controls rather
+  than accidentally hitting locked built-in definitions.
+- Added a frontend unsafe-type ratchet so new `any`, `as any`, and TypeScript
+  suppression usage cannot silently increase while the broader endpoint-contract
+  cleanup continues.
+- Updated document-upload and live-seed verifiers to match the new Action menu
+  and server-generated admission-number contract.
+
+Fresh evidence from this pass:
+
+- Backend full suite: `263 passed, 2 skipped`.
+- Focused backend: guardian credential send/phone-selection tests passed;
+  admission/category/session slices passed; phone and WhatsApp connection tests
+  passed (`23 passed`).
+- Frontend: production build passed; i18n audit passed (`1058 keys checked`);
+  unsafe-type ratchet passed (`any=135/135`, `as-any=1/1`,
+  `ts-suppressions=0/0`).
+- Browser/scripted UI gates passed: `test:visual-issues`,
+  `test:foundation-components`, `test:action-menu`, `test:students-layout`,
+  `test:phone-inputs`, `test:whatsapp-connection`, `test:credential-links`,
+  `test:forms-responses`, `test:guardian-dashboard`, `test:audience-picker`,
+  `test:salary-history`, `test:finance-profiles`, `test:report-ranges`,
+  `test:document-uploads`, `test:attendance-defaults`, `test:my-assessments`,
+  `test:my-timetable`, `test:assignment-batch`, and
+  `test:admission-builder`.
+- Static hygiene: `git diff --check` passed for the implementation changes before
+  this note was added.
+- Production smoke: `https://api-suffa.anas31.qzz.io/readyz` returned 200 and
+  a browser login through `https://app-suffa.anas31.qzz.io/` reached the
+  dashboard with no critical failed API responses. Screenshot:
+  `/tmp/suffa-production-login-dashboard.png`. The public marketing site remains
+  `https://suffa.anas31.qzz.io/`.
+- Advanced ISS3-014 acceptance delivery: the Accept Application modal now keeps
+  the conversion open after account creation, lets the admin choose student and
+  guardian delivery targets, sends the generated credentials, shows delivery
+  results, and copies the setup link only as a failure fallback. The visual gate
+  submits the conversion, asserts the student/guardian credential-send payloads
+  preserve the chosen phones, and confirms the setup-token text is not visible.
+  Evidence: `test:visual-issues` captured
+  `CURRENT-18_conversion-credential-delivery_desktop.png`.
+- Strengthened ISS3-007 evidence: the current visual gate opens Student Details
+  → Edit Student for a student with a snapshotted admission record containing
+  built-in identity/guardian fields plus custom questions, verifies those fields
+  render together, submits an admission answer edit, and asserts built-in answers
+  are preserved in the update payload. Evidence: `test:visual-issues` captured
+  `CURRENT-19_student-edit-admission-fields_desktop.png`; backend
+  `test_student_edit_updates_and_validates_admission_answers` covers merge and
+  validation behavior.
+- Closed the largest ISS3-021 implementation gap locally: credential delivery
+  now uses Evolution `sendText` for generated login links when Evolution is
+  configured, validates the selected student/teacher/guardian phone, returns a
+  503 delivery-not-configured error instead of pretending a direct send happened
+  when Evolution is absent, and redacts `/set-password?token=...` values from
+  `MessageLog.content_sent`. Evidence: focused messaging tests passed
+  (`15 passed` across WhatsApp connection plus credential delivery slices), the
+  full backend suite passed (`263 passed, 2 skipped`), and browser
+  credential/acceptance flows still hide raw setup URLs.
+
 ## 2026-07-26 — ISS3 implementation tranche and verification refresh
 
 This tranche moves the July 23 Issues 3 programme forward across shared UI,

@@ -33,7 +33,17 @@ export function SearchDropdown<T>({
   emptyLabel = "No matches",
 }: SearchDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
-  const visibleItems = useMemo(() => items.slice(0, 8), [items]);
+  const visibleItems = useMemo(() => {
+    const query = value.trim().toLowerCase();
+    const ranked = query
+      ? items.filter((item) => {
+        const label = getLabel(item).toLowerCase();
+        const description = getDescription?.(item).toLowerCase() ?? "";
+        return label.includes(query) || description.includes(query);
+      })
+      : items;
+    return ranked.slice(0, 8);
+  }, [getDescription, getLabel, items, value]);
 
   return (
     <div className="searchDropdown">

@@ -4,8 +4,25 @@ import { Edit2, Eye, FileText, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
 
-import { operationsApi, reportingApi, type FormDef, type FormFieldDefinition, type FormResponse, type ParentDashboard, type Scope } from "../lib/endpoints";
+import {
+  academicsApi,
+  operationsApi,
+  peopleApi,
+  reportingApi,
+  type AcademicClass,
+  type Course,
+  type FormDef,
+  type FormFieldDefinition,
+  type FormResponse,
+  type Guardian,
+  type ParentDashboard,
+  type Scope,
+  type Section,
+  type Student,
+  type Teacher,
+} from "../lib/endpoints";
 import { StagedAudiencePicker } from "./StagedAudiencePicker";
+import { SearchDropdown } from "./SearchDropdown";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
@@ -29,9 +46,19 @@ export function FormsView() {
   const [forms, setForms] = useState<FormDef[]>([]);
   const [activeTab, setActiveTab] = useState<"forms" | "responses">("forms");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [formFilters, setFormFilters] = useState({ audience_role: "", class_id: "", section_id: "", course_id: "", user_id: "" });
   const [selected, setSelected] = useState<FormDef | null>(null);
   const [responses, setResponses] = useState<FormResponse[]>([]);
-  const [responseFilters, setResponseFilters] = useState({ form_id: "", respondent_role: "", student_id: "", date_from: "", date_to: "" });
+  const [responseFilters, setResponseFilters] = useState({ form_id: "", respondent_role: "", respondent_user_id: "", student_id: "", class_id: "", section_id: "", course_id: "", date_from: "", date_to: "" });
+  const [classes, setClasses] = useState<AcademicClass[]>([]);
+  const [sectionsByClass, setSectionsByClass] = useState<Record<string, Section[]>>({});
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [formPersonSearch, setFormPersonSearch] = useState("");
+  const [responsePersonSearch, setResponsePersonSearch] = useState("");
+  const [responseStudentSearch, setResponseStudentSearch] = useState("");
   const [wards, setWards] = useState<ParentDashboard["children"]>([]);
   const [selectedWardId, setSelectedWardId] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -59,11 +86,26 @@ export function FormsView() {
     () => [...new Set(forms.map((f) => f.category).filter(Boolean))] as string[],
     [forms]
   );
+  const allSections = useMemo(() => Object.values(sectionsByClass).flat(), [sectionsByClass]);
+  const formSectionOptions = formFilters.class_id ? (sectionsByClass[formFilters.class_id] ?? []) : allSections;
+  const responseSectionOptions = responseFilters.class_id ? (sectionsByClass[responseFilters.class_id] ?? []) : allSections;
+  const peopleOptions = useMemo(() => [
+    ...teachers.map((person) => ({ id: person.id, user_id: person.user_id, name: person.name, role: "teacher" as const })),
+    ...students.map((person) => ({ id: person.id, user_id: person.user_id, name: person.name, role: "student" as const })),
+    ...guardians.filter((person) => person.user_id).map((person) => ({ id: person.id, user_id: person.user_id!, name: person.name, role: "guardian" as const })),
+  ], [guardians, students, teachers]);
 
   const load = async () => {
     setIsLoading(true);
     try {
-      setForms(await operationsApi.listForms({ category: categoryFilter || undefined }));
+      setForms(await operationsApi.listForms({
+        category: categoryFilter || undefined,
+        audience_role: formFilters.audience_role || undefined,
+        class_id: formFilters.class_id || undefined,
+        section_id: formFilters.section_id || undefined,
+        course_id: formFilters.course_id || undefined,
+        user_id: formFilters.user_id || undefined,
+      }));
       setLoadError("");
     } catch (err: any) {
       setLoadError(err.response?.data?.detail ?? t("failedLoadForms"));
@@ -74,7 +116,32 @@ export function FormsView() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryFilter]);
+  }, [categoryFilter, formFilters]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const classRows = await academicsApi.listClasses();
+        setClasses(classRows);
+        const sectionPairs = await Promise.all(classRows.map(async (item) => [item.id, await academicsApi.listSections(item.id)] as const));
+        setSectionsByClass(Object.fromEntries(sectionPairs));
+        const courseRows = (await Promise.all(classRows.map((item) => academicsApi.listCourses(item.id)))).flat();
+        setCourses([...new Map(courseRows.map((course) => [course.id, course])).values()]);
+        const [studentRows, teacherRows, guardianRows] = await Promise.all([
+          peopleApi.listStudents().catch(() => []),
+          peopleApi.listTeachers().catch(() => []),
+          peopleApi.listGuardians().catch(() => []),
+        ]);
+        setStudents(studentRows);
+        setTeachers(teacherRows);
+        setGuardians(guardianRows);
+      } catch {
+        setClasses([]);
+        setSectionsByClass({});
+        setCourses([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (user?.role !== "parent") return;
@@ -90,7 +157,11 @@ export function FormsView() {
     void operationsApi.listAllFormResponses({
       form_id: responseFilters.form_id || undefined,
       respondent_role: responseFilters.respondent_role || undefined,
+      respondent_user_id: responseFilters.respondent_user_id || undefined,
       student_id: responseFilters.student_id || undefined,
+      class_id: responseFilters.class_id || undefined,
+      section_id: responseFilters.section_id || undefined,
+      course_id: responseFilters.course_id || undefined,
       date_from: responseFilters.date_from || undefined,
       date_to: responseFilters.date_to || undefined,
     }).then(setResponses).catch(() => setResponses([]));
@@ -172,12 +243,56 @@ export function FormsView() {
         {knownCategories.map((c) => <option key={c} value={c} />)}
       </datalist>
 
-      <InlineFilter filters={[{
-        key: "category", type: "select", value: categoryFilter,
-        ariaLabel: t("categoryFilterLabel"), placeholder: t("allCategories"),
-        options: knownCategories.map((category) => ({ value: category, label: category })),
-        onChange: setCategoryFilter,
-      }]} />
+      <InlineFilter filters={[
+        {
+          key: "category", type: "select", value: categoryFilter,
+          ariaLabel: t("categoryFilterLabel"), placeholder: t("allCategories"),
+          options: knownCategories.map((category) => ({ value: category, label: category })),
+          onChange: setCategoryFilter,
+        },
+        {
+          key: "audience-role", type: "select", value: formFilters.audience_role,
+          placeholder: t("allRolesLabel"),
+          options: [{ value: "student", label: t("students") }, { value: "teacher", label: t("teachers") }, { value: "parent", label: t("guardians") }],
+          onChange: (value) => setFormFilters({ ...formFilters, audience_role: value }),
+        },
+        {
+          key: "audience-class", type: "select", value: formFilters.class_id,
+          placeholder: t("allClasses"),
+          options: classes.map((item) => ({ value: item.id, label: item.name })),
+          onChange: (value) => setFormFilters({ ...formFilters, class_id: value, section_id: "" }),
+        },
+        {
+          key: "audience-section", type: "select", value: formFilters.section_id,
+          placeholder: t("allSections"),
+          options: formSectionOptions.map((item) => ({ value: item.id, label: item.name })),
+          onChange: (value) => setFormFilters({ ...formFilters, section_id: value }),
+        },
+        {
+          key: "audience-course", type: "select", value: formFilters.course_id,
+          placeholder: t("allCourses"),
+          options: courses.map((item) => ({ value: item.id, label: item.name })),
+          onChange: (value) => setFormFilters({ ...formFilters, course_id: value }),
+        },
+      ]}>
+        <SearchDropdown
+          id="form-audience-person-filter"
+          label={t("specificPersonFilterLabel", "Specific person")}
+          placeholder={t("searchPeoplePlaceholder", "Search people")}
+          items={peopleOptions}
+          value={formPersonSearch}
+          getKey={(person) => person.user_id}
+          getLabel={(person) => person.name}
+          getDescription={(person) => t(person.role)}
+          onQueryChange={setFormPersonSearch}
+          onSelect={(person) => {
+            setFormPersonSearch(`${person.name} (${t(person.role)})`);
+            setFormFilters({ ...formFilters, user_id: person.user_id });
+          }}
+          emptyLabel={t("noMatchingPeople")}
+        />
+        {formFilters.user_id && <Button className="secondaryAction" type="button" onClick={() => { setFormPersonSearch(""); setFormFilters({ ...formFilters, user_id: "" }); }}>{t("cancelBtn")}</Button>}
+      </InlineFilter>
 
       <DataTable<FormDef>
         columns={[
@@ -300,10 +415,52 @@ export function FormsView() {
           <InlineFilter filters={[
             { key: "response-form", type: "select", value: responseFilters.form_id, placeholder: t("allFormsLabel"), options: forms.map((form) => ({ value: form.id, label: form.title })), onChange: (value) => setResponseFilters({ ...responseFilters, form_id: value }) },
             { key: "response-role", type: "select", value: responseFilters.respondent_role, placeholder: t("allRolesLabel"), options: [{ value: "student", label: t("students") }, { value: "teacher", label: t("teachers") }, { value: "parent", label: t("guardians") }], onChange: (value) => setResponseFilters({ ...responseFilters, respondent_role: value }) },
-            { key: "response-student", type: "input", value: responseFilters.student_id, placeholder: t("studentIdFilterPlaceholder"), onChange: (value) => setResponseFilters({ ...responseFilters, student_id: value }) },
+            { key: "response-class", type: "select", value: responseFilters.class_id, placeholder: t("allClasses"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: (value) => setResponseFilters({ ...responseFilters, class_id: value, section_id: "" }) },
+            { key: "response-section", type: "select", value: responseFilters.section_id, placeholder: t("allSections"), options: responseSectionOptions.map((item) => ({ value: item.id, label: item.name })), onChange: (value) => setResponseFilters({ ...responseFilters, section_id: value }) },
+            { key: "response-course", type: "select", value: responseFilters.course_id, placeholder: t("allCourses"), options: courses.map((item) => ({ value: item.id, label: item.name })), onChange: (value) => setResponseFilters({ ...responseFilters, course_id: value }) },
             { key: "response-from", type: "input", inputType: "date", value: responseFilters.date_from, ariaLabel: t("fromLabel"), onChange: (value) => setResponseFilters({ ...responseFilters, date_from: value }) },
             { key: "response-to", type: "input", inputType: "date", value: responseFilters.date_to, ariaLabel: t("toLabel"), onChange: (value) => setResponseFilters({ ...responseFilters, date_to: value }) },
-          ]} />
+          ]}>
+            <SearchDropdown
+              id="response-person-filter"
+              label={t("respondentLabel")}
+              placeholder={t("searchPeoplePlaceholder", "Search people")}
+              items={peopleOptions}
+              value={responsePersonSearch}
+              getKey={(person) => person.user_id}
+              getLabel={(person) => person.name}
+              getDescription={(person) => t(person.role)}
+              onQueryChange={setResponsePersonSearch}
+              onSelect={(person) => {
+                setResponsePersonSearch(`${person.name} (${t(person.role)})`);
+                setResponseFilters({ ...responseFilters, respondent_user_id: person.user_id });
+              }}
+              emptyLabel={t("noMatchingPeople")}
+            />
+            <SearchDropdown
+              id="response-student-filter"
+              label={t("wardLabel")}
+              placeholder={t("studentSearchPlaceholder")}
+              items={students}
+              value={responseStudentSearch}
+              getKey={(student) => student.id}
+              getLabel={(student) => student.name}
+              getDescription={(student) => student.admission_number}
+              onQueryChange={setResponseStudentSearch}
+              onSelect={(student) => {
+                setResponseStudentSearch(`${student.name} (${student.admission_number})`);
+                setResponseFilters({ ...responseFilters, student_id: student.id });
+              }}
+              emptyLabel={t("noStudentsYet")}
+            />
+            {(responseFilters.respondent_user_id || responseFilters.student_id) && (
+              <Button className="secondaryAction" type="button" onClick={() => {
+                setResponsePersonSearch("");
+                setResponseStudentSearch("");
+                setResponseFilters({ ...responseFilters, respondent_user_id: "", student_id: "" });
+              }}>{t("cancelBtn")}</Button>
+            )}
+          </InlineFilter>
           <DataTable<FormResponse>
             columns={[
               { header: t("formLabel"), render: (response) => forms.find((form) => form.id === response.form_id)?.title ?? "—" },

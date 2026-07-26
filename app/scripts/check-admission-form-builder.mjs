@@ -99,11 +99,11 @@ try {
   await dialog.getByLabel("Title", { exact: true }).fill("2027 admissions");
   await dialog.getByText("Built-in").first().waitFor();
   await dialog.getByRole("button", { name: "Add field" }).click();
-  await dialog.getByLabel("Label", { exact: true }).nth(11).fill("Previous school");
-  await dialog.getByLabel(/^Type/).nth(11).selectOption("textarea");
+  await dialog.getByLabel("Label", { exact: true }).nth(13).fill("Previous school");
+  await dialog.getByLabel(/^Type/).nth(13).selectOption("textarea");
   await dialog.getByRole("button", { name: "Add field" }).click();
-  await dialog.getByLabel("Label", { exact: true }).nth(12).fill("Preferred campus");
-  await dialog.getByLabel(/^Type/).nth(12).selectOption("radio");
+  await dialog.getByLabel("Label", { exact: true }).nth(14).fill("Preferred campus");
+  await dialog.getByLabel(/^Type/).nth(14).selectOption("radio");
   await dialog.getByRole("button", { name: "Create form" }).click();
   if (createdPayload) throw new Error("Option-based field was submitted without options");
   await dialog.getByLabel("Option 1").last().fill("North");
@@ -118,7 +118,7 @@ try {
   const previousSchool = createdPayload?.fields?.find((field) => field.key === "Previous school");
   const preferredCampus = createdPayload?.fields?.find((field) => field.key === "Preferred campus");
   if (
-    builtIns?.length !== 11 ||
+    builtIns?.length !== 13 ||
     !builtIns.some((field) => field.key === "guardian_phone_numbers" && field.enabled === true) ||
     JSON.stringify(previousSchool) !== JSON.stringify({ key: "Previous school", label: "Previous school", type: "textarea", required: true, options: [], enabled: true }) ||
     JSON.stringify(preferredCampus) !== JSON.stringify({ key: "Preferred campus", label: "Preferred campus", type: "radio", required: true, options: ["North", "South"], enabled: true })
@@ -129,7 +129,7 @@ try {
   await page.getByRole("button", { name: "Actions: 2027 admissions" }).click();
   await page.getByRole("menuitem", { name: "Edit" }).click();
   const editDialog = page.getByRole("dialog", { name: "Edit admission form" });
-  await editDialog.getByLabel("Label", { exact: true }).nth(11).fill("Previous madrasa");
+  await editDialog.getByLabel("Label", { exact: true }).nth(13).fill("Previous madrasa");
   await editDialog.getByRole("button", { name: "Save" }).click();
   await editDialog.waitFor({ state: "hidden" });
 
@@ -140,10 +140,12 @@ try {
   await page.goto(`${baseUrl}/public/admission/public-token`, { waitUntil: "domcontentloaded" });
   await page.getByLabel("Student name").fill("New Applicant");
   await page.getByLabel("Date of birth").fill("2017-02-03");
+  await page.getByLabel("Student portal").selectOption("enabled");
   await page.getByLabel("Guardian name").fill("New Guardian");
   await page.getByLabel("Guardian relationship").fill("father");
   await page.getByLabel("Guardian phone number").fill("3001234567");
   await page.getByLabel("Guardian preferred language").selectOption("ur");
+  await page.getByLabel("Guardian portal").selectOption("enabled");
   await page.getByLabel("Previous madrasa").fill("Suffa School");
   await page.getByRole("radio", { name: "North" }).check();
   await page.getByRole("button", { name: "Submit application" }).click();

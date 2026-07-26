@@ -56,10 +56,19 @@ async def test_download_rejects_another_madrasas_object_key(client, monkeypatch)
     ("filename", "content_type"),
     [
         ("lesson.pdf", "application/pdf"),
+        ("letter.doc", "application/msword"),
+        ("letter.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        ("sheet.xls", "application/vnd.ms-excel"),
         ("notes.md", "text/markdown"),
         ("sheet.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        ("slides.ppt", "application/vnd.ms-powerpoint"),
+        ("slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+        ("notes.odt", "application/vnd.oasis.opendocument.text"),
+        ("budget.ods", "application/vnd.oasis.opendocument.spreadsheet"),
         ("slides.odp", "application/vnd.oasis.opendocument.presentation"),
+        ("readme.txt", "text/plain"),
         ("data.csv", "text/csv"),
+        ("rich.rtf", "application/rtf"),
     ],
 )
 def test_document_upload_policy_allows_supported_family(filename, content_type):

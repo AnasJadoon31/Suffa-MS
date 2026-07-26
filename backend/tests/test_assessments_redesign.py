@@ -98,6 +98,34 @@ async def test_batch_edit_fans_out_and_delete_whole_batch(client, seed, db_sessi
     assert delete.json()["count"] == 2
 
 
+async def test_multi_section_batch_lists_once_unless_filtered_to_a_section(client, seed):
+    created = (
+        await client.post(
+            "/api/v1/assessments/assignments",
+            json=_assignment_payload(
+                seed,
+                title="Shared section homework",
+                section_ids=[str(seed.sections.a1.id), str(seed.sections.a2.id)],
+            ),
+        )
+    ).json()
+
+    unfiltered = await client.get("/api/v1/assessments/assignments")
+    assert unfiltered.status_code == 200
+    rows = [row for row in unfiltered.json() if row["batch_id"] == created[0]["batch_id"]]
+    assert len(rows) == 1
+    assert rows[0]["section_name"] == "Alif, Bay"
+
+    filtered = await client.get(
+        "/api/v1/assessments/assignments",
+        params={"section_id": str(seed.sections.a2.id)},
+    )
+    assert filtered.status_code == 200
+    filtered_rows = [row for row in filtered.json() if row["batch_id"] == created[0]["batch_id"]]
+    assert len(filtered_rows) == 1
+    assert filtered_rows[0]["section_name"] == "Bay"
+
+
 async def test_student_sees_only_own_section_assignments(client, student_client, seed):
     # student1 is in section Alif (a1).
     await client.post(
@@ -133,6 +161,75 @@ async def test_student_cannot_read_or_submit_assignment_outside_enrollment(clien
         json={"file_key": "submissions/not-mine.pdf"},
     )
     assert submission.status_code == 403
+
+
+async def test_student_can_replace_and_remove_submission_only_before_due_date(client, student_client, seed, db_sessionmaker):
+    future_assignment = (
+        await client.post(
+            "/api/v1/assessments/assignments",
+            json=_assignment_payload(
+                seed,
+                title="Future homework",
+                due_date="2027-07-01T00:00:00Z",
+                section_ids=[str(seed.sections.a1.id)],
+            ),
+        )
+    ).json()[0]
+
+    first = await student_client.post(
+        f"/api/v1/assessments/assignments/{future_assignment['id']}/submissions",
+        json={"file_key": "submissions/first.pdf"},
+    )
+    assert first.status_code == 200, first.text
+    replacement = await student_client.post(
+        f"/api/v1/assessments/assignments/{future_assignment['id']}/submissions",
+        json={"file_key": "submissions/replacement.pdf"},
+    )
+    assert replacement.status_code == 200, replacement.text
+    assert replacement.json()["file_key"] == "submissions/replacement.pdf"
+
+    removed = await student_client.delete(
+        f"/api/v1/assessments/assignments/{future_assignment['id']}/submissions/me",
+    )
+    assert removed.status_code == 200, removed.text
+    async with db_sessionmaker() as db:
+        remaining = (
+            await db.execute(
+                select(Submission).where(Submission.assignment_id == UUID(future_assignment["id"]))
+            )
+        ).scalar_one_or_none()
+        assert remaining is None
+
+    past_assignment = (
+        await client.post(
+            "/api/v1/assessments/assignments",
+            json=_assignment_payload(
+                seed,
+                title="Past homework",
+                due_date="2024-07-01T00:00:00Z",
+                section_ids=[str(seed.sections.a1.id)],
+            ),
+        )
+    ).json()[0]
+    late = await student_client.post(
+        f"/api/v1/assessments/assignments/{past_assignment['id']}/submissions",
+        json={"file_key": "submissions/late.pdf"},
+    )
+    assert late.status_code == 200, late.text
+    assert late.json()["is_late"] is True
+
+    late_replacement = await student_client.post(
+        f"/api/v1/assessments/assignments/{past_assignment['id']}/submissions",
+        json={"file_key": "submissions/late-replacement.pdf"},
+    )
+    assert late_replacement.status_code == 400
+    assert late_replacement.json()["detail"] == "Resubmission is only allowed until the due date"
+
+    late_removal = await student_client.delete(
+        f"/api/v1/assessments/assignments/{past_assignment['id']}/submissions/me",
+    )
+    assert late_removal.status_code == 400
+    assert late_removal.json()["detail"] == "Submission removal is only allowed until the due date"
 
 
 async def test_student_without_active_enrollment_sees_no_class_wide_assignments(

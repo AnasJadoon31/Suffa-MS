@@ -129,6 +129,13 @@ function ReissueCredentialsButton({
   );
 }
 
+function credentialPhones(value: string) {
+  return value
+    .split(/[;,]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 export type PeopleTab = "teachers" | "students" | "guardians" | "donators";
 
 export function PeopleView({
@@ -197,18 +204,20 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
   const [total, setTotal] = useState(0);
 
   const reissueCredentials = async (teacher: Teacher) => {
-    const result = await peopleApi.reissueTeacherCredentials(teacher.id);
-    const fullUrl = `${window.location.origin}${result.set_password_url}`;
-    await navigator.clipboard.writeText(fullUrl);
     try {
+      const result = await peopleApi.reissueTeacherCredentials(teacher.id);
+      const fullUrl = `${window.location.origin}${result.set_password_url}`;
+      await navigator.clipboard.writeText(fullUrl);
       await messagingApi.sendCredentials({
         subject_type: "teacher",
         subject_id: teacher.id,
         set_password_url: fullUrl,
       });
       setNotice(t("credentialsSentLabel"));
-    } catch {
-      setNotice(t("linkCopied"));
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      if (typeof detail === "string") setError(detail);
+      else setNotice(t("linkCopied"));
     }
   };
 
@@ -300,7 +309,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
 
   return (
     <>
-      <InlineFilter filters={[]}>
+      <InlineFilter className="studentsToolbar" filters={[]}>
         <SearchDropdown
           id="teacher-search"
           label={t("searchLabel")}
@@ -622,18 +631,20 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [total, setTotal] = useState(0);
 
   const reissueCredentials = async (student: Student) => {
-    const result = await peopleApi.reissueStudentCredentials(student.id);
-    const fullUrl = `${window.location.origin}${result.set_password_url}`;
-    await navigator.clipboard.writeText(fullUrl);
     try {
+      const result = await peopleApi.reissueStudentCredentials(student.id);
+      const fullUrl = `${window.location.origin}${result.set_password_url}`;
+      await navigator.clipboard.writeText(fullUrl);
       await messagingApi.sendCredentials({
         subject_type: "student",
         subject_id: student.id,
         set_password_url: fullUrl,
       });
       setNotice(t("credentialsSentLabel"));
-    } catch {
-      setNotice(t("linkCopied"));
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      if (typeof detail === "string") setError(detail);
+      else setNotice(t("linkCopied"));
     }
   };
 
@@ -717,15 +728,19 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
     try {
       let selectedGuardianIds = guardianMode === "link" ? guardianIds : [];
       if (guardianMode === "create") {
-        const guardian = await peopleApi.createGuardian({
-          name: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianName),
-          relationship: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianRelationship),
-          phone_numbers: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianPhoneNumbers),
-          cnic: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianCnic) || undefined,
-          address: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianAddress) || undefined,
-          preferred_language: answerString(admissionAnswers, BUILT_IN_ADMISSION_KEYS.guardianPreferredLanguage) || undefined,
-        });
-        selectedGuardianIds = [guardian.id];
+        const guardianAnswers = [
+          admissionAnswers,
+          ...(Array.isArray(admissionAnswers.guardians) ? admissionAnswers.guardians as Record<string, unknown>[] : []),
+        ];
+        const createdGuardians = await Promise.all(guardianAnswers.map((guardianAnswer) => peopleApi.createGuardian({
+          name: answerString(guardianAnswer, BUILT_IN_ADMISSION_KEYS.guardianName),
+          relationship: answerString(guardianAnswer, BUILT_IN_ADMISSION_KEYS.guardianRelationship),
+          phone_numbers: answerString(guardianAnswer, BUILT_IN_ADMISSION_KEYS.guardianPhoneNumbers),
+          cnic: answerString(guardianAnswer, BUILT_IN_ADMISSION_KEYS.guardianCnic) || undefined,
+          address: answerString(guardianAnswer, BUILT_IN_ADMISSION_KEYS.guardianAddress) || undefined,
+          preferred_language: answerString(guardianAnswer, BUILT_IN_ADMISSION_KEYS.guardianPreferredLanguage) || undefined,
+        })));
+        selectedGuardianIds = createdGuardians.map((guardian) => guardian.id);
       }
       const created = await peopleApi.createStudent({
         username: form.username,
@@ -752,7 +767,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
 
   return (
     <>
-      <InlineFilter filters={[{
+      <InlineFilter className="studentsToolbar" filters={[{
         key: "student-class", type: "select", label: t("classLabel"), value: classFilter,
         placeholder: t("allClasses"), options: classOptions.map((academicClass) => ({ value: academicClass.id, label: academicClass.name })),
         onChange: setClassFilter,
@@ -854,7 +869,14 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
               {guardianMode === "independent" && !selectedAdmissionFields.some((field) => field.key === BUILT_IN_ADMISSION_KEYS.studentPhone) && (
                 <p className="notice notice-warning">{t("independentStudentPhoneFieldHint", "Enable Student phone on this admission form before creating an independent portal account.")}</p>
               )}
-              <AdmissionAnswersFields fields={selectedAdmissionForm?.fields_definition ?? []} answers={admissionAnswers} onChange={setAdmissionAnswers} idPrefix="student-admission" />
+              <AdmissionAnswersFields
+                fields={selectedAdmissionForm?.fields_definition ?? []}
+                answers={admissionAnswers}
+                onChange={setAdmissionAnswers}
+                idPrefix="student-admission"
+                hideGuardianFields={guardianMode === "independent"}
+                allowAdditionalGuardians={guardianMode === "create"}
+              />
               </FormModal>
       )}
 
@@ -878,13 +900,14 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
       )}
 
       <DataTable<Student>
+        className="studentsTable"
         columns={[
-          { header: t("admissionNumberCol"), render: (s) => s.admission_number },
-          { header: t("studentNameLabel"), render: (s) => s.name },
-          { header: t("dobCol"), render: (s) => s.date_of_birth },
-          { header: t("portalCol"), render: (s) => s.portal_enabled ? t("enabledLabel") : t("disabledLabel") },
-          { header: t("statusCol"), render: (s) => s.status },
-          { header: t("actionsCol"), render: (s) => (
+          { header: t("admissionNumberCol"), className: "colAdmission", render: (s) => s.admission_number },
+          { header: t("studentNameLabel"), className: "colStudentName", render: (s) => s.name },
+          { header: t("dobCol"), className: "colDob", render: (s) => s.date_of_birth },
+          { header: t("portalCol"), className: "colPortal", render: (s) => s.portal_enabled ? t("enabledLabel") : t("disabledLabel") },
+          { header: t("statusCol"), className: "colStatus", render: (s) => s.status },
+          { header: t("actionsCol"), className: "colActions", render: (s) => (
             <ActionMenu items={[
               ...(canCreate ? [{
                 label: t("editBtn"),
@@ -957,6 +980,7 @@ function StudentDetail({
     b_form_number: student.b_form_number ?? "", address: student.address ?? "", phone: student.phone ?? "",
     is_independent: student.is_independent, notes: student.notes ?? ""
   });
+  const [editAdmissionAnswers, setEditAdmissionAnswers] = useState<Record<string, unknown>>(student.admission_record?.answers ?? {});
   const { hasPermission } = useAuth();
   const canEdit = hasPermission("students.edit");
   const activeEnrollment = student.active_enrollment;
@@ -1139,6 +1163,7 @@ function StudentDetail({
                 phone: editForm.phone || undefined,
                 is_independent: editForm.is_independent,
                 notes: editForm.notes || undefined,
+                ...(student.admission_record ? { admission_answers: editAdmissionAnswers } : {}),
               });
               setShowEdit(false);
               onUpdate();
@@ -1155,6 +1180,19 @@ function StudentDetail({
           <label className="checkboxLabel"><Input type="checkbox" checked={editForm.is_independent} onChange={(e) => setEditForm({ ...editForm, is_independent: e.target.checked })} />{t("independentStudentLabel")}</label>
           <label>{t("notesLabel")}<Input value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>
           <label className="checkboxLabel"><Input type="checkbox" checked={editForm.portal_enabled} onChange={(e) => setEditForm({ ...editForm, portal_enabled: e.target.checked })} />{t("portalEnabledLabel")}</label>
+          {student.admission_record && (
+            <fieldset className="choiceField">
+              <legend>{t("admissionInformationHeading", "Admission information")}</legend>
+              <p className="notice">{student.admission_record.form_title || t("sourceWalkIn")}</p>
+              <AdmissionAnswersFields
+                fields={student.admission_record.fields_definition}
+                answers={editAdmissionAnswers}
+                onChange={setEditAdmissionAnswers}
+                idPrefix="student-edit-admission"
+                hideGuardianFields={editForm.is_independent}
+              />
+            </fieldset>
+          )}
         </FormModal>
       )}
     </Modal>
@@ -1302,6 +1340,18 @@ function GuardiansTab({
     setError("");
     setNotice("");
     try {
+      const phones = credentialPhones(guardian.phone_numbers);
+      let phoneNumber = phones[0] ?? "";
+      if (phones.length > 1) {
+        const selected = await prompt(t("credentialPhonePrompt", { phones: phones.join(", ") }), {
+          title: t("credentialPhoneTitle"),
+          placeholder: phones[0],
+          defaultValue: phones[0],
+          confirmLabel: t("sendCredentialsBtn"),
+        });
+        if (!selected) return;
+        phoneNumber = selected;
+      }
       let username: string | undefined;
       if (!guardian.user_id) {
         username = (
@@ -1316,7 +1366,18 @@ function GuardiansTab({
       const result = await peopleApi.guardianCredentialsLink(guardian.id, username);
       const fullUrl = `${window.location.origin}${result.set_password_url}`;
       await navigator.clipboard.writeText(fullUrl);
-      setNotice(t("guardianLinkCopied", { username: result.username }));
+      try {
+        const link = await messagingApi.sendCredentials({
+          subject_type: "guardian",
+          subject_id: guardian.id,
+          set_password_url: fullUrl,
+          ...(phoneNumber ? { phone_number: phoneNumber } : {}),
+        });
+        if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
+        setNotice(t("credentialsSentLabel"));
+      } catch {
+        setNotice(t("guardianLinkCopied", { username: result.username }));
+      }
       await load();
     } catch (err: any) {
       setError(err.response?.data?.detail ?? t("failedSendCredentials"));

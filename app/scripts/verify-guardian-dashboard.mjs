@@ -25,6 +25,10 @@ const child = (id, name, score, status, totalPaid) => ({
   due_assignments: [{ id: `assignment-${id}`, title: "Memorisation revision", due_date: "2026-07-30T12:00:00Z", course_id: "course-1" }],
   resources: [{ id: `resource-${id}`, title: `${name} study guide` }],
   announcements: [{ id: `announcement-${id}`, title: `${name} parent meeting`, body: "After Asr prayer" }],
+  forms: [
+    { id: `form-common-${id}`, title: "All parent consent", description: "For every guardian", category: "consent", open_until: null },
+    { id: `form-${id}`, title: `${name} ward form`, description: `Only for ${name}`, category: "ward", open_until: "2026-08-15T00:00:00Z" },
+  ],
   fee_summary: { totals: [{ amount: totalPaid, currency: "PKR" }] },
   payments: [{ id: `payment-${id}`, category: "Monthly fee", amount: totalPaid, currency: "PKR", payment_date: "2026-07-01", note: "July" }],
 });
@@ -95,12 +99,23 @@ try {
   await page.getByLabel("Dashboard summary").getByText("2,000 PKR", { exact: true }).waitFor();
   await page.getByRole("heading", { name: "Attendance for Fatima Noor" }).waitFor();
   await page.getByText("Fatima Noor parent meeting", { exact: true }).waitFor();
+  await page.getByText("Forms shown here apply to Fatima Noor.").waitFor();
+  await page.getByText("Fatima Noor ward form", { exact: true }).waitFor();
+  if (await page.getByText("Ali Noor ward form", { exact: true }).count()) throw new Error("Sibling-specific form leaked after switching child");
   await page.getByText("Fatima Noor study guide", { exact: true }).waitFor();
   await page.screenshot({
     path: path.join(outputDir, "guardian-multi-child-dashboard.png"),
     fullPage: true,
     animations: "disabled",
   });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: path.join(outputDir, "guardian-multi-child-dashboard-mobile.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  if (overflow) throw new Error("Guardian dashboard overflowed on mobile");
   if (errors.length) throw new Error(errors.join("\n"));
   console.log("guardian dashboard verification passed");
 } finally {

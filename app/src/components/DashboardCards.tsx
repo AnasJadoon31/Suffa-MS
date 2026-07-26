@@ -228,6 +228,23 @@ function ParentDashboardCards({ data }: Readonly<{ data: ParentDashboard }>) {
           </PageSection>
 
           <PageSection>
+            <PageHeader title={t("forms")} notice={t("wardFormsHint", { name: child.name })} />
+            {child.forms.length === 0 && <p className="emptyState">{t("noFormsYet")}</p>}
+            <div className="dataTable">
+              {child.forms.map((form) => (
+                <div className="dataRow" key={form.id}>
+                  <span>
+                    <strong>{form.title}</strong>
+                    <small>{form.description || form.category || t("forms")}</small>
+                  </span>
+                  <span>{form.open_until ? form.open_until.slice(0, 10) : t("openBtn")}</span>
+                  <Link className="tableAction" to="/forms">{t("openBtn")}</Link>
+                </div>
+              ))}
+            </div>
+          </PageSection>
+
+          <PageSection>
             <PageHeader title={t("resources")} />
             {child.resources.length === 0 && <p className="emptyState">{t("noResourcesShared")}</p>}
             <div className="dataTable">

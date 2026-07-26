@@ -1,6 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { API_BASE } from "./config";
 import i18next from "../i18n";
+import { emitApiNotification } from "./apiNotifications";
 
 export const api = axios.create({
   baseURL: API_BASE,
@@ -90,10 +91,31 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const MUTATION_METHODS = new Set(["post", "put", "patch", "delete"]);
+const QUIET_MUTATION_PATHS = [
+  "/api/v1/auth/token",
+];
+
+function isMutationNotificationCandidate(method?: string, url?: string): boolean {
+  if (!method || !url || !MUTATION_METHODS.has(method.toLowerCase())) return false;
+  return !QUIET_MUTATION_PATHS.some((path) => url.includes(path));
+}
+
+function mutationSuccessKey(method?: string): string {
+  if (method?.toLowerCase() === "delete") return "mutationDeletedToast";
+  return "mutationSavedToast";
+}
+
 // Response Interceptor
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (isMutationNotificationCandidate(response.config.method, response.config.url)) {
+      emitApiNotification({ variant: "success", messageKey: mutationSuccessKey(response.config.method) });
+    }
+    return response;
+  },
   (error: AxiosError) => {
+    let errorMessage = String(i18next.t("mutationFailedToast"));
     if (error.response?.data && typeof error.response.data === "object" && "detail" in error.response.data) {
       const body = error.response.data as { detail?: unknown };
       const localizedErrors: Record<string, string> = {
@@ -117,12 +139,16 @@ api.interceptors.response.use(
       } else if (typeof body.detail !== "string") {
         body.detail = formatApiErrorDetail(body.detail, String(i18next.t("genericError")));
       }
+      if (typeof body.detail === "string") errorMessage = body.detail;
     }
     if (error.response?.status === 401) {
       // Clear local storage and redirect to login
       localStorage.removeItem("mms_token");
       // In a real app we'd dispatch an event or use a router redirect
       window.dispatchEvent(new Event("unauthorized"));
+    }
+    if (isMutationNotificationCandidate(error.config?.method, error.config?.url)) {
+      emitApiNotification({ variant: "error", message: errorMessage });
     }
     return Promise.reject(error);
   }

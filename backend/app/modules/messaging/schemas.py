@@ -41,15 +41,22 @@ class WhatsAppPairingResponse(BaseModel):
     pairing_code: str
 
 
+class WhatsAppQrResponse(BaseModel):
+    instance_name: str
+    state: WhatsAppConnectionState
+    qr_code_base64: str
+
+
 class SendReportRequest(BaseModel):
     student_id: UUID
     result_link: str | None = None  # tap-through URL to the full result card (FR/Appendix C {result_link})
 
 
 class SendCredentialsRequest(BaseModel):
-    subject_type: str = Field(pattern="^(student|teacher)$")
-    subject_id: UUID  # student_profiles.id or teacher_profiles.id
+    subject_type: str = Field(pattern="^(student|teacher|guardian)$")
+    subject_id: UUID  # student_profiles.id, teacher_profiles.id, or guardians.id
     set_password_url: str
+    phone_number: PakistanPhone | None = None
 
 
 class MessageTemplateCreate(BaseModel):

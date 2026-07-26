@@ -54,11 +54,11 @@ function MySalaryView() {
         {data && data.payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
         {data?.payments.map((p) => (
           <div className="dataRow" key={p.id}>
-            <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
-            <span>{p.period_covered}</span>
-            <span>{p.currency} {p.amount}</span>
-            <span>{p.method}</span>
-            <span>{p.note || "—"}</span>
+            <span data-label={t("dateCol")}>{p.payment_date}<HijriTag date={p.payment_date} /></span>
+            <span data-label={t("periodCoveredCol")}>{p.period_covered}</span>
+            <span data-label={t("amountCol")}>{p.currency} {p.amount}</span>
+            <span data-label={t("methodCol")}>{p.method}</span>
+            <span data-label={t("notesLabel")}>{p.note || "—"}</span>
           </div>
         ))}
       </div>
@@ -79,6 +79,8 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const [salaryForm, setSalaryForm] = useState({ amount: "", effective_from: "" });
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
   const [paymentEditForm, setPaymentEditForm] = useState({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
+  const [recordSalaryTeacherId, setRecordSalaryTeacherId] = useState("");
+  const [recordSalaryTeacherSearch, setRecordSalaryTeacherSearch] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -129,6 +131,19 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
     }
   };
 
+  const teacherLabel = (id: string) => {
+    const teacher = teachers.find((row) => row.id === id);
+    return teacher ? `${teacher.name} (${teacher.employee_code})` : "";
+  };
+
+  const openRecordSalaryModal = (id = teacherId) => {
+    setError("");
+    setPaymentForm({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
+    setRecordSalaryTeacherId(id);
+    setRecordSalaryTeacherSearch(teacherLabel(id));
+    setEditModal("payment");
+  };
+
   const startEditPayment = (payment: SalaryPayment) => {
     setPaymentEditForm({
       amount: String(payment.amount),
@@ -163,6 +178,13 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
       teacher.name.toLowerCase().includes(query) || teacher.employee_code.toLowerCase().includes(query)
     ));
   }, [teacherSearch, teachers]);
+  const recordSalaryTeachers = useMemo(() => {
+    const query = recordSalaryTeacherSearch.trim().toLowerCase();
+    if (!query) return teachers;
+    return teachers.filter((teacher) => (
+      teacher.name.toLowerCase().includes(query) || teacher.employee_code.toLowerCase().includes(query)
+    ));
+  }, [recordSalaryTeacherSearch, teachers]);
 
   return (
     <PageSection>
@@ -172,36 +194,45 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
       {!isLoading && loadError && <ErrorState message={loadError} />}
 
       {!isLoading && !loadError && (
-        <div className="dataTable salaryHistoryTable">
-          <div className="dataRow header">
-            <span>{t("teacherLabel")}</span><span>{t("amountCol")}</span>
-            <span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span>
-            <span>{t("methodCol")}</span><span>{t("statusCol")}</span><span>{t("actionsCol")}</span>
-          </div>
-          {history.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
-          {history.map((payment) => (
-            <div className="dataRow" key={payment.id}>
-              <span><strong>{payment.teacher_name}</strong><small>{payment.employee_code}</small></span>
-              <span>{payment.currency} {payment.amount}</span>
-              <span>{payment.payment_date}</span><span>{payment.period_covered}</span>
-              <span>{payment.method}</span><span className="badge success">{payment.status}</span>
-              <span><ActionMenu ariaLabel={t("actionsCol")} items={[
-                {
-                  label: t("viewBtn"),
-                  onClick: () => {
-                    const teacher = teachers.find((row) => row.id === payment.teacher_id);
-                    setTeacherSearch(teacher ? `${teacher.name} (${teacher.employee_code})` : payment.teacher_name);
-                    void loadTeacher(payment.teacher_id);
-                  },
-                },
-                ...(canWrite ? [
-                  { label: t("editBtn"), icon: <Pencil size={14} />, onClick: () => startEditPayment(payment) },
-                  { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => deletePayment(payment) },
-                ] : []),
-              ]} /></span>
+        <>
+          {canWrite && (
+            <div className="formActions salaryPrimaryActions">
+              <Button className="primaryAction" type="button" onClick={() => openRecordSalaryModal()}>
+                <Plus size={16} /> {t("recordSalaryBtn")}
+              </Button>
             </div>
-          ))}
-        </div>
+          )}
+          <div className="dataTable salaryHistoryTable">
+            <div className="dataRow header">
+              <span>{t("teacherLabel")}</span><span>{t("amountCol")}</span>
+              <span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span>
+              <span>{t("methodCol")}</span><span>{t("statusCol")}</span><span>{t("actionsCol")}</span>
+            </div>
+            {history.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
+            {history.map((payment) => (
+              <div className="dataRow" key={payment.id}>
+                <span data-label={t("teacherLabel")}><strong>{payment.teacher_name}</strong><small>{payment.employee_code}</small></span>
+                <span data-label={t("amountCol")}>{payment.currency} {payment.amount}</span>
+                <span data-label={t("dateCol")}>{payment.payment_date}</span><span data-label={t("periodCoveredCol")}>{payment.period_covered}</span>
+                <span data-label={t("methodCol")}>{payment.method}</span><span data-label={t("statusCol")}><span className="badge success">{payment.status}</span></span>
+                <span data-label={t("actionsCol")}><ActionMenu ariaLabel={t("actionsCol")} items={[
+                  {
+                    label: t("viewBtn"),
+                    onClick: () => {
+                      const teacher = teachers.find((row) => row.id === payment.teacher_id);
+                      setTeacherSearch(teacher ? `${teacher.name} (${teacher.employee_code})` : payment.teacher_name);
+                      void loadTeacher(payment.teacher_id);
+                    },
+                  },
+                  ...(canWrite ? [
+                    { label: t("editBtn"), icon: <Pencil size={14} />, onClick: () => startEditPayment(payment) },
+                    { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => deletePayment(payment) },
+                  ] : []),
+                ]} /></span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <InlineFilter filters={[]}>
@@ -242,7 +273,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
 
       {teacherId && (
         <>
-          {canWrite && <div className="formActions"><Button className="primaryAction" type="button" onClick={() => setEditModal("salary")}><Plus size={16} /> {t("saveSalaryBtn")}</Button><Button className="primaryAction" type="button" onClick={() => setEditModal("payment")}><Plus size={16} /> {t("recordSalaryBtn")}</Button></div>}
+          {canWrite && <div className="formActions"><Button className="primaryAction" type="button" onClick={() => setEditModal("salary")}><Plus size={16} /> {t("saveSalaryBtn")}</Button><Button className="primaryAction" type="button" onClick={() => openRecordSalaryModal(teacherId)}><Plus size={16} /> {t("recordSalaryBtn")}</Button></div>}
           {canWrite && editModal === "salary" && <FormModal
                     title={t("saveSalaryBtn")} onClose={() => setEditModal(null)}
                     onSubmit={async (e) => {
@@ -272,56 +303,17 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
           {notice && <p className="notice">{notice}</p>}
           {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 
-          {canWrite && editModal === "payment" && <FormModal
-                    title={t("recordSalaryBtn")} onClose={() => setEditModal(null)}
-                    onSubmit={async (e) => {
-                                e.preventDefault();
-                                setError("");
-                                const { amount, payment_date, period_covered, method } = paymentForm;
-                                if (!amount || !payment_date || !period_covered || !method) return;
-                                try {
-                                  await financeApi.recordSalaryPayment(teacherId, {
-                                    amount: Number(amount), payment_date, period_covered, method, note: paymentForm.note || undefined,
-                                  });
-                                  setPaymentForm({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
-                                  setEditModal(null);
-                                  await Promise.all([refreshHistory(), refreshSelectedTeacher()]);
-                                } catch (err: any) {
-                                  setError(err.response?.data?.detail ?? t("failedRecordPayment"));
-                                }
-                              }}
-                    submitLabel={t("recordSalaryBtn")}
-                    submitIcon={<Plus size={16} />}
-                  >
-                    <label>{t("amountCol")}<Input required type="number" min={0} value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} /></label>
-
-                  <label>{t("dateCol")}<Input required type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} /></label>
-
-                  <label>{t("periodCoveredCol")}<Input required value={paymentForm.period_covered} onChange={(e) => setPaymentForm({ ...paymentForm, period_covered: e.target.value })} placeholder={t("monthYearExample")} /></label>
-
-                  <label>
-                                {t("methodCol")}
-                                <Select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}>
-                                  <option value="cash">{t("methodCash")}</option>
-                                  <option value="bank_transfer">{t("methodBank")}</option>
-                                  <option value="cheque">{t("methodCheque")}</option>
-                                </Select>
-                              </label>
-
-                  <label>{t("notesLabel")}<Input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} /></label>
-                  </FormModal>}
-
           <div className="dataTable">
             <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span><span>{t("actionsCol")}</span></div>
             {payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
             {payments.map((p) => (
               <div className="dataRow" key={p.id}>
-                <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
-                <span>{p.period_covered}</span>
-                <span>{p.currency} {p.amount}</span>
-                <span>{p.method}</span>
-                <span>{p.note || "—"}</span>
-                <span>
+                <span data-label={t("dateCol")}>{p.payment_date}<HijriTag date={p.payment_date} /></span>
+                <span data-label={t("periodCoveredCol")}>{p.period_covered}</span>
+                <span data-label={t("amountCol")}>{p.currency} {p.amount}</span>
+                <span data-label={t("methodCol")}>{p.method}</span>
+                <span data-label={t("notesLabel")}>{p.note || "—"}</span>
+                <span data-label={t("actionsCol")}>
                   <ActionMenu ariaLabel={t("actionsCol")} items={[
                     { label: t("editBtn"), icon: <Pencil size={14} />, disabled: !canWrite, onClick: () => startEditPayment(p) },
                     { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: !canWrite, onClick: () => deletePayment(p) },
@@ -332,6 +324,69 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
           </div>
         </>
       )}
+
+      {canWrite && editModal === "payment" && <FormModal
+        title={t("recordSalaryBtn")} onClose={() => setEditModal(null)}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setError("");
+          const targetTeacherId = recordSalaryTeacherId || teacherId;
+          if (!targetTeacherId) {
+            setError(t("selectTeacherFirst"));
+            return;
+          }
+          const { amount, payment_date, period_covered, method } = paymentForm;
+          if (!amount || !payment_date || !period_covered || !method) return;
+          try {
+            await financeApi.recordSalaryPayment(targetTeacherId, {
+              amount: Number(amount), payment_date, period_covered, method, note: paymentForm.note || undefined,
+            });
+            setPaymentForm({ amount: "", payment_date: "", period_covered: "", method: "cash", note: "" });
+            setEditModal(null);
+            if (targetTeacherId !== teacherId) {
+              setTeacherSearch(teacherLabel(targetTeacherId));
+              await loadTeacher(targetTeacherId);
+            }
+            await Promise.all([refreshHistory(), refreshSelectedTeacher()]);
+          } catch (err: any) {
+            setError(err.response?.data?.detail ?? t("failedRecordPayment"));
+          }
+        }}
+        submitLabel={t("recordSalaryBtn")}
+        submitIcon={<Plus size={16} />}
+      >
+        <SearchDropdown
+          id="salary-record-teacher"
+          label={t("teacherLabel")}
+          placeholder={t("teacherSearchPlaceholder")}
+          items={recordSalaryTeachers}
+          value={recordSalaryTeacherSearch}
+          getKey={(teacher) => teacher.id}
+          getLabel={(teacher) => teacher.name}
+          getDescription={(teacher) => teacher.employee_code}
+          onQueryChange={(query) => {
+            setRecordSalaryTeacherSearch(query);
+            setRecordSalaryTeacherId("");
+          }}
+          onSelect={(teacher) => {
+            setRecordSalaryTeacherId(teacher.id);
+            setRecordSalaryTeacherSearch(`${teacher.name} (${teacher.employee_code})`);
+          }}
+          emptyLabel={t("noTeachersYet")}
+        />
+        <label>{t("amountCol")}<Input required type="number" min={0} value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} /></label>
+        <label>{t("dateCol")}<Input required type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} /></label>
+        <label>{t("periodCoveredCol")}<Input required value={paymentForm.period_covered} onChange={(e) => setPaymentForm({ ...paymentForm, period_covered: e.target.value })} placeholder={t("monthYearExample")} /></label>
+        <label>
+          {t("methodCol")}
+          <Select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}>
+            <option value="cash">{t("methodCash")}</option>
+            <option value="bank_transfer">{t("methodBank")}</option>
+            <option value="cheque">{t("methodCheque")}</option>
+          </Select>
+        </label>
+        <label>{t("notesLabel")}<Input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} /></label>
+      </FormModal>}
 
       {canWrite && editingPayment && <FormModal
         title={t("editSalaryPaymentHeading")}
