@@ -1,0 +1,178 @@
+import { chromium } from "@playwright/test";
+import { spawn } from "node:child_process";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
+
+const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:4181";
+const outputDir = path.resolve("artifacts/audience-picker");
+let server;
+
+const students = [
+  {
+    id: "student-1",
+    user_id: "student-user-1",
+    username: "ali.noor",
+    admission_number: "ADM-0008",
+    name: "Ali Noor",
+    date_of_birth: "2017-12-01",
+    status: "active",
+    portal_enabled: true,
+    notes: "",
+    created_at: "2026-07-01T00:00:00Z",
+    b_form_number: "",
+    address: "",
+    current_class: "Hifz Level 1 / A",
+    active_enrollment: { class_id: "class-1", section_id: "section-1" },
+    set_password_url: "/set-password/student-token",
+    admission_record: null,
+  },
+  {
+    id: "student-2",
+    user_id: "student-user-2",
+    username: "demo.student",
+    admission_number: "ADM-0009",
+    name: "Demo Student",
+    date_of_birth: "2016-02-01",
+    status: "active",
+    portal_enabled: true,
+    notes: "",
+    created_at: "2026-07-01T00:00:00Z",
+    b_form_number: "",
+    address: "",
+    current_class: "Hifz Level 1 / A",
+    active_enrollment: { class_id: "class-1", section_id: "section-1" },
+    set_password_url: "/set-password/student-token-2",
+    admission_record: null,
+  },
+];
+
+async function ensureServer() {
+  if (process.env.TEST_BASE_URL) return;
+  server = spawn("node_modules/.bin/vite", ["--host", "127.0.0.1", "--port", "4181"], { stdio: "ignore" });
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      if ((await fetch(baseUrl)).ok) return;
+    } catch {
+      // Vite is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("Timed out starting Vite for audience picker verification");
+}
+
+function responseFor(pathname, request) {
+  if (pathname === "/api/v1/auth/me") {
+    return {
+      user: {
+        id: "principal-1",
+        username: "admin",
+        role: "principal",
+        status: "active",
+        preferred_language: "en",
+        is_principal_delegate: false,
+        selected_session_id: null,
+      },
+      madrasa: { id: "madrasa-1", slug: "suffa", name: "Suffa Madrasa" },
+      permissions: [],
+      features: {},
+      branding: {},
+      has_teaching_assignment: false,
+    };
+  }
+  if (pathname === "/api/v1/academics/today") return { gregorian: "26 Jul 2026", hijri: "11 Safar 1448 AH" };
+  if (pathname === "/api/v1/academics/classes") return [{ id: "class-1", program_id: "program-1", name: "Hifz Level 1", default_portal_enabled: true, assignment_limit: 8 }];
+  if (pathname === "/api/v1/academics/classes/class-1/sections") return [{ id: "section-1", class_id: "class-1", name: "A" }];
+  if (pathname === "/api/v1/operations/forms") return [];
+  if (pathname === "/api/v1/operations/form-responses") return [];
+  if (pathname === "/api/v1/people/students") {
+    const query = new URL(request.url()).searchParams.get("search")?.toLowerCase() ?? "";
+    return query ? students.filter((student) => student.name.toLowerCase().includes(query)) : students;
+  }
+  if (pathname === "/api/v1/people/teachers") return [];
+  if (pathname === "/api/v1/people/guardians") return [];
+  return [];
+}
+
+async function verifyAtViewport(browser, viewport, label) {
+  const context = await browser.newContext({
+    viewport,
+    locale: "en-US",
+    serviceWorkers: "block",
+    reducedMotion: "reduce",
+  });
+  await context.addInitScript(() => {
+    localStorage.setItem("mms_token", "audience-picker-token");
+    localStorage.setItem("mms_tenant", "suffa");
+    localStorage.setItem("i18nextLng", "en");
+  });
+  await context.route("**/api/v1/**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    const body = responseFor(pathname, route.request());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: {
+        "Access-Control-Expose-Headers": "X-Total-Count",
+        "X-Total-Count": Array.isArray(body) ? String(body.length) : "0",
+      },
+      body: JSON.stringify(body),
+    });
+  });
+
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+
+  try {
+    await page.goto(`${baseUrl}/forms`, { waitUntil: "domcontentloaded" });
+    await page.locator(".workspace").waitFor();
+    await page.getByRole("button", { name: "Create form" }).click();
+    const dialog = page.getByRole("dialog", { name: "Create form" });
+    await dialog.waitFor();
+
+    await dialog.getByRole("button", { name: /All students/i }).click();
+    const menu = dialog.locator(".peopleMultiSelectMenu");
+    await menu.waitFor();
+    await dialog.getByRole("searchbox", { name: "Search..." }).fill("Ali");
+    await dialog.getByRole("option", { name: /Ali Noor/ }).click();
+
+    await dialog.getByText("Ali Noor").first().waitFor();
+    await dialog.getByRole("button", { name: "Ali Noor", exact: true }).waitFor();
+    const visibleRawCheckboxes = await dialog.locator(".personList, .searchBox").count();
+    if (visibleRawCheckboxes > 0) {
+      throw new Error("Legacy raw person list/search box is still rendered");
+    }
+
+    const menuBox = await menu.boundingBox();
+    const triggerBox = await dialog.locator(".peopleMultiSelectTrigger").boundingBox();
+    const optionDisplay = await dialog.locator(".peopleMultiSelectOption").first().evaluate((element) => getComputedStyle(element).display);
+    if (!menuBox || !triggerBox || menuBox.height < 90 || menuBox.width < triggerBox.width - 4) {
+      throw new Error(`Audience picker dropdown dimensions look broken: menu=${JSON.stringify(menuBox)} trigger=${JSON.stringify(triggerBox)}`);
+    }
+    if (optionDisplay !== "grid") {
+      throw new Error(`Audience picker options are not styled rows; display=${optionDisplay}`);
+    }
+    if (errors.length) {
+      throw new Error(`Browser errors while verifying ${label}: ${errors.join(" | ")}`);
+    }
+
+    await mkdir(outputDir, { recursive: true });
+    await dialog.screenshot({ path: path.join(outputDir, `audience-picker-${label}.png`), animations: "disabled" });
+    console.log(`audience picker ${label}: searchable dropdown passed`);
+  } finally {
+    await context.close();
+  }
+}
+
+await ensureServer();
+const browser = await chromium.launch({ headless: true });
+try {
+  await verifyAtViewport(browser, { width: 1280, height: 900 }, "desktop");
+  await verifyAtViewport(browser, { width: 390, height: 844 }, "mobile");
+} finally {
+  await browser.close();
+  if (server) server.kill("SIGTERM");
+}

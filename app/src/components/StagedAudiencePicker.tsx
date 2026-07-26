@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { Search } from "lucide-react";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 
-import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Course, type Scope, type Section } from "../lib/endpoints";
+import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Scope, type Section } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
-import { Select, Checkbox } from "./ui/Field";
+import { Select } from "./ui/Field";
 
 type RoleMode = "teachers" | "students" | "guardians";
 type NarrowMode = "all" | "classes" | "sections" | "persons";
@@ -42,6 +42,11 @@ export function StagedAudiencePicker({
   const [roleMode, setRoleMode] = useState<RoleMode>("students");
   const [narrowMode, setNarrowMode] = useState<NarrowMode>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isPeopleDropdownOpen, setIsPeopleDropdownOpen] = useState(false);
+  const [peopleDropdownStyle, setPeopleDropdownStyle] = useState<CSSProperties | undefined>();
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [sections, setSections] = useState<Record<string, Section[]>>({});
@@ -51,6 +56,41 @@ export function StagedAudiencePicker({
   const [allPersons, setAllPersons] = useState<SelectedPerson[]>([]);
   const [selectedPersons, setSelectedPersons] = useState<SelectedPerson[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const roleLabel = roleMode === "guardians" ? t("guardians") : roleMode === "teachers" ? t("teachers") : t("students");
+  const selectedSummary = useMemo(() => {
+    if (selectedPersons.length === 0) {
+      return t("audienceAllRole", { role: roleLabel.toLowerCase(), defaultValue: `All ${roleLabel.toLowerCase()}` });
+    }
+    if (selectedPersons.length === 1) return selectedPersons[0].name;
+    return t("selectedPeopleCount", { count: selectedPersons.length, defaultValue: `${selectedPersons.length} selected` });
+  }, [roleLabel, selectedPersons, t]);
+
+  const resetPersonSelection = () => {
+    setSelectedPersons([]);
+    setSearchQuery("");
+    setAllPersons([]);
+  };
+
+  const updatePeopleDropdownPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const estimatedHeight = isLoading ? 160 : Math.min(Math.max(allPersons.length, 1) * 50 + 58, 340);
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+    const availableAbove = rect.top - 12;
+    const openAbove = availableBelow < estimatedHeight && availableAbove > availableBelow;
+    const maxHeight = Math.max(180, Math.min(estimatedHeight, openAbove ? availableAbove - 8 : availableBelow));
+    setPeopleDropdownStyle({
+      position: "fixed",
+      left: Math.max(8, rect.left),
+      width: Math.min(rect.width, window.innerWidth - 16),
+      ...(openAbove
+        ? { top: "auto", bottom: Math.max(8, window.innerHeight - rect.top + 6) }
+        : { top: Math.min(rect.bottom + 6, window.innerHeight - 8), bottom: "auto" }),
+      maxHeight,
+    });
+  }, [allPersons.length, isLoading]);
 
   // Load classes and sections
   useEffect(() => {
@@ -73,6 +113,35 @@ export function StagedAudiencePicker({
       setSections(byClass);
     }).catch(() => setClasses([]));
   }, [user?.role]);
+
+  useEffect(() => {
+    if (!isPeopleDropdownOpen) return;
+    updatePeopleDropdownPosition();
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!pickerRef.current?.contains(event.target as Node)) {
+        setIsPeopleDropdownOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsPeopleDropdownOpen(false);
+    };
+    const handleReposition = () => updatePeopleDropdownPosition();
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
+    };
+  }, [isPeopleDropdownOpen, updatePeopleDropdownPosition]);
+
+  useEffect(() => {
+    if (!isPeopleDropdownOpen) return;
+    window.setTimeout(() => searchInputRef.current?.focus(), 0);
+  }, [isPeopleDropdownOpen]);
 
   // Async person search based on the selected role. The API caps/pages the
   // result rather than rendering a tenant-wide checkbox wall.
@@ -165,12 +234,38 @@ export function StagedAudiencePicker({
     updateScope(next);
   };
 
+  const handleRoleChange = (nextRole: RoleMode) => {
+    setRoleMode(nextRole);
+    setNarrowMode("all");
+    setSelectedClassId("");
+    setSelectedSectionId("");
+    resetPersonSelection();
+  };
+
+  const handleNarrowChange = (nextMode: NarrowMode) => {
+    setNarrowMode(nextMode);
+    setSelectedClassId("");
+    setSelectedSectionId("");
+    resetPersonSelection();
+  };
+
+  const handleClassChange = (classId: string) => {
+    setSelectedClassId(classId);
+    setSelectedSectionId("");
+    resetPersonSelection();
+  };
+
+  const handleSectionChange = (sectionId: string) => {
+    setSelectedSectionId(sectionId);
+    resetPersonSelection();
+  };
+
   return (
     <div className="stagedAudiencePicker">
       {/* Stage 1: Role Selection */}
       <div className="stage">
         <label>{t("targetAudienceLabel")}</label>
-        <Select value={roleMode} onChange={(e) => setRoleMode(e.target.value as RoleMode)}>
+        <Select value={roleMode} onChange={(e) => handleRoleChange(e.target.value as RoleMode)}>
           <option value="teachers">{t("teachers")}</option>
           <option value="students">{t("students")}</option>
           <option value="guardians">{t("guardians")}</option>
@@ -180,19 +275,19 @@ export function StagedAudiencePicker({
       {/* Stage 2: Narrow by Class/Section */}
       <div className="stage">
         <label>{t("narrowByLabel", "Narrow by")}</label>
-        <Select value={narrowMode} onChange={(e) => setNarrowMode(e.target.value as NarrowMode)}>
+        <Select value={narrowMode} onChange={(e) => handleNarrowChange(e.target.value as NarrowMode)}>
           <option value="all">{t("allLabel", "All")}</option>
           <option value="classes">{t("classesLabel", "Classes")}</option>
           <option value="sections">{t("sectionsCol", "Sections")}</option>
         </Select>
         {(narrowMode === "classes" || narrowMode === "sections") && (
-          <Select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}>
+          <Select value={selectedClassId} onChange={(e) => handleClassChange(e.target.value)}>
             <option value="">{t("allClasses", "All classes")}</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         )}
         {narrowMode === "sections" && selectedClassId && (
-          <Select value={selectedSectionId} onChange={(e) => setSelectedSectionId(e.target.value)}>
+          <Select value={selectedSectionId} onChange={(e) => handleSectionChange(e.target.value)}>
             <option value="">{t("allSections", "All sections")}</option>
             {(sections[selectedClassId] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
@@ -202,42 +297,71 @@ export function StagedAudiencePicker({
       {/* Stage 3: Person Selection */}
       <div className="stage">
         <label>{t("selectPersonsLabel", "Select persons")}</label>
-        <div className="searchBox">
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder={t("searchPlaceholder", "Search...")}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+        <div className="peopleMultiSelect" ref={pickerRef}>
+          <button
+            ref={triggerRef}
+            type="button"
+            className="peopleMultiSelectTrigger"
+            aria-haspopup="listbox"
+            aria-expanded={isPeopleDropdownOpen}
+            onClick={() => setIsPeopleDropdownOpen((open) => !open)}
+          >
+            <span className="peopleMultiSelectSummary">{selectedSummary}</span>
+            <ChevronDown size={16} aria-hidden="true" />
+          </button>
 
-        {/* Selected chips */}
-        {selectedPersons.length > 0 && (
-          <div className="selectedChips">
-            {selectedPersons.map((p) => (
-              <span key={p.id} className="chip">
-                {p.name}
-                <button type="button" onClick={() => removePerson(p.id)}>×</button>
-              </span>
-            ))}
-          </div>
-        )}
+          {selectedPersons.length > 0 && (
+            <div className="selectedChips" aria-label={t("selectedPeopleCount", { count: selectedPersons.length, defaultValue: "Selected people" })}>
+              {selectedPersons.map((p) => (
+                <span key={p.id} className="chip">
+                  {p.name}
+                  <button type="button" aria-label={t("removePersonLabel", { name: p.name, defaultValue: `Remove ${p.name}` })} onClick={() => removePerson(p.id)}>
+                    <X size={13} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
-        {/* Person list */}
-        <div className="personList">
-          {isLoading && <p>{t("loadingLabel", "Loading...")}</p>}
-          {!isLoading && filteredPersons.length === 0 && <p>{t("noResults", "No results")}</p>}
-          {!isLoading && filteredPersons.map((person) => (
-            <label key={person.id} className="checkboxLabel">
-              <Checkbox
-                checked={selectedPersons.some((p) => p.id === person.id)}
-                onChange={() => togglePerson(person)}
-              />
-              <span>{person.name}</span>
-              <small className="roleTag">({t(person.role)})</small>
-            </label>
-          ))}
+          {isPeopleDropdownOpen && (
+            <div className="peopleMultiSelectMenu" style={peopleDropdownStyle}>
+              <div className="peopleMultiSelectSearch">
+                <Search size={16} aria-hidden="true" />
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  aria-label={t("searchPlaceholder", "Search...")}
+                  placeholder={t("searchPlaceholder", "Search...")}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <div className="peopleMultiSelectList" role="listbox" aria-multiselectable="true">
+                {isLoading && <p className="peopleMultiSelectState">{t("loadingLabel", "Loading...")}</p>}
+                {!isLoading && filteredPersons.length === 0 && <p className="peopleMultiSelectState">{t("noResults", "No results")}</p>}
+                {!isLoading && filteredPersons.map((person) => {
+                  const selected = selectedPersons.some((p) => p.id === person.id);
+                  return (
+                    <button
+                      key={person.id}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`peopleMultiSelectOption${selected ? " selected" : ""}`}
+                      onClick={() => togglePerson(person)}
+                    >
+                      <span className="peopleMultiSelectCheck">{selected && <Check size={14} />}</span>
+                      <span className="peopleMultiSelectPerson">
+                        <strong>{person.name}</strong>
+                        <small>{t(person.role)}</small>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

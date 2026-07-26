@@ -12,6 +12,7 @@
     "test:admission-builder": "node scripts/check-admission-form-builder.mjs",
     "test:assessment-errors": "node scripts/check-assessment-errors.mjs",
     "test:action-menu": "node scripts/verify-action-menu.mjs",
+    "test:audience-picker": "node scripts/verify-audience-picker.mjs",
     "test:visual-issues": "node scripts/verify-current-issues.mjs",
     "test:live-seed": "node scripts/seed-live-verification.mjs",
     "test:live-roles": "node scripts/verify-live-roles.mjs",
