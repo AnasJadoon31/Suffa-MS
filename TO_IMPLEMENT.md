@@ -143,9 +143,11 @@ role/language/screenshot matrix.
   dashboard, audience picker, salary history, finance profiles, report ranges,
   document uploads, attendance defaults, My Assessments, My Timetable,
   assignment batch, and admission builder.
-- **PROD26-SMOKE** — public API `/readyz` returned 200 and browser login through
-  `https://app-suffa.anas31.qzz.io/` reached the dashboard with no critical
-  failed API responses.
+- **PROD26-SMOKE** — GitHub commit
+  `938eebc98da4d938928ab647657ac8b2a13e5f2c` is deployed in Coolify; public API
+  `/readyz` returned 200 and browser login through
+  `https://app-suffa.anas31.qzz.io/` reached `/dashboard` with no critical
+  failed API responses. Screenshot: `/tmp/suffa-live-login-938eebc.png`.
 
 ## Previous verified reports (historical, 2026-07-22)
 

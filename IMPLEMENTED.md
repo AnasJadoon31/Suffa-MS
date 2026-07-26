@@ -36,7 +36,7 @@ Fresh evidence from this pass:
 - Focused backend: guardian credential send/phone-selection tests passed;
   admission/category/session slices passed; phone and WhatsApp connection tests
   passed (`23 passed`).
-- Frontend: production build passed; i18n audit passed (`1058 keys checked`);
+- Frontend: production build passed; i18n audit passed (`1067 keys checked`);
   unsafe-type ratchet passed (`any=135/135`, `as-any=1/1`,
   `ts-suppressions=0/0`).
 - Browser/scripted UI gates passed: `test:visual-issues`,
@@ -49,11 +49,13 @@ Fresh evidence from this pass:
   `test:admission-builder`.
 - Static hygiene: `git diff --check` passed for the implementation changes before
   this note was added.
-- Production smoke: `https://api-suffa.anas31.qzz.io/readyz` returned 200 and
-  a browser login through `https://app-suffa.anas31.qzz.io/` reached the
-  dashboard with no critical failed API responses. Screenshot:
-  `/tmp/suffa-production-login-dashboard.png`. The public marketing site remains
-  `https://suffa.anas31.qzz.io/`.
+- Production deploy/smoke: pushed and deployed GitHub commit
+  `938eebc98da4d938928ab647657ac8b2a13e5f2c` through Coolify. The running
+  app/web images use that tag, `https://api-suffa.anas31.qzz.io/readyz`
+  returned 200, and a browser login through
+  `https://app-suffa.anas31.qzz.io/` reached `/dashboard` with no critical
+  failed API responses. Screenshot: `/tmp/suffa-live-login-938eebc.png`. The
+  public marketing site remains `https://suffa.anas31.qzz.io/`.
 - Advanced ISS3-014 acceptance delivery: the Accept Application modal now keeps
   the conversion open after account creation, lets the admin choose student and
   guardian delivery targets, sends the generated credentials, shows delivery
