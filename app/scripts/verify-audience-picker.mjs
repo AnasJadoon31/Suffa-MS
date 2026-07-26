@@ -45,6 +45,16 @@ const students = [
     admission_record: null,
   },
 ];
+const guardians = [
+  {
+    id: "guardian-1",
+    user_id: "guardian-user-1",
+    name: "Shaikh Noor",
+    relationship: "father",
+    phone_numbers: "+923001234567",
+    ward_count: 2,
+  },
+];
 
 async function ensureServer() {
   if (process.env.TEST_BASE_URL) return;
@@ -89,7 +99,10 @@ function responseFor(pathname, request) {
     return query ? students.filter((student) => student.name.toLowerCase().includes(query)) : students;
   }
   if (pathname === "/api/v1/people/teachers") return [];
-  if (pathname === "/api/v1/people/guardians") return [];
+  if (pathname === "/api/v1/people/guardians") {
+    const query = new URL(request.url()).searchParams.get("search")?.toLowerCase() ?? "";
+    return query ? guardians.filter((guardian) => guardian.name.toLowerCase().includes(query)) : guardians;
+  }
   return [];
 }
 
@@ -105,8 +118,28 @@ async function verifyAtViewport(browser, viewport, label) {
     localStorage.setItem("mms_tenant", "suffa");
     localStorage.setItem("i18nextLng", "en");
   });
+  const formCreatePayloads = [];
   await context.route("**/api/v1/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
+    if (route.request().method() === "POST" && pathname === "/api/v1/operations/forms") {
+      const payload = route.request().postDataJSON();
+      formCreatePayloads.push(payload);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: `form-${formCreatePayloads.length}`,
+          title: payload.title,
+          description: payload.description ?? "",
+          category: payload.category ?? null,
+          fields_definition: payload.fields,
+          allow_multiple: payload.allow_multiple,
+          visibility_scope: payload.visibility_scope,
+          created_at: "2026-07-26T00:00:00Z",
+        }),
+      });
+      return;
+    }
     const body = responseFor(pathname, route.request());
     await route.fulfill({
       status: 200,
@@ -147,6 +180,13 @@ async function verifyAtViewport(browser, viewport, label) {
     await dialog.getByRole("searchbox", { name: "Search..." }).press("ArrowDown");
     await dialog.getByRole("searchbox", { name: "Search..." }).press("Enter");
     await dialog.getByText("Demo Student").first().waitFor();
+    await dialog.getByRole("searchbox", { name: "Search..." }).press("Escape");
+    await dialog.getByLabel("Target Audience").selectOption("guardians");
+    await dialog.getByRole("button", { name: /2 selected/i }).click();
+    await dialog.getByRole("searchbox", { name: "Search..." }).fill("Shaikh");
+    await dialog.getByRole("option", { name: /Shaikh Noor/ }).waitFor();
+    await dialog.getByRole("searchbox", { name: "Search..." }).press("Enter");
+    await dialog.getByRole("button", { name: /3 selected/i }).waitFor();
     const visibleRawCheckboxes = await dialog.locator(".personList, .searchBox").count();
     if (visibleRawCheckboxes > 0) {
       throw new Error("Legacy raw person list/search box is still rendered");
@@ -161,17 +201,31 @@ async function verifyAtViewport(browser, viewport, label) {
     if (optionDisplay !== "grid") {
       throw new Error(`Audience picker options are not styled rows; display=${optionDisplay}`);
     }
-    const selectedOptions = await dialog.locator(".peopleMultiSelectOption[aria-selected='true']").count();
-    if (selectedOptions !== 2) {
-      throw new Error(`Keyboard multi-select should have selected 2 people, selected=${selectedOptions}`);
+    const selectedChips = await dialog.locator(".selectedChips .chip").count();
+    if (selectedChips !== 3) {
+      throw new Error(`Keyboard mixed-role multi-select should have 3 chips, selected=${selectedChips}`);
+    }
+
+    await mkdir(outputDir, { recursive: true });
+    await dialog.screenshot({ path: path.join(outputDir, `audience-picker-${label}.png`), animations: "disabled" });
+    await dialog.getByLabel("Title").fill(`Mixed audience ${label}`);
+    await dialog.getByLabel("Label").first().fill("Consent");
+    await dialog.getByRole("button", { name: "Create form" }).click();
+    await dialog.waitFor({ state: "hidden" });
+    const scope = formCreatePayloads.at(-1)?.visibility_scope;
+    const users = new Set(scope?.users ?? []);
+    const roles = new Set(scope?.roles ?? []);
+    for (const userId of ["student-user-1", "student-user-2", "guardian-user-1"]) {
+      if (!users.has(userId)) throw new Error(`Mixed audience payload missed ${userId}: ${JSON.stringify(scope)}`);
+    }
+    for (const role of ["student", "parent"]) {
+      if (!roles.has(role)) throw new Error(`Mixed audience payload missed role ${role}: ${JSON.stringify(scope)}`);
     }
     if (errors.length) {
       throw new Error(`Browser errors while verifying ${label}: ${errors.join(" | ")}`);
     }
 
-    await mkdir(outputDir, { recursive: true });
-    await dialog.screenshot({ path: path.join(outputDir, `audience-picker-${label}.png`), animations: "disabled" });
-    console.log(`audience picker ${label}: searchable dropdown passed`);
+    console.log(`audience picker ${label}: searchable dropdown and mixed-role payload passed`);
   } finally {
     await context.close();
   }

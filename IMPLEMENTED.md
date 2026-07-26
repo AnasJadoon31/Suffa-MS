@@ -89,8 +89,11 @@ Fresh evidence from this pass:
   searchable multi-select: the trigger exposes listbox controls, the searchbox
   keeps `aria-activedescendant`, ArrowUp/ArrowDown/Home/End move the active
   option, Enter/Space toggles selection, Escape closes cleanly, and selected
-  chips remain visible. Evidence: `test:audience-picker` now selects multiple
-  students entirely from the keyboard on desktop and mobile and refreshes
+  chips remain visible. It also preserves selected people while changing role
+  filters and submits mixed student/guardian user IDs with both `student` and
+  `parent` roles. Evidence: `test:audience-picker` now selects students and a
+  guardian entirely from the keyboard on desktop and mobile, asserts the create
+  form API payload, and refreshes
   `artifacts/audience-picker/audience-picker-*.png`; production build and the
   unsafe-type ratchet passed after the change.
 

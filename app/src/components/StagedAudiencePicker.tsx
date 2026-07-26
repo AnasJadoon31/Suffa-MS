@@ -48,6 +48,8 @@ export function StagedAudiencePicker({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listboxId = useRef(`people-picker-${crypto.randomUUID()}`);
+  const roleSelectId = useRef(`audience-role-${crypto.randomUUID()}`);
+  const narrowSelectId = useRef(`audience-narrow-${crypto.randomUUID()}`);
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
 
   const [classes, setClasses] = useState<AcademicClass[]>([]);
@@ -68,8 +70,7 @@ export function StagedAudiencePicker({
     return t("selectedPeopleCount", { count: selectedPersons.length, defaultValue: `${selectedPersons.length} selected` });
   }, [roleLabel, selectedPersons, t]);
 
-  const resetPersonSelection = () => {
-    setSelectedPersons([]);
+  const resetPersonSearch = () => {
     setSearchQuery("");
     setAllPersons([]);
   };
@@ -196,11 +197,14 @@ export function StagedAudiencePicker({
     setActiveOptionIndex(0);
   }, [roleMode, searchQuery, selectedClassId, selectedSectionId, narrowMode]);
 
+  const personKey = (person: SelectedPerson) => person.user_id || `${person.role}:${person.id}`;
+
   const togglePerson = (person: SelectedPerson) => {
-    const exists = selectedPersons.some((p) => p.id === person.id);
+    const key = personKey(person);
+    const exists = selectedPersons.some((p) => personKey(p) === key);
     let next: SelectedPerson[];
     if (exists) {
-      next = selectedPersons.filter((p) => p.id !== person.id);
+      next = selectedPersons.filter((p) => personKey(p) !== key);
     } else {
       next = [...selectedPersons, person];
     }
@@ -260,9 +264,10 @@ export function StagedAudiencePicker({
 
   const updateScope = (persons: SelectedPerson[]) => {
     const userIds = persons.map((p) => p.user_id).filter(Boolean);
+    const roles = Array.from(new Set(persons.map((p) => p.role === "guardian" ? "parent" : p.role)));
     const scope: Scope = {
       all: false,
-      roles: [roleMode === "guardians" ? "parent" : roleMode.slice(0, -1)],
+      roles: roles.length > 0 ? roles : [roleMode === "guardians" ? "parent" : roleMode.slice(0, -1)],
       classes: [],
       sections: [],
       courses: [],
@@ -285,7 +290,7 @@ export function StagedAudiencePicker({
   }, [narrowMode, onChange, roleMode, selectedClassId, selectedPersons.length, selectedSectionId]);
 
   const removePerson = (personId: string) => {
-    const next = selectedPersons.filter((p) => p.id !== personId);
+    const next = selectedPersons.filter((p) => personKey(p) !== personId);
     setSelectedPersons(next);
     updateScope(next);
   };
@@ -295,33 +300,33 @@ export function StagedAudiencePicker({
     setNarrowMode("all");
     setSelectedClassId("");
     setSelectedSectionId("");
-    resetPersonSelection();
+    resetPersonSearch();
   };
 
   const handleNarrowChange = (nextMode: NarrowMode) => {
     setNarrowMode(nextMode);
     setSelectedClassId("");
     setSelectedSectionId("");
-    resetPersonSelection();
+    resetPersonSearch();
   };
 
   const handleClassChange = (classId: string) => {
     setSelectedClassId(classId);
     setSelectedSectionId("");
-    resetPersonSelection();
+    resetPersonSearch();
   };
 
   const handleSectionChange = (sectionId: string) => {
     setSelectedSectionId(sectionId);
-    resetPersonSelection();
+    resetPersonSearch();
   };
 
   return (
     <div className="stagedAudiencePicker">
       {/* Stage 1: Role Selection */}
       <div className="stage">
-        <label>{t("targetAudienceLabel")}</label>
-        <Select value={roleMode} onChange={(e) => handleRoleChange(e.target.value as RoleMode)}>
+        <label htmlFor={roleSelectId.current}>{t("targetAudienceLabel")}</label>
+        <Select id={roleSelectId.current} value={roleMode} onChange={(e) => handleRoleChange(e.target.value as RoleMode)}>
           <option value="teachers">{t("teachers")}</option>
           <option value="students">{t("students")}</option>
           <option value="guardians">{t("guardians")}</option>
@@ -330,20 +335,20 @@ export function StagedAudiencePicker({
 
       {/* Stage 2: Narrow by Class/Section */}
       <div className="stage">
-        <label>{t("narrowByLabel", "Narrow by")}</label>
-        <Select value={narrowMode} onChange={(e) => handleNarrowChange(e.target.value as NarrowMode)}>
+        <label htmlFor={narrowSelectId.current}>{t("narrowByLabel", "Narrow by")}</label>
+        <Select id={narrowSelectId.current} value={narrowMode} onChange={(e) => handleNarrowChange(e.target.value as NarrowMode)}>
           <option value="all">{t("allLabel", "All")}</option>
           <option value="classes">{t("classesLabel", "Classes")}</option>
           <option value="sections">{t("sectionsCol", "Sections")}</option>
         </Select>
         {(narrowMode === "classes" || narrowMode === "sections") && (
-          <Select value={selectedClassId} onChange={(e) => handleClassChange(e.target.value)}>
+          <Select aria-label={t("allClasses", "All classes")} value={selectedClassId} onChange={(e) => handleClassChange(e.target.value)}>
             <option value="">{t("allClasses", "All classes")}</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         )}
         {narrowMode === "sections" && selectedClassId && (
-          <Select value={selectedSectionId} onChange={(e) => handleSectionChange(e.target.value)}>
+          <Select aria-label={t("allSections", "All sections")} value={selectedSectionId} onChange={(e) => handleSectionChange(e.target.value)}>
             <option value="">{t("allSections", "All sections")}</option>
             {(sections[selectedClassId] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
@@ -371,9 +376,9 @@ export function StagedAudiencePicker({
           {selectedPersons.length > 0 && (
             <div className="selectedChips" aria-label={t("selectedPeopleCount", { count: selectedPersons.length, defaultValue: "Selected people" })}>
               {selectedPersons.map((p) => (
-                <span key={p.id} className="chip">
+                <span key={personKey(p)} className="chip">
                   {p.name}
-                  <button type="button" aria-label={t("removePersonLabel", { name: p.name, defaultValue: `Remove ${p.name}` })} onClick={() => removePerson(p.id)}>
+                  <button type="button" aria-label={t("removePersonLabel", { name: p.name, defaultValue: `Remove ${p.name}` })} onClick={() => removePerson(personKey(p))}>
                     <X size={13} />
                   </button>
                 </span>
@@ -402,7 +407,7 @@ export function StagedAudiencePicker({
                 {isLoading && <p className="peopleMultiSelectState">{t("loadingLabel", "Loading...")}</p>}
                 {!isLoading && filteredPersons.length === 0 && <p className="peopleMultiSelectState">{t("noResults", "No results")}</p>}
                 {!isLoading && filteredPersons.map((person, index) => {
-                  const selected = selectedPersons.some((p) => p.id === person.id);
+                  const selected = selectedPersons.some((p) => personKey(p) === personKey(person));
                   return (
                     <button
                       key={person.id}
