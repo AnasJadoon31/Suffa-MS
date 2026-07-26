@@ -81,6 +81,10 @@ Fresh evidence from this pass:
   (`15 passed` across WhatsApp connection plus credential delivery slices), the
   full backend suite passed (`263 passed, 2 skipped`), and browser
   credential/acceptance flows still hide raw setup URLs.
+- Fixed the production login form labels so "Madrasa ID", "Username", and
+  "Password" are associated with their inputs. The current visual gate now fills
+  those controls with `getByLabel(...)`, which prevents the earlier selector
+  ambiguity where the tenant field could be mistaken for the username field.
 
 ## 2026-07-26 — ISS3 implementation tranche and verification refresh
 

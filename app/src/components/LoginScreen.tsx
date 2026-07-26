@@ -80,10 +80,11 @@ export function LoginScreen() {
               {error && <div className="login-error slide-in">{error}</div>}
 
               <div className="form-group">
-                <label>{t("madrasaIdLabel")}</label>
+                <label htmlFor="login-tenant">{t("madrasaIdLabel")}</label>
                 <div className="input-with-icon">
                   <Building2 size={18} className="input-icon" />
                   <Input
+                    id="login-tenant"
                     type="text"
                     value={tenant}
                     onChange={(e) => setTenant(e.target.value)}
@@ -94,10 +95,11 @@ export function LoginScreen() {
               </div>
 
               <div className="form-group">
-                <label>{t("usernameLabel")}</label>
+                <label htmlFor="login-username">{t("usernameLabel")}</label>
                 <div className="input-with-icon">
                   <span className="input-icon">@</span>
                   <Input
+                    id="login-username"
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -108,10 +110,11 @@ export function LoginScreen() {
               </div>
 
               <div className="form-group">
-                <label>{t("passwordLabel")}</label>
+                <label htmlFor="login-password">{t("passwordLabel")}</label>
                 <div className="input-with-icon">
                   <KeyRound size={18} className="input-icon" />
                   <Input
+                    id="login-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
