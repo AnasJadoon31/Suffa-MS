@@ -92,10 +92,12 @@ Fresh evidence from this pass:
   chips remain visible. It also preserves selected people while changing role
   filters and submits mixed student/guardian user IDs with both `student` and
   `parent` roles. Evidence: `test:audience-picker` now selects students and a
-  guardian entirely from the keyboard on desktop and mobile, asserts the create
-  form API payload, and refreshes
+  guardian entirely from the keyboard on desktop and mobile, exercises a 100+
+  student fixture, asserts the create form API payload, and refreshes
   `artifacts/audience-picker/audience-picker-*.png`; production build and the
-  unsafe-type ratchet passed after the change.
+  unsafe-type ratchet passed after the change. Backend audience/guardian scope
+  tests passed across `test_audience.py`, form audience filters, ward response
+  filters, and parent dashboard form exposure.
 
 ## 2026-07-26 — ISS3 implementation tranche and verification refresh
 
