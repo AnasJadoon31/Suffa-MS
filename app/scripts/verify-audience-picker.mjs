@@ -137,10 +137,16 @@ async function verifyAtViewport(browser, viewport, label) {
     const menu = dialog.locator(".peopleMultiSelectMenu");
     await menu.waitFor();
     await dialog.getByRole("searchbox", { name: "Search..." }).fill("Ali");
-    await dialog.getByRole("option", { name: /Ali Noor/ }).click();
+    await dialog.getByRole("option", { name: /Ali Noor/ }).waitFor();
+    await dialog.getByRole("searchbox", { name: "Search..." }).press("Enter");
 
     await dialog.getByText("Ali Noor").first().waitFor();
     await dialog.getByRole("button", { name: "Ali Noor", exact: true }).waitFor();
+    await dialog.getByRole("searchbox", { name: "Search..." }).fill("");
+    await dialog.getByRole("option", { name: /Demo Student/ }).waitFor();
+    await dialog.getByRole("searchbox", { name: "Search..." }).press("ArrowDown");
+    await dialog.getByRole("searchbox", { name: "Search..." }).press("Enter");
+    await dialog.getByText("Demo Student").first().waitFor();
     const visibleRawCheckboxes = await dialog.locator(".personList, .searchBox").count();
     if (visibleRawCheckboxes > 0) {
       throw new Error("Legacy raw person list/search box is still rendered");
@@ -154,6 +160,10 @@ async function verifyAtViewport(browser, viewport, label) {
     }
     if (optionDisplay !== "grid") {
       throw new Error(`Audience picker options are not styled rows; display=${optionDisplay}`);
+    }
+    const selectedOptions = await dialog.locator(".peopleMultiSelectOption[aria-selected='true']").count();
+    if (selectedOptions !== 2) {
+      throw new Error(`Keyboard multi-select should have selected 2 people, selected=${selectedOptions}`);
     }
     if (errors.length) {
       throw new Error(`Browser errors while verifying ${label}: ${errors.join(" | ")}`);

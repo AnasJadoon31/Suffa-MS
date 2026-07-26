@@ -85,6 +85,14 @@ Fresh evidence from this pass:
   "Password" are associated with their inputs. The current visual gate now fills
   those controls with `getByLabel(...)`, which prevents the earlier selector
   ambiguity where the tenant field could be mistaken for the username field.
+- Strengthened ISS3-027's staged audience picker into a keyboard-operable
+  searchable multi-select: the trigger exposes listbox controls, the searchbox
+  keeps `aria-activedescendant`, ArrowUp/ArrowDown/Home/End move the active
+  option, Enter/Space toggles selection, Escape closes cleanly, and selected
+  chips remain visible. Evidence: `test:audience-picker` now selects multiple
+  students entirely from the keyboard on desktop and mobile and refreshes
+  `artifacts/audience-picker/audience-picker-*.png`; production build and the
+  unsafe-type ratchet passed after the change.
 
 ## 2026-07-26 — ISS3 implementation tranche and verification refresh
 
