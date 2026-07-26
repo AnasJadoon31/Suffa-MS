@@ -474,8 +474,9 @@ async function loginRedirectJourney(browser) {
   await mockApi(context, "en", "principal", false);
   const page = await context.newPage();
   await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="text"]').nth(1).fill("admin");
-  await page.locator('input[type="password"]').fill("diagnostic-password");
+  await page.getByLabel("Madrasa ID").fill("suffa");
+  await page.getByLabel("Username").fill("admin");
+  await page.getByLabel("Password").fill("diagnostic-password");
   await page.locator('form.login-form button[type="submit"]').click();
   await page.waitForURL(`${baseUrl}/dashboard`, { timeout: 10_000 });
   await page.getByRole("heading", { name: "Dashboard" }).waitFor();
