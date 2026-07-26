@@ -2543,6 +2543,7 @@ html[dir="rtl"] .navGroupLabel {
 
 .peopleMultiSelectOption:hover,
 .peopleMultiSelectOption:focus-visible,
+.peopleMultiSelectOption.active,
 .peopleMultiSelectOption.selected {
   outline: none;
   background: var(--brand-soft);
