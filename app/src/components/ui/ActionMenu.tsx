@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { MoreVertical } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -22,6 +22,7 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties | undefined>();
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const menuId = useRef(`action-menu-${crypto.randomUUID()}`);
 
@@ -31,11 +32,42 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
 
   const closeAndRestoreFocus = () => {
     setIsOpen(false);
+    setDropdownStyle(undefined);
     buttonRef.current?.focus();
   };
 
+  const updateDropdownPosition = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+    const rect = button.getBoundingClientRect();
+    const isRtl = document.documentElement.dir === "rtl";
+    const estimatedMenuHeight = Math.min(items.length * 42 + 14, 280);
+    const availableBelow = window.innerHeight - rect.bottom - 8;
+    const availableAbove = rect.top - 8;
+    const openAbove = availableBelow < estimatedMenuHeight && availableAbove > availableBelow;
+    const verticalStyle = openAbove
+      ? {
+          top: "auto",
+          bottom: Math.max(8, window.innerHeight - rect.top + 6),
+          maxHeight: Math.max(96, Math.min(estimatedMenuHeight, availableAbove - 6)),
+        }
+      : {
+          bottom: "auto",
+          top: Math.min(rect.bottom + 6, window.innerHeight - 8),
+          maxHeight: Math.max(96, Math.min(estimatedMenuHeight, availableBelow)),
+        };
+    setDropdownStyle({
+      position: "fixed",
+      ...verticalStyle,
+      ...(isRtl
+        ? { left: Math.max(8, rect.left) }
+        : { right: Math.max(8, window.innerWidth - rect.right) }),
+    });
+  }, [items.length]);
+
   useEffect(() => {
     if (!isOpen) return;
+    updateDropdownPosition();
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         closeAndRestoreFocus();
@@ -46,13 +78,18 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
         closeAndRestoreFocus();
       }
     };
+    const handleReposition = () => updateDropdownPosition();
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
     };
-  }, [isOpen]);
+  }, [isOpen, updateDropdownPosition]);
 
   useEffect(() => {
     if (isOpen) setActiveIndex(enabledIndexes[0] ?? -1);
@@ -119,7 +156,14 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
         {children ?? <MoreVertical size={16} />}
       </button>
       {isOpen && (
-        <ul id={menuId.current} className="actionMenuDropdown" role="menu" aria-orientation="vertical" onKeyDown={handleKeyDown}>
+        <ul
+          id={menuId.current}
+          className="actionMenuDropdown"
+          role="menu"
+          aria-orientation="vertical"
+          style={dropdownStyle}
+          onKeyDown={handleKeyDown}
+        >
           {items.map((item, index) => (
             <li key={index} role="none">
               <button
