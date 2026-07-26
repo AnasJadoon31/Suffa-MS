@@ -3,6 +3,52 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-26 — ISS3 backlog closed locally from TO_IMPLEMENT
+
+Completed the remaining Issues 3 backlog rows in `TO_IMPLEMENT.md` and refreshed
+the gates that prove the implementation instead of leaving historical WIP rows
+behind.
+
+- Closed ISS3-003 and ISS3-006 by making the credential-link browser verifier
+  self-contained, re-running it, and pairing it with the unsafe-type ratchet,
+  strict build, endpoint-contract, and backend error-boundary tests.
+- Closed ISS3-007 through ISS3-016 with the admission conversion, student edit,
+  immutable admission-number, username proposal, guardian many-to-many, archived
+  session, portal decision, independent student, and built-in admission-section
+  test matrix. Browser evidence includes `CURRENT-20_add-student-admission-template_desktop.png`,
+  `CURRENT-19_student-edit-admission-fields_desktop.png`, and
+  `CURRENT-18_conversion-credential-delivery_desktop.png`.
+- Closed ISS3-018 through ISS3-021 with WhatsApp QR/phone pairing, Pakistan phone
+  normalization, form-builder `phone` fields, and credential delivery gates.
+- Closed ISS3-022 through ISS3-035 with finance profile/history, salary history,
+  report range, form response/guardian scope, document upload, assessment,
+  assignment-batch, attendance-default, timetable-scope, and My Timetable gates.
+- Added `app/scripts/lib/vite-server.mjs` and converted older focused browser
+  gates away from the fragile implicit `127.0.0.1:5173` dependency, so they now
+  start and stop their own Vite server when `TEST_BASE_URL` is not supplied.
+- Review remediation: guardian-specific audience selection now excludes guardians
+  without portal users so a specific-person choice cannot degrade into all-parent
+  visibility; Academics destructive actions name the target and block duplicate
+  row deletes while pending; snackbar notifications now include shared mutation
+  pending status and verified offline/background notification paths.
+
+Fresh local evidence from this pass:
+
+- Backend focused suites: `105 passed` for admission/identity/guardian/phone/
+  WhatsApp/error boundaries, and `86 passed` for files/assessments/timetable/
+  attendance/endpoint contracts/backend sweep.
+- Browser gates passed: `test:credential-links`, `test:admission-builder`,
+  `test:phone-inputs`, `test:whatsapp-connection`, `test:forms-responses`,
+  `test:guardian-dashboard`, `test:salary-history`, `test:finance-profiles`,
+  `test:report-ranges`, `test:document-uploads`, `test:attendance-defaults`,
+  `test:my-assessments`, `test:my-timetable`, `test:assignment-batch`, and
+  `test:visual-issues`.
+- Post-review focused gates passed: `test:audience-picker`, `test:snackbar`,
+  `test:foundation-components`, `test:action-menu`, `test:i18n`,
+  `test:type-safety`, and production `npm --prefix app run build`.
+- `test:students-layout` now includes desktop, tablet, mobile, and Urdu mobile
+  geometry checks.
+
 ## 2026-07-26 — ISS3-002 students layout acceptance closed
 
 - Extended the People → Students layout verifier to cover Urdu mobile without

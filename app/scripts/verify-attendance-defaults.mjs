@@ -1,8 +1,11 @@
 import { chromium } from "@playwright/test";
+import { ensureViteServer } from "./lib/vite-server.mjs";
 
-const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:5173";
+const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:4196";
 
 const today = "2026-07-26";
+
+await ensureViteServer({ baseUrl, port: 4196 });
 const courses = [{ id: "course-1", name: "Quran Memorization" }];
 const classes = [{
   id: "class-1",

@@ -18,6 +18,9 @@ interface SelectedPerson {
   section_id?: string;
 }
 
+const audienceRoleForPerson = (role: SelectedPerson["role"]) => role === "guardian" ? "parent" : role;
+const audienceRoleForMode = (mode: RoleMode) => mode === "guardians" ? "parent" : mode.slice(0, -1);
+
 /**
  * ISS3-027: Staged audience picker
  * 
@@ -168,7 +171,9 @@ export function StagedAudiencePicker({
           })));
         } else if (roleMode === "guardians") {
           const guardians = await peopleApi.listGuardians(searchQuery || undefined);
-          setAllPersons(guardians.map((g) => ({ id: g.id, user_id: g.user_id ?? "", name: g.name, role: "guardian" as const })));
+          setAllPersons(guardians
+            .filter((g) => Boolean(g.user_id))
+            .map((g) => ({ id: g.id, user_id: g.user_id as string, name: g.name, role: "guardian" as const })));
         }
       } catch {
         setAllPersons([]);
@@ -264,10 +269,10 @@ export function StagedAudiencePicker({
 
   const updateScope = (persons: SelectedPerson[]) => {
     const userIds = persons.map((p) => p.user_id).filter(Boolean);
-    const roles = Array.from(new Set(persons.map((p) => p.role === "guardian" ? "parent" : p.role)));
+    const roles = Array.from(new Set(persons.map((p) => audienceRoleForPerson(p.role))));
     const scope: Scope = {
       all: false,
-      roles: roles.length > 0 ? roles : [roleMode === "guardians" ? "parent" : roleMode.slice(0, -1)],
+      roles: roles.length > 0 ? roles : [audienceRoleForMode(roleMode)],
       classes: [],
       sections: [],
       courses: [],
@@ -278,7 +283,7 @@ export function StagedAudiencePicker({
 
   useEffect(() => {
     if (selectedPersons.length > 0) return;
-    const role = roleMode === "guardians" ? "parent" : roleMode.slice(0, -1);
+    const role = audienceRoleForMode(roleMode);
     onChange({
       all: false,
       roles: [role],

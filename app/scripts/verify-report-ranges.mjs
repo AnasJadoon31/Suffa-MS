@@ -1,6 +1,7 @@
 import { chromium } from "@playwright/test";
+import { ensureViteServer } from "./lib/vite-server.mjs";
 
-const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:5173";
+const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:4194";
 const viewport = process.env.TEST_VIEWPORT === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 900 };
 const fixedNow = "2026-07-26T08:00:00Z";
 const expectedRanges = {
@@ -12,6 +13,8 @@ const expectedRanges = {
 };
 
 const reportRequests = [];
+
+await ensureViteServer({ baseUrl, port: 4194 });
 
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ serviceWorkers: "block", viewport });

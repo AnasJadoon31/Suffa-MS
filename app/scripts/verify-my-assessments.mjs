@@ -1,7 +1,10 @@
 import { chromium } from "@playwright/test";
+import { ensureViteServer } from "./lib/vite-server.mjs";
 
-const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:5173";
+const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:4197";
 const viewport = process.env.TEST_VIEWPORT === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 900 };
+
+await ensureViteServer({ baseUrl, port: 4197 });
 
 let replacePosts = 0;
 let removePosts = 0;
