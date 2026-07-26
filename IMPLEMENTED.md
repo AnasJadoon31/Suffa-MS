@@ -108,6 +108,12 @@ Fresh evidence from this pass:
   prompt, verifies no native browser dialog events fired, and confirms raw setup
   tokens stay out of visible page text. `test:foundation-components` and the
   production build passed afterward.
+- Closed ISS3-001 evidence: migrated the remaining Academics multi-action rows
+  (programs, classes, courses, sections, and sessions) to the shared
+  `ActionMenu`. `test:action-menu` now verifies People, Resources, Holidays,
+  and Academics row menus on desktop and mobile, including positioned dropdowns,
+  list-style reset, row-height stability, and destructive actions; production
+  build passed afterward.
 
 ## 2026-07-26 — ISS3 implementation tranche and verification refresh
 
