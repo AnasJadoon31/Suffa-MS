@@ -98,6 +98,10 @@ Fresh evidence from this pass:
   unsafe-type ratchet passed after the change. Backend audience/guardian scope
   tests passed across `test_audience.py`, form audience filters, ward response
   filters, and parent dashboard form exposure.
+- Closed ISS3-005 evidence: `test:foundation-components` runs the snackbar
+  browser gate, which proves queued success/error mutation toasts, `aria-live`,
+  dismiss controls, mobile layout, and no raw credential token leakage while
+  leaving blocking confirmation flows in `DialogContext`.
 
 ## 2026-07-26 — ISS3 implementation tranche and verification refresh
 
