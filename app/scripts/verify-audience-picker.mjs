@@ -72,6 +72,14 @@ const guardians = [
     phone_numbers: "+923001234567",
     ward_count: 2,
   },
+  {
+    id: "guardian-unlinked",
+    user_id: null,
+    name: "Unlinked Guardian",
+    relationship: "uncle",
+    phone_numbers: "+923009999999",
+    ward_count: 1,
+  },
 ];
 
 async function ensureServer() {
@@ -206,6 +214,11 @@ async function verifyAtViewport(browser, viewport, label) {
     await dialog.getByRole("searchbox", { name: "Search..." }).press("Escape");
     await dialog.getByLabel("Target Audience").selectOption("guardians");
     await dialog.getByRole("button", { name: /2 selected/i }).click();
+    await dialog.getByRole("searchbox", { name: "Search..." }).fill("Unlinked");
+    await page.waitForTimeout(350);
+    if (await dialog.getByRole("option", { name: /Unlinked Guardian/ }).count()) {
+      throw new Error("Guardian without a portal user was offered as a specific person target");
+    }
     await dialog.getByRole("searchbox", { name: "Search..." }).fill("Shaikh");
     await dialog.getByRole("option", { name: /Shaikh Noor/ }).waitFor();
     await dialog.getByRole("searchbox", { name: "Search..." }).press("Enter");

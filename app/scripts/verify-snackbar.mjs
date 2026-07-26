@@ -5,6 +5,7 @@ import path from "node:path";
 const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:4185";
 let server;
 let credentialAttempts = 0;
+let abortNextCredentialRequest = false;
 
 async function ensureServer() {
   if (process.env.TEST_BASE_URL) return;
@@ -70,6 +71,11 @@ async function routeApi(context) {
     } else if (pathname === "/api/v1/people/students" && request.method() === "GET") {
       body = studentRows();
     } else if (pathname === "/api/v1/people/students/student-1/credentials-link") {
+      if (abortNextCredentialRequest) {
+        abortNextCredentialRequest = false;
+        await route.abort("internetdisconnected");
+        return;
+      }
       credentialAttempts += 1;
       if (credentialAttempts === 1) {
         body = { username: "ali.noor", set_password_url: "/set-password?token=SECRET-SNACKBAR-TOKEN" };
@@ -140,6 +146,7 @@ try {
   await page.getByText("ADM-0008").waitFor();
 
   await clickLoginLink(page);
+  await page.locator(".snackbarToast.info", { hasText: "Saving changes…" }).first().waitFor();
   const successToast = page.locator(".snackbarToast.success", { hasText: "Changes saved." }).first();
   await successToast.waitFor();
   await page.locator(".snackbarToast.success").nth(1).waitFor();
@@ -150,6 +157,17 @@ try {
 
   await clickLoginLink(page);
   await page.locator(".snackbarToast.error", { hasText: "Demo failure from API" }).waitFor();
+
+  abortNextCredentialRequest = true;
+  await clickLoginLink(page);
+  await page.locator(".snackbarToast.error", { hasText: "Action failed. Please try again." }).waitFor();
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent("suffa:api-notification", {
+      detail: { variant: "warning", message: "Background sync waiting for connection" },
+    }));
+  });
+  await page.locator(".snackbarToast.warning", { hasText: "Background sync waiting for connection" }).waitFor();
 
   const visibleText = await page.locator("body").innerText();
   if (visibleText.includes("SECRET-SNACKBAR-TOKEN")) {
@@ -162,7 +180,7 @@ try {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   if (overflow) throw new Error("snackbar page overflowed on mobile");
   if (errors.length) throw new Error(`browser errors: ${errors.join(" | ")}`);
-  console.log("snackbar: mutation success/error queue, ARIA, dismiss, token redaction, and mobile layout passed");
+  console.log("snackbar: mutation pending/success/error/offline/background queue, ARIA, dismiss, token redaction, and mobile layout passed");
 } finally {
   await browser.close();
   if (server) server.kill();

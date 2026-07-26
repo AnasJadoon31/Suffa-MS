@@ -84,6 +84,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
 
   const refreshAll = async () => {
     try {
@@ -121,13 +122,17 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
   };
 
   // Generic delete handler
-  const handleDelete = async (action: () => Promise<void>) => {
-    if (!(await confirm(t("deleteRecordConfirm")))) return;
+  const handleDelete = async (key: string, targetName: string, action: () => Promise<void>) => {
+    if (pendingDeleteKey) return;
+    if (!(await confirm(t("deleteNamedRecordConfirm", { name: targetName })))) return;
+    setPendingDeleteKey(key);
     try {
       await action();
       await refreshAll();
     } catch (e) {
       handleError(e);
+    } finally {
+      setPendingDeleteKey(null);
     }
   };
 
@@ -236,7 +241,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                     <span className="actions">
                       <ActionMenu ariaLabel={`${t("actionsCol")}: ${p.name}`} items={[
                         { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingProgram(p) },
-                        { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => handleDelete(() => academicsApi.deleteProgram(p.id)) },
+                        { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `program:${p.id}`, onClick: () => handleDelete(`program:${p.id}`, p.name, () => academicsApi.deleteProgram(p.id)) },
                       ]} />
                     </span>
                   </div>
@@ -339,7 +344,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         <span className="actions">
                           <ActionMenu ariaLabel={`${t("actionsCol")}: ${c.name}`} items={[
                             { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingClass(c) },
-                            { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => handleDelete(() => academicsApi.deleteClass(c.id)) },
+                            { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `class:${c.id}`, onClick: () => handleDelete(`class:${c.id}`, c.name, () => academicsApi.deleteClass(c.id)) },
                           ]} />
                         </span>
                   </div>
@@ -398,7 +403,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         <span className="actions">
                           <ActionMenu ariaLabel={`${t("actionsCol")}: ${c.name}`} items={[
                             { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingCourse(c) },
-                            { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => handleDelete(() => academicsApi.deleteCourse(c.id)) },
+                            { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `course:${c.id}`, onClick: () => handleDelete(`course:${c.id}`, c.name, () => academicsApi.deleteCourse(c.id)) },
                           ]} />
                         </span>
                   </div>
@@ -474,7 +479,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               <span className="actions" style={{ marginLeft: "auto" }}>
                                 <ActionMenu ariaLabel={`${t("actionsCol")}: ${s.name}`} items={[
                                   { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingSection(s) },
-                                  { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => handleDelete(() => academicsApi.deleteSection(c.id, s.id)) },
+                                  { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `section:${s.id}`, onClick: () => handleDelete(`section:${s.id}`, `${c.name} / ${s.name}`, () => academicsApi.deleteSection(c.id, s.id)) },
                                 ]} />
                               </span>
                         </div>
@@ -583,7 +588,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               label: t("deleteBtn"),
                               icon: <Trash2 size={14} />,
                               destructive: true,
-                              onClick: () => handleDelete(() => academicsApi.deleteSession(s.id)),
+                              disabled: pendingDeleteKey === `session:${s.id}`,
+                              onClick: () => handleDelete(`session:${s.id}`, s.name, () => academicsApi.deleteSession(s.id)),
                             }] : []),
                           ]} />
                         </span>
@@ -624,7 +630,9 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
               } catch (err) { handleError(err); }
             }}
             onUnassign={async (courseId) => {
-              if (!(await confirm(t("deleteRecordConfirm")))) return;
+              const course = allCourses.find((item) => item.id === courseId);
+              const targetName = `${cls.name} / ${course?.name ?? t("courseLabel")}`;
+              if (!(await confirm(t("deleteNamedRecordConfirm", { name: targetName })))) return;
               try {
                 await academicsApi.unassignCourseFromClass(cls.id, courseId);
                 await refreshAll();

@@ -1,8 +1,24 @@
 import { chromium } from "@playwright/test";
+import { spawn } from "node:child_process";
 
-const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:5173";
+const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:4188";
 const viewport = process.env.TEST_VIEWPORT === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 900 };
 const forbiddenFragments = ["SECRET-CREATE-TOKEN", "SECRET-REISSUE-TOKEN", "/set-password?token="];
+let server;
+
+async function ensureServer() {
+  if (process.env.TEST_BASE_URL) return;
+  server = spawn("node_modules/.bin/vite", ["--host", "127.0.0.1", "--port", "4188"], { stdio: "ignore" });
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      if ((await fetch(baseUrl)).ok) return;
+    } catch {
+      // Vite is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("Timed out starting Vite for credential-link verification");
+}
 
 let teachers = [];
 const guardians = [{
@@ -19,6 +35,7 @@ const guardians = [{
 const credentialSendPayloads = [];
 const clipboardWrites = [];
 
+await ensureServer();
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ serviceWorkers: "block", viewport });
 
@@ -171,4 +188,5 @@ try {
 } finally {
   await context.close();
   await browser.close();
+  if (server) server.kill();
 }

@@ -1,6 +1,7 @@
 import { chromium } from "@playwright/test";
+import { ensureViteServer } from "./lib/vite-server.mjs";
 
-const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:5173";
+const baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:4192";
 const viewport = process.env.TEST_VIEWPORT === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 900 };
 
 const classes = [{ id: "class-1", program_id: "program-1", name: "Hifz Level 1", default_portal_enabled: true }];
@@ -23,6 +24,8 @@ const responses = [
 
 const formQueries = [];
 const responseQueries = [];
+
+await ensureViteServer({ baseUrl, port: 4192 });
 
 function paramsObject(searchParams) {
   return Object.fromEntries([...searchParams.entries()].filter(([key]) => !["limit", "offset"].includes(key)));

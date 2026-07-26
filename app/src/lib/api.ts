@@ -86,6 +86,10 @@ api.interceptors.request.use(
       config.headers["X-Academic-Session-Id"] = academicSessionId;
     }
 
+    if (isMutationNotificationCandidate(config.method, config.url)) {
+      emitApiNotification({ variant: "info", messageKey: "mutationSavingToast" });
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
