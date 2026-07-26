@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import delete, func, or_, select, text, update
+from sqlalchemy import and_, delete, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -25,6 +25,7 @@ from app.db.session import get_session
 from app.modules.academics.models import (
     AcademicClass,
     AcademicSession,
+    ClassCourse,
     Course,
     Enrollment,
     Madrasa,
@@ -33,9 +34,11 @@ from app.modules.academics.models import (
 )
 from app.modules.operations.audience import get_viewer_context, scope_allows
 from app.modules.auth.models import User, UserRole
-from app.modules.auth.service import UsernameTakenError, provision_login
+from app.modules.auth.service import UsernameTakenError, generate_unique_username, provision_login
 from app.modules.operations.admissions import (
     admission_answer_date,
+    admission_answer_enabled,
+    admission_guardian_payloads,
     admission_answer_text,
     normalize_admission_fields,
     validate_admission_answers,
@@ -1289,6 +1292,11 @@ async def list_forms(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     category: str | None = None,
+    audience_role: UserRole | None = None,
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
+    course_id: UUID | None = None,
+    user_id: UUID | None = None,
     mine_only: bool = False,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
@@ -1301,11 +1309,42 @@ async def list_forms(
     rows = (await session.execute(stmt.order_by(Form.title))).scalars().all()
     is_admin = await _form_admin(current_user, session)
     ctx = await get_viewer_context(session, current_user, madrasa.id)
+    target_ctx = None
+    if user_id is not None:
+        target_user = await session.scalar(
+            select(User).where(User.id == user_id, User.madrasa_id == madrasa.id)
+        )
+        if target_user is not None:
+            target_ctx = await get_viewer_context(session, target_user, madrasa.id)
     # scope_allows is a Python-side visibility check, so filter before paging.
-    visible = [
-        row for row in rows
-        if is_admin or row.created_by_id == current_user.id or scope_allows(row.visibility_scope, ctx)
-    ]
+    def _scope_matches_requested_filter(scope: dict) -> bool:
+        scope = scope or {}
+        if scope.get("all"):
+            return True
+        if user_id is not None:
+            if target_ctx is None or not scope_allows(scope, target_ctx):
+                return False
+        if audience_role is not None:
+            roles = {str(role) for role in scope.get("roles") or []}
+            if roles and audience_role.value not in roles:
+                return False
+            if not roles and not any(scope.get(key) for key in ("classes", "sections", "courses", "users")):
+                return False
+        if class_id is not None and str(class_id) not in {str(value) for value in scope.get("classes") or []}:
+            return False
+        if section_id is not None and str(section_id) not in {str(value) for value in scope.get("sections") or []}:
+            return False
+        if course_id is not None and str(course_id) not in {str(value) for value in scope.get("courses") or []}:
+            return False
+        return True
+
+    visible = []
+    for row in rows:
+        if not (is_admin or row.created_by_id == current_user.id or scope_allows(row.visibility_scope, ctx)):
+            continue
+        if not _scope_matches_requested_filter(row.visibility_scope or {}):
+            continue
+        visible.append(row)
     response.headers["X-Total-Count"] = str(len(visible))
     page = visible[offset : offset + limit]
     return [FormRead.model_validate(row) for row in page]
@@ -1414,6 +1453,7 @@ async def list_all_form_responses(
     student_id: UUID | None = None,
     class_id: UUID | None = None,
     section_id: UUID | None = None,
+    course_id: UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
@@ -1435,11 +1475,20 @@ async def list_all_form_responses(
                 FormResponse.ward_id == student_id,
             )
         )
-    if class_id or section_id:
+    if class_id or section_id or course_id:
         enrollment_stmt = select(Enrollment.student_id).where(
             Enrollment.madrasa_id == madrasa.id,
             Enrollment.ended_on.is_(None),
         )
+        if course_id:
+            enrollment_stmt = enrollment_stmt.join(
+                ClassCourse,
+                and_(
+                    ClassCourse.madrasa_id == Enrollment.madrasa_id,
+                    ClassCourse.class_id == Enrollment.class_id,
+                    ClassCourse.course_id == course_id,
+                ),
+            )
         if class_id:
             enrollment_stmt = enrollment_stmt.where(Enrollment.class_id == class_id)
         if section_id:
@@ -2123,21 +2172,37 @@ async def convert_admission_application(
     answers = application.extra_data or {}
     student_name = admission_answer_text(answers, "student_name") or application.applicant_name
     student_dob = admission_answer_date(answers, "student_date_of_birth") or application.date_of_birth
-    guardian_name = payload.guardian_name or admission_answer_text(answers, "guardian_name")
-    guardian_relationship = payload.guardian_relationship or admission_answer_text(answers, "guardian_relationship")
-    guardian_phone = admission_answer_text(answers, "guardian_phone_numbers") or application.guardian_contact
-    guardian_cnic = payload.guardian_cnic or admission_answer_text(answers, "guardian_cnic") or None
-    guardian_address = payload.guardian_address or admission_answer_text(answers, "guardian_address") or None
-    guardian_preferred_language = payload.guardian_preferred_language or admission_answer_text(answers, "guardian_preferred_language") or "ur"
+    student_portal_enabled = payload.student_portal_enabled
+    if student_portal_enabled is None:
+        student_portal_enabled = admission_answer_enabled(answers, "student_portal_enabled", default=True)
+    guardian_portal_enabled_override = payload.guardian_portal_enabled
+    guardian_payloads = admission_guardian_payloads(answers)
+    if guardian_payloads and payload.guardian_name:
+        guardian_payloads[0]["name"] = payload.guardian_name
+    if guardian_payloads and payload.guardian_relationship:
+        guardian_payloads[0]["relationship"] = payload.guardian_relationship
+    if guardian_payloads and payload.guardian_cnic:
+        guardian_payloads[0]["cnic"] = payload.guardian_cnic
+    if guardian_payloads and payload.guardian_address:
+        guardian_payloads[0]["address"] = payload.guardian_address
+    if guardian_payloads and payload.guardian_preferred_language:
+        guardian_payloads[0]["preferred_language"] = payload.guardian_preferred_language
+    if guardian_payloads and guardian_portal_enabled_override is not None:
+        guardian_payloads[0]["portal_enabled"] = guardian_portal_enabled_override
 
     if student_dob is None:
         raise HTTPException(status_code=422, detail="Application date_of_birth is required for conversion")
-    if not guardian_name:
+    if not guardian_payloads:
+        raise HTTPException(status_code=422, detail="At least one guardian or independent workflow is required for conversion")
+    primary_guardian = guardian_payloads[0]
+    if not primary_guardian["name"]:
         raise HTTPException(status_code=422, detail="Guardian name is required for conversion")
-    if not guardian_relationship:
+    if not primary_guardian["relationship"]:
         raise HTTPException(status_code=422, detail="Guardian relationship is required for conversion")
-    if not guardian_phone:
+    if not primary_guardian["phone_numbers"]:
         raise HTTPException(status_code=422, detail="Guardian phone number is required for conversion")
+    if primary_guardian["portal_enabled"] and not payload.guardian_username:
+        raise HTTPException(status_code=422, detail="Guardian username is required when guardian portal is enabled")
 
     admission_number = await _next_admission_number(session, madrasa.id)
 
@@ -2149,16 +2214,19 @@ async def convert_admission_application(
             username=payload.student_username,
             role=UserRole.student,
             preferred_language=payload.student_preferred_language,
-            portal_enabled=academic_class.default_portal_enabled,
+            portal_enabled=student_portal_enabled and academic_class.default_portal_enabled,
         )
-        guardian_user, guardian_link = await provision_login(
-            session,
-            madrasa_id=madrasa.id,
-            actor_id=current_user.id,
-            username=payload.guardian_username,
-            role=UserRole.parent,
-            preferred_language=guardian_preferred_language,
-        )
+        guardian_user = None
+        guardian_link = None
+        if primary_guardian["portal_enabled"]:
+            guardian_user, guardian_link = await provision_login(
+                session,
+                madrasa_id=madrasa.id,
+                actor_id=current_user.id,
+                username=payload.guardian_username or primary_guardian["name"],
+                role=UserRole.parent,
+                preferred_language=primary_guardian["preferred_language"],
+            )
     except UsernameTakenError as exc:
         await session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -2169,31 +2237,66 @@ async def convert_admission_application(
         admission_number=admission_number,
         name=student_name,
         date_of_birth=student_dob,
-        portal_enabled=academic_class.default_portal_enabled,
+        portal_enabled=student_portal_enabled and academic_class.default_portal_enabled,
         b_form_number=admission_answer_text(answers, "student_b_form_number") or None,
         address=admission_answer_text(answers, "student_address") or None,
         phone=admission_answer_text(answers, "student_phone") or None,
     )
     guardian = Guardian(
         madrasa_id=madrasa.id,
-        user_id=guardian_user.id,
-        name=guardian_name,
-        relationship=guardian_relationship,
-        phone_numbers=guardian_phone,
-        cnic=guardian_cnic,
-        address=guardian_address,
-        preferred_language=guardian_preferred_language,
+        user_id=guardian_user.id if guardian_user else None,
+        name=primary_guardian["name"],
+        relationship=primary_guardian["relationship"],
+        phone_numbers=primary_guardian["phone_numbers"],
+        cnic=primary_guardian["cnic"],
+        address=primary_guardian["address"],
+        preferred_language=primary_guardian["preferred_language"],
     )
     session.add_all([student, guardian])
     await session.flush()
+    linked_guardians = [guardian]
+    for extra_guardian in guardian_payloads[1:]:
+        extra_user = None
+        if extra_guardian["portal_enabled"]:
+            try:
+                extra_username = await generate_unique_username(session, extra_guardian["name"], madrasa.id)
+                extra_user, _ = await provision_login(
+                    session,
+                    madrasa_id=madrasa.id,
+                    actor_id=current_user.id,
+                    username=extra_username,
+                    role=UserRole.parent,
+                    preferred_language=extra_guardian["preferred_language"],
+                )
+            except UsernameTakenError as exc:
+                await session.rollback()
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+        row = Guardian(
+            madrasa_id=madrasa.id,
+            user_id=extra_user.id if extra_user else None,
+            name=extra_guardian["name"],
+            relationship=extra_guardian["relationship"],
+            phone_numbers=extra_guardian["phone_numbers"],
+            cnic=extra_guardian["cnic"],
+            address=extra_guardian["address"],
+            preferred_language=extra_guardian["preferred_language"],
+        )
+        session.add(row)
+        await session.flush()
+        linked_guardians.append(row)
     session.add_all(
         [
-            StudentGuardian(
-                madrasa_id=madrasa.id,
-                student_id=student.id,
-                guardian_id=guardian.id,
-                relationship=guardian.relationship,
-            ),
+            *[
+                StudentGuardian(
+                    madrasa_id=madrasa.id,
+                    student_id=student.id,
+                    guardian_id=item.id,
+                    relationship=item.relationship,
+                    is_primary=index == 0,
+                    portal_access=guardian_payloads[index]["portal_enabled"],
+                )
+                for index, item in enumerate(linked_guardians)
+            ],
             Enrollment(
                 madrasa_id=madrasa.id,
                 student_id=student.id,
@@ -2254,7 +2357,7 @@ async def convert_admission_application(
         application=AdmissionApplicationRead.model_validate(application),
         student=await _student_read(session, student),
         guardian=GuardianRead.model_validate(guardian),
-        student_set_password_url=student_link,
+        student_set_password_url=student_link if student.portal_enabled else None,
         guardian_set_password_url=guardian_link,
         already_converted=False,
     )

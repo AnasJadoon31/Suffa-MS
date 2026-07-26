@@ -13,12 +13,14 @@ BUILT_IN_ADMISSION_FIELDS = {
     "student_b_form_number": {"label": "B-Form number", "type": "text", "required": False, "enabled": True},
     "student_address": {"label": "Student address", "type": "textarea", "required": False, "enabled": True},
     "student_phone": {"label": "Student phone", "type": "phone", "required": False, "enabled": False},
+    "student_portal_enabled": {"label": "Student portal", "type": "dropdown", "required": True, "enabled": True, "options": ["enabled", "disabled"]},
     "guardian_name": {"label": "Guardian name", "type": "text", "required": True, "enabled": True},
     "guardian_relationship": {"label": "Guardian relationship", "type": "text", "required": True, "enabled": True},
     "guardian_phone_numbers": {"label": "Guardian phone number", "type": "phone", "required": True, "enabled": True},
     "guardian_cnic": {"label": "Guardian CNIC", "type": "text", "required": False, "enabled": True},
     "guardian_address": {"label": "Guardian address", "type": "textarea", "required": False, "enabled": True},
     "guardian_preferred_language": {"label": "Guardian preferred language", "type": "dropdown", "required": True, "enabled": True, "options": ["ur", "en"]},
+    "guardian_portal_enabled": {"label": "Guardian portal", "type": "dropdown", "required": True, "enabled": True, "options": ["enabled", "disabled"]},
 }
 
 
@@ -73,14 +75,61 @@ def admission_answer_date(answers: dict | None, key: str) -> date | None:
         raise HTTPException(status_code=422, detail=f"{key} must be YYYY-MM-DD") from error
 
 
-def validate_admission_answers(fields_definition: list, answers: dict) -> None:
+def admission_answer_enabled(answers: dict | None, key: str, *, default: bool = True) -> bool:
+    value = admission_answer_text(answers, key)
+    if not value:
+        return default
+    return value == "enabled"
+
+
+def admission_guardian_payloads(answers: dict | None) -> list[dict]:
+    answers = answers or {}
+    guardians: list[dict] = []
+    primary = {
+        "name": admission_answer_text(answers, "guardian_name"),
+        "relationship": admission_answer_text(answers, "guardian_relationship"),
+        "phone_numbers": admission_answer_text(answers, "guardian_phone_numbers"),
+        "cnic": admission_answer_text(answers, "guardian_cnic") or None,
+        "address": admission_answer_text(answers, "guardian_address") or None,
+        "preferred_language": admission_answer_text(answers, "guardian_preferred_language") or "ur",
+        "portal_enabled": admission_answer_enabled(answers, "guardian_portal_enabled", default=True),
+    }
+    if primary["name"] or primary["phone_numbers"]:
+        guardians.append(primary)
+
+    extra_guardians = answers.get("guardians") or []
+    if not isinstance(extra_guardians, list):
+        raise HTTPException(status_code=422, detail="guardians must be a list")
+    for index, item in enumerate(extra_guardians):
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=422, detail=f"guardian {index + 2} must be an object")
+        phone = item.get("phone_numbers") or item.get("guardian_phone_numbers") or ""
+        try:
+            phone = normalize_pakistan_phone(phone) if phone else ""
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=f"Invalid phone field: guardians[{index}].phone_numbers") from error
+        guardians.append({
+            "name": str(item.get("name") or item.get("guardian_name") or "").strip(),
+            "relationship": str(item.get("relationship") or item.get("guardian_relationship") or "").strip(),
+            "phone_numbers": phone,
+            "cnic": str(item.get("cnic") or item.get("guardian_cnic") or "").strip() or None,
+            "address": str(item.get("address") or item.get("guardian_address") or "").strip() or None,
+            "preferred_language": str(item.get("preferred_language") or item.get("guardian_preferred_language") or "ur").strip(),
+            "portal_enabled": (item.get("portal_enabled") or item.get("guardian_portal_enabled") or "enabled") == "enabled",
+        })
+    return guardians
+
+
+def validate_admission_answers(fields_definition: list, answers: dict, *, require_guardian: bool = True) -> None:
     fields = enabled_admission_fields(fields_definition)
     answer_fields = {field.key: field for field in fields if field.type != "label"}
-    unknown_keys = sorted(set(answers) - set(answer_fields))
+    unknown_keys = sorted(set(answers) - set(answer_fields) - {"guardians"})
     if unknown_keys:
         raise HTTPException(status_code=422, detail=f"Unknown form field: {unknown_keys[0]}")
 
     for key, field in answer_fields.items():
+        if not require_guardian and key.startswith("guardian_"):
+            continue
         value = answers.get(key)
         is_empty = value is None or value == "" or value == []
         if field.required and is_empty:
@@ -99,3 +148,13 @@ def validate_admission_answers(fields_definition: list, answers: dict) -> None:
         if field.type == "checkbox_group":
             if not isinstance(value, list) or any(option not in field.options for option in value):
                 raise HTTPException(status_code=422, detail=f"Invalid options for form field: {key}")
+
+    for index, guardian in enumerate(admission_guardian_payloads(answers)[1:]):
+        if not guardian["name"]:
+            raise HTTPException(status_code=422, detail=f"Guardian {index + 2} name is required")
+        if not guardian["relationship"]:
+            raise HTTPException(status_code=422, detail=f"Guardian {index + 2} relationship is required")
+        if not guardian["phone_numbers"]:
+            raise HTTPException(status_code=422, detail=f"Guardian {index + 2} phone number is required")
+        if guardian["preferred_language"] not in {"ur", "en"}:
+            raise HTTPException(status_code=422, detail=f"Guardian {index + 2} preferred language is invalid")

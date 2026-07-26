@@ -8,6 +8,8 @@ export interface Column<T> {
   header: ReactNode;
   /** Cell renderer for this column. */
   render: (item: T, index: number) => ReactNode;
+  /** Optional class applied to this column's header and body cells. */
+  className?: string;
 }
 
 export interface DataTableProps<T> {
@@ -60,7 +62,7 @@ export function DataTable<T>({
         {/* ---- header row ---- */}
         <div className="dataRow header">
         {columns.map((col, i) => (
-          <span key={i}>{col.header}</span>
+          <span key={i} className={col.className}>{col.header}</span>
         ))}
       </div>
 
@@ -110,7 +112,7 @@ function DataRow<T>({
       <div className="dataRow">
         {columns.map((col, i) => {
           const label = typeof col.header === "string" ? col.header : undefined;
-          return <span key={i} data-label={label}>{col.render(item, index)}</span>;
+          return <span key={i} data-label={label} className={col.className}>{col.render(item, index)}</span>;
         })}
       </div>
     </>

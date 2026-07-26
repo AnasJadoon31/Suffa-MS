@@ -25,10 +25,12 @@ def _built_in_answers(
     return {
         "student_name": student_name,
         "student_date_of_birth": dob,
+        "student_portal_enabled": "enabled",
         "guardian_name": guardian_name,
         "guardian_relationship": guardian_relationship,
         "guardian_phone_numbers": guardian_phone,
         "guardian_preferred_language": guardian_language,
+        "guardian_portal_enabled": "enabled",
         **extra,
     }
 
@@ -152,6 +154,48 @@ async def test_people_student_creation_saves_an_immutable_admission_form_snapsho
     fetched = await client.get(f"/api/v1/people/students/{created.json()['id']}")
     assert fetched.status_code == 200
     assert fetched.json()["admission_record"] == record
+
+
+async def test_student_edit_updates_and_validates_admission_answers(client, seed):
+    form = await _create_form(client, seed)
+    created = await client.post(
+        "/api/v1/people/students",
+        json={
+            "username": "edit.admission",
+            "admission_form_id": form["id"],
+            "admission_answers": _built_in_answers(
+                student_name="Before Edit",
+                dob="2017-02-03",
+                previous_school="Old School",
+            ),
+        },
+    )
+    assert created.status_code == 200, created.text
+    student_id = created.json()["id"]
+
+    edited = await client.put(
+        f"/api/v1/people/students/{student_id}",
+        json={
+            "admission_answers": {
+                "student_name": "After Edit",
+                "student_date_of_birth": "2017-03-04",
+                "student_portal_enabled": "disabled",
+                "previous_school": "New School",
+            }
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    body = edited.json()
+    assert body["name"] == "After Edit"
+    assert body["date_of_birth"] == "2017-03-04"
+    assert body["portal_enabled"] is False
+    assert body["admission_record"]["answers"]["previous_school"] == "New School"
+
+    invalid = await client.put(
+        f"/api/v1/people/students/{student_id}",
+        json={"admission_answers": {"previous_school": ""}},
+    )
+    assert invalid.status_code == 422
 
 
 async def test_admission_application_can_be_edited_and_status_is_reversible(client, seed):
@@ -300,6 +344,64 @@ async def test_accept_conversion_is_atomic_idempotent_and_notifies_admin(client,
     )
     assert marked.status_code == 200
     assert marked.json()["is_read"] is True
+
+
+async def test_conversion_creates_multiple_guardians_and_respects_portal_decisions(client, seed, db_sessionmaker):
+    form = await _create_open_form_without_required_fields(client, seed)
+    submitted = await client.post(
+        "/api/v1/operations/admissions",
+        json={
+            "form_id": form["id"],
+            "extra_data": _built_in_answers(
+                student_name="Two Guardian Child",
+                guardian_name="Offline Parent",
+                guardian_phone="+923001110011",
+                guardian_portal_enabled="disabled",
+                student_portal_enabled="disabled",
+                guardians=[{
+                    "guardian_name": "Portal Uncle",
+                    "guardian_relationship": "uncle",
+                    "guardian_phone_numbers": "+923001110012",
+                    "guardian_preferred_language": "en",
+                    "guardian_portal_enabled": "enabled",
+                }],
+            ),
+        },
+    )
+    assert submitted.status_code == 200, submitted.text
+
+    converted = await client.post(
+        f"/api/v1/operations/admissions/{submitted.json()['id']}/convert",
+        json={
+            "student_username": "two.guardian.child",
+            "student_portal_enabled": False,
+            "guardian_portal_enabled": False,
+            "session_id": str(seed.old_session.id),
+            "class_id": str(seed.class_a.id),
+            "section_id": str(seed.sections.a1.id),
+        },
+    )
+    assert converted.status_code == 200, converted.text
+    assert converted.json()["student_set_password_url"] is None
+    assert converted.json()["guardian_set_password_url"] is None
+
+    async with db_sessionmaker() as db:
+        student_id = UUID(converted.json()["student"]["id"])
+        links = (
+            await db.execute(
+                select(StudentGuardian, Guardian)
+                .join(Guardian, Guardian.id == StudentGuardian.guardian_id)
+                .where(StudentGuardian.student_id == student_id)
+                .order_by(StudentGuardian.is_primary.desc(), Guardian.name)
+            )
+        ).all()
+        assert len(links) == 2
+        assert links[0][1].name == "Offline Parent"
+        assert links[0][1].user_id is None
+        assert links[0][0].portal_access is False
+        assert links[1][1].name == "Portal Uncle"
+        assert links[1][1].user_id is not None
+        assert links[1][0].portal_access is True
 
 
 async def test_admission_conversion_allocates_after_highest_existing_number(

@@ -24,7 +24,7 @@ function ReportCard({
   return (
     <PageSection>
       <PageHeader title={title} />
-      <InlineFilter filters={filters}>
+      <InlineFilter className="reportCardFilter" filters={filters}>
         <div className="formActions">
           <Button className="secondaryAction" type="button" disabled={disabled} onClick={() => onDownload("csv")}>
             <FileDown size={16} /> CSV

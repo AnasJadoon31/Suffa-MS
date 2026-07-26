@@ -10,6 +10,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { Input } from "./ui/Field";
 import { useDialog } from "../lib/DialogContext";
+import { DOCUMENT_UPLOAD_ACCEPT, getDocumentUploadContentType } from "../lib/filePolicy";
 
 export function MyAssessmentsView() {
   const { t } = useTranslation();
@@ -48,10 +49,15 @@ export function MyAssessmentsView() {
     if (!file || readOnly) return;
     setError("");
     try {
+      const contentType = getDocumentUploadContentType(file);
+      if (!contentType) {
+        setError(t("unsupportedDocumentFile"));
+        return;
+      }
       const { object_key, upload_url } = await filesApi.presignUpload({
-        category: "submissions", filename: file.name, content_type: file.type || "application/octet-stream", size_bytes: file.size,
+        category: "submissions", filename: file.name, content_type: contentType, size_bytes: file.size,
       });
-      await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+      await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": contentType } });
       const submission = await assessmentsApi.submitAssignment(assignment.id, object_key);
       setSubmitted((current) => new Set(current).add(assignment.id));
       setAssignments((current) => current.map((item) => item.id === assignment.id ? {
@@ -106,7 +112,7 @@ export function MyAssessmentsView() {
         </div>
       )}
       {!loading && assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
-      <div className="dataTable">
+      <div className="dataTable assessmentTable">
         <div className="dataRow header assessmentStudentRow">
           <span>{t("assignmentLabel")}</span><span>{t("dueDateLabel")}</span>
           <span>{t("instructionsLabel")}</span><span>{t("submissionActionsLabel")}</span>
@@ -134,7 +140,7 @@ export function MyAssessmentsView() {
                   )}
                   {!readOnly && new Date() <= new Date(assignment.due_date) && (
                     <>
-                      <Input aria-label={t("replacementFileLabel")} type="file" onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
+                      <Input aria-label={t("replacementFileLabel")} type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
                       <Button className="tableAction" type="button" disabled={!files[assignment.id]} onClick={() => submit(assignment)}>
                         <Upload size={14} /> {t("replaceSubmissionBtn")}
                       </Button>
@@ -146,7 +152,7 @@ export function MyAssessmentsView() {
                 </span>
               ) : (
                 <>
-                  <Input type="file" disabled={readOnly} onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
+                  <Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} disabled={readOnly} onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
                   <Button className="tableAction" type="button" disabled={readOnly || !files[assignment.id]} onClick={() => submit(assignment)}>
                     <Upload size={14} /> {t("submitBtn")}
                   </Button>

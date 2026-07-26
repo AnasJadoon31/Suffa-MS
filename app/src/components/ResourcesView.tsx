@@ -17,6 +17,7 @@ import {
 import { AudiencePicker } from "./AudiencePicker";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
+import { DOCUMENT_UPLOAD_ACCEPT, getDocumentUploadContentType } from "../lib/filePolicy";
 import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
@@ -24,6 +25,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
+import { ActionMenu } from "./ui/ActionMenu";
 
 const emptyForm = { category_id: "", title: "", description: "", video_url: "" };
 
@@ -177,6 +179,7 @@ export function ResourcesView() {
 
       {canManage && showResourceForm && <FormModal
             title={t("addResourceBtn")} onClose={() => setShowResourceForm(false)}
+            error={error}
             onSubmit={async (e) => {
                       e.preventDefault();
                       setError("");
@@ -185,10 +188,15 @@ export function ResourcesView() {
                       try {
                         let file_key: string | undefined;
                         if (file) {
+                          const contentType = getDocumentUploadContentType(file);
+                          if (!contentType) {
+                            setError(t("unsupportedDocumentFile"));
+                            return;
+                          }
                           const { object_key, upload_url } = await filesApi.presignUpload({
-                            category: "resources", filename: file.name, content_type: file.type || "application/octet-stream", size_bytes: file.size,
+                            category: "resources", filename: file.name, content_type: contentType, size_bytes: file.size,
                           });
-                          await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+                          await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": contentType } });
                           file_key = object_key;
                         }
                         await operationsApi.createResource({
@@ -221,7 +229,7 @@ export function ResourcesView() {
 
           <label>{t("videoUrlLabel")}<Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder={t("optionalPlaceholder")} /></label>
 
-          <label>{t("fileLabel")}<Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
+          <label>{t("fileLabel")}<Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
 
           <AudiencePicker value={audience} onChange={setAudience} />
           </FormModal>}
@@ -233,45 +241,54 @@ export function ResourcesView() {
           { header: t("titleCol"), render: (r) => r.title },
           { header: t("categoryCol"), render: (r) => categories.find((c) => c.id === r.category_id)?.name ?? "—" },
           { header: t("ownerCol"), render: (r) => r.owner_name ?? "—" },
-          { header: t("actionsCol"), render: (r) => (
-            <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {r.video_url && (
-                <a className="tableAction" href={r.video_url} target="_blank" rel="noreferrer">
-                  <Video size={14} /> {t("watchBtn")}
-                </a>
-              )}
-              {r.file_key && (
-                <Button
-                  className="tableAction"
-                  type="button"
-                  onClick={async () => {
+          { header: t("actionsCol"), render: (r) => {
+            const items = [
+                ...(r.video_url ? [{
+                  label: t("watchBtn"),
+                  icon: <Video size={14} />,
+                  onClick: () => window.open(r.video_url!, "_blank", "noreferrer"),
+                }] : []),
+                ...(r.file_key ? [{
+                  label: t("downloadBtn"),
+                  icon: <Download size={14} />,
+                  onClick: async () => {
                     const { url } = await filesApi.presignDownload(r.file_key!);
                     window.open(url, "_blank", "noreferrer");
-                  }}
-                >
-                  <Download size={14} /> {t("downloadBtn")}
-                </Button>
-              )}
-              {canManage && (
-                <>
-                  <Button className="iconBtn" type="button" title={t("editBtn") ?? ""} onClick={() => {
-                    setEditing(r);
-                    setEditAudience(r.visibility_scope);
-                    setEditError("");
-                  }}><Edit2 size={14} /></Button>
-                  <Button className="iconBtn" type="button" title={t("deleteBtn") ?? ""} onClick={async () => {
-                    if (!(await confirm(t("deleteResourceConfirm") ?? ""))) return;
-                    try {
-                      await operationsApi.deleteResource(r.id);
-                      await refreshAll();
-                    } catch (err: any) {
-                      await alert(err.response?.data?.detail ?? t("failedDeleteResource"));
-                    }
-                  }}><Trash2 size={14} /></Button>
-                </>
-              )}
-            </span>
-          )},
+                  },
+                }] : []),
+                ...(canManage ? [
+                  {
+                    label: t("editBtn"),
+                    icon: <Edit2 size={14} />,
+                    onClick: () => {
+                      setEditing(r);
+                      setEditAudience(r.visibility_scope);
+                      setEditError("");
+                    },
+                  },
+                  {
+                    label: t("deleteBtn"),
+                    icon: <Trash2 size={14} />,
+                    destructive: true,
+                    onClick: async () => {
+                      if (!(await confirm(t("deleteResourceConfirm") ?? ""))) return;
+                      try {
+                        await operationsApi.deleteResource(r.id);
+                        await refreshAll();
+                      } catch (err: any) {
+                        await alert(err.response?.data?.detail ?? t("failedDeleteResource"));
+                      }
+                    },
+                  },
+                ] : []),
+              ];
+            return items.length ? (
+              <ActionMenu
+                ariaLabel={`${t("actionsCol")}: ${r.title}`}
+                items={items}
+              />
+            ) : null;
+          }},
         ]}
         data={resources}
         keyExtractor={(r) => r.id}

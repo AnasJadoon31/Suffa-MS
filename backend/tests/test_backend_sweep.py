@@ -284,7 +284,12 @@ async def test_public_admission_form_flow(client, seed):
     public_form = await client.get(f"/api/v1/public/admission-forms/{token}")
     assert public_form.status_code == 200
     assert public_form.json()["title"] == "Hifz admissions"
-    assert public_form.json()["fields_definition"] == [
+    custom_fields = [
+        {key: value for key, value in field.items() if key not in {"built_in", "enabled"}}
+        for field in public_form.json()["fields_definition"]
+        if not field.get("built_in")
+    ]
+    assert custom_fields == [
         {
             "key": "previous_school",
             "label": "Previous school",
@@ -307,10 +312,24 @@ async def test_public_admission_form_flow(client, seed):
             "options": ["Hifz", "Sports"],
         },
     ]
+    valid_built_ins = {
+        "student_name": "New Kid",
+        "student_date_of_birth": "2016-01-05",
+        "student_portal_enabled": "enabled",
+        "guardian_name": "Applicant Parent",
+        "guardian_relationship": "father",
+        "guardian_phone_numbers": "+923001110010",
+        "guardian_preferred_language": "ur",
+        "guardian_portal_enabled": "enabled",
+    }
 
     missing_required = await client.post(
         f"/api/v1/public/admission-forms/{token}",
-        json={"applicant_name": "Missing Answer", "guardian_contact": "+92310"},
+        json={
+            "applicant_name": "Missing Answer",
+            "guardian_contact": "+923001110010",
+            "extra_data": valid_built_ins,
+        },
     )
     assert missing_required.status_code == 422
     assert "previous_school" in missing_required.json()["detail"]
@@ -319,8 +338,9 @@ async def test_public_admission_form_flow(client, seed):
         f"/api/v1/public/admission-forms/{token}",
         json={
             "applicant_name": "Invalid Choice",
-            "guardian_contact": "+92310",
+            "guardian_contact": "+923001110010",
             "extra_data": {
+                **valid_built_ins,
                 "previous_school": "None",
                 "campus": "West",
                 "activities": ["Hifz"],
@@ -332,8 +352,8 @@ async def test_public_admission_form_flow(client, seed):
 
     submitted = await client.post(
         f"/api/v1/public/admission-forms/{token}",
-        json={"applicant_name": "New Kid", "guardian_contact": "+92311", "date_of_birth": "2016-01-05",
-              "extra_data": {"previous_school": "None", "campus": "North", "activities": ["Hifz"]}},
+        json={"applicant_name": "New Kid", "guardian_contact": "+923001110010", "date_of_birth": "2016-01-05",
+              "extra_data": {**valid_built_ins, "previous_school": "None", "campus": "North", "activities": ["Hifz"]}},
     )
     assert submitted.status_code == 200
     assert submitted.json()["form_id"] == created.json()["id"]

@@ -38,7 +38,20 @@ async def test_admission_form_with_applications_can_be_deleted_without_losing_ap
     token = created.json()["public_token"]
     submitted = await client.post(
         f"/api/v1/public/admission-forms/{token}",
-        json={"applicant_name": "Applicant", "guardian_contact": "+92000000000"},
+        json={
+            "applicant_name": "Applicant",
+            "guardian_contact": "+923001110011",
+            "extra_data": {
+                "student_name": "Applicant",
+                "student_date_of_birth": "2016-01-05",
+                "student_portal_enabled": "enabled",
+                "guardian_name": "Applicant Parent",
+                "guardian_relationship": "father",
+                "guardian_phone_numbers": "+923001110011",
+                "guardian_preferred_language": "ur",
+                "guardian_portal_enabled": "enabled",
+            },
+        },
     )
     assert submitted.status_code == 200
 

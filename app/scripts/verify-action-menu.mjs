@@ -31,7 +31,7 @@ function apiResponse(pathname) {
         selected_session_id: null,
       },
       madrasa: { id: "madrasa-1", slug: "suffa", name: "Suffa Madrasa" },
-      permissions: [],
+      permissions: ["students.view", "students.send_credentials", "resources.manage", "holidays.manage"],
       features: {},
       branding: {},
       has_teaching_assignment: false,
@@ -62,10 +62,54 @@ function apiResponse(pathname) {
   }
   if (pathname === "/api/v1/people/guardians") return [];
   if (pathname === "/api/v1/academics/programs") return [];
-  if (pathname === "/api/v1/academics/classes") return [];
+  if (pathname === "/api/v1/academics/classes") return [{ id: "class-1", program_id: "program-1", name: "Hifz Level 1", default_portal_enabled: true }];
   if (pathname === "/api/v1/academics/sessions") return [];
   if (pathname === "/api/v1/operations/admission-forms") return [];
+  if (pathname === "/api/v1/operations/resource-categories") return [{ id: "category-1", name: "Handouts", description: "" }];
+  if (pathname === "/api/v1/operations/resources") {
+    return [{
+      id: "resource-1",
+      category_id: "category-1",
+      title: "Week 1 packet",
+      description: "Read before class",
+      file_key: "resources/week-1.pdf",
+      video_url: "https://example.test/lesson",
+      visibility_scope: { all: true },
+      owner_id: "teacher-1",
+      owner_name: "Ustad Ahmad",
+      created_at: "2026-07-26T00:00:00Z",
+    }];
+  }
+  if (pathname === "/api/v1/operations/holidays") {
+    return [{
+      id: "holiday-1",
+      name: "Eid break",
+      category: "holiday",
+      start_date: "2026-07-01",
+      end_date: "2026-07-03",
+      class_ids: [],
+      created_at: "2026-07-26T00:00:00Z",
+    }];
+  }
   return [];
+}
+
+async function verifyMenuItems(page, triggerName, itemNames, label) {
+  await page.getByRole("button", { name: triggerName }).click();
+  const menu = page.getByRole("menu");
+  await menu.waitFor();
+  for (const itemName of itemNames) {
+    await page.getByRole("menuitem", { name: itemName }).waitFor();
+  }
+  const styles = await menu.evaluate((element) => ({
+    position: getComputedStyle(element).position,
+    listStyle: getComputedStyle(element).listStyleType,
+    firstItemDisplay: getComputedStyle(element.querySelector(".actionMenuItem")).display,
+  }));
+  if (styles.position !== "fixed" || styles.listStyle !== "none" || styles.firstItemDisplay !== "flex") {
+    throw new Error(`Action menu styling regressed on ${label}: ${JSON.stringify(styles)}`);
+  }
+  await page.keyboard.press("Escape");
 }
 
 async function verifyActionMenuAtViewport(browser, viewport, label) {
@@ -151,6 +195,15 @@ async function verifyActionMenuAtViewport(browser, viewport, label) {
     if (errors.length) {
       throw new Error(`Browser errors while verifying ${label}: ${errors.join(" | ")}`);
     }
+
+    await page.goto(`${baseUrl}/resources`, { waitUntil: "domcontentloaded" });
+    await page.getByText("Week 1 packet").waitFor();
+    await verifyMenuItems(page, "Actions: Week 1 packet", ["Watch", "Download", "Edit", "Delete"], `${label} resources`);
+
+    await page.goto(`${baseUrl}/holidays`, { waitUntil: "domcontentloaded" });
+    await page.getByText("Eid break").waitFor();
+    await verifyMenuItems(page, "Actions: Eid break", ["Edit", "Delete"], `${label} holidays`);
+
     console.log(`action menu ${label}: positioned dropdown passed (${Math.round(menuBox.width)}x${Math.round(menuBox.height)}, row ${Math.round(afterHeight)}px)`);
   } finally {
     await context.close();

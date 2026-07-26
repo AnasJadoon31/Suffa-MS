@@ -17,6 +17,7 @@ class ErrorCode(StrEnum):
     WHATSAPP_PAIRING_CODE_FAILED = "whatsapp_pairing_code_failed"
     WHATSAPP_PAIRING_REPLACE_REQUIRED = "whatsapp_pairing_replace_required"
     WHATSAPP_PHONE_INVALID = "whatsapp_phone_invalid"
+    WHATSAPP_TEXT_DELIVERY_FAILED = "whatsapp_text_delivery_failed"
     WHATSAPP_MEDIA_DELIVERY_FAILED = "whatsapp_media_delivery_failed"
     COURSE_NAME_EXISTS = "course_name_exists"
     PERMISSION_REQUIRED = "permission_required"

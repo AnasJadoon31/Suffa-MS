@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { filesApi, messagingApi, operationsApi, type TypedSetting, type WhatsAppConnectionStatus } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
+import { PhoneInput } from "./ui/PhoneInput";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
@@ -26,8 +27,10 @@ export function SettingsView() {
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppConnectionStatus | null>(null);
   const [whatsAppLoading, setWhatsAppLoading] = useState(false);
   const [pairingOpen, setPairingOpen] = useState(false);
+  const [pairingMethod, setPairingMethod] = useState<"phone" | "qr">("phone");
   const [pairingPhone, setPairingPhone] = useState("");
   const [pairingCode, setPairingCode] = useState("");
+  const [qrCode, setQrCode] = useState("");
   const [pairingError, setPairingError] = useState("");
   const [replacePairingPending, setReplacePairingPending] = useState(false);
 
@@ -142,6 +145,26 @@ export function SettingsView() {
     }
   };
 
+  const generateQrCode = async (replaceExisting = false) => {
+    setPairingError("");
+    setWhatsAppLoading(true);
+    try {
+      const response = await messagingApi.requestWhatsAppQrCode(replaceExisting);
+      setQrCode(response.qr_code_base64);
+      setPairingCode("");
+      setReplacePairingPending(false);
+      setWhatsAppStatus({ instance_name: response.instance_name, state: response.state, connected: false });
+    } catch (err: any) {
+      if (err.response?.status === 428) {
+        setReplacePairingPending(true);
+      } else {
+        setPairingError(err.response?.data?.detail ?? t("whatsappPairingCodeFailedError"));
+      }
+    } finally {
+      setWhatsAppLoading(false);
+    }
+  };
+
   const requestPairingCode = (event: React.FormEvent) => {
     event.preventDefault();
     void generatePairingCode(false);
@@ -170,7 +193,7 @@ export function SettingsView() {
           </div>
           {pairingError && <p className="notice" style={{ color: "var(--rose)" }}>{pairingError}</p>}
           <div className="whatsappConnectionActions">
-            <Button type="button" onClick={() => { setPairingOpen(true); setPairingCode(""); setPairingError(""); setReplacePairingPending(false); }} disabled={whatsAppLoading || !whatsAppStatus || whatsAppStatus.connected}>
+            <Button type="button" onClick={() => { setPairingOpen(true); setPairingMethod("phone"); setPairingCode(""); setQrCode(""); setPairingError(""); setReplacePairingPending(false); }} disabled={whatsAppLoading || !whatsAppStatus || whatsAppStatus.connected}>
               <MessageCircle size={15} /> {t("connectWhatsAppBtn")}
             </Button>
             <Button className="secondaryAction" type="button" onClick={() => void loadWhatsAppStatus()} disabled={whatsAppLoading}>
@@ -181,26 +204,49 @@ export function SettingsView() {
       )}
 
       {pairingOpen && (
-        <Modal title={t("connectWhatsAppTitle")} onClose={() => { setPairingOpen(false); setPairingCode(""); }}>
-          {!pairingCode ? (
-            <form className="whatsappPairingForm" onSubmit={requestPairingCode}>
-              <p className="notice">{t("whatsappPhoneHelp")}</p>
-              <label>{t("whatsappPhoneLabel")}<Input autoFocus required inputMode="tel" placeholder={t("whatsappPhonePlaceholder")} value={pairingPhone} onChange={(event) => setPairingPhone(event.target.value)} /></label>
+        <Modal title={t("connectWhatsAppTitle")} onClose={() => { setPairingOpen(false); setPairingCode(""); setQrCode(""); }}>
+          {!pairingCode && !qrCode ? (
+            <form className="whatsappPairingForm" onSubmit={pairingMethod === "phone" ? requestPairingCode : (event) => { event.preventDefault(); void generateQrCode(false); }}>
+              <div className="whatsappMethodSwitch" role="tablist" aria-label={t("whatsappPairingMethodLabel")}>
+                <Button className={pairingMethod === "phone" ? "primaryAction" : "secondaryAction"} type="button" role="tab" aria-selected={pairingMethod === "phone"} onClick={() => { setPairingMethod("phone"); setReplacePairingPending(false); setPairingError(""); }}>
+                  {t("whatsappPhonePairingTab")}
+                </Button>
+                <Button className={pairingMethod === "qr" ? "primaryAction" : "secondaryAction"} type="button" role="tab" aria-selected={pairingMethod === "qr"} onClick={() => { setPairingMethod("qr"); setReplacePairingPending(false); setPairingError(""); }}>
+                  {t("whatsappQrPairingTab")}
+                </Button>
+              </div>
+              <p className="notice">{pairingMethod === "phone" ? t("whatsappPhoneHelp") : t("whatsappQrHelp")}</p>
+              {pairingMethod === "phone" ? (
+                <PhoneInput
+                  id="whatsapp-pairing-phone"
+                  required
+                  label={t("whatsappPhoneLabel")}
+                  placeholder={t("whatsappPhonePlaceholder")}
+                  value={pairingPhone}
+                  onChange={setPairingPhone}
+                />
+              ) : null}
               {pairingError && <p className="notice" style={{ color: "var(--rose)" }}>{pairingError}</p>}
               {replacePairingPending ? (
                 <div className="whatsappPairingWarning" role="alert">
                   <p>{t("whatsappReplacePairingWarning")}</p>
                   <div className="whatsappConnectionActions">
-                    <Button type="button" onClick={() => void generatePairingCode(true)} disabled={whatsAppLoading}>{t("replacePairingBtn")}</Button>
+                    <Button type="button" onClick={() => void (pairingMethod === "phone" ? generatePairingCode(true) : generateQrCode(true))} disabled={whatsAppLoading}>{t("replacePairingBtn")}</Button>
                     <Button className="secondaryAction" type="button" onClick={() => setReplacePairingPending(false)}>{t("cancelBtn")}</Button>
                   </div>
                 </div>
               ) : (
-                <Button type="submit" disabled={whatsAppLoading}>{whatsAppLoading ? t("generatingCodeLabel") : t("generatePairingCodeBtn")}</Button>
+                <Button type="submit" disabled={whatsAppLoading || (pairingMethod === "phone" && !pairingPhone)}>{whatsAppLoading ? t("generatingCodeLabel") : pairingMethod === "phone" ? t("generatePairingCodeBtn") : t("generateQrCodeBtn")}</Button>
               )}
             </form>
           ) : whatsAppStatus?.connected ? (
             <div className="whatsappPairingSuccess"><Wifi size={30} /><h3>{t("whatsappConnectedTitle")}</h3><p className="notice">{t("whatsappConnectedDescription")}</p></div>
+          ) : qrCode ? (
+            <div className="whatsappPairingCode">
+              <p>{t("whatsappQrInstructions")}</p>
+              <img className="whatsappQrImage" src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`} alt={t("whatsappQrAlt")} />
+              <p className="notice">{t("whatsappWaitingForConnection")}</p>
+            </div>
           ) : (
             <div className="whatsappPairingCode">
               <p>{t("whatsappPairingInstructions")}</p>

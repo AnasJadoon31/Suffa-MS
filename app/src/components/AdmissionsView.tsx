@@ -6,6 +6,7 @@ import { useDialog } from "../lib/DialogContext";
 
 import {
   academicsApi,
+  messagingApi,
   operationsApi,
   type AdmissionApplication,
   type AdmissionForm,
@@ -16,10 +17,12 @@ import {
   type AcademicSession,
   type Section,
   type AdminNotification,
+  type AdmissionConversion,
 } from "../lib/endpoints";
 import { AdmissionAnswersFields } from "./AdmissionAnswersFields";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select } from "./ui/Field";
+import { PhoneInput } from "./ui/PhoneInput";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
@@ -241,7 +244,7 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
         catch (err: any) { setError(err.response?.data?.detail ?? t("failedUpdateApplication")); }
       }}>
         <label>{t("applicantNameLabel")}<Input required value={editing.applicant_name} onChange={(e) => setEditing({ ...editing, applicant_name: e.target.value })} /></label>
-        <label>{t("guardianContactLabel")}<Input value={editing.guardian_contact} onChange={(e) => setEditing({ ...editing, guardian_contact: e.target.value })} /></label>
+        <PhoneInput id="admission-edit-guardian-contact" required label={t("guardianContactLabel")} value={editing.guardian_contact} onChange={(value) => setEditing({ ...editing, guardian_contact: value })} />
         <label>{t("programLabel")}<Select value={editing.program_id ?? ""} onChange={(e) => setEditing({ ...editing, program_id: e.target.value || null })}><option value="">{t("selectEllipsis")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</Select></label>
         <label>{t("dobLabel")}<Input type="date" value={editing.date_of_birth ?? ""} onChange={(e) => setEditing({ ...editing, date_of_birth: e.target.value || null })} /></label>
         {Object.entries(editing.extra_data ?? {}).map(([key, value]) => <label key={key}>{key.replaceAll("_", " ")}<Input value={String(value ?? "")} onChange={(e) => setEditing({ ...editing, extra_data: { ...(editing.extra_data ?? {}), [key]: e.target.value } })} /></label>)}
@@ -257,25 +260,113 @@ function AdmissionConversionModal({ application, programs, onClose, onSuccess }:
   const [sessions, setSessions] = useState<AcademicSession[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  const [converted, setConverted] = useState<AdmissionConversion | null>(null);
+  const [deliveryResults, setDeliveryResults] = useState<{ subject: string; status: "sent" | "copied" | "skipped"; message: string }[]>([]);
   const [form, setForm] = useState({
-    student_username: "", guardian_username: "", session_id: "", class_id: "", section_id: "",
+    student_username: "", guardian_username: "", student_portal_enabled: "enabled", guardian_portal_enabled: "enabled",
+    student_delivery_phone: answerString(application.extra_data ?? {}, BUILT_IN_ADMISSION_KEYS.studentPhone),
+    guardian_delivery_phone: answerString(application.extra_data ?? {}, BUILT_IN_ADMISSION_KEYS.guardianPhoneNumbers) || application.guardian_contact,
+    session_id: "", class_id: "", section_id: "",
   });
   const [error, setError] = useState("");
   useEffect(() => { void Promise.all([academicsApi.listSessions(), academicsApi.listClasses()]).then(([sessionRows, classRows]) => { setSessions(sessionRows); setClasses(classRows); }); }, []);
   useEffect(() => { if (!form.class_id) setSections([]); else void academicsApi.listSections(form.class_id).then(setSections); }, [form.class_id]);
-  return <FormModal title={t("acceptApplicationHeading")} maxWidth={800} onClose={onClose} submitLabel={t("acceptAndCreatePeopleBtn")} submitIcon={<CheckCircle2 size={16} />} error={error} onSubmit={async () => {
+  const phoneOptions = (value: string) => Array.from(new Set(value.split(/[;,]/).map((part) => part.trim()).filter(Boolean)));
+  const studentPhoneOptions = phoneOptions(answerString(application.extra_data ?? {}, BUILT_IN_ADMISSION_KEYS.studentPhone));
+  const guardianPhoneOptions = phoneOptions(`${answerString(application.extra_data ?? {}, BUILT_IN_ADMISSION_KEYS.guardianPhoneNumbers)};${application.guardian_contact}`);
+  const credentialUrl = (path: string) => path.startsWith("http") ? path : `${window.location.origin}${path}`;
+
+  const sendConvertedCredentials = async (result: AdmissionConversion) => {
+    const nextResults: { subject: string; status: "sent" | "copied" | "skipped"; message: string }[] = [];
+    const tasks = [
+      {
+        enabled: Boolean(result.student_set_password_url),
+        subject: t("studentLabel", "Student"),
+        subjectType: "student" as const,
+        subjectId: result.student.id,
+        url: result.student_set_password_url,
+        phone: form.student_delivery_phone || undefined,
+      },
+      {
+        enabled: Boolean(result.guardian_set_password_url),
+        subject: t("guardianLabel", "Guardian"),
+        subjectType: "guardian" as const,
+        subjectId: result.guardian.id,
+        url: result.guardian_set_password_url,
+        phone: form.guardian_delivery_phone || undefined,
+      },
+    ];
+    for (const task of tasks) {
+      if (!task.enabled || !task.url) {
+        nextResults.push({ subject: task.subject, status: "skipped", message: t("credentialDeliverySkipped", "Portal disabled; no login link created.") });
+        continue;
+      }
+      const fullUrl = credentialUrl(task.url);
+      try {
+        const link = await messagingApi.sendCredentials({
+          subject_type: task.subjectType,
+          subject_id: task.subjectId,
+          set_password_url: fullUrl,
+          phone_number: task.phone,
+        });
+        if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
+        nextResults.push({ subject: task.subject, status: "sent", message: t("credentialsSentLabel") });
+      } catch {
+        await navigator.clipboard.writeText(fullUrl);
+        nextResults.push({ subject: task.subject, status: "copied", message: t("credentialDeliveryCopiedFallback", "Delivery failed; login link copied to clipboard.") });
+      }
+      setDeliveryResults([...nextResults]);
+    }
+  };
+
+  return <FormModal title={t("acceptApplicationHeading")} maxWidth={800} onClose={onClose} submitLabel={converted ? t("doneBtn", "Done") : t("acceptAndCreatePeopleBtn")} submitIcon={<CheckCircle2 size={16} />} error={error} onSubmit={async () => {
+    if (converted) {
+      await onSuccess();
+      return;
+    }
     setError("");
-    try { await operationsApi.convertAdmission(application.id, form); await onSuccess(); }
+    setDeliveryResults([
+      { subject: t("studentLabel", "Student"), status: "skipped", message: t("credentialDeliveryPending", "Waiting for acceptance...") },
+      { subject: t("guardianLabel", "Guardian"), status: "skipped", message: t("credentialDeliveryPending", "Waiting for acceptance...") },
+    ]);
+    try {
+      const result = await operationsApi.convertAdmission(application.id, {
+        student_username: form.student_username,
+        guardian_username: form.guardian_portal_enabled === "enabled" ? form.guardian_username : undefined,
+        student_portal_enabled: form.student_portal_enabled === "enabled",
+        guardian_portal_enabled: form.guardian_portal_enabled === "enabled",
+        session_id: form.session_id,
+        class_id: form.class_id,
+        section_id: form.section_id,
+      });
+      setConverted(result);
+      await sendConvertedCredentials(result);
+    }
     catch (err: any) { setError(err.response?.data?.detail ?? t("failedConvertApplication")); }
   }}>
     <p className="notice">{t("acceptApplicationHint", { name: application.applicant_name })}</p>
-    <div className="formGridTwo">
+    {!converted && <div className="formGridTwo">
       <label>{t("studentUsernameLabel")}<Input required value={form.student_username} onChange={(e) => setForm({ ...form, student_username: e.target.value })} /></label>
-      <label>{t("guardianUsernameLabel")}<Input required value={form.guardian_username} onChange={(e) => setForm({ ...form, guardian_username: e.target.value })} /></label>
+      <label>{t("studentPortalDecisionLabel", "Student portal")}<Select required value={form.student_portal_enabled} onChange={(e) => setForm({ ...form, student_portal_enabled: e.target.value })}><option value="enabled">{t("enabledLabel")}</option><option value="disabled">{t("disabledLabel")}</option></Select></label>
+      {form.student_portal_enabled === "enabled" && <label>{t("studentDeliveryTargetLabel", "Student delivery target")}<Select value={form.student_delivery_phone} onChange={(e) => setForm({ ...form, student_delivery_phone: e.target.value })}><option value="">{t("copyFallbackOnlyLabel", "Copy fallback only")}</option>{studentPhoneOptions.map((phone) => <option key={phone} value={phone}>{phone}</option>)}</Select></label>}
+      <label>{t("guardianPortalDecisionLabel", "Guardian portal")}<Select required value={form.guardian_portal_enabled} onChange={(e) => setForm({ ...form, guardian_portal_enabled: e.target.value, guardian_username: e.target.value === "disabled" ? "" : form.guardian_username })}><option value="enabled">{t("enabledLabel")}</option><option value="disabled">{t("disabledLabel")}</option></Select></label>
+      {form.guardian_portal_enabled === "enabled" && <label>{t("guardianUsernameLabel")}<Input required value={form.guardian_username} onChange={(e) => setForm({ ...form, guardian_username: e.target.value })} /></label>}
+      {form.guardian_portal_enabled === "enabled" && <label>{t("guardianDeliveryTargetLabel", "Guardian delivery target")}<Select value={form.guardian_delivery_phone} onChange={(e) => setForm({ ...form, guardian_delivery_phone: e.target.value })}><option value="">{t("copyFallbackOnlyLabel", "Copy fallback only")}</option>{guardianPhoneOptions.map((phone) => <option key={phone} value={phone}>{phone}</option>)}</Select></label>}
       <label>{t("sessionLabel")}<Select required value={form.session_id} onChange={(e) => setForm({ ...form, session_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sessions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
       <label>{t("classLabel")}<Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: "" })}><option value="">{t("selectEllipsis")}</option>{classes.filter((item) => !application.program_id || item.program_id === application.program_id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
       <label>{t("sectionLabel")}<Select required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
-    </div>
+    </div>}
+    {deliveryResults.length > 0 && (
+      <div className="credentialDeliverySummary" role="status" aria-live="polite">
+        <h4>{t("credentialDeliveryResultsHeading", "Credential delivery")}</h4>
+        {deliveryResults.map((item) => (
+          <p key={`${item.subject}-${item.status}`}>
+            <strong>{item.subject}</strong>
+            <span>{item.message}</span>
+          </p>
+        ))}
+      </div>
+    )}
   </FormModal>;
 }
 

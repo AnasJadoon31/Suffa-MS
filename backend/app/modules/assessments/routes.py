@@ -429,6 +429,7 @@ async def _assignment_reads(
     madrasa_id: UUID,
     rows: list[Assignment],
     student_id: UUID | None = None,
+    section_name_overrides: dict[UUID, str] | None = None,
 ) -> list[AssignmentRead]:
     """Attach display names (class/section/course/teacher) to assignment rows."""
     class_names = dict((await session.execute(select(AcademicClass.id, AcademicClass.name).where(AcademicClass.madrasa_id == madrasa_id))).all())
@@ -447,12 +448,13 @@ async def _assignment_reads(
         ).scalars().all()
         submissions = {submission.assignment_id: submission for submission in submission_rows}
     reads = []
+    section_name_overrides = section_name_overrides or {}
     for row in rows:
         data = AssignmentRead.model_validate(row).model_dump()
         submission = submissions.get(row.id)
         data.update(
             class_name=class_names.get(row.class_id),
-            section_name=section_names.get(row.section_id) if row.section_id else None,
+            section_name=section_name_overrides.get(row.id) or (section_names.get(row.section_id) if row.section_id else None),
             course_name=course_names.get(row.course_id),
             teacher_name=teacher_names.get(row.created_by_id) if row.created_by_id else None,
             submission_file_key=submission.file_key if submission else None,
@@ -462,6 +464,63 @@ async def _assignment_reads(
         )
         reads.append(AssignmentRead(**data))
     return reads
+
+
+async def _collapse_assignment_batches_for_list(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    rows: list[Assignment],
+    *,
+    section_id: UUID | None,
+) -> tuple[list[Assignment], dict[UUID, str]]:
+    """Return one representative row per multi-section batch for broad lists.
+
+    Section-filtered lists must keep the section-specific row so edit/delete
+    and submissions can still target the exact assignment copy. Broad lists
+    are a user-facing overview, so a two-section publish should appear as one
+    logical assignment with the section names combined.
+    """
+    if section_id is not None:
+        return rows, {}
+
+    representative_by_batch: dict[UUID, Assignment] = {}
+    collapsed: list[Assignment] = []
+    batch_ids: set[UUID] = set()
+    for row in rows:
+        if row.batch_id is None:
+            collapsed.append(row)
+            continue
+        batch_ids.add(row.batch_id)
+        if row.batch_id not in representative_by_batch:
+            representative_by_batch[row.batch_id] = row
+            collapsed.append(row)
+
+    if not batch_ids:
+        return collapsed, {}
+
+    section_rows = (
+        await session.execute(
+            select(Assignment.batch_id, Section.name)
+            .join(Section, Section.id == Assignment.section_id)
+            .where(
+                Assignment.madrasa_id == madrasa_id,
+                Assignment.batch_id.in_(batch_ids),
+            )
+            .order_by(Section.name)
+        )
+    ).all()
+    names_by_batch: dict[UUID, list[str]] = {}
+    for batch_id, section_name in section_rows:
+        names_by_batch.setdefault(batch_id, [])
+        if section_name not in names_by_batch[batch_id]:
+            names_by_batch[batch_id].append(section_name)
+
+    section_name_overrides = {
+        representative.id: ", ".join(names_by_batch.get(batch_id, []))
+        for batch_id, representative in representative_by_batch.items()
+        if names_by_batch.get(batch_id)
+    }
+    return collapsed, section_name_overrides
 
 
 @router.get("/assignments", response_model=list[AssignmentRead])
@@ -554,11 +613,19 @@ async def list_assignments(
         # JSONB), so it's applied to the already-paginated page.
         rows = [row for row in rows if not row.target_student_ids or str(student.id) in row.target_student_ids]
 
-    return await _assignment_reads(
+    collapsed_rows, section_name_overrides = await _collapse_assignment_batches_for_list(
         session,
         madrasa.id,
         list(rows),
+        section_id=section_id,
+    )
+
+    return await _assignment_reads(
+        session,
+        madrasa.id,
+        collapsed_rows,
         student_id=student.id if student is not None else None,
+        section_name_overrides=section_name_overrides,
     )
 
 

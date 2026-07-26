@@ -242,6 +242,7 @@ function ListView({
   onError: (message: string) => void;
 }>) {
   const { t } = useTranslation();
+  const { confirm } = useDialog();
   const [filters, setFilters] = useState({ class_id: "", section_id: "", course_id: "", teacher_id: "", day: "" });
   const [form, setForm] = useState({
     class_id: "", section_id: "", course_id: "", teacher_id: "", day_of_week: "0", start_time: "", end_time: "",

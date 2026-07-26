@@ -26,8 +26,9 @@ from app.modules.attendance.models import AttendanceStatus, StudentAttendance, T
 from app.modules.attendance.routes import compute_attendance_summary
 from app.modules.auth.models import User, UserRole
 from app.modules.finance.models import Donation, Donor, Payment, PaymentCategory
-from app.modules.operations.models import Announcement, Resource
+from app.modules.operations.models import Announcement, Form, Resource
 from app.modules.operations.routes import _active_session_id, _visible
+from app.modules.operations.audience import ViewerContext, scope_allows
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 
 router = APIRouter()
@@ -79,6 +80,7 @@ async def _parent_dashboard(
             student,
             session_id=session_id,
             audience_role=UserRole.parent,
+            audience_user_id=current_user.id,
         )
         latest_result = child_portal_data.get("latest_result")
         if isinstance(latest_result, dict):
@@ -418,6 +420,7 @@ async def _student_dashboard_for_profile(
     *,
     session_id: UUID,
     audience_role: UserRole,
+    audience_user_id: UUID | None = None,
 ) -> dict[str, object]:
     enrollment = None
     if session_id is not None:
@@ -543,6 +546,23 @@ async def _student_dashboard_for_profile(
         ]
 
     viewer_class_id = enrollment.class_id if enrollment else None
+    viewer_section_id = enrollment.section_id if enrollment else None
+    viewer_course_ids: set[UUID] = set()
+    if viewer_class_id is not None:
+        viewer_course_ids = set(
+            (
+                await session.execute(
+                    select(ClassCourse.course_id).where(ClassCourse.class_id == viewer_class_id)
+                )
+            ).scalars().all()
+        )
+    viewer_ctx = ViewerContext(
+        role=audience_role.value,
+        user_id=audience_user_id or student.user_id or student.id,
+        class_ids=frozenset({viewer_class_id} if viewer_class_id else set()),
+        section_ids=frozenset({viewer_section_id} if viewer_section_id else set()),
+        course_ids=frozenset(viewer_course_ids),
+    )
 
     resource_rows = (
         await session.execute(select(Resource).where(Resource.madrasa_id == madrasa.id))
@@ -550,7 +570,7 @@ async def _student_dashboard_for_profile(
     resources = [
         {"id": str(r.id), "title": r.title}
         for r in resource_rows
-        if _visible(r.visibility_scope, viewer_class_id, audience_role.value)
+        if scope_allows(r.visibility_scope, viewer_ctx)
     ]
 
     now = datetime.now(timezone.utc)
@@ -560,7 +580,24 @@ async def _student_dashboard_for_profile(
     announcements = [
         {"id": str(a.id), "title": a.title, "body": a.body}
         for a in announcement_rows
-        if _visible(a.audience_scope, viewer_class_id, audience_role.value) and (a.expires_at is None or a.expires_at >= now)
+        if scope_allows(a.audience_scope, viewer_ctx) and (a.expires_at is None or a.expires_at >= now)
+    ]
+
+    form_rows = (
+        await session.execute(select(Form).where(Form.madrasa_id == madrasa.id).order_by(Form.title))
+    ).scalars().all()
+    forms = [
+        {
+            "id": str(form.id),
+            "title": form.title,
+            "description": form.description,
+            "category": form.category,
+            "open_until": form.open_until.isoformat() if form.open_until else None,
+        }
+        for form in form_rows
+        if scope_allows(form.visibility_scope, viewer_ctx)
+        and (form.open_from is None or form.open_from <= now)
+        and (form.open_until is None or form.open_until >= now)
     ]
 
     return {
@@ -572,6 +609,7 @@ async def _student_dashboard_for_profile(
         "due_assignments": due_assignments,
         "resources": resources,
         "announcements": announcements,
+        "forms": forms,
     }
 
 

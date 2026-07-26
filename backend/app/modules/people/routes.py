@@ -21,6 +21,7 @@ from app.modules.people.models import (
 )
 from app.modules.operations.admissions import (
     admission_answer_date,
+    admission_answer_enabled,
     admission_answer_text,
     normalize_admission_fields,
     validate_admission_answers,
@@ -324,7 +325,7 @@ async def create_student(
         if admission_form is None or admission_form.madrasa_id != madrasa.id:
             raise HTTPException(status_code=404, detail="Admission form not found")
         fields_definition = normalize_admission_fields(admission_form.fields_definition or [])
-        validate_admission_answers(fields_definition, payload.admission_answers)
+        validate_admission_answers(fields_definition, payload.admission_answers, require_guardian=not payload.is_independent)
     elif payload.admission_answers:
         raise HTTPException(status_code=422, detail="admission_form_id is required with admission_answers")
 
@@ -335,7 +336,10 @@ async def create_student(
     if student_dob is None:
         raise HTTPException(status_code=422, detail="Student date of birth is required")
     student_phone = payload.phone or admission_answer_text(payload.admission_answers, "student_phone") or None
-    if payload.is_independent and payload.portal_enabled is not False and not student_phone:
+    student_portal_enabled = payload.portal_enabled
+    if student_portal_enabled is None:
+        student_portal_enabled = admission_answer_enabled(payload.admission_answers, "student_portal_enabled", default=True)
+    if payload.is_independent and student_portal_enabled and not student_phone:
         raise HTTPException(status_code=422, detail="An independent student with portal access requires a phone")
 
     try:
@@ -348,7 +352,7 @@ async def create_student(
             preferred_language=payload.preferred_language,
             # Class-level portal defaults apply at enrolment time, once a
             # class is known; before that, default to enabled (FR-STU-03).
-            portal_enabled=payload.portal_enabled if payload.portal_enabled is not None else True,
+            portal_enabled=student_portal_enabled,
         )
     except UsernameTakenError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -363,7 +367,7 @@ async def create_student(
         admission_number=admission_number,
         name=student_name,
         date_of_birth=student_dob,
-        portal_enabled=payload.portal_enabled if payload.portal_enabled is not None else True,
+        portal_enabled=student_portal_enabled,
         b_form_number=payload.b_form_number or admission_answer_text(payload.admission_answers, "student_b_form_number") or None,
         address=payload.address or admission_answer_text(payload.admission_answers, "student_address") or None,
         phone=student_phone,
@@ -485,7 +489,25 @@ async def update_student(
             raise HTTPException(status_code=404, detail="Student admission information not found")
         # Merge instead of replace so fields hidden by a later template version
         # remain intact.
-        admission_record.answers = {**(admission_record.answers or {}), **admission_answers}
+        merged_answers = {**(admission_record.answers or {}), **admission_answers}
+        validate_admission_answers(
+            admission_record.fields_definition or [],
+            merged_answers,
+            require_guardian=not updates.get("is_independent", student.is_independent),
+        )
+        admission_record.answers = merged_answers
+        if "student_name" in admission_answers:
+            student.name = admission_answer_text(merged_answers, "student_name") or student.name
+        if "student_date_of_birth" in admission_answers:
+            student.date_of_birth = admission_answer_date(merged_answers, "student_date_of_birth") or student.date_of_birth
+        if "student_b_form_number" in admission_answers:
+            student.b_form_number = admission_answer_text(merged_answers, "student_b_form_number") or None
+        if "student_address" in admission_answers:
+            student.address = admission_answer_text(merged_answers, "student_address") or None
+        if "student_phone" in admission_answers:
+            student.phone = admission_answer_text(merged_answers, "student_phone") or None
+        if "student_portal_enabled" in admission_answers:
+            student.portal_enabled = admission_answer_enabled(merged_answers, "student_portal_enabled", default=student.portal_enabled)
     try:
         await session.commit()
     except exc.IntegrityError as e:

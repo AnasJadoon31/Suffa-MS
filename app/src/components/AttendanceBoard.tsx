@@ -465,8 +465,6 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         );
         setRoster(data);
         setSessionId(data.session_id);
-        setMarked(Object.fromEntries(data.students.map((student) => [student.id, "present" as AttendanceStatus])));
-        setHasUnsavedMarks(data.students.length > 0);
       } catch (err: any) {
         setRoster(null);
         setSessionId(null);
@@ -617,10 +615,38 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     return student.name.toLowerCase().includes(query) || student.admission_number.toLowerCase().includes(query);
   });
 
+  useEffect(() => {
+    if (!roster || activeTab !== "calendar" || selectedDate !== todayKey || editingToday || isLoadingClassHistory) return;
+    if (selectedDayEntries.length > 0 && !onlyApprovedLeaveEntries) {
+      setMarked({});
+      setHasUnsavedMarks(false);
+      return;
+    }
+    const defaults = Object.fromEntries(
+      roster.students
+        .filter((student) => !approvedLeaveStudentIds.has(student.id))
+        .map((student) => [student.id, "present" as AttendanceStatus]),
+    );
+    setMarked(defaults);
+    setHasUnsavedMarks(Object.keys(defaults).length > 0);
+    setSaveMessage("");
+  }, [
+    activeTab,
+    approvedLeaveStudentIds,
+    editingToday,
+    isLoadingClassHistory,
+    onlyApprovedLeaveEntries,
+    roster,
+    selectedDate,
+    selectedDayEntries.length,
+    todayKey,
+  ]);
+
   function handleSelectClassDate(date: string): void {
     setSelectedDate(date);
     setEditingToday(false);
     setMarked({});
+    setHasUnsavedMarks(false);
   }
 
   function startEditingToday(): void {

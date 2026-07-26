@@ -26,6 +26,7 @@ import {
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { consumePendingClassNav } from "../lib/pendingNav";
+import { DOCUMENT_UPLOAD_ACCEPT, getDocumentUploadContentType } from "../lib/filePolicy";
 import { Input, Select, Checkbox } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
@@ -160,6 +161,7 @@ function AssignmentsTab({
   canPublishAll,
 }: Readonly<{ classes: AcademicClass[]; courses: Course[]; students: Student[]; teachers: Teacher[]; teacherSlots: TimetableSlot[] | null; canCreate: boolean; canPublishAll: boolean }>) {
   const { t } = useTranslation();
+  const { confirm } = useDialog();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filters, setFilters] = useState(() => {
     // Deep link from the dashboard's "open class list" button (§C).
@@ -265,14 +267,15 @@ function AssignmentsTab({
 
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       <DataTable<Assignment>
+        className="assignmentsTable"
         columns={[
-          { header: t("titleCol"), render: (a) => a.title },
-          { header: t("categoryCol"), render: (a) => a.category ?? "—" },
-          { header: t("classSectionCol"), render: (a) => `${a.class_name ?? "—"}${a.section_name ? ` / ${a.section_name}` : ""}` },
-          { header: t("courseCol"), render: (a) => a.course_name ?? "—" },
-          { header: t("teacherCol"), render: (a) => a.teacher_name ?? "—" },
-          { header: t("dueCol"), render: (a) => new Date(a.due_date).toLocaleDateString() },
-          { header: t("actionsCol"), render: (a) => (
+          { header: t("titleCol"), className: "colTitle", render: (a) => a.title },
+          { header: t("categoryCol"), className: "colCategory", render: (a) => a.category ?? "—" },
+          { header: t("classSectionCol"), className: "colClassSection", render: (a) => `${a.class_name ?? "—"}${a.section_name ? ` / ${a.section_name}` : ""}` },
+          { header: t("courseCol"), className: "colCourse", render: (a) => a.course_name ?? "—" },
+          { header: t("teacherCol"), className: "colTeacher", render: (a) => a.teacher_name ?? "—" },
+          { header: t("dueCol"), className: "colDue", render: (a) => new Date(a.due_date).toLocaleDateString() },
+          { header: t("actionsCol"), className: "colActions", render: (a) => (
             <ActionMenu items={[
               ...(a.attachment_key ? [{
                 label: t("downloadBtn"),
@@ -395,10 +398,15 @@ function AssignmentCreateForm({
         try {
           let attachment_key: string | undefined;
           if (attachmentFile) {
+            const contentType = getDocumentUploadContentType(attachmentFile);
+            if (!contentType) {
+              setError(t("unsupportedDocumentFile"));
+              return;
+            }
             const { object_key, upload_url } = await filesApi.presignUpload({
-              category: "assignments", filename: attachmentFile.name, content_type: attachmentFile.type || "application/octet-stream", size_bytes: attachmentFile.size,
+              category: "assignments", filename: attachmentFile.name, content_type: contentType, size_bytes: attachmentFile.size,
             });
-            await fetch(upload_url, { method: "PUT", body: attachmentFile, headers: { "Content-Type": attachmentFile.type || "application/octet-stream" } });
+            await fetch(upload_url, { method: "PUT", body: attachmentFile, headers: { "Content-Type": contentType } });
             attachment_key = object_key;
           }
           await assessmentsApi.createAssignment({
@@ -492,7 +500,7 @@ function AssignmentCreateForm({
       </label>
       <label>
         {t("attachmentLabel")}
-        <Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
+        <Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
       </label>
       </div>
     </FormModal>
@@ -775,6 +783,7 @@ function GradingPlanSetup({
   canCreateExamType,
 }: Readonly<{ courses: Course[]; classes: AcademicClass[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
   const { t } = useTranslation();
+  const { confirm } = useDialog();
   type EditableBand = { label: string; min_score: string; max_score: string };
   type EditableComponent = { id?: string | null; name: string; weightage: string };
   const defaults: EditableBand[] = [
@@ -853,6 +862,7 @@ function GradingSetup({
   canCreateExamType,
 }: Readonly<{ courses: Course[]; classes: AcademicClass[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
   const { t } = useTranslation();
+  const { confirm } = useDialog();
   type EditableBand = { label: string; min_score: string; max_score: string };
   const defaultBands: EditableBand[] = [];
   const [schemes, setSchemes] = useState<GradingScheme[]>([]);

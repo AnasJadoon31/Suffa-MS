@@ -90,7 +90,7 @@ await setProvisionedPassword(delegatedTeacher.set_password_url);
 const student = await request("/people/students", {
   token: principal,
   method: "POST",
-  body: { username: "student.verify", name: "Ali Noor", date_of_birth: "2017-01-12", admission_number: "ADM-V001", guardian_ids: [guardian.id], preferred_language: "en", b_form_number: "61101-1234567-3", address: "Model Town, Lahore" },
+  body: { username: "student.verify", name: "Ali Noor", date_of_birth: "2017-01-12", guardian_ids: [guardian.id], preferred_language: "en", b_form_number: "61101-1234567-3", address: "Model Town, Lahore" },
 });
 await setProvisionedPassword(student.set_password_url);
 await request("/academics/students/enroll", {

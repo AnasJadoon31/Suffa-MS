@@ -175,11 +175,12 @@ export function PhoneInput({
           onBlur={handleBlur}
           placeholder={placeholder || t("phonePlaceholder", "3001234567")}
           disabled={disabled}
+          required={required}
           className={`phoneInputField${error && touched ? " invalid" : ""}`}
           dir="ltr"
           inputMode="tel"
           autoComplete="tel"
-          maxLength={10}
+          maxLength={16}
           aria-invalid={!!error && touched}
           aria-describedby={error && touched ? `${id}-error` : undefined}
         />

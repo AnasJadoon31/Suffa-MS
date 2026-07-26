@@ -100,6 +100,96 @@ async def test_principal_can_replace_disconnected_instance_with_phone_pairing(
     ]
 
 
+async def test_principal_can_create_qr_pairing_for_missing_instance(client, monkeypatch):
+    requests: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(404, request=request, json={"message": "missing"})
+        body = json.loads(request.content)
+        assert body == {
+            "instanceName": "suffa-ms",
+            "integration": "WHATSAPP-BAILEYS",
+            "qrcode": True,
+        }
+        return httpx.Response(
+            201,
+            request=request,
+            json={
+                "instance": {"instanceName": "suffa-ms", "connectionStatus": "connecting"},
+                "qrcode": {"base64": "data:image/png;base64,QRDATA"},
+            },
+        )
+
+    _use_evolution_transport(monkeypatch, handler)
+    response = await client.post("/api/v1/messaging/whatsapp/connection/qr-code")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "instance_name": "suffa-ms",
+        "state": "connecting",
+        "qr_code_base64": "data:image/png;base64,QRDATA",
+    }
+    assert requests == [
+        ("GET", "/instance/connectionState/suffa-ms"),
+        ("POST", "/instance/create"),
+    ]
+
+
+async def test_qr_pairing_reuses_existing_qr_without_deletion(client, monkeypatch):
+    requests: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(200, request=request, json={"instance": {"state": "connecting"}})
+        assert request.url.path == "/instance/connect/suffa-ms"
+        return httpx.Response(200, request=request, json={"qrcode": {"base64": "data:image/png;base64,EXISTING"}})
+
+    _use_evolution_transport(monkeypatch, handler)
+    response = await client.post("/api/v1/messaging/whatsapp/connection/qr-code")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["qr_code_base64"] == "data:image/png;base64,EXISTING"
+    assert requests == [
+        ("GET", "/instance/connectionState/suffa-ms"),
+        ("GET", "/instance/connect/suffa-ms"),
+    ]
+
+
+async def test_switching_incomplete_phone_pairing_to_qr_requires_explicit_replacement(client, monkeypatch):
+    requests: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(200, request=request, json={"instance": {"state": "connecting"}})
+        return httpx.Response(200, request=request, json={"pairingCode": "ABCD1234"})
+
+    _use_evolution_transport(monkeypatch, handler)
+    response = await client.post("/api/v1/messaging/whatsapp/connection/qr-code")
+
+    assert response.status_code == 428
+    assert response.json()["detail"] == "whatsapp_pairing_replace_required"
+    assert requests == [
+        ("GET", "/instance/connectionState/suffa-ms"),
+        ("GET", "/instance/connect/suffa-ms"),
+    ]
+
+
+async def test_qr_pairing_does_not_replace_connected_instance(client, monkeypatch):
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/instance/connectionState/suffa-ms"
+        return httpx.Response(200, request=request, json={"instance": {"state": "open"}})
+
+    _use_evolution_transport(monkeypatch, handler)
+    response = await client.post("/api/v1/messaging/whatsapp/connection/qr-code", params={"replace_existing": True})
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "whatsapp_instance_already_connected"
+
+
 async def test_closed_whatsapp_instance_reconnects_without_deletion(client, monkeypatch):
     requests: list[tuple[str, str]] = []
 
