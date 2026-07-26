@@ -57,18 +57,18 @@ function apiResponse(pathname) {
   return [];
 }
 
-async function verifyViewport(browser, viewport, label) {
+async function verifyViewport(browser, viewport, label, language = "en") {
   const context = await browser.newContext({
     viewport,
-    locale: "en-US",
+    locale: language === "ur" ? "ur-PK" : "en-US",
     serviceWorkers: "block",
     reducedMotion: "reduce",
   });
-  await context.addInitScript(() => {
+  await context.addInitScript((lng) => {
     localStorage.setItem("mms_token", "students-layout-token");
     localStorage.setItem("mms_tenant", "suffa");
-    localStorage.setItem("i18nextLng", "en");
-  });
+    localStorage.setItem("i18nextLng", lng);
+  }, language);
   await context.route("**/api/v1/**", async (route) => {
     const body = apiResponse(new URL(route.request().url()).pathname);
     await route.fulfill({
@@ -92,11 +92,10 @@ async function verifyViewport(browser, viewport, label) {
   try {
     await page.goto(`${baseUrl}/people/students`, { waitUntil: "domcontentloaded" });
     await page.getByText("ADM-0008").waitFor();
-    await page.getByRole("button", { name: "Add student" }).waitFor();
     const geometry = await page.evaluate(() => {
       const doc = document.documentElement;
       const toolbar = document.querySelector(".studentsToolbar")?.getBoundingClientRect();
-      const addButton = [...document.querySelectorAll("button")].find((button) => button.textContent?.includes("Add student"))?.getBoundingClientRect();
+      const addButton = document.querySelector(".studentsToolbar button.primaryAction")?.getBoundingClientRect();
       const portal = document.querySelector(".studentsTable .colPortal")?.getBoundingClientRect();
       const status = document.querySelector(".studentsTable .colStatus")?.getBoundingClientRect();
       const actions = document.querySelector(".studentsTable .colActions")?.getBoundingClientRect();
@@ -118,8 +117,8 @@ async function verifyViewport(browser, viewport, label) {
       }
     }
 
-    await page.getByRole("button", { name: "Actions: Ali Noor" }).click();
-    await page.getByRole("menuitem", { name: "Edit" }).waitFor();
+    await page.locator(".studentsTable .actionMenuTrigger").first().click();
+    await page.getByRole("menuitem").first().waitFor();
     await page.screenshot({ path: `/tmp/suffa-students-layout-${label}.png`, fullPage: true, animations: "disabled" });
     if (errors.length) throw new Error(`${label}: browser errors: ${errors.join(" | ")}`);
     console.log(`students layout ${label}: toolbar, table sizing, actions, and overflow checks passed`);
@@ -134,6 +133,7 @@ try {
   await verifyViewport(browser, { width: 1440, height: 900 }, "desktop");
   await verifyViewport(browser, { width: 768, height: 1024 }, "tablet");
   await verifyViewport(browser, { width: 390, height: 844 }, "mobile");
+  await verifyViewport(browser, { width: 390, height: 844 }, "mobile-urdu", "ur");
 } finally {
   await browser.close();
   if (server) server.kill();
