@@ -61,9 +61,19 @@ function apiResponse(pathname) {
     }];
   }
   if (pathname === "/api/v1/people/guardians") return [];
-  if (pathname === "/api/v1/academics/programs") return [];
+  if (pathname === "/api/v1/academics/programs") return [{ id: "program-1", name: "Hifz Program", created_at: "2026-07-26T00:00:00Z" }];
   if (pathname === "/api/v1/academics/classes") return [{ id: "class-1", program_id: "program-1", name: "Hifz Level 1", default_portal_enabled: true }];
-  if (pathname === "/api/v1/academics/sessions") return [];
+  if (pathname === "/api/v1/academics/classes/class-1/sections") return [{ id: "section-1", class_id: "class-1", name: "A" }];
+  if (pathname === "/api/v1/academics/classes/class-1/courses") return [];
+  if (pathname === "/api/v1/academics/courses") return [{ id: "course-1", name: "Quran" }];
+  if (pathname === "/api/v1/academics/sessions") return [{
+    id: "session-1",
+    name: "2026-27",
+    gregorian_start: "2026-04-01",
+    gregorian_end: "2027-03-31",
+    hijri_span: "1447-1448 AH",
+    is_active: false,
+  }];
   if (pathname === "/api/v1/operations/admission-forms") return [];
   if (pathname === "/api/v1/operations/resource-categories") return [{ id: "category-1", name: "Handouts", description: "" }];
   if (pathname === "/api/v1/operations/resources") {
@@ -203,6 +213,22 @@ async function verifyActionMenuAtViewport(browser, viewport, label) {
     await page.goto(`${baseUrl}/holidays`, { waitUntil: "domcontentloaded" });
     await page.getByText("Eid break").waitFor();
     await verifyMenuItems(page, "Actions: Eid break", ["Edit", "Delete"], `${label} holidays`);
+
+    await page.goto(`${baseUrl}/academics/programs`, { waitUntil: "domcontentloaded" });
+    await page.getByText("Hifz Program").waitFor();
+    await verifyMenuItems(page, "Actions: Hifz Program", ["Edit", "Delete"], `${label} academic programs`);
+
+    await page.goto(`${baseUrl}/academics/classes`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Actions: Hifz Level 1" }).waitFor();
+    await verifyMenuItems(page, "Actions: Hifz Level 1", ["Edit", "Delete"], `${label} academic classes`);
+
+    await page.goto(`${baseUrl}/academics/courses`, { waitUntil: "domcontentloaded" });
+    await page.getByText("Quran").waitFor();
+    await verifyMenuItems(page, "Actions: Quran", ["Edit", "Delete"], `${label} academic courses`);
+
+    await page.goto(`${baseUrl}/academics/sessions`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Actions: 2026-27" }).waitFor();
+    await verifyMenuItems(page, "Actions: 2026-27", ["Activate", "Edit", "Delete"], `${label} academic sessions`);
 
     console.log(`action menu ${label}: positioned dropdown passed (${Math.round(menuBox.width)}x${Math.round(menuBox.height)}, row ${Math.round(afterHeight)}px)`);
   } finally {

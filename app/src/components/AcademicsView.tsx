@@ -20,6 +20,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
+import { ActionMenu } from "./ui/ActionMenu";
 
 
 export type AcademicTab = "programs" | "classes" | "courses" | "sessions";
@@ -233,9 +234,11 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                     )}
                     <span>{p.name}</span>
                     <span className="actions">
-                          <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingProgram(p)}><Edit2 size={16} /></Button>
-                          <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteProgram(p.id))}><Trash2 size={16} /></Button>
-                        </span>
+                      <ActionMenu ariaLabel={`${t("actionsCol")}: ${p.name}`} items={[
+                        { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingProgram(p) },
+                        { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => handleDelete(() => academicsApi.deleteProgram(p.id)) },
+                      ]} />
+                    </span>
                   </div>
                 ))}
               </div>
@@ -334,8 +337,10 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         <span>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
                         <span>{c.default_portal_enabled ? t("yesLabel") : t("noLabel")}</span>
                         <span className="actions">
-                          <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingClass(c)}><Edit2 size={16} /></Button>
-                          <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteClass(c.id))}><Trash2 size={16} /></Button>
+                          <ActionMenu ariaLabel={`${t("actionsCol")}: ${c.name}`} items={[
+                            { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingClass(c) },
+                            { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => handleDelete(() => academicsApi.deleteClass(c.id)) },
+                          ]} />
                         </span>
                   </div>
                 ))}
@@ -391,8 +396,10 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                     )}
                         <span>{c.name}</span>
                         <span className="actions">
-                          <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingCourse(c)}><Edit2 size={16} /></Button>
-                          <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteCourse(c.id))}><Trash2 size={16} /></Button>
+                          <ActionMenu ariaLabel={`${t("actionsCol")}: ${c.name}`} items={[
+                            { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingCourse(c) },
+                            { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => handleDelete(() => academicsApi.deleteCourse(c.id)) },
+                          ]} />
                         </span>
                   </div>
                 ))}
@@ -465,8 +472,10 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                           )}
                               <span>{s.name}</span>
                               <span className="actions" style={{ marginLeft: "auto" }}>
-                                <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSection(s)}><Edit2 size={14} /></Button>
-                                <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSection(c.id, s.id))}><Trash2 size={14} /></Button>
+                                <ActionMenu ariaLabel={`${t("actionsCol")}: ${s.name}`} items={[
+                                  { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingSection(s) },
+                                  { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => handleDelete(() => academicsApi.deleteSection(c.id, s.id)) },
+                                ]} />
                               </span>
                         </div>
                       ))}
@@ -561,18 +570,22 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         <span>{s.gregorian_start} → {s.gregorian_end}</span>
                         <span>{s.is_active ? <CheckCircle2 size={16} color="var(--leaf)" /> : "—"}</span>
                         <span className="actions" style={{ gap: "8px" }}>
-                          {!s.is_active && (
-                            <Button className="tableAction" type="button" onClick={async () => { await academicsApi.activateSession(s.id); await refreshAll(); }}>
-                              {t("activateBtn")}
-                            </Button>
-                          )}
-                          {s.is_active && (
-                            <Button className="tableAction" type="button" onClick={() => setRolloverSourceSession(s)} style={{ color: "var(--brand-deep)" }}>
-                              Year-End Rollover
-                            </Button>
-                          )}
-                          <Button className="iconBtn" title={t("editBtn")} onClick={() => setEditingSession(s)}><Edit2 size={16} /></Button>
-                          {!s.is_active && <Button className="iconBtn" title={t("deleteBtn")} onClick={() => handleDelete(() => academicsApi.deleteSession(s.id))}><Trash2 size={16} /></Button>}
+                          <ActionMenu ariaLabel={`${t("actionsCol")}: ${s.name}`} items={[
+                            ...(!s.is_active ? [{
+                              label: t("activateBtn"),
+                              onClick: async () => { await academicsApi.activateSession(s.id); await refreshAll(); },
+                            }] : [{
+                              label: "Year-End Rollover",
+                              onClick: () => setRolloverSourceSession(s),
+                            }]),
+                            { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingSession(s) },
+                            ...(!s.is_active ? [{
+                              label: t("deleteBtn"),
+                              icon: <Trash2 size={14} />,
+                              destructive: true,
+                              onClick: () => handleDelete(() => academicsApi.deleteSession(s.id)),
+                            }] : []),
+                          ]} />
                         </span>
                   </div>
                 ))}
