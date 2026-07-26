@@ -16,16 +16,51 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-def upgrade() -> None:
-    op.drop_constraint("users_username_key", "users", type_="unique")
-    op.create_unique_constraint("uq_user_username_tenant", "users", ["madrasa_id", "username"])
-
-    op.drop_constraint(
-        "student_profiles_admission_number_key",
-        "student_profiles",
-        type_="unique",
+def _constraint_exists(table_name: str, constraint_name: str) -> bool:
+    bind = op.get_bind()
+    if bind.dialect.name != "postgresql":
+        return False
+    return bool(
+        bind.execute(
+            sa.text(
+                """
+                SELECT 1
+                FROM pg_constraint constraint_row
+                JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
+                WHERE table_row.relname = :table_name
+                  AND constraint_row.conname = :constraint_name
+                """
+            ),
+            {"table_name": table_name, "constraint_name": constraint_name},
+        ).scalar()
     )
-    op.create_unique_constraint(
+
+
+def _drop_unique_constraint_if_exists(table_name: str, constraint_name: str) -> None:
+    if _constraint_exists(table_name, constraint_name):
+        op.drop_constraint(constraint_name, table_name, type_="unique")
+
+
+def _create_unique_constraint_if_missing(
+    constraint_name: str, table_name: str, columns: list[str]
+) -> None:
+    if not _constraint_exists(table_name, constraint_name):
+        op.create_unique_constraint(constraint_name, table_name, columns)
+
+
+def upgrade() -> None:
+    _drop_unique_constraint_if_exists("users", "users_username_key")
+    _create_unique_constraint_if_missing(
+        "uq_user_username_tenant",
+        "users",
+        ["madrasa_id", "username"],
+    )
+
+    _drop_unique_constraint_if_exists(
+        "student_profiles",
+        "student_profiles_admission_number_key",
+    )
+    _create_unique_constraint_if_missing(
         "uq_student_admission_number_tenant",
         "student_profiles",
         ["madrasa_id", "admission_number"],
@@ -74,16 +109,15 @@ def downgrade() -> None:
     op.drop_column("student_profiles", "is_independent")
     op.drop_column("student_profiles", "phone")
 
-    op.drop_constraint(
-        "uq_student_admission_number_tenant",
+    _drop_unique_constraint_if_exists(
         "student_profiles",
-        type_="unique",
+        "uq_student_admission_number_tenant",
     )
-    op.create_unique_constraint(
+    _create_unique_constraint_if_missing(
         "student_profiles_admission_number_key",
         "student_profiles",
         ["admission_number"],
     )
 
-    op.drop_constraint("uq_user_username_tenant", "users", type_="unique")
-    op.create_unique_constraint("users_username_key", "users", ["username"])
+    _drop_unique_constraint_if_exists("users", "uq_user_username_tenant")
+    _create_unique_constraint_if_missing("users_username_key", "users", ["username"])
