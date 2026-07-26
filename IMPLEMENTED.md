@@ -102,6 +102,12 @@ Fresh evidence from this pass:
   browser gate, which proves queued success/error mutation toasts, `aria-live`,
   dismiss controls, mobile layout, and no raw credential token leakage while
   leaving blocking confirmation flows in `DialogContext`.
+- Closed ISS3-004 evidence: `test:dialogs` now combines the AST native-dialog
+  audit with `verify-dialog-flows.mjs`, a browser journey that cancels and then
+  confirms a destructive Resource delete, completes the Guardian login username
+  prompt, verifies no native browser dialog events fired, and confirms raw setup
+  tokens stay out of visible page text. `test:foundation-components` and the
+  production build passed afterward.
 
 ## 2026-07-26 — ISS3 implementation tranche and verification refresh
 

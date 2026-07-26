@@ -9,7 +9,7 @@
     "build": "tsc && vite build",
     "test:i18n": "node scripts/check-i18n-keys.mjs",
     "test:type-safety": "node scripts/check-type-safety-ratchet.mjs",
-    "test:dialogs": "node scripts/check-dialog-usage.mjs",
+    "test:dialogs": "node scripts/check-dialog-usage.mjs && node scripts/verify-dialog-flows.mjs",
     "test:snackbar": "node scripts/verify-snackbar.mjs",
     "test:document-uploads": "node scripts/verify-document-uploads.mjs",
     "test:date-ranges": "node --experimental-strip-types scripts/check-date-ranges.mjs",
