@@ -3,6 +3,20 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-26 — ISS3-002 students layout acceptance closed
+
+- Extended the People → Students layout verifier to cover Urdu mobile without
+  relying on English-only button/menu text, while keeping desktop, tablet, and
+  English mobile geometry checks.
+- Verified the toolbar, Add Student action, content-sized Portal/Status columns,
+  row Action menu usability, and absence of page-level horizontal overflow at
+  1440, 768, 390, and 390 Urdu viewports.
+- Evidence: `npm --prefix app run test:students-layout` passed and refreshed
+  `/tmp/suffa-students-layout-desktop.png`,
+  `/tmp/suffa-students-layout-tablet.png`,
+  `/tmp/suffa-students-layout-mobile.png`, and
+  `/tmp/suffa-students-layout-mobile-urdu.png`.
+
 ## 2026-07-26 — ISS3 evidence refresh: action menus, credentials, built-ins, and gates
 
 This pass tightened the current Issues 3 implementation instead of treating the
