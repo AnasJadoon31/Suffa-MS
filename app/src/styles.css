@@ -3705,3 +3705,58 @@ html[lang="ur"] .actionMenuItem span {
     display: grid;
   }
 }
+
+/* MUI migration guardrails: keep the People toolbar from inheriting the
+   old horizontal-scroll inline-filter behavior now that Autocomplete and
+   Button bring their own measured boxes/popovers. */
+.studentsToolbar.inlineFilter {
+  flex-wrap: wrap;
+  overflow: visible;
+  align-items: flex-end;
+}
+
+.studentsToolbar .inlineFilterActions {
+  flex: 1 1 520px;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.studentsToolbar .inlineFilterActions > .searchDropdown {
+  flex: 1 1 300px;
+  min-width: 240px;
+  max-width: 520px;
+  display: block;
+}
+
+.studentsToolbar .inlineFilterActions > .formActions {
+  flex: 0 0 auto;
+}
+
+.muiDataTable .MuiTableCell-root {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.muiDataTable .dataRow {
+  display: table-row !important;
+  border: 0;
+  border-radius: 0;
+  background: inherit;
+  overflow: visible;
+}
+
+.muiDataTable .dataRow > .MuiTableCell-root {
+  display: table-cell !important;
+  border-inline-start: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.studentsTable .colPortal,
+.studentsTable .colStatus,
+.studentsTable .colActions {
+  width: 1%;
+  text-align: center;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}

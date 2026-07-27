@@ -1,18 +1,20 @@
 import { type ReactNode, type CSSProperties } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
 
 export function AppShell({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <main className={`appShell ${className}`.trim()}>{children}</main>;
+  return <Box component="main" className={`appShell ${className}`.trim()}>{children}</Box>;
 }
 
 export function Topbar({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <header className={`topbar ${className}`.trim()}>{children}</header>;
+  return <Box component="header" className={`topbar ${className}`.trim()}>{children}</Box>;
 }
 
 export function Workspace({ children, className = "", style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
-    <section className={`workspace ${className}`.trim()} style={style}>
+    <Box component="section" className={`workspace ${className}`.trim()} style={style}>
       {children}
-    </section>
+    </Box>
   );
 }
 
@@ -35,9 +37,9 @@ export function PageSection({
   if (className) classes.push(className);
 
   return (
-    <section className={classes.join(" ")} style={style}>
+    <Paper component="section" variant="outlined" className={classes.join(" ")} style={style}>
       {children}
-    </section>
+    </Paper>
   );
 }
 
@@ -60,7 +62,15 @@ export function PageHeader({
   if (className) classes.push(className);
 
   return (
-    <div className={classes.join(" ")}>
+    <Box
+      className={classes.join(" ")}
+      sx={{
+        display: "flex",
+        flexDirection: { xs: "column", sm: "row" },
+        alignItems: { xs: "stretch", sm: "flex-start" },
+        gap: 2,
+      }}
+    >
       <div style={{ flex: 1, minWidth: 0 }}>
         <h2>
           {icon}
@@ -71,12 +81,12 @@ export function PageHeader({
       </div>
       {actions && <div style={{ flexShrink: 0 }}>{actions}</div>}
       {children}
-    </div>
+    </Box>
   );
 }
 
 export function FilterBar({ children, className = "" }: { children: ReactNode; className?: string }) {
   const classes = ["filterBar"];
   if (className) classes.push(className);
-  return <div className={classes.join(" ")}>{children}</div>;
+  return <Box className={classes.join(" ")}>{children}</Box>;
 }

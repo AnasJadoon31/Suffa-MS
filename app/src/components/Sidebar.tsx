@@ -1,7 +1,8 @@
 import { Button } from "./ui/Button";
+import Paper from "@mui/material/Paper";
 import { LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation } from "react-router";
 
 import { isNavItemAccessible, navGroups, portalRoutes, resolveNavItemPath } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
@@ -74,7 +75,7 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
       </nav>
 
       {user && (
-        <div className="profileCard">
+        <Paper variant="outlined" className="profileCard">
           <span className="avatar" aria-hidden="true">{initialsOf(user.username)}</span>
           <div className="profileText">
             <strong>{user.username}</strong>
@@ -83,7 +84,7 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
           <Button className="iconButton" type="button" title={t("logout")} aria-label={t("logout")} onClick={logout}>
             <LogOut size={16} />
           </Button>
-        </div>
+        </Paper>
       )}
     </aside>
   );

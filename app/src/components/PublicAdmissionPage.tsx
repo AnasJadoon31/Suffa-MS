@@ -1,7 +1,8 @@
 import { Button } from "./ui/Button";
+import Paper from "@mui/material/Paper";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 
 import { AdmissionAnswersFields } from "./AdmissionAnswersFields";
 import { answerString, BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields } from "../lib/admissionBuiltIns";
@@ -28,11 +29,11 @@ export function PublicAdmissionPage() {
 
   if (loading) return <main className="publicFormPage"><LoadingState /></main>;
   if (error || !definition) return <main className="publicFormPage"><ErrorState message={error || t("failedLoadAdmissionForms")} /></main>;
-  if (submitted) return <main className="publicFormPage"><section className="publicFormCard"><h1>{t("applicationSubmitted")}</h1></section></main>;
+  if (submitted) return <main className="publicFormPage"><Paper component="section" variant="outlined" className="publicFormCard"><h1>{t("applicationSubmitted")}</h1></Paper></main>;
 
   return (
     <main className="publicFormPage">
-      <section className="publicFormCard">
+      <Paper component="section" variant="outlined" className="publicFormCard">
         <header className="moduleHeader">
           <span className="eyebrow">{definition.program_name}</span>
           <h1>{definition.title}</h1>
@@ -70,7 +71,7 @@ export function PublicAdmissionPage() {
           {error && <p className="notice notice-warning">{error}</p>}
           <Button className="primaryAction" type="submit">{t("submitApplicationBtn")}</Button>
         </form>}
-      </section>
+      </Paper>
     </main>
   );
 }

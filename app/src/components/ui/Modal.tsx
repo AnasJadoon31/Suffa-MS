@@ -1,23 +1,36 @@
 import { X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
 import { useTranslation } from "react-i18next";
 import { Button } from "./Button";
 
 export function Modal({ title, onClose, maxWidth, actions, children }: Readonly<{ title: string | ReactNode; onClose: () => void; maxWidth?: number | string; actions?: ReactNode; children: ReactNode }>) {
   const { t } = useTranslation();
+  const titleId = useId();
   return (
-    <div className="modalOverlay" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined} onMouseDown={onClose}>
-      <div className="modalCard" style={maxWidth ? { width: "100%", maxWidth } : {}} onMouseDown={(event) => event.stopPropagation()}>
-        <div className="moduleHeader modalHeader">
+    <Dialog
+      open
+      onClose={onClose}
+      aria-labelledby={titleId}
+      fullWidth
+      maxWidth={false}
+      slotProps={{ paper: { className: "modalCard", sx: { width: "100%", maxWidth: maxWidth ?? 720 } } }}
+    >
+      <DialogTitle id={titleId} className="moduleHeader modalHeader" component="div">
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
           <h3>{title}</h3>
-          <div className="modalHeaderActions">
+          <Box className="modalHeaderActions" sx={{ display: "flex", gap: 1, alignItems: "center" }}>
             {actions}
-            <Button className="tableAction" type="button" aria-label={t("closeBtn")} onClick={onClose}><X size={16} /></Button>
-          </div>
-        </div>
-        <div className="modalBody">{children}</div>
-      </div>
-    </div>
+            <IconButton className="tableAction" type="button" aria-label={t("closeBtn")} onClick={onClose} size="small"><X size={16} /></IconButton>
+          </Box>
+        </Box>
+      </DialogTitle>
+      <DialogContent className="modalBody">{children}</DialogContent>
+    </Dialog>
   );
 }
 

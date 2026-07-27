@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, CheckCircle, Info, X } from "lucide-react";
+import IconButton from "@mui/material/IconButton";
 import { useTranslation } from "react-i18next";
 import { API_NOTIFICATION_EVENT, type ApiNotificationDetail } from "../../lib/apiNotifications";
 
@@ -114,9 +115,9 @@ function SnackbarToast({
       <span className="snackbarIcon" aria-hidden="true">{icon}</span>
       <span id={descriptionId} className="snackbarMessage">{item.message}</span>
       {item.dismissible && (
-        <button type="button" className="iconButton snackbarDismiss" aria-label={t("dismissLabel")} onClick={() => onDismiss(item.id)}>
+        <IconButton type="button" className="iconButton snackbarDismiss" aria-label={t("dismissLabel")} onClick={() => onDismiss(item.id)} size="small">
           <X size={16} />
-        </button>
+        </IconButton>
       )}
     </div>
   );

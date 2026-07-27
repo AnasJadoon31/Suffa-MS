@@ -1,5 +1,6 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
+import Paper from "@mui/material/Paper";
 import { Pencil, Plus, Save, Trash2, X, Palmtree } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -121,7 +122,7 @@ export function HolidaysView() {
   };
 
   const classPicker = (value: string[], onChange: (next: string[]) => void) => (
-    <div className="sectionPicker" style={{ gridColumn: "1 / -1" }}>
+    <Paper component="section" variant="outlined" className="sectionPicker" style={{ gridColumn: "1 / -1" }}>
       <small className="notice">{t("holidayClassesHint")}</small>
       {classes.map((c) => (
         <label key={c.id} className="checkboxLabel">
@@ -135,7 +136,7 @@ export function HolidaysView() {
           {c.name}
         </label>
       ))}
-    </div>
+    </Paper>
   );
 
   return (

@@ -1,5 +1,7 @@
 import { Button } from "./ui/Button";
 import { useEffect, useRef } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
 import { useTranslation } from "react-i18next";
 import { Select } from "./ui/Field";
 import {
@@ -55,8 +57,8 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   };
 
   return (
-    <div className="richTextEditor">
-      <div className="richTextToolbar" role="toolbar" aria-label={t("textFormattingLabel")}>
+    <Paper variant="outlined" className="richTextEditor">
+      <Box className="richTextToolbar" role="toolbar" aria-label={t("textFormattingLabel")}>
         <Button type="button" title={t("boldLabel")} onMouseDown={(e) => { e.preventDefault(); exec("bold"); }}><Bold size={14} /></Button>
         <Button type="button" title={t("italicLabel")} onMouseDown={(e) => { e.preventDefault(); exec("italic"); }}><Italic size={14} /></Button>
         <Button type="button" title={t("underlineLabel")} onMouseDown={(e) => { e.preventDefault(); exec("underline"); }}><Underline size={14} /></Button>
@@ -75,8 +77,8 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         >
           {FONT_OPTIONS.map((f) => <option key={f.labelKey} value={f.value}>{t(f.labelKey)}</option>)}
         </Select>
-      </div>
-      <div
+      </Box>
+      <Box
         ref={editorRef}
         className="richTextArea"
         contentEditable
@@ -84,6 +86,6 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         onInput={emit}
         onBlur={emit}
       />
-    </div>
+    </Paper>
   );
 }

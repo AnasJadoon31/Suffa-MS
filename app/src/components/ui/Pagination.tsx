@@ -1,6 +1,9 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 import type { PageResult } from "../../lib/api";
+import { Button } from "./Button";
 
 export const DEFAULT_PAGE_SIZE = 25;
 
@@ -38,24 +41,29 @@ export function PaginationControls({
   if (total <= state.pageSize && page === 0) return null;
 
   return (
-    <nav className="pagination" aria-label={t("paginationLabel")}>
-      <button
+    <Box
+      component="nav"
+      className="pagination"
+      aria-label={t("paginationLabel")}
+      sx={{ display: "flex", gap: 1.25, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}
+    >
+      <Button
         className="secondaryAction"
         type="button"
         disabled={page === 0}
         onClick={() => onChange({ ...state, page: page - 1 })}
       >
         <ChevronLeft size={15} /> {t("previousPageBtn")}
-      </button>
-      <span>{t("pageOfLabel", { page: page + 1, pages, total })}</span>
-      <button
+      </Button>
+      <Typography variant="body2" color="text.secondary">{t("pageOfLabel", { page: page + 1, pages, total })}</Typography>
+      <Button
         className="secondaryAction"
         type="button"
         disabled={page + 1 >= pages}
         onClick={() => onChange({ ...state, page: page + 1 })}
       >
         {t("nextPageBtn")} <ChevronRight size={15} />
-      </button>
-    </nav>
+      </Button>
+    </Box>
   );
 }

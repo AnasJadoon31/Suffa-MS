@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import InputAdornment from "@mui/material/InputAdornment";
+import TextField from "@mui/material/TextField";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 
 import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Scope, type Section } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { Button } from "./ui/Button";
 import { Select } from "./ui/Field";
 
 type RoleMode = "teachers" | "students" | "guardians";
@@ -225,6 +230,7 @@ export function StagedAudiencePicker({
   const handlePeoplePickerKeyDown = (event: ReactKeyboardEvent) => {
     if (!isPeopleDropdownOpen && (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
+      event.stopPropagation();
       setIsPeopleDropdownOpen(true);
       return;
     }
@@ -232,32 +238,39 @@ export function StagedAudiencePicker({
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
+        event.stopPropagation();
         moveActiveOption(1);
         break;
       case "ArrowUp":
         event.preventDefault();
+        event.stopPropagation();
         moveActiveOption(-1);
         break;
       case "Home":
         event.preventDefault();
+        event.stopPropagation();
         setActiveOptionIndex(0);
         break;
       case "End":
         event.preventDefault();
+        event.stopPropagation();
         setActiveOptionIndex(Math.max(0, filteredPersons.length - 1));
         break;
       case "Enter":
         event.preventDefault();
+        event.stopPropagation();
         if (filteredPersons[activeOptionIndex]) togglePerson(filteredPersons[activeOptionIndex]);
         break;
       case " ":
         if (event.currentTarget !== searchInputRef.current) {
           event.preventDefault();
+          event.stopPropagation();
           if (filteredPersons[activeOptionIndex]) togglePerson(filteredPersons[activeOptionIndex]);
         }
         break;
       case "Escape":
         event.preventDefault();
+        event.stopPropagation();
         setIsPeopleDropdownOpen(false);
         triggerRef.current?.focus();
         break;
@@ -327,19 +340,19 @@ export function StagedAudiencePicker({
   };
 
   return (
-    <div className="stagedAudiencePicker">
+    <Box className="stagedAudiencePicker">
       {/* Stage 1: Role Selection */}
-      <div className="stage">
+      <Box className="stage">
         <label htmlFor={roleSelectId.current}>{t("targetAudienceLabel")}</label>
         <Select id={roleSelectId.current} value={roleMode} onChange={(e) => handleRoleChange(e.target.value as RoleMode)}>
           <option value="teachers">{t("teachers")}</option>
           <option value="students">{t("students")}</option>
           <option value="guardians">{t("guardians")}</option>
         </Select>
-      </div>
+      </Box>
 
       {/* Stage 2: Narrow by Class/Section */}
-      <div className="stage">
+      <Box className="stage">
         <label htmlFor={narrowSelectId.current}>{t("narrowByLabel", "Narrow by")}</label>
         <Select id={narrowSelectId.current} value={narrowMode} onChange={(e) => handleNarrowChange(e.target.value as NarrowMode)}>
           <option value="all">{t("allLabel", "All")}</option>
@@ -358,16 +371,17 @@ export function StagedAudiencePicker({
             {(sections[selectedClassId] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
         )}
-      </div>
+      </Box>
 
       {/* Stage 3: Person Selection */}
-      <div className="stage">
+      <Box className="stage">
         <label>{t("selectPersonsLabel", "Select persons")}</label>
-        <div className="peopleMultiSelect" ref={pickerRef}>
-          <button
+        <Box className="peopleMultiSelect" ref={pickerRef}>
+          <Button
             ref={triggerRef}
             type="button"
             className="peopleMultiSelectTrigger"
+            aria-label={`${t("selectPersonsLabel", "Select persons")}: ${selectedSummary}`}
             aria-haspopup="listbox"
             aria-expanded={isPeopleDropdownOpen}
             aria-controls={isPeopleDropdownOpen ? listboxId.current : undefined}
@@ -376,67 +390,107 @@ export function StagedAudiencePicker({
           >
             <span className="peopleMultiSelectSummary">{selectedSummary}</span>
             <ChevronDown size={16} aria-hidden="true" />
-          </button>
+          </Button>
 
           {selectedPersons.length > 0 && (
             <div className="selectedChips" aria-label={t("selectedPeopleCount", { count: selectedPersons.length, defaultValue: "Selected people" })}>
               {selectedPersons.map((p) => (
-                <span key={personKey(p)} className="chip">
+                <Button key={personKey(p)} className="chip" type="button" aria-label={p.name} onClick={() => removePerson(personKey(p))}>
                   {p.name}
-                  <button type="button" aria-label={t("removePersonLabel", { name: p.name, defaultValue: `Remove ${p.name}` })} onClick={() => removePerson(personKey(p))}>
-                    <X size={13} />
-                  </button>
-                </span>
+                  <X size={13} />
+                </Button>
               ))}
             </div>
           )}
 
           {isPeopleDropdownOpen && (
-            <div className="peopleMultiSelectMenu" style={peopleDropdownStyle}>
-              <div className="peopleMultiSelectSearch">
-                <Search size={16} aria-hidden="true" />
-                <input
-                  ref={searchInputRef}
-                  type="search"
-                  aria-label={t("searchPlaceholder", "Search...")}
-                  aria-controls={listboxId.current}
-                  aria-activedescendant={filteredPersons[activeOptionIndex] ? `${listboxId.current}-${filteredPersons[activeOptionIndex].id}` : undefined}
-                  placeholder={t("searchPlaceholder", "Search...")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handlePeoplePickerKeyDown}
-                />
-              </div>
-
-              <div id={listboxId.current} className="peopleMultiSelectList" role="listbox" aria-multiselectable="true">
-                {isLoading && <p className="peopleMultiSelectState">{t("loadingLabel", "Loading...")}</p>}
-                {!isLoading && filteredPersons.length === 0 && <p className="peopleMultiSelectState">{t("noResults", "No results")}</p>}
-                {!isLoading && filteredPersons.map((person, index) => {
+            <Box className="peopleMultiSelectMenu" style={peopleDropdownStyle} sx={{ minHeight: 180 }}>
+              <TextField
+                inputRef={searchInputRef}
+                fullWidth
+                size="small"
+                type="search"
+                label={t("searchPlaceholder", "Search...")}
+                placeholder={t("searchPlaceholder", "Search...")}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={handlePeoplePickerKeyDown}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search size={16} aria-hidden="true" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: isLoading ? (
+                      <InputAdornment position="end">
+                        <CircularProgress size={16} />
+                      </InputAdornment>
+                    ) : undefined,
+                  },
+                  htmlInput: {
+                    role: "searchbox",
+                    "aria-label": t("searchPlaceholder", "Search..."),
+                    "aria-controls": listboxId.current,
+                    "aria-activedescendant": filteredPersons[activeOptionIndex]
+                      ? `${listboxId.current}-${filteredPersons[activeOptionIndex].id}`
+                      : undefined,
+                  },
+                }}
+              />
+              <Box
+                id={listboxId.current}
+                role="listbox"
+                aria-label={t("selectPersonsLabel", "Select persons")}
+                sx={{ mt: 1, maxHeight: "calc(100% - 54px)", overflowY: "auto" }}
+              >
+                {filteredPersons.map((person, index) => {
+                  const key = personKey(person);
                   const selected = selectedPersons.some((p) => personKey(p) === personKey(person));
                   return (
-                    <button
-                      key={person.id}
-                      id={`${listboxId.current}-${person.id}`}
+                    <Box
+                      component="button"
                       type="button"
+                      key={key}
+                      id={`${listboxId.current}-${person.id}`}
                       role="option"
                       aria-selected={selected}
-                      className={`peopleMultiSelectOption${selected ? " selected" : ""}${index === activeOptionIndex ? " active" : ""}`}
+                      className="peopleMultiSelectOption"
+                      onMouseDown={(event) => event.preventDefault()}
                       onClick={() => togglePerson(person)}
-                      onMouseEnter={() => setActiveOptionIndex(index)}
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "24px minmax(0, 1fr)",
+                        gap: 1,
+                        alignItems: "center",
+                        width: "100%",
+                        border: 0,
+                        borderRadius: 1,
+                        background: index === activeOptionIndex ? "rgba(14, 93, 83, 0.1)" : "transparent",
+                        color: "inherit",
+                        cursor: "pointer",
+                        px: 1,
+                        py: 1,
+                        textAlign: "left",
+                        "&:hover": { background: "rgba(14, 93, 83, 0.12)" },
+                      }}
                     >
                       <span className="peopleMultiSelectCheck">{selected && <Check size={14} />}</span>
                       <span className="peopleMultiSelectPerson">
                         <strong>{person.name}</strong>
                         <small>{t(person.role)}</small>
                       </span>
-                    </button>
+                    </Box>
                   );
                 })}
-              </div>
-            </div>
+                {!isLoading && filteredPersons.length === 0 && (
+                  <Box sx={{ px: 1, py: 2, color: "text.secondary" }}>{t("noResults", "No results")}</Box>
+                )}
+              </Box>
+            </Box>
           )}
-        </div>
-      </div>
-    </div>
+        </Box>
+      </Box>
+    </Box>
   );
 }

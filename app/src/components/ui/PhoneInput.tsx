@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
+import InputAdornment from "@mui/material/InputAdornment";
+import TextField from "@mui/material/TextField";
 import { useTranslation } from "react-i18next";
+
+const MUITextField = TextField as any;
 
 /**
  * ISS3-019: Shared Pakistan phone-number value object/input
@@ -165,9 +169,8 @@ export function PhoneInput({
   return (
     <div className="phoneInput">
       {label && <label htmlFor={id}>{label}</label>}
-      <div className="phoneInputWrapper">
-        <span className="phonePrefix" aria-hidden="true">+92</span>
-        <input
+      <div className="phoneInputWrapper muiPhoneInputWrapper">
+        <MUITextField
           id={id}
           type="tel"
           value={displayValue}
@@ -178,11 +181,20 @@ export function PhoneInput({
           required={required}
           className={`phoneInputField${error && touched ? " invalid" : ""}`}
           dir="ltr"
-          inputMode="tel"
-          autoComplete="tel"
-          maxLength={16}
           aria-invalid={!!error && touched}
           aria-describedby={error && touched ? `${id}-error` : undefined}
+          size="small"
+          fullWidth
+          slotProps={{
+            input: {
+              startAdornment: <InputAdornment position="start">+92</InputAdornment>,
+            },
+            htmlInput: {
+              inputMode: "tel",
+              autoComplete: "tel",
+              maxLength: 16,
+            },
+          }}
         />
       </div>
       {error && touched && (

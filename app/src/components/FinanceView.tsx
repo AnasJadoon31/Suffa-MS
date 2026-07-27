@@ -247,9 +247,9 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
         {!isLoading && !error && visiblePayments.map((p) => (
           <div className="dataRow" key={p.id}>
             <span data-label={t("studentCol")}>
-              <button className="identityLink" type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadContributions")))}>
+              <Button className="identityLink" type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadContributions")))}>
                 {p.student_name ?? t("deletedPersonLabel")}
-              </button>
+              </Button>
             </span>
             <span data-label={t("categoryCol")}>{p.category_name ?? t("unknownLabel")}</span>
             <span data-label={t("amountCol")}>{p.currency} {p.amount}</span>
@@ -477,9 +477,9 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
         {!isLoading && !error && visibleDonations.map((d) => (
           <div className="dataRow" key={d.id}>
             <span data-label={t("donorCol")}>
-              <button className="identityLink" type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDonations")))}>
+              <Button className="identityLink" type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDonations")))}>
                 {d.donor_name ?? t("deletedPersonLabel")}
-              </button>
+              </Button>
             </span>
             <span data-label={t("categoryCol")}>{d.category_name ?? t("unknownLabel")}</span>
             <span data-label={t("amountCol")}>{d.currency} {d.amount}</span>

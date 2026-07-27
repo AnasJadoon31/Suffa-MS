@@ -1,6 +1,8 @@
-import { Button } from "./ui/Button";
-import { useMemo, useState } from "react";
-import { Input } from "./ui/Field";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 
 
 type SearchDropdownProps<T> = Readonly<{
@@ -33,6 +35,7 @@ export function SearchDropdown<T>({
   emptyLabel = "No matches",
 }: SearchDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const visibleItems = useMemo(() => {
     const query = value.trim().toLowerCase();
     const ranked = query
@@ -45,42 +48,75 @@ export function SearchDropdown<T>({
     return ranked.slice(0, 8);
   }, [getDescription, getLabel, items, value]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isOpen]);
+
   return (
-    <div className="searchDropdown">
-      <label htmlFor={id}>{label}</label>
-      <Input
-        id={id}
-        disabled={disabled}
+    <Box
+      className="searchDropdown"
+      id={id}
+      ref={rootRef}
+      sx={{ position: "relative" }}
+    >
+      <TextField
+        label={label}
         placeholder={placeholder}
+        size="small"
+        fullWidth
+        disabled={disabled}
         value={value}
-        autoComplete="off"
-        onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+        onFocus={() => setIsOpen(!disabled)}
         onChange={(event) => {
           onQueryChange?.(event.target.value);
-          setIsOpen(true);
+          setIsOpen(!disabled);
         }}
-        onFocus={() => setIsOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            setIsOpen(false);
+          }
+        }}
+        slotProps={{ htmlInput: { autoComplete: "off" } }}
       />
       {isOpen && !disabled && (
-        <div className="searchDropdownMenu" role="listbox">
-          {visibleItems.length === 0 && <span className="searchDropdownEmpty">{emptyLabel}</span>}
+        <Paper
+          className="searchDropdownMenu"
+          elevation={8}
+          role="listbox"
+          sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
+        >
           {visibleItems.map((item) => (
-            <Button
-              className="searchDropdownItem"
-              key={getKey(item)}
+            <Box
+              component="button"
               type="button"
+              key={getKey(item)}
+              className="searchDropdownItem"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 onSelect(item);
                 setIsOpen(false);
               }}
             >
-              <strong>{getLabel(item)}</strong>
-              {getDescription && <small>{getDescription(item)}</small>}
-            </Button>
+              <Typography component="strong" variant="body2" sx={{ display: "block", fontWeight: 800 }}>
+                {getLabel(item)}
+              </Typography>
+              {getDescription && (
+                <Typography component="small" variant="caption" color="text.secondary">
+                  {getDescription(item)}
+                </Typography>
+              )}
+            </Box>
           ))}
-        </div>
+          {visibleItems.length === 0 && <Box className="searchDropdownEmpty">{emptyLabel}</Box>}
+        </Paper>
       )}
-    </div>
+    </Box>
   );
 }

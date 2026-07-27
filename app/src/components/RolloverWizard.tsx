@@ -1,5 +1,7 @@
 import { Button } from "./ui/Button";
 import { Input, Select, Checkbox } from "./ui/Field";
+import { Modal } from "./ui/Modal";
+import Paper from "@mui/material/Paper";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type AcademicSession, type AcademicClass, academicsApi } from "../lib/endpoints";
@@ -55,15 +57,7 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
   };
 
   return (
-    <div className="modalOverlay" style={{
-      position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000
-    }}>
-      <div className="modalContent" style={{
-        backgroundColor: "var(--surface)", padding: "24px", borderRadius: "8px", width: "100%", maxWidth: "600px",
-        maxHeight: "90vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px"
-      }}>
-        <h2 style={{ margin: 0 }}>{t("rolloverHeading", { name: sourceSession.name })}</h2>
+    <Modal title={t("rolloverHeading", { name: sourceSession.name })} onClose={onClose} maxWidth={600}>
         {error && <div style={{ color: "var(--error)", padding: "8px", backgroundColor: "var(--error-light)", borderRadius: "4px" }}>{error}</div>}
 
         {step === 1 && (
@@ -87,7 +81,7 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
               {t("hijriSpanLabel")}
               <Input className="inputField" required value={form.hijri_span} onChange={(e) => setForm({ ...form, hijri_span: e.target.value })} placeholder="1448-1449" />
             </label>
-            <fieldset className="sectionPicker">
+            <Paper component="fieldset" variant="outlined" className="sectionPicker">
               <legend>{t("rolloverCopyLegend")}</legend>
               <label className="checkboxLabel">
                 <Checkbox  checked={form.copy_timetable} onChange={(e) => setForm({ ...form, copy_timetable: e.target.checked })} />
@@ -103,7 +97,7 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
                   {t("shiftHolidayDatesLabel")}
                 </label>
               )}
-            </fieldset>
+            </Paper>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "16px" }}>
               <Button type="button" className="secondaryAction" onClick={onClose}>{t("cancelBtn")}</Button>
               <Button type="submit" className="primaryAction">{t("nextBtn")}</Button>
@@ -139,7 +133,6 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

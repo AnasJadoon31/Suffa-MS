@@ -1,6 +1,6 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
-import { ShieldCheck, X } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -14,6 +14,7 @@ import {
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Select, Checkbox } from "./ui/Field";
+import { Modal } from "./ui/Modal";
 
 /**
  * "Mini-admin" delegation (IMPLEMENT.md §3): principals drop this button into
@@ -154,12 +155,7 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
   };
 
   return (
-    <div className="modalOverlay" role="dialog" aria-modal="true">
-      <div className="modalCard">
-        <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between" }}>
-          <h3>{t("delegateHeading")}</h3>
-          <Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>
-        </div>
+    <Modal title={t("delegateHeading")} onClose={onClose}>
         <p className="notice">{t("delegateHint")}</p>
 
         <label style={{ display: "block", marginBottom: 12 }}>
@@ -205,7 +201,6 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
             </div>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

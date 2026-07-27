@@ -1,4 +1,6 @@
 import { type ReactNode, type CSSProperties } from "react";
+import Paper from "@mui/material/Paper";
+import Box from "@mui/material/Box";
 
 export function Card({
   children,
@@ -10,9 +12,9 @@ export function Card({
   style?: CSSProperties;
 }) {
   return (
-    <article className={`card ${className}`.trim()} style={style}>
+    <Paper component="article" variant="outlined" className={`card ${className}`.trim()} style={style}>
       {children}
-    </article>
+    </Paper>
   );
 }
 
@@ -26,9 +28,9 @@ export function MetricGrid({
   "aria-label"?: string;
 }) {
   return (
-    <section className={`metricGrid ${className}`.trim()} aria-label={ariaLabel}>
+    <Box component="section" className={`metricGrid ${className}`.trim()} aria-label={ariaLabel}>
       {children}
-    </section>
+    </Box>
   );
 }
 
@@ -46,12 +48,12 @@ export function MetricCard({
   children?: ReactNode;
 }) {
   return (
-    <article className={`metricCard ${className}`.trim()}>
+    <Paper component="article" variant="outlined" className={`metricCard ${className}`.trim()}>
       <h3>{title}</h3>
       {value !== undefined && <div className="metricValue">{value}</div>}
       {trend !== undefined && <div className="metricTrend">{trend}</div>}
       {children}
-    </article>
+    </Paper>
   );
 }
 
@@ -63,8 +65,8 @@ export function BlogCard({
   className?: string;
 }) {
   return (
-    <article className={`blogCard ${className}`.trim()}>
+    <Paper component="article" variant="outlined" className={`blogCard ${className}`.trim()}>
       {children}
-    </article>
+    </Paper>
   );
 }

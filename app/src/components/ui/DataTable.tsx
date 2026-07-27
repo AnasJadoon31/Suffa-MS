@@ -1,4 +1,12 @@
 import type { ReactNode } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
 import { LoadingState, ErrorState } from "./AsyncState";
 
 /* ------------------------------------------------------------------ types */
@@ -57,36 +65,59 @@ export function DataTable<T>({
   const showData = !isLoading && !error;
 
   return (
-    <div className="tableResponsive">
-      <div className={className ? `dataTable ${className}` : "dataTable"}>
-        {/* ---- header row ---- */}
-        <div className="dataRow header">
-        {columns.map((col, i) => (
-          <span key={i} className={col.className}>{col.header}</span>
-        ))}
-      </div>
-
-      {/* ---- async states ---- */}
-      {isLoading && <LoadingState />}
-      {!isLoading && error && <ErrorState message={error} />}
-      {showData && data.length === 0 && emptyMessage && (
-        <p className="emptyState">{emptyMessage}</p>
+    <TableContainer
+      component={Paper}
+      variant="outlined"
+      className={className ? `muiDataTable ${className}` : "muiDataTable"}
+      sx={{
+        width: "100%",
+        overflowX: "auto",
+        overflowY: "visible",
+        borderColor: "divider",
+        boxShadow: "none",
+      }}
+    >
+      {isLoading && (
+        <Box sx={{ p: 3 }}>
+          <LoadingState />
+        </Box>
       )}
-
-      {/* ---- data rows ---- */}
-      {showData &&
-        data.map((item, index) => (
-          <DataRow
-            key={keyExtractor(item)}
-            item={item}
-            index={index}
-            data={data}
-            columns={columns}
-            renderBeforeRow={renderBeforeRow}
-          />
-        ))}
-      </div>
-    </div>
+      {!isLoading && error && (
+        <Box sx={{ p: 3 }}>
+          <ErrorState message={error} />
+        </Box>
+      )}
+      {showData && data.length === 0 && emptyMessage && (
+        <Box className="emptyState" sx={{ p: 3 }}>
+          {emptyMessage}
+        </Box>
+      )}
+      {showData && data.length > 0 && (
+        <Table size="small" stickyHeader aria-label="data table" sx={{ minWidth: 720 }}>
+          <TableHead>
+            <TableRow>
+              {columns.map((col, i) => (
+                <TableCell key={i} className={col.className}>
+                  {col.header}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {data.map((item, index) => (
+              <DataRow
+                key={keyExtractor(item)}
+                item={item}
+                index={index}
+                data={data}
+                columns={columns}
+                renderBeforeRow={renderBeforeRow}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </TableContainer>
   );
 }
 
@@ -108,13 +139,17 @@ function DataRow<T>({
   const before = renderBeforeRow?.(item, index, data);
   return (
     <>
-      {before}
-      <div className="dataRow">
+      {before && (
+        <TableRow className="dataRow sectionRow">
+          <TableCell colSpan={columns.length}>{before}</TableCell>
+        </TableRow>
+      )}
+      <TableRow hover className="dataRow">
         {columns.map((col, i) => {
           const label = typeof col.header === "string" ? col.header : undefined;
-          return <span key={i} data-label={label} className={col.className}>{col.render(item, index)}</span>;
+          return <TableCell key={i} data-label={label} className={col.className}>{col.render(item, index)}</TableCell>;
         })}
-      </div>
+      </TableRow>
     </>
   );
 }

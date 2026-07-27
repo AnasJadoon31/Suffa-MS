@@ -1,5 +1,7 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
 import { Copy, Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X, Edit2, Pencil, UserMinus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -29,7 +31,7 @@ import {
 import { AdmissionAnswersFields } from "./AdmissionAnswersFields";
 import { answerString, BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields } from "../lib/admissionBuiltIns";
 import { SearchDropdown } from "./SearchDropdown";
-import { Input, Select } from "./ui/Field";
+import { Checkbox, Input, Select } from "./ui/Field";
 import { LoadingState } from "./ui/AsyncState";
 import { DataTable, type Column } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
@@ -368,7 +370,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
               <label>{t("emergencyContactLabel")}<Input value={form.emergency_contact} onChange={(e) => setForm({ ...form, emergency_contact: e.target.value })} /></label>
 
               <label className="checkboxLabel">
-                <input type="checkbox" checked={form.is_principal_delegate} onChange={(e) => setForm({ ...form, is_principal_delegate: e.target.checked })} />
+                <Checkbox checked={form.is_principal_delegate} onChange={(e) => setForm({ ...form, is_principal_delegate: e.target.checked })} />
                 <span>{t("principalDelegateLabel", "Delegate as Principal (Access all menus)")}</span>
               </label>
               </FormModal>
@@ -389,7 +391,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           <label>{t("addressLabel")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
           <label>{t("emergencyContactLabel")}<Input value={editForm.emergency_contact} onChange={(e) => setEditForm({ ...editForm, emergency_contact: e.target.value })} /></label>
           <label className="checkboxLabel">
-            <input type="checkbox" checked={editForm.is_principal_delegate} onChange={(e) => setEditForm({ ...editForm, is_principal_delegate: e.target.checked })} />
+            <Checkbox checked={editForm.is_principal_delegate} onChange={(e) => setEditForm({ ...editForm, is_principal_delegate: e.target.checked })} />
             <span>{t("principalDelegateLabel", "Delegate as Principal (Access all menus)")}</span>
           </label>
         </FormModal>
@@ -1559,8 +1561,8 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
         ) : null
       }
     >
-      <div className="detailPanel" style={{ padding: "1.5rem" }}>
-      <section className="guardianIdentityCard">
+      <Box className="detailPanel" sx={{ p: 3 }}>
+      <Paper component="section" variant="outlined" className="guardianIdentityCard">
         <div className="personHero compactPersonHero">
           <div><span>{t("fullNameLabel")}</span><strong>{guardian.name}</strong></div>
           <div><span>{t("relationshipLabel")}</span><strong>{guardian.relationship}</strong></div>
@@ -1584,7 +1586,7 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
           <div>{guardian.address || "—"}</div>
         </div>
       </div>
-      </section>
+      </Paper>
 
       <div style={{ marginTop: "2rem" }}>
         <h3>{t("linkedStudents", "Linked Students")}</h3>
@@ -1611,7 +1613,7 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
             <p className="notice">{t("noStudentsLinked", "No students linked yet.")}</p>
           ) : (
             linkedStudents.map((s) => (
-              <div key={s.id} className="linkedPersonCard">
+              <Paper key={s.id} variant="outlined" className="linkedPersonCard">
                 <div>
                   <strong>{s.name}</strong>
                   <span>{s.admission_number} · {s.current_class || t("notAssignedLabel")}</span>
@@ -1619,12 +1621,12 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
                 <Button className="tableAction" type="button" onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn")}>
                   <X size={14} />
                 </Button>
-              </div>
+              </Paper>
             ))
           )}
         </div>
       </div>
-      </div>
+      </Box>
       
       {showEdit && (
         <FormModal

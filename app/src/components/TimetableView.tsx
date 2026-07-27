@@ -17,7 +17,7 @@ import {
   type TimetableSlot,
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
-import { Input, Select } from "./ui/Field";
+import { Input, Select, Textarea } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
@@ -468,7 +468,7 @@ function ImportView({ onDone }: Readonly<{ onDone: () => void }>) {
     <div>
       <p className="notice">{t("importHint")}</p>
       <pre className="importExample">Class 1, Alif, Nazra, TCH-0001, 0, 08:00, 08:40</pre>
-      <textarea
+      <Textarea
         className="importTextarea"
         rows={8}
         value={text}

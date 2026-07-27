@@ -1,5 +1,6 @@
 import { Button } from "./ui/Button";
 import React, { useState } from "react";
+import Paper from "@mui/material/Paper";
 import { useTranslation } from "react-i18next";
 import { LogIn, Building2, KeyRound, Loader2 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
@@ -53,21 +54,21 @@ export function LoginScreen() {
             <h1>MMS</h1>
             <p>{t("loginTagline")}</p>
             <div className="hero-stats">
-              <div className="stat-card">
+              <Paper variant="outlined" className="stat-card">
                 <h3>{t("loginOfflineTitle")}</h3>
                 <span>{t("loginOfflineSub")}</span>
-              </div>
-              <div className="stat-card">
+              </Paper>
+              <Paper variant="outlined" className="stat-card">
                 <h3>{t("loginTenantTitle")}</h3>
                 <span>{t("loginTenantSub")}</span>
-              </div>
+              </Paper>
             </div>
           </div>
         </div>
 
         {/* Right Side: Form */}
         <div className="login-form-container">
-          <div className="login-card glass">
+          <Paper variant="outlined" className="login-card glass">
             <div className="login-header">
               <div className="login-icon-wrapper">
                 <LogIn size={28} />
@@ -128,7 +129,7 @@ export function LoginScreen() {
                 {t("signInButton")}
               </Button>
             </form>
-          </div>
+          </Paper>
         </div>
       </div>
     </div>

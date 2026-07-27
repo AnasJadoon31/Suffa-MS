@@ -648,8 +648,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
 
 /**
  * B7(e): dedicated course↔class mapping layout — a two-column assigned/
- * available picker in a modal (same `modalOverlay`/`modalCard` idiom as
- * `DelegateButton.tsx`), replacing the cramped inline courses column.
+ * available picker in a shared MUI-backed modal, replacing the cramped inline
+ * courses column.
  * Same `assignCourseToClass`/`unassignCourseFromClass` calls as before.
  */
 function CourseMappingModal({
@@ -672,12 +672,7 @@ function CourseMappingModal({
   const available = allCourses.filter((co) => !assignedIds.has(co.id));
 
   return (
-    <div className="modalOverlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="modalCard" style={{ width: "min(680px, 92vw)" }} onClick={(e) => e.stopPropagation()}>
-        <div className="moduleHeader" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3>{t("manageCoursesTitle", { class: cls.name })}</h3>
-          <Button className="tableAction" type="button" onClick={onClose}><X size={16} /></Button>
-        </div>
+    <Modal title={t("manageCoursesTitle", { class: cls.name })} onClose={onClose} maxWidth={680}>
         <div className="courseMapColumns">
           <div>
             <h4>{t("assignedCoursesLabel")}</h4>
@@ -708,7 +703,6 @@ function CourseMappingModal({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

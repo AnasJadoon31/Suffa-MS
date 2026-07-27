@@ -1,5 +1,6 @@
 import { Button } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import Paper from "@mui/material/Paper";
 import { BookOpen, ClipboardList, FileDown, Pencil, Plus, Send, Trash2, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -27,7 +28,7 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { consumePendingClassNav } from "../lib/pendingNav";
 import { DOCUMENT_UPLOAD_ACCEPT, getDocumentUploadContentType } from "../lib/filePolicy";
-import { Input, Select, Checkbox } from "./ui/Field";
+import { Input, Select, Checkbox, Textarea } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
@@ -463,7 +464,7 @@ function AssignmentCreateForm({
         </Select>
       </label>
       {!allClasses && sections.length > 0 && (
-        <fieldset className="sectionPicker">
+        <Paper component="fieldset" variant="outlined" className="sectionPicker">
           <legend>{t("sectionsLegend")}</legend>
           <small className="notice">{t("sectionsHint")}</small>
           {sections.map((s) => (
@@ -472,7 +473,7 @@ function AssignmentCreateForm({
               {s.name}
             </label>
           ))}
-        </fieldset>
+        </Paper>
       )}
       <label>
         {t("titleLabel")}
@@ -582,7 +583,7 @@ function SubmissionRow({
       <span>{submission.is_late ? t("lateLabel") : t("onTimeLabel")}</span>
       <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <Input style={{ width: 80 }} placeholder="Mark" value={mark} onChange={(e) => setMark(e.target.value)} />
-        <textarea className="input" placeholder="Feedback/Remarks" rows={2} style={{ width: 150 }} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+        <Textarea className="input" placeholder="Feedback/Remarks" rows={2} style={{ width: 150 }} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
       </span>
       <span>
         <Button

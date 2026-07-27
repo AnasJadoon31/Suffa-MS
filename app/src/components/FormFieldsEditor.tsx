@@ -1,4 +1,5 @@
 import { Button } from "./ui/Button";
+import Paper from "@mui/material/Paper";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -60,7 +61,7 @@ export function FormFieldsEditor({
   };
 
   return (
-    <section className="formFieldsEditor" aria-label={t("formFieldsHeading")}>
+    <Paper component="section" variant="outlined" className="formFieldsEditor" aria-label={t("formFieldsHeading")}>
       <div className="formFieldsHeader">
         <div>
           <h4>{t("formFieldsHeading")}</h4>
@@ -74,7 +75,7 @@ export function FormFieldsEditor({
       {fields.length === 0 && <p className="emptyState compactEmptyState">{t("noCustomFieldsYet")}</p>}
       <div className="formFieldsList">
         {fields.map((field, index) => (
-          <div key={index} className="formFieldCard">
+          <Paper key={index} variant="outlined" className="formFieldCard">
             <span className="formFieldNumber">{index + 1}</span>
             {field.built_in && <span className="formFieldBuiltInBadge">{t("builtInFieldLabel", "Built-in")}</span>}
             <label>
@@ -145,9 +146,9 @@ export function FormFieldsEditor({
             >
               <Trash2 size={15} />
             </Button>
-          </div>
+          </Paper>
         ))}
       </div>
-    </section>
+    </Paper>
   );
 }

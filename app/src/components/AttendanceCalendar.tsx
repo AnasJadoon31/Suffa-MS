@@ -1,4 +1,6 @@
 import { Button } from "./ui/Button";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -64,8 +66,8 @@ export function AttendanceCalendar({
   ];
 
   return (
-    <div className="attendanceCalendar">
-      <div className="attendanceCalendarNav">
+    <Paper variant="outlined" className="attendanceCalendar">
+      <Box className="attendanceCalendarNav">
         <Button
           className="secondaryAction"
           type="button"
@@ -83,13 +85,13 @@ export function AttendanceCalendar({
         >
           <ChevronRight size={17} />
         </Button>
-      </div>
-      <div className="attendanceCalendarWeekdays">
+      </Box>
+      <Box className="attendanceCalendarWeekdays">
         {weekdayLabels.map((label) => (
           <span key={label}>{label}</span>
         ))}
-      </div>
-      <div className="attendanceCalendarGrid">
+      </Box>
+      <Box className="attendanceCalendarGrid">
         {cells.map((cell, index) => {
           if (!cell) return <span className="attendanceCalendarDay blank" key={`blank-${index}`} />;
 
@@ -131,7 +133,7 @@ export function AttendanceCalendar({
             </Button>
           );
         })}
-      </div>
-    </div>
+      </Box>
+    </Paper>
   );
 }

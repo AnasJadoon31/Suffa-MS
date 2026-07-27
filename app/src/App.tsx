@@ -1,7 +1,7 @@
 import { CalendarDays, Languages, Menu } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ComponentType, type LazyExoticComponent } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 
 import { LoginScreen } from "./components/LoginScreen";
 import { DelegateButton } from "./components/DelegateButton";

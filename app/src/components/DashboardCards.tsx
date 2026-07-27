@@ -2,7 +2,7 @@ import { Button } from "./ui/Button";
 import { AlertTriangle, CalendarDays, CircleDollarSign, ClipboardCheck, ExternalLink, FileDown, GraduationCap, LogIn, LogOut, UserRoundCog } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 import { AttendanceCalendar, toDateKey, type StudentDayStatus } from "./AttendanceCalendar";
 import { ErrorState, LoadingState } from "./ui/AsyncState";

@@ -1,7 +1,8 @@
 import { Button } from "./ui/Button";
+import Paper from "@mui/material/Paper";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { KeyRound } from "lucide-react";
 
 import { api } from "../lib/api";
@@ -48,7 +49,7 @@ export function SetPasswordPage() {
           </div>
         </div>
         <div className="login-form-container">
-          <div className="login-card glass">
+          <Paper variant="outlined" className="login-card glass">
             <div className="login-header">
               <div className="login-icon-wrapper"><KeyRound size={28} /></div>
               <h2>{t("setPasswordHeading")}</h2>
@@ -73,7 +74,7 @@ export function SetPasswordPage() {
                 <Button type="submit" className="login-button">{t("setPasswordBtn")}</Button>
               </form>
             )}
-          </div>
+          </Paper>
         </div>
       </div>
     </div>

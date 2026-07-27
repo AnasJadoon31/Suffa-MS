@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
 import { useTranslation } from "react-i18next";
 
 import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Course, type Scope, type Section } from "../lib/endpoints";
@@ -90,7 +92,7 @@ export function AudiencePicker({
   };
 
   return (
-    <div className="audiencePicker">
+    <Box className="audiencePicker">
       <label>
         {t("audienceLabel")}
         <Select value={mode} onChange={(e) => setMode2(e.target.value as Mode)}>
@@ -104,7 +106,7 @@ export function AudiencePicker({
         </Select>
       </label>
       {mode === "classes" && (
-        <div className="sectionPicker">
+        <Paper variant="outlined" className="sectionPicker">
           {classes.map((c) => (
             <label key={c.id} className="checkboxLabel">
               <Checkbox
@@ -115,10 +117,10 @@ export function AudiencePicker({
               {c.name}
             </label>
           ))}
-        </div>
+        </Paper>
       )}
       {mode === "sections" && (
-        <div className="sectionPicker">
+        <Paper variant="outlined" className="sectionPicker">
           {classes.flatMap((c) =>
             (sections[c.id] ?? []).map((s) => (
               <label key={s.id} className="checkboxLabel">
@@ -131,10 +133,10 @@ export function AudiencePicker({
               </label>
             ))
           )}
-        </div>
+        </Paper>
       )}
       {mode === "courses" && (
-        <div className="sectionPicker">
+        <Paper variant="outlined" className="sectionPicker">
           <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectCoursesHint")}</p>
           {courses.map((co) => (
             <label key={co.id} className="checkboxLabel">
@@ -146,10 +148,10 @@ export function AudiencePicker({
               {co.name}
             </label>
           ))}
-        </div>
+        </Paper>
       )}
       {mode === "users" && (
-        <div className="sectionPicker">
+        <Paper variant="outlined" className="sectionPicker">
           <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectUsersHint")}</p>
           {people.map((p) => (
             <label key={p.user_id} className="checkboxLabel">
@@ -161,8 +163,8 @@ export function AudiencePicker({
               {p.name} <small style={{ color: "var(--muted)" }}>({p.role === "teacher" ? t("teachers") : t("students")})</small>
             </label>
           ))}
-        </div>
+        </Paper>
       )}
-    </div>
+    </Box>
   );
 }
