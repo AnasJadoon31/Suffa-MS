@@ -199,7 +199,7 @@ async def request_whatsapp_qr_code(
                     if qr_response.is_error:
                         _raise_evolution_pairing_failure(qr_response)
                     existing_qr = _qr_code_base64_value(qr_response)
-                    if existing_qr is not None:
+                    if existing_qr is not None and not replace_existing:
                         return WhatsAppQrResponse(
                             instance_name=settings.evolution_instance,
                             state="connecting",
@@ -293,7 +293,7 @@ async def request_whatsapp_pairing_code(
                     if pairing_response.is_error:
                         _raise_evolution_pairing_failure(pairing_response)
                     existing_code = _pairing_code_value(pairing_response)
-                    if existing_code is not None:
+                    if existing_code is not None and not payload.replace_existing:
                         return WhatsAppPairingResponse(
                             instance_name=settings.evolution_instance,
                             state="connecting",

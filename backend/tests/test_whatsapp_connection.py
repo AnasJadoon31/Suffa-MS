@@ -178,6 +178,52 @@ async def test_switching_incomplete_phone_pairing_to_qr_requires_explicit_replac
     ]
 
 
+async def test_replace_existing_qr_pairing_deletes_stale_instance_even_when_qr_exists(
+    client, monkeypatch,
+):
+    requests: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(200, request=request, json={"instance": {"state": "connecting"}})
+        if request.url.path == "/instance/connect/suffa-ms":
+            return httpx.Response(
+                200,
+                request=request,
+                json={"qrcode": {"base64": "data:image/png;base64,STALE"}},
+            )
+        if request.url.path == "/webhook/find/suffa-ms":
+            return httpx.Response(200, request=request, json=None)
+        if request.method == "DELETE":
+            return httpx.Response(200, request=request, json={"status": "SUCCESS"})
+        assert request.method == "POST"
+        return httpx.Response(
+            201,
+            request=request,
+            json={
+                "instance": {"instanceName": "suffa-ms", "connectionStatus": "connecting"},
+                "qrcode": {"base64": "data:image/png;base64,FRESH"},
+            },
+        )
+
+    _use_evolution_transport(monkeypatch, handler)
+    response = await client.post(
+        "/api/v1/messaging/whatsapp/connection/qr-code",
+        params={"replace_existing": True},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["qr_code_base64"] == "data:image/png;base64,FRESH"
+    assert requests == [
+        ("GET", "/instance/connectionState/suffa-ms"),
+        ("GET", "/instance/connect/suffa-ms"),
+        ("GET", "/webhook/find/suffa-ms"),
+        ("DELETE", "/instance/delete/suffa-ms"),
+        ("POST", "/instance/create"),
+    ]
+
+
 async def test_qr_pairing_does_not_replace_connected_instance(client, monkeypatch):
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/instance/connectionState/suffa-ms"
@@ -214,7 +260,7 @@ async def test_closed_whatsapp_instance_reconnects_without_deletion(client, monk
     ]
 
 
-async def test_repeated_pairing_request_reuses_existing_code(client, monkeypatch):
+async def test_repeated_pairing_request_reuses_existing_code_without_replacement(client, monkeypatch):
     requests: list[tuple[str, str]] = []
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -226,7 +272,7 @@ async def test_repeated_pairing_request_reuses_existing_code(client, monkeypatch
     _use_evolution_transport(monkeypatch, handler)
     response = await client.post(
         "/api/v1/messaging/whatsapp/connection/pairing-code",
-        json={"phone_number": "923001234567", "replace_existing": True},
+        json={"phone_number": "923001234567"},
     )
 
     assert response.status_code == 200, response.text
@@ -234,6 +280,48 @@ async def test_repeated_pairing_request_reuses_existing_code(client, monkeypatch
     assert requests == [
         ("GET", "/instance/connectionState/suffa-ms"),
         ("GET", "/instance/connect/suffa-ms"),
+    ]
+
+
+async def test_replace_existing_phone_pairing_deletes_stale_instance_even_when_code_exists(
+    client, monkeypatch,
+):
+    requests: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(200, request=request, json={"instance": {"state": "connecting"}})
+        if request.url.path == "/instance/connect/suffa-ms":
+            return httpx.Response(200, request=request, json={"pairingCode": "STALE123"})
+        if request.url.path == "/webhook/find/suffa-ms":
+            return httpx.Response(200, request=request, json=None)
+        if request.method == "DELETE":
+            return httpx.Response(200, request=request, json={"status": "SUCCESS"})
+        assert request.method == "POST"
+        return httpx.Response(
+            201,
+            request=request,
+            json={
+                "instance": {"instanceName": "suffa-ms", "connectionStatus": "connecting"},
+                "qrcode": {"pairingCode": "ABCD5678"},
+            },
+        )
+
+    _use_evolution_transport(monkeypatch, handler)
+    response = await client.post(
+        "/api/v1/messaging/whatsapp/connection/pairing-code",
+        json={"phone_number": "923001234567", "replace_existing": True},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["pairing_code"] == "ABCD-5678"
+    assert requests == [
+        ("GET", "/instance/connectionState/suffa-ms"),
+        ("GET", "/instance/connect/suffa-ms"),
+        ("GET", "/webhook/find/suffa-ms"),
+        ("DELETE", "/instance/delete/suffa-ms"),
+        ("POST", "/instance/create"),
     ]
 
 
