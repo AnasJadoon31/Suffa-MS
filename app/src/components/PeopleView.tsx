@@ -1179,9 +1179,9 @@ function StudentDetail({
           <label>{t("bFormNumberCol")}<Input value={editForm.b_form_number} onChange={(e) => setEditForm({ ...editForm, b_form_number: e.target.value })} placeholder="12345-1234567-1" /></label>
           <label>{t("addressCol")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
           <PhoneInput id="student-phone-edit" label={t("studentPhoneLabel")} required={editForm.is_independent && editForm.portal_enabled} value={editForm.phone} onChange={(value) => setEditForm({ ...editForm, phone: value })} />
-          <label className="checkboxLabel"><Input type="checkbox" checked={editForm.is_independent} onChange={(e) => setEditForm({ ...editForm, is_independent: e.target.checked })} />{t("independentStudentLabel")}</label>
+          <label className="checkboxLabel"><Checkbox checked={editForm.is_independent} onChange={(e) => setEditForm({ ...editForm, is_independent: e.target.checked })} />{t("independentStudentLabel")}</label>
           <label>{t("notesLabel")}<Input value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>
-          <label className="checkboxLabel"><Input type="checkbox" checked={editForm.portal_enabled} onChange={(e) => setEditForm({ ...editForm, portal_enabled: e.target.checked })} />{t("portalEnabledLabel")}</label>
+          <label className="checkboxLabel"><Checkbox checked={editForm.portal_enabled} onChange={(e) => setEditForm({ ...editForm, portal_enabled: e.target.checked })} />{t("portalEnabledLabel")}</label>
           {student.admission_record && (
             <fieldset className="choiceField">
               <legend>{t("admissionInformationHeading", "Admission information")}</legend>

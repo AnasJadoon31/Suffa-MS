@@ -555,7 +555,7 @@ function SummaryTab() {
 
   return (
     <>
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         { key: "summary-from", type: "input", inputType: "date", label: t("fromLabel"), value: range.date_from, onChange: (value) => setRange({ ...range, date_from: value }) },
         { key: "summary-to", type: "input", inputType: "date", label: t("toLabel"), value: range.date_to, onChange: (value) => setRange({ ...range, date_to: value }) },
       ]}>

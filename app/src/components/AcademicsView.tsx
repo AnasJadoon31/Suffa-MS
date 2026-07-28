@@ -281,13 +281,13 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                                             <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder={t("classExample")} />
                                           </label>
 
-                          <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }} title={t("classPortalEnabledHint") ?? ""}>
-                                            <Input type="checkbox" checked={classPortalEnabled} onChange={(e) => setClassPortalEnabled(e.target.checked)} />
+                          <label className="checkboxLabel" title={t("classPortalEnabledHint") ?? ""}>
+                                            <Checkbox checked={classPortalEnabled} onChange={(e) => setClassPortalEnabled(e.target.checked)} />
                                             {t("classPortalEnabledLabel")}
                                           </label>
 
                           </FormModal>}
-              <InlineFilter filters={[
+              <InlineFilter className="pwaFilterStack" filters={[
                 { key: "class-search", type: "input", inputType: "search", ariaLabel: t("searchLabel"), placeholder: t("searchClassesPlaceholder"), value: classSearch, onChange: setClassSearch },
                 { key: "program", type: "select", ariaLabel: t("programLabel"), placeholder: t("allPrograms"), value: classFilterProgram, options: programs.map((p) => ({ value: p.id, label: p.name })), onChange: setClassFilterProgram },
                 { key: "sort", type: "select", ariaLabel: t("sortByNameLabel"), value: classSortBy, options: [
@@ -328,9 +328,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                             {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                           </Select>
                         </label>
-                        <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }} title={t("classPortalEnabledHint") ?? ""}>
-                          <Input
-                            type="checkbox"
+                        <label className="checkboxLabel" title={t("classPortalEnabledHint") ?? ""}>
+                          <Checkbox
                             checked={editingClass.default_portal_enabled}
                             onChange={(e) => setEditingClass({ ...editingClass, default_portal_enabled: e.target.checked })}
                           />
@@ -442,7 +441,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                                             <Input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder={t("sectionExample")} />
                                           </label>
                           </FormModal>}
-              <InlineFilter filters={[
+              <InlineFilter className="pwaFilterStack" filters={[
                 { key: "mapping-search", type: "input", inputType: "search", ariaLabel: t("searchLabel"), placeholder: t("searchClassesPlaceholder"), value: courseMapSearch, onChange: setCourseMapSearch },
                 { key: "mapping-class", type: "select", ariaLabel: t("classLabel"), placeholder: t("filterByClassLabel"), value: courseMapFilterClass, options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: setCourseMapFilterClass },
               ]} />

@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Optional
 from uuid import UUID
 
@@ -1664,8 +1664,8 @@ async def list_announcements(
     audience: str | None = None,  # teachers | students | all — the admin tabs
     category: str | None = None,
     q: str | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[AnnouncementRead]:
@@ -1677,9 +1677,9 @@ async def list_announcements(
         pattern = f"%{q}%"
         stmt = stmt.where(Announcement.title.ilike(pattern) | Announcement.body.ilike(pattern))
     if date_from:
-        stmt = stmt.where(Announcement.created_at >= date_from)
+        stmt = stmt.where(Announcement.created_at >= datetime.combine(date_from, time.min, tzinfo=UTC))
     if date_to:
-        stmt = stmt.where(Announcement.created_at <= date_to)
+        stmt = stmt.where(Announcement.created_at < datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=UTC))
     rows = (await session.execute(stmt.order_by(Announcement.created_at.desc()))).scalars().all()
     ctx = await get_viewer_context(session, current_user, madrasa.id)
 

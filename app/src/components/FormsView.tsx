@@ -177,7 +177,7 @@ export function FormsView() {
   const canEditForm = (form: FormDef) => !readOnly && (canManageAll || form.created_by_id === user?.id);
 
   return (
-    <PageSection>
+    <PageSection className="formsPanel">
       <PageHeader
         title={t("forms")}
         icon={<FileText size={18} />}
@@ -190,7 +190,7 @@ export function FormsView() {
       </div>
 
       {activeTab === "forms" && (<>
-      {canCreate && <div className="formActions" style={{ marginBottom: 12 }}>
+      {canCreate && <div className="formActions formsCreateActions">
         <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createFormBtn")}</Button>
       </div>}
 
@@ -229,8 +229,8 @@ export function FormsView() {
                       <label>{t("titleLabel")}<Input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></label>
                       <label>{t("descriptionLabel")}<Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} /></label>
                       <label>{t("formCategoryLabel")}<Input value={formCategory} onChange={(e) => setFormCategory(e.target.value)} placeholder={t("formCategoryPlaceholder") ?? ""} list="form-categories" /></label>
-                      <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        <Input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} /> {t("allowMultipleLabel")}
+                      <label className="checkboxLabel">
+                        <Checkbox checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} /> {t("allowMultipleLabel")}
                       </label>
                     </div>
 
@@ -243,7 +243,7 @@ export function FormsView() {
         {knownCategories.map((c) => <option key={c} value={c} />)}
       </datalist>
 
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         {
           key: "category", type: "select", value: categoryFilter,
           ariaLabel: t("categoryFilterLabel"), placeholder: t("allCategories"),
@@ -412,7 +412,7 @@ export function FormsView() {
 
       {activeTab === "responses" && canViewResponses && (
         <>
-          <InlineFilter filters={[
+          <InlineFilter className="pwaFilterStack" filters={[
             { key: "response-form", type: "select", value: responseFilters.form_id, placeholder: t("allFormsLabel"), options: forms.map((form) => ({ value: form.id, label: form.title })), onChange: (value) => setResponseFilters({ ...responseFilters, form_id: value }) },
             { key: "response-role", type: "select", value: responseFilters.respondent_role, placeholder: t("allRolesLabel"), options: [{ value: "student", label: t("students") }, { value: "teacher", label: t("teachers") }, { value: "parent", label: t("guardians") }], onChange: (value) => setResponseFilters({ ...responseFilters, respondent_role: value }) },
             { key: "response-class", type: "select", value: responseFilters.class_id, placeholder: t("allClasses"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: (value) => setResponseFilters({ ...responseFilters, class_id: value, section_id: "" }) },

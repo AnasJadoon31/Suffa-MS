@@ -173,7 +173,7 @@ function GridView({
 
   return (
     <section className="timetableGridSection">
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         { key: "class", type: "select", value: classId, placeholder: t("chooseClassEllipsis"), options: pickableClasses.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => { setClassId(value); setSectionId(""); } },
         { key: "section", type: "select", value: sectionId, placeholder: t("allSections"), disabled: !classId, options: pickableSections.map((s) => ({ value: s.id, label: s.name })), onChange: setSectionId },
       ]} />
@@ -341,7 +341,7 @@ function ListView({
               </FormModal>
       )}
 
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value, section_id: "" }) },
         { key: "section", type: "select", value: filters.section_id, placeholder: t("allSections"), disabled: !filters.class_id, options: (sections[filters.class_id] ?? []).map((s) => ({ value: s.id, label: s.name })), onChange: (value) => setFilters({ ...filters, section_id: value }) },
         { key: "course", type: "select", value: filters.course_id, placeholder: t("allCourses"), options: allCourses.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, course_id: value }) },

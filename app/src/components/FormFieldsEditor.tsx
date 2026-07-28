@@ -128,12 +128,12 @@ export function FormFieldsEditor({
               </fieldset>
             )}
             <label className="checkboxLabel formFieldRequired">
-              <Input type="checkbox" checked={field.required} onChange={(event) => updateField(index, { required: event.target.checked })} />
+              <Checkbox checked={field.required} onChange={(event) => updateField(index, { required: event.target.checked })} />
               {t("requiredLabel")}
             </label>
             {field.built_in && (
               <label className="checkboxLabel formFieldEnabled">
-                <Input type="checkbox" checked={field.enabled !== false} onChange={(event) => updateField(index, { enabled: event.target.checked })} />
+                <Checkbox checked={field.enabled !== false} onChange={(event) => updateField(index, { enabled: event.target.checked })} />
                 {t("enabledLabel")}
               </label>
             )}

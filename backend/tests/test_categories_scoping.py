@@ -479,3 +479,17 @@ async def test_announcement_category_filter(client):
     resp = await client.get("/api/v1/operations/announcements", params={"category": "exam"})
     assert resp.status_code == 200
     assert {a["title"] for a in resp.json()} == {"Exam week"}
+
+
+async def test_announcement_date_filters_accept_mobile_date_inputs(client):
+    await client.post(
+        "/api/v1/operations/announcements",
+        json={"title": "Mobile date notice", "body": "...", "category": "general", "audience_scope": {"all": True}},
+    )
+
+    resp = await client.get(
+        "/api/v1/operations/announcements",
+        params={"date_from": "2026-01-01", "date_to": "2099-12-31"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert "Mobile date notice" in {a["title"] for a in resp.json()}

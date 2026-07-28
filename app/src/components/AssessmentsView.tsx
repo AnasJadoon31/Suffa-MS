@@ -232,7 +232,7 @@ function AssignmentsTab({
 
   return (
     <>
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => updateFilters({ ...filters, class_id: value, section_id: "" }) },
         { key: "section", type: "select", value: filters.section_id, placeholder: t("allSections"), disabled: !filters.class_id, options: filterSections.map((s) => ({ value: s.id, label: s.name })), onChange: (value) => updateFilters({ ...filters, section_id: value }) },
         { key: "course", type: "select", value: filters.course_id, placeholder: t("allCourses"), options: courses.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => updateFilters({ ...filters, course_id: value }) },
@@ -652,7 +652,7 @@ function GradingTab({
 
   return (
     <>
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         { key: "class", type: "select", value: classId, placeholder: t("chooseClassEllipsis"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: setClassId },
         ...(matrix && section ? [{ key: "course", type: "select" as const, value: courseId, options: section.courses.map((c) => ({ value: c.course_id, label: c.course_name })), onChange: setCourseId }] : []),
       ]} />
@@ -830,7 +830,7 @@ function GradingPlanSetup({
   return <div className="gradingSetupLayout">
     <PageSection className="gradingPlanCard">
       <div className="gradingPlanHeader"><div><h3>{t("gradingPlanHeading")}</h3><p className="notice">{t("gradingPlanHint")}</p></div><div className={`weightTotal ${Math.abs(totalWeight - 100) < 0.01 ? "valid" : "invalid"}`}>{t("totalWeightLabel")}: {totalWeight}%</div></div>
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         { key: "course", type: "select", label: t("courseLabel"), value: courseId, placeholder: t("selectEllipsis"), options: courses.map((item) => ({ value: item.id, label: item.name })), onChange: setCourseId },
         { key: "class", type: "select", label: t("classOverrideLabel"), value: classId, placeholder: t("courseDefaultOption"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: setClassId, disabled: !courseId },
       ]} />
@@ -1176,7 +1176,7 @@ function ResultsTab({
 
   return (
     <>
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         { key: "class", type: "select", value: classId, placeholder: t("chooseClassEllipsis"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: setClassId },
       ]}>
         {matrix && (

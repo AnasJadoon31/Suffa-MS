@@ -118,9 +118,9 @@ export const navGroups: readonly NavGroup[] = [
   {
     labelKey: "groupAccount",
     items: [
-      // Personal settings (§C/§D) — every teacher/student gets their own
-      // profile + change-password page; principals already have the full
-      // madrasa Settings screen above.
+      // Personal settings (§C/§D) — every signed-in madrasa user gets their
+      // own profile + change-password page. Madrasa Settings is separate and
+      // does not replace account password management for principals.
       { id: "profile", labelKey: "myProfile", descKey: "descProfile", icon: User }
     ]
   }
@@ -178,7 +178,7 @@ export const portalRoutes: readonly PortalRoute[] = [
   { key: "reports", path: "/reports", view: "reports", permissionsAny: ["attendance.take", "assessments.marks.enter", "finance.reports.view", "teachers.salary.manage"], feature: "reports", roles: ["principal", "teacher"], implicitTeacher: true },
   { key: "blog", path: "/blog", view: "blog", feature: "blog", roles: ["principal", "teacher"] },
   { key: "settings", path: "/settings", view: "settings", permission: "settings.manage" },
-  { key: "profile", path: "/my-profile", view: "profile", roles: ["teacher", "student"] },
+  { key: "profile", path: "/my-profile", view: "profile", roles: ["principal", "teacher", "student", "parent"] },
 ];
 
 export function isPortalRouteAccessible(

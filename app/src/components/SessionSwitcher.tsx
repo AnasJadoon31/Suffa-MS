@@ -45,11 +45,11 @@ export function SessionSwitcher() {
 
   return (
     <Select
-      className="inputField"
+      className="inputField sessionSwitcherSelect"
       value={selectedId}
       onChange={handleChange}
       disabled={saving}
-      style={{ padding: "4px 8px", fontSize: "0.85rem", minHeight: "32px", height: "auto", width: "auto", marginRight: "8px" }}
+      style={{ fontSize: "0.85rem", minHeight: "34px", width: "auto" }}
     >
       {sessions.map((s) => (
         <option key={s.id} value={s.id}>

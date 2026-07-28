@@ -484,6 +484,10 @@ h3 { font-size: 1rem; }
   flex-wrap: wrap;
 }
 
+.topbar .MuiButton-root {
+  min-width: 0;
+}
+
 .dateChip,
 .profileChip {
   display: flex;
@@ -494,6 +498,11 @@ h3 { font-size: 1rem; }
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--shadow-1);
+}
+
+.profileChipButton {
+  justify-content: flex-start;
+  text-transform: none;
 }
 
 .dateChip svg {
@@ -550,6 +559,10 @@ h3 { font-size: 1rem; }
   border: 1px solid var(--brand-deep);
   background: var(--brand-deep);
   color: #fff;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .primaryAction:hover {
@@ -568,6 +581,10 @@ h3 { font-size: 1rem; }
   border: 1px solid var(--line-strong);
   background: var(--surface);
   color: var(--ink);
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .iconTextButton:hover,
@@ -782,6 +799,8 @@ button:disabled {
 }
 
 .attendanceCalendarDay {
+  width: 100%;
+  min-width: 0;
   min-height: 56px;
   display: grid;
   align-content: center;
@@ -793,6 +812,13 @@ button:disabled {
   color: var(--ink);
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.attendanceCalendarDay.MuiButton-root {
+  min-width: 0;
+  padding: 4px;
+  line-height: 1.1;
+  text-transform: none;
 }
 
 .attendanceCalendarDay.blank {
@@ -1829,6 +1855,7 @@ button:disabled {
 }
 
 .tabButton {
+  min-width: max-content;
   padding: 8px 16px;
   background: transparent;
   border: none;
@@ -1838,7 +1865,13 @@ button:disabled {
   font-size: 0.95rem;
   cursor: pointer;
   white-space: nowrap;
+  line-height: 1.35;
   transition: all 0.2s ease;
+}
+
+.tabButton.MuiButton-root {
+  min-width: max-content;
+  text-transform: none;
 }
 
 .tabButton:hover {
@@ -1921,6 +1954,7 @@ button:disabled {
   padding: 16px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  user-select: none;
 }
 
 .stat-card h3 {
@@ -2125,6 +2159,10 @@ html[dir="rtl"] button {
   line-height: 2.2;
 }
 
+html[dir="rtl"] .MuiNativeSelect-select {
+  padding-inline: 34px 12px !important;
+}
+
 html[dir="rtl"] .navGroupLabel {
   letter-spacing: 0;
 }
@@ -2309,12 +2347,61 @@ html[dir="rtl"] .navGroupLabel {
   min-width: 0;
 }
 
+.pwaFilterStack {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-block: 0;
+}
+
+.pwaFilterStack .inlineFilterField {
+  min-width: min(100%, 170px);
+}
+
 .inlineFilterTabs,
 .inlineFilterActions {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tabs > button {
+  flex: 0 1 auto;
+}
+
+.formsCreateActions {
+  margin-bottom: 12px;
+}
+
+.resourceHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.resourceMineToggle {
+  min-height: 42px;
+  padding: 4px 2px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.resourceMineToggle .MuiCheckbox-root {
+  padding: 0;
+}
+
+.resourcesFilter .inlineFilterActions {
+  align-self: flex-end;
 }
 
 .financePrimaryToolbar,
@@ -2417,6 +2504,20 @@ html[dir="rtl"] .navGroupLabel {
   gap: 6px;
   font-size: 0.9rem;
   cursor: pointer;
+}
+
+.inlineForm .checkboxLabel,
+.formGridTwo .checkboxLabel,
+.formFieldsEditor .checkboxLabel,
+.sectionPicker .checkboxLabel {
+  display: inline-flex;
+  grid-template-columns: none;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 42px;
+  width: fit-content;
 }
 
 .checkboxLabel input[type="checkbox"] {
@@ -2979,6 +3080,48 @@ input[type="radio"] {
   .formStack, .inlineForm { gap: 16px; padding: 18px 16px 20px; }
   .inlineFilter { overflow-x: auto; }
   .inlineFilterField { flex-basis: 160px; min-width: 160px; }
+  .pwaFilterStack {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    overflow: visible;
+    width: 100%;
+  }
+  .pwaFilterStack .inlineFilterField,
+  .pwaFilterStack .inlineFilterTabs,
+  .pwaFilterStack .inlineFilterActions,
+  .pwaFilterStack .inlineFilterActions > *,
+  .pwaFilterStack .searchDropdown {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+  .pwaFilterStack .inlineFilterTabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .pwaFilterStack .inlineFilterTabs > button,
+  .pwaFilterStack .inlineFilterActions > button {
+    width: 100%;
+  }
+  .pwaFilterStack .inlineFilterActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .formsPanel .tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  .formsPanel .tabs > button,
+  .formsCreateActions,
+  .formsCreateActions > button,
+  .resourceHeaderActions,
+  .resourceHeaderActions > button,
+  .resourceMineToggle,
+  .announcementsPanel .moduleHeader .primaryAction {
+    width: 100%;
+  }
   .financePrimaryToolbar,
   .financeRecordToolbar {
     overflow: visible;
@@ -3248,13 +3391,23 @@ input[type="radio"] {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 10px 6px;
   border: 1px solid var(--border, #e2e8f0);
   border-radius: 10px;
   background: var(--surface, #fff);
   font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
   cursor: pointer;
+}
+
+.quickLink > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .notFoundView {
@@ -3421,7 +3574,17 @@ input[type="radio"] {
   }
 
   .quickLink {
-    min-height: 72px;
+    min-height: 88px;
+    line-height: 1.35;
+    overflow: visible;
+  }
+
+  .quickLink.MuiButton-root {
+    min-height: 88px;
+    padding-block: 12px;
+    line-height: 1.35;
+    overflow: visible;
+    text-transform: none;
   }
 }
 
@@ -3467,7 +3630,8 @@ input[type="radio"] {
 
   .topbar-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
     width: 100%;
   }
 
@@ -3481,11 +3645,46 @@ input[type="radio"] {
     white-space: nowrap;
   }
 
+  .sessionSwitcherSelect {
+    width: 100% !important;
+    grid-column: 1 / -1;
+    order: 2;
+  }
+
   .dateChip {
+    min-width: 0;
+    order: 1;
+  }
+
+  .topbar-actions .iconTextButton {
+    order: 3;
+  }
+
+  .profileChipButton {
+    order: 4;
+  }
+
+  .dateChipText,
+  .profileChipText {
     min-width: 0;
   }
 
-  .profileChip {
+  .dateChipText strong,
+  .dateChipText small,
+  .profileChipText strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .profileChipButton {
+    width: 42px;
+    min-width: 42px;
+    padding-inline: 6px;
+    justify-content: center;
+  }
+
+  .profileChipButton .profileChipText {
     display: none;
   }
 
@@ -3497,6 +3696,24 @@ input[type="radio"] {
   .metricCard {
     min-height: 104px;
     padding: 16px;
+  }
+
+  .tabList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .tabButton,
+  .tabButton.MuiButton-root {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .quickLink,
+  .quickLink.MuiButton-root {
+    min-height: 92px;
   }
 
   .attendancePanel,
@@ -3527,10 +3744,13 @@ input[type="radio"] {
 
   .hero-stats {
     gap: 10px;
+    flex-wrap: wrap;
   }
 
   .stat-card {
+    min-width: min(142px, 100%);
     padding: 12px;
+    overflow-wrap: anywhere;
   }
 
   .login-form-container {
@@ -3731,6 +3951,33 @@ html[lang="ur"] .actionMenuItem span {
 
 .studentsToolbar .inlineFilterActions > .formActions {
   flex: 0 0 auto;
+}
+
+@media (max-width: 768px) {
+  .studentsToolbar.inlineFilter {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    overflow: visible;
+  }
+
+  .studentsToolbar .inlineFilterField,
+  .studentsToolbar > .searchDropdown,
+  .studentsToolbar .inlineFilterActions,
+  .studentsToolbar .inlineFilterActions > .searchDropdown,
+  .studentsToolbar .formActions,
+  .studentsToolbar .formActions > button {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    flex-basis: auto;
+  }
+
+  .studentsToolbar .inlineFilterActions {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
 }
 
 .muiDataTable .MuiTableCell-root {

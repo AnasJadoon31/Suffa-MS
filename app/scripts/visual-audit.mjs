@@ -133,6 +133,64 @@ async function capture(browser, viewport, name, preferredLanguage = "en") {
     if (overflow.content > overflow.viewport + 1) {
       errors.push(`${route}: horizontal overflow ${overflow.content - overflow.viewport}px`);
     }
+    const controlIssues = await page.evaluate(() => {
+      const isVisible = (element) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.visibility !== "hidden"
+          && style.display !== "none"
+          && rect.width > 1
+          && rect.height > 1;
+      };
+      const viewportWidth = document.documentElement.clientWidth;
+      const issues = [];
+      const controls = document.querySelectorAll([
+        "button",
+        "input:not([type='hidden'])",
+        "select",
+        "textarea",
+        ".MuiInputBase-root",
+        ".MuiNativeSelect-root",
+        ".MuiCheckbox-root",
+      ].join(","));
+      for (const control of controls) {
+        if (!isVisible(control)) continue;
+        const rect = control.getBoundingClientRect();
+        const tag = control.tagName.toLowerCase();
+        const label = control.getAttribute("aria-label")
+          || control.textContent?.trim()
+          || control.getAttribute("placeholder")
+          || control.getAttribute("type")
+          || tag;
+        if (rect.left < -1 || rect.right > viewportWidth + 1) {
+          issues.push(`${label}: leaves viewport (${Math.round(rect.left)}-${Math.round(rect.right)} of ${viewportWidth})`);
+        }
+        if (control.scrollWidth > control.clientWidth + 1) {
+          issues.push(`${label}: clipped horizontally (${control.scrollWidth}/${control.clientWidth})`);
+        }
+        if (control.scrollHeight > control.clientHeight + 1 && !["textarea"].includes(tag)) {
+          issues.push(`${label}: clipped vertically (${control.scrollHeight}/${control.clientHeight})`);
+        }
+      }
+      for (const label of document.querySelectorAll(".checkboxLabel")) {
+        if (!isVisible(label)) continue;
+        const control = label.querySelector(".MuiCheckbox-root, .MuiRadio-root, input[type='checkbox'], input[type='radio']");
+        if (!control || !isVisible(control)) {
+          issues.push(`${label.textContent?.trim() || "checkbox"}: missing visible checkbox control`);
+          continue;
+        }
+        const labelRect = label.getBoundingClientRect();
+        const controlRect = control.getBoundingClientRect();
+        const delta = Math.abs(((controlRect.top + controlRect.bottom) / 2) - ((labelRect.top + labelRect.bottom) / 2));
+        if (!["flex", "inline-flex"].includes(getComputedStyle(label).display) || delta > 8) {
+          issues.push(`${label.textContent?.trim() || "checkbox"}: checkbox not aligned with label`);
+        }
+      }
+      return issues;
+    });
+    for (const issue of controlIssues) {
+      errors.push(`${route}: ${issue}`);
+    }
   }
 
   await context.close();
@@ -142,10 +200,19 @@ async function capture(browser, viewport, name, preferredLanguage = "en") {
 await mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 try {
-  const desktopErrors = await capture(browser, { width: 1440, height: 1000 }, "desktop");
-  const mobileErrors = await capture(browser, { width: 390, height: 844 }, "mobile");
-  const mobileUrduErrors = await capture(browser, { width: 390, height: 844 }, "mobile-urdu", "ur");
-  const errors = [...desktopErrors, ...mobileErrors, ...mobileUrduErrors];
+  const auditMatrix = [
+    { viewport: { width: 320, height: 740 }, name: "phone-320", language: "en" },
+    { viewport: { width: 320, height: 740 }, name: "phone-320-urdu", language: "ur" },
+    { viewport: { width: 390, height: 844 }, name: "phone-390", language: "en" },
+    { viewport: { width: 390, height: 844 }, name: "phone-390-urdu", language: "ur" },
+    { viewport: { width: 768, height: 1024 }, name: "tablet-768", language: "en" },
+    { viewport: { width: 768, height: 1024 }, name: "tablet-768-urdu", language: "ur" },
+    { viewport: { width: 1440, height: 1000 }, name: "desktop-1440", language: "en" },
+  ];
+  const errors = [];
+  for (const entry of auditMatrix) {
+    errors.push(...await capture(browser, entry.viewport, entry.name, entry.language));
+  }
   if (errors.length) {
     console.log(JSON.stringify({ label, errors }, null, 2));
   } else {

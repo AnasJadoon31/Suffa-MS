@@ -27,6 +27,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className
           "aria-label": ariaLabel,
           "aria-describedby": ariaDescribedBy,
           "aria-invalid": ariaInvalid,
+          accept: textFieldProps.accept,
         },
       }}
       onClick={(e: React.MouseEvent<HTMLInputElement>) => {
@@ -67,9 +68,14 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({ classN
         }}
         {...selectProps}
         sx={{
+          minHeight: 48,
           "& .MuiNativeSelect-select": {
-            minHeight: 22,
-            padding: "8.5px 32px 8.5px 12px",
+            boxSizing: "border-box",
+            minHeight: 34,
+            height: "auto",
+            padding: "12px 36px 12px 12px",
+            lineHeight: 1.7,
+            overflow: "visible",
           },
         }}
       >

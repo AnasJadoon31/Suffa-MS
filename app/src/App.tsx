@@ -9,6 +9,7 @@ import { SessionReadOnlyBanner, SessionSwitcher } from "./components/SessionSwit
 import { initialsOf, RoleBadge, Sidebar } from "./components/Sidebar";
 import { NotFoundView } from "./components/NotFoundView";
 import { LoadingState } from "./components/ui/AsyncState";
+import { Button } from "./components/ui/Button";
 import { useAuth } from "./lib/AuthContext";
 import { academicsApi } from "./lib/endpoints";
 import { useNavigationGuard } from "./lib/NavigationGuardContext";
@@ -254,14 +255,14 @@ function Workspace() {
       {navOpen && <div className="navOverlay" onClick={() => setNavOpen(false)} />}
       <section className="workspace" id="main-content" tabIndex={-1}>
         <header className="topbar">
-          <button
+          <Button
             className="iconButton navToggle"
             type="button"
             aria-label={t("openMenu")}
             onClick={() => setNavOpen((v) => !v)}
           >
             <Menu size={20} />
-          </button>
+          </Button>
           <div className="topbarContext">
             <h1>{activeItem ? t(activeItem.labelKey) : t("appName")}</h1>
             <p className="viewDescription">{activeItem ? t(activeItem.descKey) : ""}</p>
@@ -278,18 +279,24 @@ function Workspace() {
               </span>
             )}
             <SessionSwitcher />
-            <button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>
+            <Button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>
               <Languages size={16} />
               {isUrdu ? "English" : "اردو"}
-            </button>
+            </Button>
             {user && (
-              <span className="profileChip" title={madrasa?.name ?? ""}>
+              <Button
+                className="profileChip profileChipButton"
+                type="button"
+                title={t("myProfile")}
+                aria-label={`${t("myProfile")}: ${user.username}`}
+                onClick={() => void guardedNavigate("/my-profile")}
+              >
                 <span className="avatar avatarSmall" aria-hidden="true">{initialsOf(user.username)}</span>
                 <span className="profileChipText">
                   <strong>{user.username}</strong>
                   <RoleBadge role={user.role} />
                 </span>
-              </span>
+              </Button>
             )}
           </div>
         </header>

@@ -88,6 +88,12 @@ const donation = {
   donation_date: "2026-07-22", note: "General fund", recorded_by_id: "principal-1",
   donor_name: donor.name, category_name: paymentCategory.name,
 };
+const resourceCategory = { id: "resource-category-1", name: "Handouts", description: "", is_global: true, owner_id: null, is_mine: false };
+const resource = {
+  id: "resource-1", category_id: resourceCategory.id, owner_id: "principal-1", owner_name: "admin",
+  title: "Week 1 packet", description: "Introductory lesson notes.", file_key: "resources/week-1.pdf",
+  video_url: null, visibility_scope: { all: true }, created_at: "2026-07-22T00:00:00Z",
+};
 const portalForm = {
   id: "portal-form-1", title: "Parent consent", description: "Annual trip permission", category: "Consent",
   fields_definition: [{ key: "consent", label: "I give consent", type: "radio", required: true, options: ["Yes", "No"] }],
@@ -174,6 +180,8 @@ function responseFor(pathname, request, persona = "principal") {
   if (pathname === "/api/v1/finance/donors") return [donor];
   if (pathname === "/api/v1/finance/donations") return [donation];
   if (pathname === "/api/v1/finance/categories" || pathname === "/api/v1/finance/payment-categories") return [paymentCategory];
+  if (pathname === "/api/v1/operations/resource-categories") return [resourceCategory];
+  if (pathname === "/api/v1/operations/resources") return [resource];
   if (pathname === "/api/v1/reporting/dashboard" && persona === "teacher") return {
     role: "teacher", my_classes: [{ class_id: "class-1", section_id: "section-1", course_id: "course-1", class_name: "Hifz Level 1", section_name: "A", course_name: "Quran Memorization" }],
     pending_submissions: 2, today_timetable: [{ course_id: "course-1", period: 1, start_time: "08:00", end_time: "09:00" }], today_attendance: null,
@@ -232,6 +240,67 @@ async function shot(page, name, locator = null) {
   const target = locator ?? page;
   await target.screenshot({ path: path.join(outputDir, name), animations: "disabled", ...(locator ? {} : { fullPage: false }) });
   console.log(`captured ${name}`);
+}
+
+async function assertMobileToolbarGeometry(page, selector, label, viewportWidth = 390) {
+  const geometry = await page.locator(selector).first().evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const clippedControls = [...element.querySelectorAll("button, input, select, .MuiInputBase-root, .MuiNativeSelect-root")]
+      .map((control) => {
+        const controlRect = control.getBoundingClientRect();
+        return {
+          tag: control.tagName,
+          text: control.textContent?.trim() ?? "",
+          left: controlRect.left,
+          right: controlRect.right,
+          scrollWidth: control.scrollWidth,
+          clientWidth: control.clientWidth,
+          scrollHeight: control.scrollHeight,
+          clientHeight: control.clientHeight,
+        };
+      })
+      .filter((control) => (
+        control.left < rect.left - 1
+        || control.right > rect.right + 1
+        || control.scrollWidth > control.clientWidth + 1
+        || control.scrollHeight > control.clientHeight + 1
+      ));
+    return {
+      left: rect.left,
+      right: rect.right,
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      clippedControls,
+    };
+  });
+  if (
+    geometry.left < 0
+    || geometry.right > viewportWidth
+    || geometry.scrollWidth > geometry.clientWidth + 1
+    || geometry.clippedControls.length
+  ) {
+    throw new Error(`${label} mobile toolbar geometry failed: ${JSON.stringify(geometry)}`);
+  }
+}
+
+async function assertCheckboxLabelCohesion(page, selector, label) {
+  const geometry = await page.locator(selector).evaluate((element) => {
+    const control = element.querySelector(".MuiCheckbox-root") ?? element.querySelector('input[type="checkbox"]');
+    const controlRect = control?.getBoundingClientRect();
+    const labelRect = element.getBoundingClientRect();
+    return {
+      display: getComputedStyle(element).display,
+      controlCenter: controlRect ? (controlRect.top + controlRect.bottom) / 2 : null,
+      labelCenter: (labelRect.top + labelRect.bottom) / 2,
+    };
+  });
+  if (
+    !["flex", "inline-flex"].includes(geometry.display)
+    || geometry.controlCenter === null
+    || Math.abs(geometry.controlCenter - geometry.labelCenter) > 8
+  ) {
+    throw new Error(`${label} checkbox label cohesion failed: ${JSON.stringify(geometry)}`);
+  }
 }
 
 async function desktopJourneys(browser) {
@@ -295,6 +364,20 @@ async function desktopJourneys(browser) {
   await editStudentDialog.getByLabel("Guardian name").waitFor();
   await editStudentDialog.getByLabel("Previous madrasa").fill("Updated Dar-ul-Ilm");
   await shot(page, "CURRENT-19_student-edit-admission-fields_desktop.png", editStudentDialog);
+  const invalidStudentEditFields = await editStudentDialog.locator("input:invalid, select:invalid, textarea:invalid").evaluateAll((elements) => (
+    elements.map((element) => ({
+      tag: element.tagName,
+      type: element.getAttribute("type"),
+      name: element.getAttribute("name"),
+      id: element.getAttribute("id"),
+      label: element.labels?.[0]?.textContent?.trim() || element.getAttribute("aria-label") || "",
+      value: element.value,
+      validationMessage: element.validationMessage,
+    }))
+  ));
+  if (invalidStudentEditFields.length) {
+    throw new Error(`Student edit has invalid fields before save: ${JSON.stringify(invalidStudentEditFields)}`);
+  }
   await Promise.all([
     page.waitForResponse((response) => response.url().endsWith("/api/v1/people/students/student-1") && response.request().method() === "PUT"),
     editStudentDialog.getByRole("button", { name: "Save" }).click(),
@@ -415,19 +498,42 @@ async function mobileUrduJourneys(browser) {
   const { context, page, errors } = await newPage(browser, { width: 390, height: 844 }, "ur");
   await open(page, "/announcements");
   await page.locator(".inlineFilter").waitFor();
+  await assertMobileToolbarGeometry(page, ".announcementsPanel .moduleHeader", "Announcements header");
+  await assertMobileToolbarGeometry(page, ".announcementsPanel .pwaFilterStack", "Announcements filters");
   await shot(page, "CURRENT-02_shared-inline-filter_mobile-urdu.png");
+  await open(page, "/forms");
+  await page.locator(".formsPanel .pwaFilterStack").waitFor();
+  await assertMobileToolbarGeometry(page, ".formsPanel .tabs", "Forms tabs");
+  await assertMobileToolbarGeometry(page, ".formsPanel .formsCreateActions", "Forms create actions");
+  await assertMobileToolbarGeometry(page, ".formsPanel .pwaFilterStack", "Forms filters");
+  await shot(page, "CURRENT-02_forms-filter_mobile-urdu.png");
+  await open(page, "/academics/classes");
+  await page.locator(".pwaFilterStack").first().waitFor();
+  await assertMobileToolbarGeometry(page, ".pwaFilterStack", "Academic classes filters");
+  await shot(page, "CURRENT-02_academic-classes-filter_mobile-urdu.png");
+  await open(page, "/resources");
+  await page.locator(".resourcesFilter").waitFor();
+  await assertMobileToolbarGeometry(page, ".resourcesPanel .moduleHeader", "Resources header");
+  await assertMobileToolbarGeometry(page, ".resourcesFilter", "Resources filters");
+  await assertCheckboxLabelCohesion(page, ".resourceMineToggle", "Resources mine-only filter");
+  await shot(page, "CURRENT-02_resources-filter_mobile-urdu.png");
+  await page.locator(".resourceHeaderActions .secondaryAction").click();
+  const categoryDialog = page.getByRole("dialog").last();
+  await categoryDialog.waitFor();
+  await assertCheckboxLabelCohesion(page, ".modalCard .checkboxLabel", "Resources category global option");
+  await shot(page, "CURRENT-02_resources-category-checkbox_mobile-urdu.png", categoryDialog);
   await open(page, "/admission-forms");
   await page.getByRole("button", { name: /فارم/ }).filter({ has: page.locator("svg") }).first().click();
   const chooser = page.getByRole("dialog");
   await chooser.waitFor();
-  const modalCard = chooser.locator(".modalCard");
+  const modalCard = page.locator(".modalCard").last();
   await shot(page, "CURRENT-08_rounded-modal_mobile-urdu.png", modalCard);
   const geometry = await modalCard.evaluate((element) => {
     const style = getComputedStyle(element);
     const rect = element.getBoundingClientRect();
     return { left: rect.left, right: rect.right, width: rect.width, radius: style.borderRadius, overflow: style.overflow };
   });
-  if (geometry.left < 0 || geometry.right > 390 || geometry.radius === "0px" || geometry.overflow !== "hidden") {
+  if (geometry.left < 0 || geometry.right > 390 || geometry.radius === "0px" || !geometry.overflow.startsWith("hidden")) {
     throw new Error(`Mobile modal geometry failed: ${JSON.stringify(geometry)}`);
   }
   await context.close();

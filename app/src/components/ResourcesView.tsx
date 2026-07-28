@@ -115,12 +115,12 @@ export function ResourcesView() {
   }, [classFilter]);
 
   return (
-    <PageSection>
+    <PageSection className="resourcesPanel">
       <PageHeader
         title={t("resources")}
         notice={t("descResources")}
         actions={canManage && (
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div className="resourceHeaderActions">
             <Button className="secondaryAction" type="button" onClick={() => setShowCategoryForm(true)}><FolderPlus size={16} /> {t("addCategoryBtn")}</Button>
             <Button className="primaryAction" type="button" onClick={() => setShowResourceForm(true)}><Plus size={16} /> {t("addResourceBtn")}</Button>
           </div>
@@ -144,14 +144,14 @@ export function ResourcesView() {
             <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("resourceCategoryExample")} /></label>
 
           {canManageAll && (
-                      <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        <Input type="checkbox" checked={categoryIsGlobal} onChange={(e) => setCategoryIsGlobal(e.target.checked)} />
+                      <label className="checkboxLabel">
+                        <Checkbox checked={categoryIsGlobal} onChange={(e) => setCategoryIsGlobal(e.target.checked)} />
                         {t("globalLabel")}
                       </label>
                     )}
           </FormModal>}
 
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack resourcesFilter" filters={[
         {
           key: "resource-category", type: "select", label: t("categoryCol"), value: categoryFilter,
           placeholder: t("allCategories"), onChange: setCategoryFilter,
@@ -170,8 +170,8 @@ export function ResourcesView() {
         }] : []),
       ]}>
         {canManage && (
-          <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
+          <label className="checkboxLabel resourceMineToggle">
+            <Checkbox checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
             {t("myUploadsOnlyLabel")}
           </label>
         )}

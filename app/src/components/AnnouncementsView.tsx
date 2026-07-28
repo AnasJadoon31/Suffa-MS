@@ -132,10 +132,13 @@ export function AnnouncementsView() {
   };
 
   return (
-    <PageSection>
-      <PageHeader title={t("announcementsHeading")} notice={t("announcementsSubtitle")} />
+    <PageSection className="announcementsPanel">
+      <PageHeader
+        title={t("announcementsHeading")}
+        notice={t("announcementsSubtitle")}
+        actions={canPost ? <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("postAnnouncementBtn")}</Button> : null}
+      />
 
-      {canPost && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("postAnnouncementBtn")}</Button>}
       {canPost && showCreate && (
         <FormModal
                 title={t("postAnnouncementBtn")} onClose={() => setShowCreate(false)}
@@ -177,7 +180,7 @@ export function AnnouncementsView() {
         {knownCategories.map((c) => <option key={c} value={c} />)}
       </datalist>
 
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         ...(canPost ? [{ key: "audience", type: "tab" as const, value: tab, options: [
           { value: "all", label: t("audienceEveryone") },
           { value: "teachers", label: t("teachers") },
@@ -185,8 +188,8 @@ export function AnnouncementsView() {
         ], onChange: (value: string) => setTab(value as typeof tab) }] : []),
         { key: "search", type: "input", inputType: "search", value: search, placeholder: t("searchAnnouncementsPlaceholder"), onChange: setSearch },
         { key: "category", type: "select", value: categoryFilter, placeholder: t("allCategories"), options: knownCategories.map((category) => ({ value: category, label: category })), onChange: setCategoryFilter },
-        { key: "date-from", type: "input", inputType: "date", value: dates.date_from, onChange: (value) => setDates({ ...dates, date_from: value }) },
-        { key: "date-to", type: "input", inputType: "date", value: dates.date_to, onChange: (value) => setDates({ ...dates, date_to: value }) },
+        { key: "date-from", type: "input", inputType: "date", label: t("fromLabel"), value: dates.date_from, onChange: (value) => setDates({ ...dates, date_from: value }) },
+        { key: "date-to", type: "input", inputType: "date", label: t("toLabel"), value: dates.date_to, onChange: (value) => setDates({ ...dates, date_to: value }) },
       ]} />
 
       <div className="roster">

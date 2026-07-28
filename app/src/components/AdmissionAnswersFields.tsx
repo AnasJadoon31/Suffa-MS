@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields } from "../lib/admissionBuiltIns";
 import type { FormFieldDefinition } from "../lib/endpoints";
 import { Button } from "./ui/Button";
-import { Checkbox, Input, Select, Textarea } from "./ui/Field";
+import { Checkbox, Input, Radio, Select, Textarea } from "./ui/Field";
 import { PhoneInput } from "./ui/PhoneInput";
 
 type AdmissionAnswers = Record<string, unknown>;
@@ -97,10 +97,10 @@ export function AdmissionAnswersFields({
               <legend>{field.label}</legend>
               {field.options.map((option) => (
                 <label className="checkboxLabel" key={option}>
-                  <Input
-                    type="radio"
+                  <Radio
                     name={`${idPrefix}-${keyPrefix}-${field.key}`}
                     required={field.required}
+                    value={option}
                     checked={value === option}
                     onChange={() => onValueChange(option)}
                   />

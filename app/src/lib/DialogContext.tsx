@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Field";
 import { useTranslation } from "react-i18next";
 
 type DialogType = "alert" | "confirm" | "warning" | "prompt";
@@ -132,13 +133,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               {dialogState.message}
             </p>
             {dialogState.type === "prompt" && (
-              <input
+              <Input
                 type={dialogState.options.inputType ?? "text"}
-                className="input"
                 placeholder={dialogState.options.placeholder}
                 value={promptValue}
                 onChange={(e) => setPromptValue(e.target.value)}
-                style={{ width: "100%", padding: "0.5rem", borderRadius: 6, border: "1px solid var(--border)" }}
               />
             )}
             {dialogState.options.blockedMessage && (
