@@ -173,7 +173,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
 
   return (
     <>
-      <InlineFilter className="financeRecordToolbar" filters={[
+      <InlineFilter className="pwaFilterStack financeRecordToolbar" filters={[
         { key: "search", type: "input", inputType: "search", value: recordSearch, ariaLabel: t("searchContributionsLabel"), placeholder: t("searchContributionsPlaceholder"), onChange: setRecordSearch },
         { key: "class", type: "select", value: filters.class_id, ariaLabel: t("classCol"), placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
         { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
@@ -376,7 +376,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
 
   return (
     <>
-      <InlineFilter className="financeRecordToolbar" filters={[
+      <InlineFilter className="pwaFilterStack financeRecordToolbar" filters={[
         { key: "search", type: "input", inputType: "search", value: recordSearch, ariaLabel: t("searchDonationsLabel"), placeholder: t("searchDonationsPlaceholder"), onChange: setRecordSearch },
         { key: "donor", type: "select", value: filters.donor_id, ariaLabel: t("donorCol"), placeholder: t("allDonors"), options: donors.map((donor) => ({ value: donor.id, label: donor.name })), onChange: (value) => setFilters({ ...filters, donor_id: value }) },
         { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((category) => ({ value: category.id, label: category.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
@@ -573,7 +573,7 @@ function SummaryTab() {
           <div className="dataTable">
             <div className="dataRow header"><span>{t("categoryCol")}</span><span>{t("amountCol")}</span></div>
             {Object.entries(summary.by_category).map(([name, amount]) => (
-              <div className="dataRow" key={name}><span>{name}</span><span>{amount}</span></div>
+              <div className="dataRow" key={name}><span data-label={t("categoryCol")}>{name}</span><span data-label={t("amountCol")}>{amount}</span></div>
             ))}
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { Button } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Paper from "@mui/material/Paper";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { BookOpen, ClipboardList, FileDown, Pencil, Plus, Send, Trash2, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -28,7 +29,7 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { consumePendingClassNav } from "../lib/pendingNav";
 import { DOCUMENT_UPLOAD_ACCEPT, getDocumentUploadContentType } from "../lib/filePolicy";
-import { Input, Select, Checkbox, Textarea } from "./ui/Field";
+import { Input, Select, CheckboxField, Textarea } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
@@ -431,20 +432,17 @@ function AssignmentCreateForm({
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       {canPublishAll && (
-        <label className="checkboxLabel">
-          <Checkbox
-            
-            checked={allClasses}
-            onChange={(e) => {
-              setAllClasses(e.target.checked);
-              if (e.target.checked) {
-                setForm({ ...form, class_id: "" });
-                setSectionIds([]);
-              }
-            }}
-          />
-          {t("publishAllClassesLabel")}
-        </label>
+        <CheckboxField
+          checked={allClasses}
+          onChange={(e) => {
+            setAllClasses(e.target.checked);
+            if (e.target.checked) {
+              setForm({ ...form, class_id: "" });
+              setSectionIds([]);
+            }
+          }}
+          label={t("publishAllClassesLabel")}
+        />
       )}
       {allClasses && <small className="notice">{t("publishAllClassesHint")}</small>}
       {!allClasses && (
@@ -468,10 +466,12 @@ function AssignmentCreateForm({
           <legend>{t("sectionsLegend")}</legend>
           <small className="notice">{t("sectionsHint")}</small>
           {sections.map((s) => (
-            <label key={s.id} className="checkboxLabel">
-              <Checkbox  checked={sectionIds.includes(s.id)} onChange={() => toggleSection(s.id)} />
-              {s.name}
-            </label>
+            <CheckboxField
+              key={s.id}
+              checked={sectionIds.includes(s.id)}
+              onChange={() => toggleSection(s.id)}
+              label={s.name}
+            />
           ))}
         </Paper>
       )}
@@ -558,10 +558,11 @@ function AssignmentEditForm({
       <label>Max Marks<Input type="number" step="any" min="0" value={form.max_marks} onChange={(e) => setForm({ ...form, max_marks: e.target.value })} placeholder="e.g. 100" /></label>
       <label>Weightage (%)<Input type="number" step="any" min="0" max="100" value={form.weightage} onChange={(e) => setForm({ ...form, weightage: e.target.value })} placeholder="e.g. 20" /></label>
       {assignment.batch_id && (
-        <label className="checkboxLabel">
-          <Checkbox  checked={form.apply_to_batch} onChange={(e) => setForm({ ...form, apply_to_batch: e.target.checked })} />
-          {t("applyToBatchLabel")}
-        </label>
+        <CheckboxField
+          checked={form.apply_to_batch}
+          onChange={(e) => setForm({ ...form, apply_to_batch: e.target.checked })}
+          label={t("applyToBatchLabel")}
+        />
       )}
       </div>
     </FormModal>
@@ -578,14 +579,14 @@ function SubmissionRow({
   const [feedback, setFeedback] = useState(submission.feedback ?? "");
   return (
     <div className="dataRow">
-      <span>{studentName}</span>
-      <span>{new Date(submission.submitted_at).toLocaleString()}</span>
-      <span>{submission.is_late ? t("lateLabel") : t("onTimeLabel")}</span>
-      <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <Input style={{ width: 80 }} placeholder="Mark" value={mark} onChange={(e) => setMark(e.target.value)} />
-        <Textarea className="input" placeholder="Feedback/Remarks" rows={2} style={{ width: 150 }} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+      <span data-label={t("studentCol")}>{studentName}</span>
+      <span data-label={t("submittedCol")}>{new Date(submission.submitted_at).toLocaleString()}</span>
+      <span data-label={t("lateCol")}>{submission.is_late ? t("lateLabel") : t("onTimeLabel")}</span>
+      <span className="submissionGradeField" data-label={t("markCol")}>
+        <Input placeholder={t("markCol")} value={mark} onChange={(e) => setMark(e.target.value)} />
+        <Textarea className="input" placeholder={t("feedbackLabel", "Feedback")} rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
       </span>
-      <span>
+      <span className="submissionActions" data-label={t("actionsCol")}>
         <Button
           className="tableAction"
           type="button"
@@ -622,6 +623,7 @@ function GradingTab({
   const [courseId, setCourseId] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [error, setError] = useState("");
+  const renderCards = useMediaQuery("(max-width: 768px)");
 
   const load = async (targetClassId: string) => {
     setError("");
@@ -684,8 +686,43 @@ function GradingTab({
           </p>
           {course.exam_types.length === 0 ? (
             <p className="emptyState">{t("noExamTypesForCourse")}</p>
+          ) : renderCards ? (
+            <div className="assessmentMobileList" role="list" aria-label={t("gradingTab")}>
+              {section.students.map((student) => {
+                const cell = student.courses.find((c) => c.course_id === course.course_id);
+                return (
+                  <article className="assessmentMobileCard" role="listitem" key={student.student_id}>
+                    <header>
+                      <strong>{student.name}</strong>
+                      <span>{student.admission_number}</span>
+                    </header>
+                    <div className="assessmentMobileFields">
+                      {course.exam_types.map((et) => (
+                        <label key={et.id} className="assessmentMarkField">
+                          <span>{et.name} <small>({et.weightage})</small></span>
+                          <MarkCell
+                            examTypeId={et.id}
+                            studentId={student.student_id}
+                            initial={cell?.marks.find((m) => m.exam_type_id === et.id)?.score ?? null}
+                            onSaved={() => void load(classId)}
+                          />
+                        </label>
+                      ))}
+                      <div className="assessmentMobileMetric">
+                        <span>{t("scoreCol")}</span>
+                        <strong>{cell?.raw_score ?? "—"}</strong>
+                      </div>
+                      <div className="assessmentMobileMetric">
+                        <span>{t("bandCol")}</span>
+                        <strong>{cell?.band ?? "—"}</strong>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           ) : (
-            <div className="sheetWrap">
+            <div className="sheetWrap desktopOnlySheet">
               <table className="sheet">
                 <thead>
                   <tr>
@@ -703,10 +740,10 @@ function GradingTab({
                     const cell = student.courses.find((c) => c.course_id === course.course_id);
                     return (
                       <tr key={student.student_id}>
-                        <td>{student.name}</td>
-                        <td>{student.admission_number}</td>
+                        <td data-label={t("studentCol")}>{student.name}</td>
+                        <td data-label={t("admissionNoCol")}>{student.admission_number}</td>
                         {course.exam_types.map((et) => (
-                          <td key={et.id}>
+                          <td key={et.id} data-label={`${et.name} (${et.weightage})`}>
                             <MarkCell
                               examTypeId={et.id}
                               studentId={student.student_id}
@@ -715,8 +752,8 @@ function GradingTab({
                             />
                           </td>
                         ))}
-                        <td>{cell?.raw_score ?? "—"}</td>
-                        <td>{cell?.band ?? "—"}</td>
+                        <td data-label={t("scoreCol")}>{cell?.raw_score ?? "—"}</td>
+                        <td data-label={t("bandCol")}>{cell?.band ?? "—"}</td>
                       </tr>
                     );
                   })}
@@ -769,7 +806,7 @@ function MarkCell({
         }}
       />
       {value !== (initial?.toString() ?? "") && (
-        <Button className="iconBtn" onClick={() => save()} disabled={saving} type="button" title={t("saveBtn")}>
+        <Button className="iconBtn" onClick={() => save()} disabled={saving} type="button" aria-label={t("saveBtn")} title={t("saveBtn")}>
           <Save size={14} />
         </Button>
       )}
@@ -972,10 +1009,11 @@ function GradingSetup({
             submitDisabled={schemeForm.bands.length === 0}
           >
             <label>{t("schemeNameLabel")}<Input required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} /></label>
-            <label className="checkboxLabel">
-              <Checkbox checked={schemeForm.include_assignments} onChange={(e) => setSchemeForm({ ...schemeForm, include_assignments: e.target.checked })} />
-              {t("includeAssignmentsInResultsLabel")}
-            </label>
+            <CheckboxField
+              checked={schemeForm.include_assignments}
+              onChange={(e) => setSchemeForm({ ...schemeForm, include_assignments: e.target.checked })}
+              label={t("includeAssignmentsInResultsLabel")}
+            />
 
           <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
                     <strong>{t("bandsLabel")}</strong>
@@ -983,7 +1021,7 @@ function GradingSetup({
                       <label>{t("nameLabel")}<Input required value={band.label} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /></label>
                       <label>{t("minimumLabel")}<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: event.target.value } : item) })} /></label>
                       <label>{t("maximumLabel")}<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: event.target.value } : item) })} /></label>
-                      <Button className="tableAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={14} /></Button>
+                      <Button className="tableAction" type="button" aria-label={t("removeBandBtn")} title={t("removeBandBtn")} onClick={() => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={14} /></Button>
                     </div>)}
                     <Button className="secondaryAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: [...schemeForm.bands, { label: "", min_score: "", max_score: "" }] })}><Plus size={14} /> {t("addFieldBtn")}</Button>
                   </div>
@@ -1120,6 +1158,7 @@ function ResultsTab({
   const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const renderCards = useMediaQuery("(max-width: 768px)");
 
   const load = async (targetClassId: string) => {
     setError("");
@@ -1195,10 +1234,12 @@ function ResultsTab({
         <div className="formActions" style={{ marginBottom: 8, flexWrap: "wrap" }}>
           <small className="notice">{t("toggleColumnsHint")}</small>
           {uniqueCourses.map((c) => (
-            <label key={c.course_id} className="checkboxLabel">
-              <Checkbox  checked={!hiddenCourses.has(c.course_id)} onChange={() => toggleCourse(c.course_id)} />
-              {c.course_name}
-            </label>
+            <CheckboxField
+              key={c.course_id}
+              checked={!hiddenCourses.has(c.course_id)}
+              onChange={() => toggleCourse(c.course_id)}
+              label={c.course_name}
+            />
           ))}
         </div>
       )}
@@ -1217,56 +1258,106 @@ function ResultsTab({
                 </Button>
               )}
             </PageHeader>
-            <div className="sheetWrap">
-              <table className="sheet">
-                <thead>
-                  <tr>
-                    <th>{t("studentCol")}</th>
-                    <th>{t("admissionNoCol")}</th>
-                    {visibleCourses.map((c) => <th key={c.course_id}>{c.course_name}</th>)}
-                    <th>{t("overallLabel")}</th>
-                    <th>{t("actionsCol")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {section.students.length === 0 && (
-                    <tr><td colSpan={visibleCourses.length + 4}>{t("noStudentsInSection")}</td></tr>
-                  )}
-                  {section.students.map((student) => (
-                    <tr key={student.student_id}>
-                      <td>{student.name}</td>
-                      <td>{student.admission_number}</td>
+            {renderCards ? (
+              <div className="assessmentMobileList" role="list" aria-label={`${section.class_name} / ${section.section_name}`}>
+                {section.students.length === 0 && <p className="emptyState">{t("noStudentsInSection")}</p>}
+                {section.students.map((student) => (
+                  <article className="assessmentMobileCard" role="listitem" key={student.student_id}>
+                    <header>
+                      <strong>{student.name}</strong>
+                      <span>{student.admission_number}</span>
+                    </header>
+                    <div className="assessmentMobileFields">
                       {visibleCourses.map((c) => {
                         const cell = student.courses.find((x) => x.course_id === c.course_id);
                         return (
-                          <td key={c.course_id}>
-                            {cell?.raw_score !== null && cell?.raw_score !== undefined
-                              ? `${cell.raw_score}${cell.band ? ` (${cell.band})` : ""}`
-                              : "—"}
-                          </td>
+                          <div className="assessmentMobileMetric" key={c.course_id}>
+                            <span>{c.course_name}</span>
+                            <strong>
+                              {cell?.raw_score !== null && cell?.raw_score !== undefined
+                                ? `${cell.raw_score}${cell.band ? ` (${cell.band})` : ""}`
+                                : "—"}
+                            </strong>
+                          </div>
                         );
                       })}
-                      <td><strong>{student.overall_score ?? "—"}</strong></td>
-                      <td>
-                        <Button
-                          className="tableAction"
-                          type="button"
-                          title={t("downloadResultCardBtn")}
-                          onClick={() => assessmentsApi.downloadResultCard(student.student_id, matrix.session_id)}
-                        >
-                          <FileDown size={14} />
+                      <div className="assessmentMobileMetric assessmentMobileTotal">
+                        <span>{t("overallLabel")}</span>
+                        <strong>{student.overall_score ?? "—"}</strong>
+                      </div>
+                    </div>
+                    <div className="assessmentMobileActions" aria-label={t("actionsCol")}>
+                      <Button
+                        className="tableAction"
+                        type="button"
+                        aria-label={t("downloadResultCardBtn")}
+                        title={t("downloadResultCardBtn")}
+                        onClick={() => assessmentsApi.downloadResultCard(student.student_id, matrix.session_id)}
+                      >
+                        <FileDown size={14} />
+                      </Button>
+                      {canMessage && (
+                        <Button className="tableAction" type="button" aria-label={t("sendToParentsBtn")} title={t("sendToParentsBtn")} onClick={() => sendReport(student.student_id)}>
+                          <Send size={14} />
                         </Button>
-                        {canMessage && (
-                          <Button className="tableAction" type="button" title={t("sendToParentsBtn")} onClick={() => sendReport(student.student_id)}>
-                            <Send size={14} />
-                          </Button>
-                        )}
-                      </td>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="sheetWrap desktopOnlySheet">
+                <table className="sheet">
+                  <thead>
+                    <tr>
+                      <th>{t("studentCol")}</th>
+                      <th>{t("admissionNoCol")}</th>
+                      {visibleCourses.map((c) => <th key={c.course_id}>{c.course_name}</th>)}
+                      <th>{t("overallLabel")}</th>
+                      <th>{t("actionsCol")}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {section.students.length === 0 && (
+                      <tr><td className="sheetEmpty" colSpan={visibleCourses.length + 4}>{t("noStudentsInSection")}</td></tr>
+                    )}
+                    {section.students.map((student) => (
+                      <tr key={student.student_id}>
+                        <td data-label={t("studentCol")}>{student.name}</td>
+                        <td data-label={t("admissionNoCol")}>{student.admission_number}</td>
+                        {visibleCourses.map((c) => {
+                          const cell = student.courses.find((x) => x.course_id === c.course_id);
+                          return (
+                            <td key={c.course_id} data-label={c.course_name}>
+                              {cell?.raw_score !== null && cell?.raw_score !== undefined
+                                ? `${cell.raw_score}${cell.band ? ` (${cell.band})` : ""}`
+                                : "—"}
+                            </td>
+                          );
+                        })}
+                        <td data-label={t("overallLabel")}><strong>{student.overall_score ?? "—"}</strong></td>
+                        <td data-label={t("actionsCol")}>
+                          <Button
+                            className="tableAction"
+                            type="button"
+                            aria-label={t("downloadResultCardBtn")}
+                            title={t("downloadResultCardBtn")}
+                            onClick={() => assessmentsApi.downloadResultCard(student.student_id, matrix.session_id)}
+                          >
+                            <FileDown size={14} />
+                          </Button>
+                          {canMessage && (
+                            <Button className="tableAction" type="button" aria-label={t("sendToParentsBtn")} title={t("sendToParentsBtn")} onClick={() => sendReport(student.student_id)}>
+                              <Send size={14} />
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <div className="teacherSummary">
               <strong>{t("courseTeachersHeading")}</strong>
               <ul>

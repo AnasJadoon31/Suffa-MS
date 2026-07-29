@@ -158,11 +158,11 @@ async function verifyActionMenuAtViewport(browser, viewport, label) {
   try {
     await page.goto(`${baseUrl}/people/students`, { waitUntil: "domcontentloaded" });
     await page.locator(".workspace").waitFor();
-    await page.getByText("ADM-0008").waitFor();
+    await page.getByText("ADM-0008").first().waitFor();
 
-    const row = page.locator(".dataRow", { hasText: "Ali Noor" }).last();
+    const row = page.locator(".dataRow, .mobileDataCard", { hasText: "Ali Noor" }).last();
     const beforeHeight = (await row.boundingBox())?.height ?? 0;
-    await page.getByRole("button", { name: "Actions: Ali Noor" }).click();
+    await row.getByRole("button", { name: "Actions: Ali Noor" }).click();
 
     const menu = page.getByRole("menu");
     await menu.waitFor();

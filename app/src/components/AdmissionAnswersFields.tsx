@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields } from "../lib/admissionBuiltIns";
 import type { FormFieldDefinition } from "../lib/endpoints";
 import { Button } from "./ui/Button";
-import { Checkbox, Input, Radio, Select, Textarea } from "./ui/Field";
+import { CheckboxField, Input, RadioField, Select, Textarea } from "./ui/Field";
 import { PhoneInput } from "./ui/PhoneInput";
 
 type AdmissionAnswers = Record<string, unknown>;
@@ -96,16 +96,15 @@ export function AdmissionAnswersFields({
             <fieldset className="choiceField" key={`${keyPrefix}-${field.key}`}>
               <legend>{field.label}</legend>
               {field.options.map((option) => (
-                <label className="checkboxLabel" key={option}>
-                  <Radio
-                    name={`${idPrefix}-${keyPrefix}-${field.key}`}
-                    required={field.required}
-                    value={option}
-                    checked={value === option}
-                    onChange={() => onValueChange(option)}
-                  />
-                  {option}
-                </label>
+                <RadioField
+                  key={option}
+                  name={`${idPrefix}-${keyPrefix}-${field.key}`}
+                  required={field.required}
+                  value={option}
+                  checked={value === option}
+                  onChange={() => onValueChange(option)}
+                  label={option}
+                />
               ))}
             </fieldset>
           );
@@ -116,13 +115,12 @@ export function AdmissionAnswersFields({
             <fieldset className="choiceField" key={`${keyPrefix}-${field.key}`}>
               <legend>{field.label}</legend>
               {field.options.map((option) => (
-                <label className="checkboxLabel" key={option}>
-                  <Checkbox
-                    checked={chosen.includes(option)}
-                    onChange={(event) => onValueChange(event.target.checked ? [...chosen, option] : chosen.filter((item) => item !== option))}
-                  />
-                  {option}
-                </label>
+                <CheckboxField
+                  key={option}
+                  checked={chosen.includes(option)}
+                  onChange={(event) => onValueChange(event.target.checked ? [...chosen, option] : chosen.filter((item) => item !== option))}
+                  label={option}
+                />
               ))}
             </fieldset>
           );

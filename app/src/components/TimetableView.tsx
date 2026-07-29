@@ -183,38 +183,68 @@ function GridView({
       ) : gridPeriods.length === 0 ? (
         <p className="emptyState">{t("noSlotsForSection")}</p>
       ) : (
-        <div className="timetableGrid" style={{ gridTemplateColumns: `auto repeat(${DAY_KEYS.length}, 1fr)` }}>
-          <div className="timetableGridCell timetableGridCorner" />
-          {DAY_KEYS.map((day) => (
-            <div className="timetableGridCell timetableGridHeader" key={day}>{t(day)}</div>
-          ))}
-          {gridPeriods.map((period) => {
-            const timeForPeriod = gridSlots.find((s) => s.period === period);
-            return (
-              <Fragment key={period}>
-                <div className="timetableGridCell timetableGridHeader">
-                  <strong>{t("periodLabel", { period })}</strong>
-                  {timeForPeriod && <small>{timeForPeriod.start_time}–{timeForPeriod.end_time}</small>}
-                </div>
-                {DAY_KEYS.map((_, dayIndex) => {
-                  const slot = gridSlots.find((s) => s.day_of_week === dayIndex && s.period === period);
-                  return (
-                    <div className="timetableGridCell" key={`${period}-${dayIndex}`}>
-                      {slot ? (
-                        <>
-                          <strong>{slot.course_name ?? "—"}</strong>
-                          <small>{slot.teacher_name ?? "—"}</small>
-                        </>
-                      ) : (
-                        <span className="timetableGridEmpty">—</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </Fragment>
-            );
-          })}
-        </div>
+        <>
+          <div className="timetableGrid" style={{ gridTemplateColumns: `auto repeat(${DAY_KEYS.length}, 1fr)` }}>
+            <div className="timetableGridCell timetableGridCorner" />
+            {DAY_KEYS.map((day) => (
+              <div className="timetableGridCell timetableGridHeader" key={day}>{t(day)}</div>
+            ))}
+            {gridPeriods.map((period) => {
+              const timeForPeriod = gridSlots.find((s) => s.period === period);
+              return (
+                <Fragment key={period}>
+                  <div className="timetableGridCell timetableGridHeader">
+                    <strong>{t("periodLabel", { period })}</strong>
+                    {timeForPeriod && <small>{timeForPeriod.start_time}–{timeForPeriod.end_time}</small>}
+                  </div>
+                  {DAY_KEYS.map((_, dayIndex) => {
+                    const slot = gridSlots.find((s) => s.day_of_week === dayIndex && s.period === period);
+                    return (
+                      <div className="timetableGridCell" key={`${period}-${dayIndex}`}>
+                        {slot ? (
+                          <>
+                            <strong>{slot.course_name ?? "—"}</strong>
+                            <small>{slot.teacher_name ?? "—"}</small>
+                          </>
+                        ) : (
+                          <span className="timetableGridEmpty">—</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              );
+            })}
+          </div>
+
+          <div className="mobileTimetableCards">
+            {gridPeriods.map((period) => {
+              const timeForPeriod = gridSlots.find((s) => s.period === period);
+              return (
+                <section className="mobileTimetablePeriod" key={period}>
+                  <header>
+                    <strong>{t("periodLabel", { period })}</strong>
+                    {timeForPeriod && <small>{timeForPeriod.start_time}–{timeForPeriod.end_time}</small>}
+                  </header>
+                  <div className="mobileTimetableDayList">
+                    {DAY_KEYS.map((day, dayIndex) => {
+                      const slot = gridSlots.find((s) => s.day_of_week === dayIndex && s.period === period);
+                      return (
+                        <article className="mobileTimetableDay" key={`${period}-${dayIndex}`}>
+                          <span>{t(day)}</span>
+                          <div>
+                            <strong>{slot?.course_name ?? "—"}</strong>
+                            <small>{slot?.teacher_name ?? "—"}</small>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </>
       )}
     </section>
   );
@@ -362,6 +392,8 @@ function ListView({
               <Button
                 className="tableAction"
                 type="button"
+                aria-label={t("deleteSlotConfirm")}
+                title={t("deleteSlotConfirm")}
                 onClick={async () => {
                   if (!(await confirm(t("deleteSlotConfirm")))) return;
                   onError("");
@@ -487,9 +519,9 @@ function ImportView({ onDone }: Readonly<{ onDone: () => void }>) {
           <div className="dataRow header"><span>{t("rowCol")}</span><span>{t("statusCol")}</span><span>{t("errorCol")}</span></div>
           {result.results.map((row) => (
             <div className="dataRow" key={row.row}>
-              <span>{row.row}</span>
-              <span>{row.ok ? "✓" : "✗"}</span>
-              <span>{row.error ?? ""}</span>
+              <span data-label={t("rowCol")}>{row.row}</span>
+              <span data-label={t("statusCol")}>{row.ok ? "✓" : "✗"}</span>
+              <span data-label={t("errorCol")}>{row.error ?? ""}</span>
             </div>
           ))}
           {result.created > 0 && <p className="notice">{t("importCreated", { count: result.created })}</p>}

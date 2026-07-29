@@ -31,7 +31,7 @@ import {
 import { AdmissionAnswersFields } from "./AdmissionAnswersFields";
 import { answerString, BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields } from "../lib/admissionBuiltIns";
 import { SearchDropdown } from "./SearchDropdown";
-import { Checkbox, Input, Select } from "./ui/Field";
+import { CheckboxField, Input, Select } from "./ui/Field";
 import { LoadingState } from "./ui/AsyncState";
 import { DataTable, type Column } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
@@ -369,10 +369,11 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
 
               <label>{t("emergencyContactLabel")}<Input value={form.emergency_contact} onChange={(e) => setForm({ ...form, emergency_contact: e.target.value })} /></label>
 
-              <label className="checkboxLabel">
-                <Checkbox checked={form.is_principal_delegate} onChange={(e) => setForm({ ...form, is_principal_delegate: e.target.checked })} />
-                <span>{t("principalDelegateLabel", "Delegate as Principal (Access all menus)")}</span>
-              </label>
+              <CheckboxField
+                checked={form.is_principal_delegate}
+                onChange={(e) => setForm({ ...form, is_principal_delegate: e.target.checked })}
+                label={t("principalDelegateLabel", "Delegate as Principal (Access all menus)")}
+              />
               </FormModal>
       )}
 
@@ -390,10 +391,11 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           <label>{t("cnicLabel")}<Input value={editForm.cnic} onChange={(e) => setEditForm({ ...editForm, cnic: e.target.value })} /></label>
           <label>{t("addressLabel")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
           <label>{t("emergencyContactLabel")}<Input value={editForm.emergency_contact} onChange={(e) => setEditForm({ ...editForm, emergency_contact: e.target.value })} /></label>
-          <label className="checkboxLabel">
-            <Checkbox checked={editForm.is_principal_delegate} onChange={(e) => setEditForm({ ...editForm, is_principal_delegate: e.target.checked })} />
-            <span>{t("principalDelegateLabel", "Delegate as Principal (Access all menus)")}</span>
-          </label>
+          <CheckboxField
+            checked={editForm.is_principal_delegate}
+            onChange={(e) => setEditForm({ ...editForm, is_principal_delegate: e.target.checked })}
+            label={t("principalDelegateLabel", "Delegate as Principal (Access all menus)")}
+          />
         </FormModal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
@@ -519,10 +521,10 @@ function TeacherDetail({
             {payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
             {payments.map((p) => (
               <div className="dataRow" key={p.id}>
-                <span>{p.payment_date}</span>
-                <span>{p.amount} {p.currency}</span>
-                <span>{p.period_covered}</span>
-                <span>{p.method}</span>
+                <span data-label={t("dateCol")}>{p.payment_date}</span>
+                <span data-label={t("amountCol")}>{p.amount} {p.currency}</span>
+                <span data-label={t("periodCoveredCol")}>{p.period_covered}</span>
+                <span data-label={t("methodCol")}>{p.method}</span>
               </div>
             ))}
           </div>
@@ -1060,11 +1062,11 @@ function StudentDetail({
         {guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
         {guardians.map((g) => (
           <div className="dataRow" key={g.id}>
-            <span>{g.name}</span>
-            <span>{g.relationship}</span>
-            <span>{g.phone_numbers}</span>
-            <span>
-              <Button className="tableAction" type="button" title={t("viewBtn")} onClick={() => setSelectedGuardian(g)}>
+            <span data-label={t("nameLabel")}>{g.name}</span>
+            <span data-label={t("relationshipLabel")}>{g.relationship}</span>
+            <span data-label={t("phoneCol")}>{g.phone_numbers}</span>
+            <span data-label={t("actionsCol")}>
+              <Button className="tableAction" type="button" aria-label={t("viewBtn")} title={t("viewBtn")} onClick={() => setSelectedGuardian(g)}>
                 <Eye size={14} />
               </Button>
             </span>
@@ -1080,9 +1082,9 @@ function StudentDetail({
             {payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
             {payments.map((p) => (
               <div className="dataRow" key={p.id}>
-                <span>{p.payment_date}</span>
-                <span>{p.amount} {p.currency}</span>
-                <span>{categories.find((c) => c.id === p.category_id)?.name ?? "—"}</span>
+                <span data-label={t("dateCol")}>{p.payment_date}</span>
+                <span data-label={t("amountCol")}>{p.amount} {p.currency}</span>
+                <span data-label={t("categoryCol")}>{categories.find((c) => c.id === p.category_id)?.name ?? "—"}</span>
               </div>
             ))}
           </div>
@@ -1179,9 +1181,17 @@ function StudentDetail({
           <label>{t("bFormNumberCol")}<Input value={editForm.b_form_number} onChange={(e) => setEditForm({ ...editForm, b_form_number: e.target.value })} placeholder="12345-1234567-1" /></label>
           <label>{t("addressCol")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
           <PhoneInput id="student-phone-edit" label={t("studentPhoneLabel")} required={editForm.is_independent && editForm.portal_enabled} value={editForm.phone} onChange={(value) => setEditForm({ ...editForm, phone: value })} />
-          <label className="checkboxLabel"><Checkbox checked={editForm.is_independent} onChange={(e) => setEditForm({ ...editForm, is_independent: e.target.checked })} />{t("independentStudentLabel")}</label>
+          <CheckboxField
+            checked={editForm.is_independent}
+            onChange={(e) => setEditForm({ ...editForm, is_independent: e.target.checked })}
+            label={t("independentStudentLabel")}
+          />
           <label>{t("notesLabel")}<Input value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>
-          <label className="checkboxLabel"><Checkbox checked={editForm.portal_enabled} onChange={(e) => setEditForm({ ...editForm, portal_enabled: e.target.checked })} />{t("portalEnabledLabel")}</label>
+          <CheckboxField
+            checked={editForm.portal_enabled}
+            onChange={(e) => setEditForm({ ...editForm, portal_enabled: e.target.checked })}
+            label={t("portalEnabledLabel")}
+          />
           {student.admission_record && (
             <fieldset className="choiceField">
               <legend>{t("admissionInformationHeading", "Admission information")}</legend>
@@ -1434,7 +1444,7 @@ function GuardiansTab({
                 {selectedStudent ? (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem", border: "1px solid var(--border)", borderRadius: "4px" }}>
                     <span>{selectedStudent.name} ({selectedStudent.username || selectedStudent.admission_number})</span>
-                    <Button className="iconBtn danger" type="button" onClick={() => setSelectedStudent(null)}><UserMinus size={14} /></Button>
+                    <Button className="iconBtn danger" type="button" aria-label={t("unlinkBtn")} title={t("unlinkBtn")} onClick={() => setSelectedStudent(null)}><UserMinus size={14} /></Button>
                   </div>
                 ) : (
                   <>
@@ -1618,7 +1628,7 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
                   <strong>{s.name}</strong>
                   <span>{s.admission_number} · {s.current_class || t("notAssignedLabel")}</span>
                 </div>
-                <Button className="tableAction" type="button" onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn")}>
+                <Button className="tableAction" type="button" aria-label={t("unlinkBtn")} onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn")}>
                   <X size={14} />
                 </Button>
               </Paper>
@@ -1749,9 +1759,9 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
             {donations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
             {donations.map((d) => (
               <div className="dataRow" key={d.id}>
-                <span>{d.donation_date}</span>
-                <span>{d.amount} {d.currency}</span>
-                <span>{categories.find((c) => c.id === d.category_id)?.name ?? "—"}</span>
+                <span data-label={t("dateCol")}>{d.donation_date}</span>
+                <span data-label={t("amountCol")}>{d.amount} {d.currency}</span>
+                <span data-label={t("categoryCol")}>{categories.find((c) => c.id === d.category_id)?.name ?? "—"}</span>
               </div>
             ))}
           </div>

@@ -24,7 +24,7 @@ import {
 import { StagedAudiencePicker } from "./StagedAudiencePicker";
 import { SearchDropdown } from "./SearchDropdown";
 import { useAuth } from "../lib/AuthContext";
-import { Input, Select, Checkbox } from "./ui/Field";
+import { Input, Select, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
@@ -229,9 +229,11 @@ export function FormsView() {
                       <label>{t("titleLabel")}<Input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></label>
                       <label>{t("descriptionLabel")}<Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} /></label>
                       <label>{t("formCategoryLabel")}<Input value={formCategory} onChange={(e) => setFormCategory(e.target.value)} placeholder={t("formCategoryPlaceholder") ?? ""} list="form-categories" /></label>
-                      <label className="checkboxLabel">
-                        <Checkbox checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} /> {t("allowMultipleLabel")}
-                      </label>
+                      <CheckboxField
+                        checked={allowMultiple}
+                        onChange={(e) => setAllowMultiple(e.target.checked)}
+                        label={t("allowMultipleLabel")}
+                      />
                     </div>
 
           <StagedAudiencePicker value={audience} onChange={setAudience} />

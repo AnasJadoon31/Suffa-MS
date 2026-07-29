@@ -270,6 +270,7 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
 
       {canManage && (
         <InlineFilter
+          className="pwaFilterStack"
           filters={[
             {
               key: "tabs",
@@ -311,7 +312,7 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
           setSearchQuery(searchDraft);
         }}
       >
-        <InlineFilter filters={[{
+        <InlineFilter className="pwaFilterStack" filters={[{
           key: "leave-search", type: "input", inputType: "search", label: t("searchLeaveLabel"),
           placeholder: t("searchLeavePlaceholder"), value: searchDraft, onChange: setSearchDraft,
         }]}>

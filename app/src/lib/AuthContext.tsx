@@ -44,6 +44,46 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+type ProfilePayload = {
+  user?: User;
+  madrasa?: Madrasa;
+  branding?: Record<string, string>;
+  permissions?: string[];
+  features?: Record<string, boolean>;
+  has_teaching_assignment?: boolean;
+};
+
+const PROFILE_CACHE_PREFIX = "mms_profile_cache_v1";
+
+function profileCacheKey(): string | null {
+  const token = localStorage.getItem("mms_token");
+  const tenant = localStorage.getItem("mms_tenant") || "suffa";
+  if (!token) return null;
+  return `${PROFILE_CACHE_PREFIX}:${tenant}:${token.slice(0, 12)}`;
+}
+
+function readCachedProfile(): ProfilePayload | null {
+  const key = profileCacheKey();
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) as ProfilePayload : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedProfile(payload: ProfilePayload): void {
+  const key = profileCacheKey();
+  if (!key) return;
+  localStorage.setItem(key, JSON.stringify(payload));
+}
+
+function clearCachedProfile(): void {
+  const key = profileCacheKey();
+  if (key) localStorage.removeItem(key);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [madrasa, setMadrasa] = useState<Madrasa | null>(null);
@@ -51,47 +91,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [features, setFeatures] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
 
+  const applyProfile = async (payload: ProfilePayload, options: { cache?: boolean; resolveLogo?: boolean } = {}) => {
+    const language = payload.user?.preferred_language === "ur" ? "ur" : "en";
+    await i18n.changeLanguage(language);
+    document.documentElement.dir = language === "ur" ? "rtl" : "ltr";
+    document.documentElement.lang = language;
+    setOfflineAccountKey(payload.madrasa?.id ?? null, payload.user?.id ?? null);
+    setUser(payload.user ? { ...payload.user, has_teaching_assignment: payload.has_teaching_assignment ?? false } : null);
+    const branding = payload.branding ?? {};
+    let logoUrl: string | undefined;
+    if (options.resolveLogo !== false && branding["madrasa.logo_file_id"]) {
+      try {
+        const logo = await api.get("/api/v1/files/presign-download", { params: { object_key: branding["madrasa.logo_file_id"] } });
+        logoUrl = logo.data.url;
+      } catch {
+        logoUrl = undefined;
+      }
+    }
+    setMadrasa(payload.madrasa ? {
+      ...payload.madrasa,
+      name_en: branding["madrasa.name_en"] || payload.madrasa.name,
+      name_ur: branding["madrasa.name_ur"] || payload.madrasa.name,
+      address: branding["madrasa.address"],
+      phone: branding["madrasa.phone"],
+      email: branding["madrasa.email"],
+      website: branding["madrasa.website"],
+      logo_url: logoUrl,
+    } : null);
+    setPermissions(payload.permissions ?? []);
+    setFeatures(payload.features ?? {});
+    setAcademicSessionId(payload.user?.selected_session_id ?? null);
+    if (options.cache !== false) writeCachedProfile(payload);
+  };
+
+  const clearProfileState = () => {
+    setUser(null);
+    setMadrasa(null);
+    setPermissions([]);
+    setFeatures({});
+    setAcademicSessionId(null);
+    setOfflineAccountKey(null, null);
+  };
+
   const fetchProfile = async () => {
     try {
       await clearLegacyApiCache();
       const res = await api.get("/api/v1/auth/me");
-      const language = res.data.user?.preferred_language === "ur" ? "ur" : "en";
-      await i18n.changeLanguage(language);
-      document.documentElement.dir = language === "ur" ? "rtl" : "ltr";
-      document.documentElement.lang = language;
-      setOfflineAccountKey(res.data.madrasa?.id ?? null, res.data.user?.id ?? null);
-      setUser({ ...res.data.user, has_teaching_assignment: res.data.has_teaching_assignment ?? false });
-      const branding = res.data.branding ?? {};
-      let logoUrl: string | undefined;
-      if (branding["madrasa.logo_file_id"]) {
-        try {
-          const logo = await api.get("/api/v1/files/presign-download", { params: { object_key: branding["madrasa.logo_file_id"] } });
-          logoUrl = logo.data.url;
-        } catch {
-          logoUrl = undefined;
-        }
-      }
-      setMadrasa(res.data.madrasa ? {
-        ...res.data.madrasa,
-        name_en: branding["madrasa.name_en"] || res.data.madrasa.name,
-        name_ur: branding["madrasa.name_ur"] || res.data.madrasa.name,
-        address: branding["madrasa.address"],
-        phone: branding["madrasa.phone"],
-        email: branding["madrasa.email"],
-        website: branding["madrasa.website"],
-        logo_url: logoUrl,
-      } : null);
-      setPermissions(res.data.permissions ?? []);
-      setFeatures(res.data.features ?? {});
-      setAcademicSessionId(res.data.user?.selected_session_id ?? null);
+      await applyProfile(res.data);
     } catch (err) {
-      setUser(null);
-      setMadrasa(null);
-      setPermissions([]);
-      setFeatures({});
-      setAcademicSessionId(null);
-      setOfflineAccountKey(null, null);
-      localStorage.removeItem("mms_token");
+      const cachedProfile = navigator.onLine === false ? readCachedProfile() : null;
+      if (cachedProfile?.user) {
+        await applyProfile(cachedProfile, { cache: false, resolveLogo: false });
+      } else {
+        clearProfileState();
+        clearCachedProfile();
+        localStorage.removeItem("mms_token");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -106,11 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const handleUnauthorized = () => {
-      setUser(null);
-      setMadrasa(null);
-      setPermissions([]);
-      setAcademicSessionId(null);
-      setOfflineAccountKey(null, null);
+      clearProfileState();
     };
 
     const refreshDelegatedAccess = () => {
@@ -137,13 +188,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    clearCachedProfile();
     localStorage.removeItem("mms_token");
     localStorage.removeItem("mms_tenant");
-    setUser(null);
-    setMadrasa(null);
-    setPermissions([]);
-    setAcademicSessionId(null);
-    setOfflineAccountKey(null, null);
+    clearProfileState();
     void clearLegacyApiCache();
   };
 

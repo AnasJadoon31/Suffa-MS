@@ -18,7 +18,7 @@ import { AudiencePicker } from "./AudiencePicker";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
 import { DOCUMENT_UPLOAD_ACCEPT, getDocumentUploadContentType } from "../lib/filePolicy";
-import { Input, Select, Checkbox } from "./ui/Field";
+import { Input, Select, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
@@ -144,10 +144,11 @@ export function ResourcesView() {
             <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("resourceCategoryExample")} /></label>
 
           {canManageAll && (
-                      <label className="checkboxLabel">
-                        <Checkbox checked={categoryIsGlobal} onChange={(e) => setCategoryIsGlobal(e.target.checked)} />
-                        {t("globalLabel")}
-                      </label>
+                      <CheckboxField
+                        checked={categoryIsGlobal}
+                        onChange={(e) => setCategoryIsGlobal(e.target.checked)}
+                        label={t("globalLabel")}
+                      />
                     )}
           </FormModal>}
 
@@ -170,10 +171,12 @@ export function ResourcesView() {
         }] : []),
       ]}>
         {canManage && (
-          <label className="checkboxLabel resourceMineToggle">
-            <Checkbox checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
-            {t("myUploadsOnlyLabel")}
-          </label>
+          <CheckboxField
+            className="resourceMineToggle"
+            checked={mineOnly}
+            onChange={(e) => setMineOnly(e.target.checked)}
+            label={t("myUploadsOnlyLabel")}
+          />
         )}
       </InlineFilter>
 

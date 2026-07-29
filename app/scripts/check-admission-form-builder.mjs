@@ -139,7 +139,7 @@ try {
     throw new Error(`Admission form fields were not updated: ${JSON.stringify(updatedPayload)}`);
   }
 
-  await page.goto(`${baseUrl}/public/admission/public-token`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/admission/public-token`, { waitUntil: "domcontentloaded" });
   await page.getByLabel("Student name").fill("New Applicant");
   await page.getByLabel("Date of birth").fill("2017-02-03");
   await page.getByLabel("Student portal").selectOption("enabled");

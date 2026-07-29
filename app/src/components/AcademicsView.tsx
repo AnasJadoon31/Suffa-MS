@@ -14,7 +14,7 @@ import {
   academicsApi,
 } from "../lib/endpoints";
 import { RolloverWizard } from "./RolloverWizard";
-import { Input, Select, Checkbox } from "./ui/Field";
+import { Input, Select, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
@@ -237,8 +237,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         </label>
                       </FormModal>
                     )}
-                    <span>{p.name}</span>
-                    <span className="actions">
+                    <span data-label={t("nameLabel")}>{p.name}</span>
+                    <span data-label={t("actionsCol")} className="actions">
                       <ActionMenu ariaLabel={`${t("actionsCol")}: ${p.name}`} items={[
                         { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingProgram(p) },
                         { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `program:${p.id}`, onClick: () => handleDelete(`program:${p.id}`, p.name, () => academicsApi.deleteProgram(p.id)) },
@@ -281,10 +281,12 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                                             <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder={t("classExample")} />
                                           </label>
 
-                          <label className="checkboxLabel" title={t("classPortalEnabledHint") ?? ""}>
-                                            <Checkbox checked={classPortalEnabled} onChange={(e) => setClassPortalEnabled(e.target.checked)} />
-                                            {t("classPortalEnabledLabel")}
-                                          </label>
+                          <CheckboxField
+                            title={t("classPortalEnabledHint") ?? ""}
+                            checked={classPortalEnabled}
+                            onChange={(e) => setClassPortalEnabled(e.target.checked)}
+                            label={t("classPortalEnabledLabel")}
+                          />
 
                           </FormModal>}
               <InlineFilter className="pwaFilterStack" filters={[
@@ -328,19 +330,18 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                             {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                           </Select>
                         </label>
-                        <label className="checkboxLabel" title={t("classPortalEnabledHint") ?? ""}>
-                          <Checkbox
-                            checked={editingClass.default_portal_enabled}
-                            onChange={(e) => setEditingClass({ ...editingClass, default_portal_enabled: e.target.checked })}
-                          />
-                          {t("classPortalEnabledLabel")}
-                        </label>
+                        <CheckboxField
+                          title={t("classPortalEnabledHint") ?? ""}
+                          checked={editingClass.default_portal_enabled}
+                          onChange={(e) => setEditingClass({ ...editingClass, default_portal_enabled: e.target.checked })}
+                          label={t("classPortalEnabledLabel")}
+                        />
                       </FormModal>
                     )}
-                        <span>{c.name}</span>
-                        <span>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
-                        <span>{c.default_portal_enabled ? t("yesLabel") : t("noLabel")}</span>
-                        <span className="actions">
+                        <span data-label={t("nameLabel")}>{c.name}</span>
+                        <span data-label={t("programLabel")}>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</span>
+                        <span data-label={t("portalCol")}>{c.default_portal_enabled ? t("yesLabel") : t("noLabel")}</span>
+                        <span data-label={t("actionsCol")} className="actions">
                           <ActionMenu ariaLabel={`${t("actionsCol")}: ${c.name}`} items={[
                             { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingClass(c) },
                             { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `class:${c.id}`, onClick: () => handleDelete(`class:${c.id}`, c.name, () => academicsApi.deleteClass(c.id)) },
@@ -398,8 +399,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         </label>
                       </FormModal>
                     )}
-                        <span>{c.name}</span>
-                        <span className="actions">
+                        <span data-label={t("nameLabel")}>{c.name}</span>
+                        <span data-label={t("actionsCol")} className="actions">
                           <ActionMenu ariaLabel={`${t("actionsCol")}: ${c.name}`} items={[
                             { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingCourse(c) },
                             { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `course:${c.id}`, onClick: () => handleDelete(`course:${c.id}`, c.name, () => academicsApi.deleteCourse(c.id)) },
@@ -450,8 +451,8 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 {classesForCourseMap.length === 0 && <p className="emptyState">{t("noClassesYet")}</p>}
                 {classesForCourseMap.map((c) => (
                   <div className="dataRow" key={c.id} style={{ alignItems: "flex-start", gap: "1rem" }}>
-                    <span><strong>{c.name}</strong></span>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <span data-label={t("classLabel")}><strong>{c.name}</strong></span>
+                    <div data-label={t("sectionsCol")} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {(sections[c.id] ?? []).map((s) => (
                         <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           {editingSection?.id === s.id && (
@@ -485,7 +486,7 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                       ))}
                       {!(sections[c.id]?.length > 0) && "—"}
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
+                    <div data-label={t("coursesCol")} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
                       <span
                         className="badge"
                         style={{ background: "var(--surface-2, #f1f5f9)", color: "var(--muted, #475569)" }}
@@ -570,10 +571,10 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                         </label>
                       </FormModal>
                     )}
-                        <span>{s.name}</span>
-                        <span>{s.gregorian_start} → {s.gregorian_end}</span>
-                        <span>{s.is_active ? <CheckCircle2 size={16} color="var(--leaf)" /> : "—"}</span>
-                        <span className="actions" style={{ gap: "8px" }}>
+                        <span data-label={t("nameLabel")}>{s.name}</span>
+                        <span data-label={t("spanCol")}>{s.gregorian_start} → {s.gregorian_end}</span>
+                        <span data-label={t("activeCol")}>{s.is_active ? <CheckCircle2 size={16} color="var(--leaf)" /> : "—"}</span>
+                        <span data-label={t("actionsCol")} className="actions" style={{ gap: "8px" }}>
                           <ActionMenu ariaLabel={`${t("actionsCol")}: ${s.name}`} items={[
                             ...(!s.is_active ? [{
                               label: t("activateBtn"),
@@ -680,7 +681,7 @@ function CourseMappingModal({
               {assignedCourses.map((co) => (
                 <div className="courseMapItem" key={co.id}>
                   <span>{co.name}</span>
-                  <Button className="iconBtn" title={t("unassignBtn")} type="button" onClick={() => onUnassign(co.id)}>
+                  <Button className="iconBtn" aria-label={t("unassignBtn")} title={t("unassignBtn")} type="button" onClick={() => onUnassign(co.id)}>
                     <Trash2 size={14} />
                   </Button>
                 </div>
@@ -694,7 +695,7 @@ function CourseMappingModal({
               {available.map((co) => (
                 <div className="courseMapItem" key={co.id}>
                   <span>{co.name}</span>
-                  <Button className="iconBtn" title={t("assignCourseBtn")} type="button" onClick={() => onAssign(co.id)}>
+                  <Button className="iconBtn" aria-label={t("assignCourseBtn")} title={t("assignCourseBtn")} type="button" onClick={() => onAssign(co.id)}>
                     <Plus size={14} />
                   </Button>
                 </div>

@@ -1,5 +1,5 @@
 import { Button } from "./ui/Button";
-import { Input, Select, Checkbox } from "./ui/Field";
+import { Input, Select, CheckboxField } from "./ui/Field";
 import { Modal } from "./ui/Modal";
 import Paper from "@mui/material/Paper";
 import { useState } from "react";
@@ -67,7 +67,7 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
               {t("newSessionNameLabel")}
               <Input className="inputField" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("academicSessionExample")} />
             </label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div className="formGridTwo">
               <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                 {t("gregorianStartLabel")}
                 <Input className="inputField" type="date" required value={form.gregorian_start} onChange={(e) => setForm({ ...form, gregorian_start: e.target.value })} />
@@ -83,19 +83,22 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
             </label>
             <Paper component="fieldset" variant="outlined" className="sectionPicker">
               <legend>{t("rolloverCopyLegend")}</legend>
-              <label className="checkboxLabel">
-                <Checkbox  checked={form.copy_timetable} onChange={(e) => setForm({ ...form, copy_timetable: e.target.checked })} />
-                {t("copyTimetableLabel")}
-              </label>
-              <label className="checkboxLabel">
-                <Checkbox  checked={form.copy_holidays} onChange={(e) => setForm({ ...form, copy_holidays: e.target.checked })} />
-                {t("copyHolidaysLabel")}
-              </label>
+              <CheckboxField
+                checked={form.copy_timetable}
+                onChange={(e) => setForm({ ...form, copy_timetable: e.target.checked })}
+                label={t("copyTimetableLabel")}
+              />
+              <CheckboxField
+                checked={form.copy_holidays}
+                onChange={(e) => setForm({ ...form, copy_holidays: e.target.checked })}
+                label={t("copyHolidaysLabel")}
+              />
               {form.copy_holidays && (
-                <label className="checkboxLabel">
-                  <Checkbox  checked={form.shift_holiday_dates} onChange={(e) => setForm({ ...form, shift_holiday_dates: e.target.checked })} />
-                  {t("shiftHolidayDatesLabel")}
-                </label>
+                <CheckboxField
+                  checked={form.shift_holiday_dates}
+                  onChange={(e) => setForm({ ...form, shift_holiday_dates: e.target.checked })}
+                  label={t("shiftHolidayDatesLabel")}
+                />
               )}
             </Paper>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "16px" }}>
@@ -108,20 +111,22 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
         {step === 2 && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <p style={{ margin: 0, color: "var(--muted)" }}>{t("rolloverStep2Hint")}</p>
-            <div className="dataTable" style={{ display: "grid", gap: "8px" }}>
-              <div className="dataRow header" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", fontWeight: "bold" }}>
+            <div className="dataTable rolloverMappingTable">
+              <div className="dataRow header">
                 <span>{t("currentClassCol", { name: sourceSession.name })}</span>
                 <span>{t("nextClassCol", { name: form.name })}</span>
               </div>
               {classes.map(c => (
-                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", alignItems: "center" }}>
-                  <span>{c.name}</span>
+                <div className="dataRow" key={c.id}>
+                  <span data-label={t("currentClassCol", { name: sourceSession.name })}>{c.name}</span>
+                  <div data-label={t("nextClassCol", { name: form.name })}>
                   <Select className="inputField" value={mappings[c.id] || ""} onChange={(e) => setMappings({ ...mappings, [c.id]: e.target.value })}>
                     <option value="">{t("graduateOption")}</option>
                     {classes.map(targetClass => (
                       <option key={targetClass.id} value={targetClass.id}>{targetClass.name}</option>
                     ))}
                   </Select>
+                  </div>
                 </div>
               ))}
             </div>

@@ -128,12 +128,65 @@ async function checkViewport(browser, width, height) {
   return labelState;
 }
 
+async function checkDesktopViewport(browser) {
+  const context = await browser.newContext({
+    viewport: { width: 1200, height: 900 },
+    serviceWorkers: "block",
+    reducedMotion: "reduce",
+  });
+  await context.addInitScript(() => {
+    localStorage.setItem("mms_token", "drawer-test-token");
+    localStorage.setItem("mms_tenant", "suffa");
+  });
+  await mockApi(context);
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/my-timetable`, { waitUntil: "domcontentloaded" });
+  await page.locator(".workspace").waitFor({ state: "visible" });
+  await page.waitForLoadState("networkidle");
+
+  const state = await page.evaluate(() => {
+    const toggle = document.querySelector(".navToggle");
+    const sidebar = document.querySelector(".sidebar");
+    const sidebarLabel = document.querySelector(".sidebar .navItem span");
+    const toggleStyle = toggle ? getComputedStyle(toggle) : null;
+    const sidebarRect = sidebar?.getBoundingClientRect();
+    return {
+      toggleExists: Boolean(toggle),
+      toggleDisplay: toggleStyle?.display ?? null,
+      toggleVisibility: toggleStyle?.visibility ?? null,
+      toggleWidth: toggle?.getBoundingClientRect().width ?? 0,
+      sidebarWidth: sidebarRect?.width ?? 0,
+      sidebarTransform: sidebar ? getComputedStyle(sidebar).transform : null,
+      labelDisplay: sidebarLabel ? getComputedStyle(sidebarLabel).display : null,
+      labelWidth: sidebarLabel?.getBoundingClientRect().width ?? 0,
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+
+  if (state.toggleDisplay !== "none" || state.toggleWidth > 1) {
+    throw new Error(`desktop: nav toggle should be hidden when permanent sidebar is visible: ${JSON.stringify(state)}`);
+  }
+  if (state.sidebarWidth < 200 || state.sidebarTransform !== "none") {
+    throw new Error(`desktop: permanent sidebar is not visible: ${JSON.stringify(state)}`);
+  }
+  if (state.labelDisplay === "none" || state.labelWidth < 1) {
+    throw new Error(`desktop: sidebar labels are hidden: ${JSON.stringify(state)}`);
+  }
+  if (state.pageOverflow > 1) {
+    throw new Error(`desktop: horizontal overflow ${JSON.stringify(state)}`);
+  }
+
+  await context.close();
+  return state;
+}
+
 await ensureServer();
 const browser = await chromium.launch({ headless: true });
 try {
   const phone = await checkViewport(browser, 390, 844);
   const compactTablet = await checkViewport(browser, 920, 900);
-  console.log(JSON.stringify({ phone, compactTablet }));
+  const desktop = await checkDesktopViewport(browser);
+  console.log(JSON.stringify({ phone, compactTablet, desktop }));
 } finally {
   await browser.close();
   previewServer?.kill("SIGTERM");

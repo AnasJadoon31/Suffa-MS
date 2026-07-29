@@ -21,6 +21,19 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className
       variant="outlined"
       size="small"
       fullWidth
+      sx={{
+        "& .MuiInputBase-root": {
+          minHeight: 60,
+        },
+        "& .MuiInputBase-input": {
+          boxSizing: "border-box",
+          minHeight: 58,
+          height: 58,
+          paddingBlock: "10px",
+          lineHeight: 1.35,
+          overflow: "visible",
+        },
+      }}
       {...textFieldProps}
       slotProps={{
         htmlInput: {
@@ -71,10 +84,10 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({ classN
           minHeight: 48,
           "& .MuiNativeSelect-select": {
             boxSizing: "border-box",
-            minHeight: 34,
+            minHeight: 44,
             height: "auto",
-            padding: "12px 36px 12px 12px",
-            lineHeight: 1.7,
+            padding: "10px 36px 10px 12px",
+            lineHeight: 1.45,
             overflow: "visible",
           },
         }}
@@ -117,11 +130,39 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(({ cla
       ref={ref}
       size="small"
       className={className}
+      sx={{
+        color: "var(--muted)",
+        width: 44,
+        height: 44,
+        padding: "10px",
+        flex: "0 0 44px",
+        "&.Mui-checked": {
+          color: "var(--accent)",
+        },
+        "& .MuiSvgIcon-root": {
+          fontSize: 22,
+        },
+      }}
       {...props}
     />
   );
 });
 Checkbox.displayName = "Checkbox";
+
+type CheckboxFieldProps = CheckboxProps & {
+  label: React.ReactNode;
+  checkboxClassName?: string;
+};
+
+export const CheckboxField = React.forwardRef<HTMLInputElement, CheckboxFieldProps>(({ className, checkboxClassName, label, title, ...props }, ref) => {
+  return (
+    <label className={`checkboxLabel checkboxField ${className || ""}`.trim()} title={title}>
+      <Checkbox ref={ref} className={checkboxClassName} {...props} />
+      <span className="checkboxFieldText">{label}</span>
+    </label>
+  );
+});
+CheckboxField.displayName = "CheckboxField";
 
 type RadioProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type">;
 export const Radio = React.forwardRef<HTMLInputElement, RadioProps>(({ className, size: _nativeSize, color: _nativeColor, ...props }, ref) => {
@@ -130,8 +171,36 @@ export const Radio = React.forwardRef<HTMLInputElement, RadioProps>(({ className
       ref={ref}
       size="small"
       className={className}
+      sx={{
+        color: "var(--muted)",
+        width: 44,
+        height: 44,
+        padding: "10px",
+        flex: "0 0 44px",
+        "&.Mui-checked": {
+          color: "var(--accent)",
+        },
+        "& .MuiSvgIcon-root": {
+          fontSize: 22,
+        },
+      }}
       {...props}
     />
   );
 });
 Radio.displayName = "Radio";
+
+type RadioFieldProps = RadioProps & {
+  label: React.ReactNode;
+  radioClassName?: string;
+};
+
+export const RadioField = React.forwardRef<HTMLInputElement, RadioFieldProps>(({ className, radioClassName, label, title, ...props }, ref) => {
+  return (
+    <label className={`choiceLabel radioField ${className || ""}`.trim()} title={title}>
+      <Radio ref={ref} className={radioClassName} {...props} />
+      <span className="choiceFieldText">{label}</span>
+    </label>
+  );
+});
+RadioField.displayName = "RadioField";

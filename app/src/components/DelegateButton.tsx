@@ -13,7 +13,7 @@ import {
   type Teacher,
 } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
-import { Select, Checkbox } from "./ui/Field";
+import { Select, CheckboxField } from "./ui/Field";
 import { Modal } from "./ui/Modal";
 
 /**
@@ -182,13 +182,17 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
 
             <div className="delegateList">
               {relevant.map((p) => (
-                <label key={p.code} className="checkboxLabel">
-                  <Checkbox  checked={selected.has(p.code)} onChange={() => toggle(p.code)} />
-                  <span>
+                <CheckboxField
+                  key={p.code}
+                  checked={selected.has(p.code)}
+                  onChange={() => toggle(p.code)}
+                  label={(
+                    <>
                     {p.label} <small className="notice">({p.code})</small>
                     {!p.scoped && <small className="notice"> · {t("madrasaWideOnly")}</small>}
-                  </span>
-                </label>
+                    </>
+                  )}
+                />
               ))}
               {relevant.length === 0 && <p className="emptyState">{t("noDelegatablePermissions")}</p>}
             </div>

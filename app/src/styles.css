@@ -68,6 +68,12 @@ textarea {
   font: inherit;
 }
 
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  min-height: 44px;
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -404,7 +410,7 @@ h3 { font-size: 1rem; }
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 38px;
+  min-height: 44px;
   padding: 8px 10px;
   border: 0;
   border-radius: 8px;
@@ -485,7 +491,11 @@ h3 { font-size: 1rem; }
 }
 
 .topbar .MuiButton-root {
-  min-width: 0;
+  min-width: 44px;
+}
+
+.navToggle.iconButton {
+  display: none;
 }
 
 .dateChip,
@@ -493,6 +503,7 @@ h3 { font-size: 1rem; }
   display: flex;
   align-items: center;
   gap: 9px;
+  min-height: 44px;
   padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -503,6 +514,31 @@ h3 { font-size: 1rem; }
 .profileChipButton {
   justify-content: flex-start;
   text-transform: none;
+}
+
+.pwaStatusChip.MuiButton-root {
+  min-height: 44px;
+  padding-inline: 12px;
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.pwaStatusChip svg {
+  color: var(--brand);
+}
+
+.pwaStatusChip-offline.MuiButton-root {
+  border-color: #f0c36d;
+  background: #fdf3d7;
+  color: #7a5b12;
+}
+
+.pwaStatusChip-update.MuiButton-root {
+  border-color: var(--brand);
+  color: var(--brand-deep);
 }
 
 .dateChip svg {
@@ -554,7 +590,7 @@ h3 { font-size: 1rem; }
 }
 
 .primaryAction {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 16px;
   border: 1px solid var(--brand-deep);
   background: var(--brand-deep);
@@ -576,7 +612,7 @@ h3 { font-size: 1rem; }
 
 .iconTextButton,
 .secondaryAction {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--line-strong);
   background: var(--surface);
@@ -595,7 +631,7 @@ h3 { font-size: 1rem; }
 }
 
 .tableAction {
-  min-height: 30px;
+  min-height: 38px;
   padding: 2px 10px;
   border: 1px solid var(--line);
   background: var(--surface);
@@ -746,9 +782,8 @@ button:disabled {
 
 .attendanceClassBody strong,
 .attendanceClassBody small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .attendanceClassBody small {
@@ -787,8 +822,11 @@ button:disabled {
 .attendanceCalendarWeekdays,
 .attendanceCalendarGrid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
   gap: 6px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding-bottom: 2px;
 }
 
 .attendanceCalendarWeekdays span {
@@ -815,7 +853,7 @@ button:disabled {
 }
 
 .attendanceCalendarDay.MuiButton-root {
-  min-width: 0;
+  min-width: 44px;
   padding: 4px;
   line-height: 1.1;
   text-transform: none;
@@ -899,7 +937,7 @@ button:disabled {
 }
 
 .attendanceStudentSearchInput {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1013,7 +1051,7 @@ button:disabled {
 }
 
 .statusButton {
-  min-height: 36px;
+  min-height: 44px;
   border: 1px solid var(--line);
   background: var(--surface-2);
   color: var(--muted);
@@ -1106,7 +1144,7 @@ button:disabled {
   letter-spacing: 0.04em;
 }
 
-.dataRow > span {
+.dataRow > :where(span, div) {
   min-width: 0;
   padding: 11px 12px;
   border-inline-start: 1px solid var(--line);
@@ -1117,7 +1155,7 @@ button:disabled {
   gap: 4px;
 }
 
-.dataRow > span:first-child {
+.dataRow > :where(span, div):first-child {
   border-inline-start: 0;
 }
 
@@ -1182,7 +1220,7 @@ button:disabled {
   font-weight: 650;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .tableResponsive {
     overflow-x: hidden;
   }
@@ -1205,7 +1243,7 @@ button:disabled {
     background: var(--surface);
     overflow: hidden;
   }
-  .dataRow > span {
+  .dataRow > :where(span, div) {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1252,10 +1290,10 @@ button:disabled {
   .studentsTable .colActions {
     justify-content: flex-end;
   }
-  .dataRow > span:last-child {
+  .dataRow > :where(span, div):last-child {
     border-bottom: none;
   }
-  .dataRow > span::before {
+  .dataRow > :where(span, div)::before {
     content: attr(data-label);
     font-weight: 600;
     color: var(--faint);
@@ -1267,7 +1305,7 @@ button:disabled {
 .dataRow input,
 .dataRow select {
   width: 100%;
-  min-height: 34px;
+  min-height: 44px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   padding: 0 10px;
@@ -1330,6 +1368,20 @@ button:disabled {
   overflow-wrap: normal;
 }
 
+.submissionGradeField {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.submissionGradeField .mms-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.submissionActions {
+  justify-content: flex-end;
+}
+
 .salaryHistoryTable {
   width: 100%;
   min-width: 0;
@@ -1359,6 +1411,15 @@ button:disabled {
 .salaryPrimaryActions {
   justify-content: flex-end;
   margin-bottom: 12px;
+}
+
+.salaryTeacherToolbar {
+  overflow: visible;
+}
+
+.salaryTeacherToolbar .searchDropdown {
+  width: 100%;
+  min-width: 0;
 }
 
 .emptyState {
@@ -1422,6 +1483,70 @@ button:disabled {
 
 .timetableGridEmpty {
   color: var(--faint);
+}
+
+.mobileTimetableCards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .timetableGrid {
+    display: none;
+  }
+
+  .mobileTimetableCards {
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobileTimetablePeriod {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+  }
+
+  .mobileTimetablePeriod > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mobileTimetablePeriod small,
+  .mobileTimetableDay small {
+    color: var(--muted);
+  }
+
+  .mobileTimetableDayList {
+    display: grid;
+    gap: 8px;
+  }
+
+  .mobileTimetableDay {
+    display: grid;
+    grid-template-columns: minmax(72px, 0.35fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+  }
+
+  .mobileTimetableDay > span {
+    color: var(--brand-deep);
+    font-size: 0.8rem;
+    font-weight: 800;
+  }
+
+  .mobileTimetableDay > div {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
 }
 
 /* ============================ forms ============================ */
@@ -1603,7 +1728,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   align-self: end;
-  min-height: 42px;
+  min-height: 44px;
 }
 
 .formFieldRemove {
@@ -1645,7 +1770,7 @@ button:disabled {
 
 .mms-input {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   padding: 0 12px;
@@ -1687,6 +1812,7 @@ button:disabled {
   display: grid;
   gap: 2px;
   width: 100%;
+  min-height: 44px;
   padding: 10px 12px;
   border: 0;
   border-bottom: 1px solid var(--line);
@@ -1794,8 +1920,8 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  min-height: 28px;
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
@@ -1809,7 +1935,7 @@ button:disabled {
 }
 
 .richTextToolbar select {
-  min-height: 28px;
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
@@ -1855,6 +1981,7 @@ button:disabled {
 }
 
 .tabButton {
+  min-height: 44px;
   min-width: max-content;
   padding: 8px 16px;
   background: transparent;
@@ -1882,6 +2009,22 @@ button:disabled {
 .tabButton.active {
   background: var(--brand-soft);
   color: var(--brand-deep);
+}
+
+@media (max-width: 640px) {
+  .tabList {
+    display: grid;
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+  }
+
+  .tabButton,
+  .tabButton.MuiButton-root {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    white-space: normal;
+  }
 }
 
 .tabPanel {
@@ -2163,6 +2306,57 @@ html[dir="rtl"] .MuiNativeSelect-select {
   padding-inline: 34px 12px !important;
 }
 
+html[dir="rtl"] .mms-input input,
+html[dir="rtl"] .mms-input textarea,
+html[dir="rtl"] .mms-input select,
+html[lang="ur"] .mms-input input,
+html[lang="ur"] .mms-input textarea,
+html[lang="ur"] .mms-input select,
+html[dir="rtl"] .mms-input .MuiInputBase-input,
+html[lang="ur"] .mms-input .MuiInputBase-input,
+html[dir="rtl"] .mms-input .MuiNativeSelect-select,
+html[lang="ur"] .mms-input .MuiNativeSelect-select {
+  line-height: 1.35 !important;
+}
+
+@media (max-width: 390px) {
+  .attendanceCalendarWeekdays {
+    display: none;
+  }
+
+  .attendanceCalendarGrid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    overflow-x: visible;
+  }
+
+  .attendanceCalendarDay.blank {
+    display: none;
+  }
+
+  .attendanceCalendarDay.MuiButton-root {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
+  .attendanceCalendarDayNumber {
+    font-size: 0.95rem;
+  }
+
+  .attendanceCalendarDayStat {
+    display: inline;
+  }
+
+  html[dir="rtl"] .pwaFilterStack .mms-input .MuiNativeSelect-select,
+  html[lang="ur"] .pwaFilterStack .mms-input .MuiNativeSelect-select {
+    font-size: 0.84rem;
+  }
+}
+
 html[dir="rtl"] .navGroupLabel {
   letter-spacing: 0;
 }
@@ -2347,6 +2541,20 @@ html[dir="rtl"] .navGroupLabel {
   min-width: 0;
 }
 
+@media (max-width: 960px) {
+  .inlineFilter {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    scrollbar-width: auto;
+  }
+
+  .inlineFilterField {
+    flex: 1 1 220px;
+    min-width: min(100%, 220px);
+    max-width: none;
+  }
+}
+
 .pwaFilterStack {
   align-items: flex-end;
   flex-wrap: wrap;
@@ -2389,19 +2597,32 @@ html[dir="rtl"] .navGroupLabel {
 }
 
 .resourceMineToggle {
-  min-height: 42px;
-  padding: 4px 2px;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 44px;
+  gap: 8px;
+  padding: 0;
   color: var(--ink);
   font-size: 0.95rem;
   font-weight: 500;
+  line-height: 1.35;
 }
 
 .resourceMineToggle .MuiCheckbox-root {
-  padding: 0;
+  flex: 0 0 auto;
 }
 
 .resourcesFilter .inlineFilterActions {
   align-self: flex-end;
+}
+
+.pwaFilterStack .inlineFilterField,
+.pwaFilterStack .inlineFilterActions,
+.pwaFilterStack .inlineFilterActions > *,
+.pwaFilterStack .searchDropdown {
+  min-width: 0;
 }
 
 .financePrimaryToolbar,
@@ -2472,7 +2693,7 @@ html[dir="rtl"] .navGroupLabel {
   gap: 8px !important;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .financeTable {
     width: 100%;
     min-width: 0;
@@ -2498,32 +2719,74 @@ html[dir="rtl"] .navGroupLabel {
   align-items: center;
 }
 
-.checkboxLabel {
+.checkboxLabel,
+.choiceLabel {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-height: 44px;
+  max-width: 100%;
+  min-width: 0;
   font-size: 0.9rem;
+  line-height: 1.35;
   cursor: pointer;
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+.checkboxField,
+.radioField {
+  width: fit-content;
+  justify-content: flex-start;
+}
+
+.checkboxFieldText,
+.choiceFieldText,
+.checkboxLabel > span:last-child,
+.choiceLabel > span:last-child {
+  display: inline-block;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .inlineForm .checkboxLabel,
+.inlineForm .choiceLabel,
 .formGridTwo .checkboxLabel,
+.formGridTwo .choiceLabel,
 .formFieldsEditor .checkboxLabel,
-.sectionPicker .checkboxLabel {
+.formFieldsEditor .choiceLabel,
+.sectionPicker .checkboxLabel,
+.sectionPicker .choiceLabel {
   display: inline-flex;
   grid-template-columns: none;
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  min-height: 42px;
+  min-height: 44px;
   width: fit-content;
 }
 
 .checkboxLabel input[type="checkbox"] {
-  width: 1rem;
-  height: 1rem;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
   accent-color: var(--accent, #2563eb);
+}
+
+.checkboxLabel .MuiCheckbox-root input[type="checkbox"] {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.choiceLabel .MuiRadio-root input[type="radio"] {
+  width: 100%;
+  height: 100%;
+  margin: 0;
 }
 
 .stagedAudiencePicker {
@@ -2554,7 +2817,7 @@ html[dir="rtl"] .navGroupLabel {
   justify-content: space-between;
   gap: 10px;
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   padding: 9px 12px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
@@ -2600,7 +2863,7 @@ html[dir="rtl"] .navGroupLabel {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -2716,8 +2979,8 @@ html[dir="rtl"] .navGroupLabel {
 .chip button {
   display: inline-grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -2761,9 +3024,168 @@ html[dir="rtl"] .navGroupLabel {
   background: var(--surface-2, #fafbfd);
 }
 
+.assessmentMobileList {
+  display: grid;
+  gap: 12px;
+}
+
+.assessmentMobileCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.assessmentMobileCard header {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.assessmentMobileCard header strong,
+.assessmentMobileCard header span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.assessmentMobileCard header span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.assessmentMobileFields {
+  display: grid;
+  gap: 10px;
+}
+
+.assessmentMarkField,
+.assessmentMobileMetric {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.assessmentMarkField > span,
+.assessmentMobileMetric > span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.assessmentMarkField > div {
+  min-width: 0;
+  justify-self: end;
+}
+
+.assessmentMobileMetric > strong {
+  min-width: 0;
+  justify-self: end;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+
+.assessmentMobileTotal {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.assessmentMobileActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+@media (max-width: 960px) {
+  .desktopOnlySheet {
+    display: none !important;
+  }
+
+  .sheetWrap {
+    overflow-x: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .sheet,
+  .sheet thead,
+  .sheet tbody,
+  .sheet tr,
+  .sheet th,
+  .sheet td {
+    display: block;
+    width: 100%;
+  }
+
+  .sheet thead {
+    display: none;
+  }
+
+  .sheet tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .sheet tbody tr {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+  }
+
+  .sheet tbody tr:nth-child(even) {
+    background: var(--surface);
+  }
+
+  .sheet td {
+    display: grid;
+    grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .sheet td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .sheet td.sheetEmpty {
+    display: block;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .sheet td.sheetEmpty::before {
+    content: none;
+  }
+}
+
 .markInput {
   width: 64px !important;
-  min-height: 30px !important;
+  min-height: 44px !important;
   padding: 2px 6px !important;
   text-align: center;
 }
@@ -3073,13 +3495,121 @@ input[type="radio"] {
   padding: 24px !important;
 }
 
+@media (max-width: 768px) {
+  .iconButton,
+  .actionMenuTrigger,
+  .dateChip,
+  .profileChip,
+  .profileChipButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .iconButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .primaryAction,
+  .secondaryAction,
+  .iconTextButton,
+  .tableAction,
+  .statusButton,
+  .tabs > button,
+  .inlineFilterTabs > button,
+  .inlineFilterActions > button,
+  .resourceHeaderActions > button,
+  .formActions > button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .checkboxLabel,
+  .choiceLabel,
+  .resourceMineToggle {
+    min-height: 44px;
+  }
+
+  .checkboxLabel input[type="checkbox"] {
+    flex-basis: 44px;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+  }
+
+  .checkboxLabel .MuiCheckbox-root,
+  .choiceLabel .MuiRadio-root,
+  .resourceMineToggle .MuiCheckbox-root {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+  }
+
+  .pwaFilterStack {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    overflow: visible;
+    width: 100%;
+  }
+
+  .pwaFilterStack .inlineFilterField,
+  .pwaFilterStack .inlineFilterTabs,
+  .pwaFilterStack .inlineFilterActions,
+  .pwaFilterStack .inlineFilterActions > *,
+  .pwaFilterStack .searchDropdown {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+
+  .pwaFilterStack .inlineFilterTabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .pwaFilterStack .inlineFilterTabs > button,
+  .pwaFilterStack .inlineFilterActions > button {
+    width: 100%;
+  }
+
+  .pwaFilterStack .inlineFilterActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .inlineFilter {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    overflow-x: visible;
+    width: 100%;
+  }
+
+  .inlineFilterField {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+}
+
 @media (max-width: 640px) {
   .modalOverlay { align-items: flex-end; padding: 8px; }
   .modalCard { width: 100%; max-height: 94vh; border-radius: 16px; }
   .modalHeader { padding: 16px; }
   .formStack, .inlineForm { gap: 16px; padding: 18px 16px 20px; }
-  .inlineFilter { overflow-x: auto; }
-  .inlineFilterField { flex-basis: 160px; min-width: 160px; }
+  .inlineFilter {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    overflow-x: visible;
+    width: 100%;
+  }
+  .inlineFilterField {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
   .pwaFilterStack {
     display: grid;
     grid-template-columns: 1fr;
@@ -3294,12 +3824,12 @@ input[type="radio"] {
 
 /* --------------------------------------------------------- Mobile drawer */
 
-.navToggle {
+.navToggle.iconButton {
   display: none;
 }
 
 @media (max-width: 960px) {
-  .navToggle {
+  .navToggle.iconButton {
     display: inline-flex;
   }
 
@@ -3400,7 +3930,8 @@ input[type="radio"] {
   font-size: 0.78rem;
   line-height: 1.35;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
   text-align: center;
   cursor: pointer;
 }
@@ -3487,8 +4018,8 @@ input[type="radio"] {
 }
 
 .snackbarDismiss {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
 }
 
 /* ======================== mobile/PWA refinement pass ======================== */
@@ -3567,6 +4098,10 @@ input[type="radio"] {
     order: initial;
   }
 
+  .navToggle {
+    display: inline-flex;
+  }
+
   .quickLinks {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3609,6 +4144,10 @@ input[type="radio"] {
     backdrop-filter: none;
   }
 
+  .quickLinks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .topbarContext {
     align-self: center;
   }
@@ -3618,9 +4157,9 @@ input[type="radio"] {
   }
 
   .viewDescription {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
   }
 
   .topbar > .secondaryAction,
@@ -3630,7 +4169,7 @@ input[type="radio"] {
 
   .topbar-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     align-items: center;
     width: 100%;
   }
@@ -3660,8 +4199,13 @@ input[type="radio"] {
     order: 3;
   }
 
-  .profileChipButton {
+  .pwaStatusChip.MuiButton-root {
     order: 4;
+    padding-inline: 10px;
+  }
+
+  .profileChipButton {
+    order: 5;
   }
 
   .dateChipText,
@@ -3678,8 +4222,8 @@ input[type="radio"] {
   }
 
   .profileChipButton {
-    width: 42px;
-    min-width: 42px;
+    width: 44px;
+    min-width: 44px;
     padding-inline: 6px;
     justify-content: center;
   }
@@ -3700,7 +4244,7 @@ input[type="radio"] {
 
   .tabList {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 132px), 1fr));
     overflow: visible;
   }
 
@@ -3708,6 +4252,7 @@ input[type="radio"] {
   .tabButton.MuiButton-root {
     width: 100%;
     min-width: 0;
+    min-height: 44px;
     white-space: normal;
   }
 
@@ -3844,7 +4389,7 @@ html[lang="ur"] .actionMenuItem span {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card);
@@ -3875,6 +4420,7 @@ html[lang="ur"] .actionMenuItem span {
   outline: 0;
   background: transparent;
   padding: 10px 12px;
+  min-height: 44px;
   color: var(--ink);
   font: inherit;
 }
@@ -3953,7 +4499,7 @@ html[lang="ur"] .actionMenuItem span {
   flex: 0 0 auto;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .studentsToolbar.inlineFilter {
     display: grid;
     grid-template-columns: 1fr;
@@ -3985,6 +4531,10 @@ html[lang="ur"] .actionMenuItem span {
   overflow-wrap: anywhere;
 }
 
+.mobileDataCards {
+  display: none;
+}
+
 .muiDataTable .dataRow {
   display: table-row !important;
   border: 0;
@@ -3997,6 +4547,137 @@ html[lang="ur"] .actionMenuItem span {
   display: table-cell !important;
   border-inline-start: 0;
   border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 960px) {
+  .muiDataTable {
+    overflow: visible !important;
+    border: 0;
+    background: transparent !important;
+    box-shadow: none;
+  }
+
+  .muiDataTable .desktopDataTable {
+    display: none;
+  }
+
+  .mobileDataCards {
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobileDataSection {
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--brand-soft);
+    color: var(--brand-deep);
+    font-weight: 750;
+  }
+
+  .mobileDataCard {
+    display: grid;
+    gap: 0;
+    min-width: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+    overflow: hidden;
+  }
+
+  .mobileDataField {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 0.42fr) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: start;
+  }
+
+  .muiDataTable .mobileDataField,
+  .studentsTable .mobileDataField,
+  .assignmentsTable .mobileDataField,
+  .salaryHistoryTable .mobileDataField {
+    width: 100% !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    text-align: start;
+  }
+
+  .mobileDataField:last-child {
+    border-bottom: 0;
+  }
+
+  .mobileDataField dt,
+  .mobileDataField dd {
+    min-width: 0;
+    margin: 0;
+  }
+
+  .mobileDataField dt {
+    color: var(--faint);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .mobileDataField dd {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+    text-align: end;
+  }
+
+  .mobileDataField.colActions,
+  .mobileDataField[class*="Actions"] {
+    grid-template-columns: 1fr;
+  }
+
+  .mobileDataField.colActions dd,
+  .mobileDataField[class*="Actions"] dd {
+    justify-content: flex-end;
+    text-align: end;
+  }
+
+  .mobileDataField.colActions .actionMenu,
+  .mobileDataField[class*="Actions"] .actionMenu {
+    width: auto;
+    justify-content: flex-end;
+  }
+
+  html[dir="rtl"] .mobileDataField dd {
+    text-align: start;
+  }
+}
+
+@media (max-width: 420px) {
+  .mobileDataField {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .mobileDataField dd {
+    justify-content: flex-start;
+    text-align: start;
+  }
+
+  .mobileDataField.colActions dd,
+  .mobileDataField[class*="Actions"] dd {
+    justify-content: flex-end;
+    text-align: end;
+  }
 }
 
 .studentsTable .colPortal,

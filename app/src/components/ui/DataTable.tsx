@@ -7,6 +7,7 @@ import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { LoadingState, ErrorState } from "./AsyncState";
 
 /* ------------------------------------------------------------------ types */
@@ -63,6 +64,7 @@ export function DataTable<T>({
   renderBeforeRow,
 }: Readonly<DataTableProps<T>>) {
   const showData = !isLoading && !error;
+  const renderCards = useMediaQuery("(max-width: 768px)");
 
   return (
     <TableContainer
@@ -92,30 +94,44 @@ export function DataTable<T>({
           {emptyMessage}
         </Box>
       )}
-      {showData && data.length > 0 && (
-        <Table size="small" stickyHeader aria-label="data table" sx={{ minWidth: 720 }}>
-          <TableHead>
-            <TableRow>
-              {columns.map((col, i) => (
-                <TableCell key={i} className={col.className}>
-                  {col.header}
-                </TableCell>
+      {showData && data.length > 0 && !renderCards && (
+        <Table className="desktopDataTable" size="small" stickyHeader aria-label="data table" sx={{ minWidth: 720 }}>
+            <TableHead>
+              <TableRow>
+                {columns.map((col, i) => (
+                  <TableCell key={i} className={col.className}>
+                    {col.header}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {data.map((item, index) => (
+                <DataRow
+                  key={keyExtractor(item)}
+                  item={item}
+                  index={index}
+                  data={data}
+                  columns={columns}
+                  renderBeforeRow={renderBeforeRow}
+                />
               ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {data.map((item, index) => (
-              <DataRow
-                key={keyExtractor(item)}
-                item={item}
-                index={index}
-                data={data}
-                columns={columns}
-                renderBeforeRow={renderBeforeRow}
-              />
-            ))}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+      )}
+      {showData && data.length > 0 && renderCards && (
+        <Box className="mobileDataCards" role="list" aria-label="data cards">
+          {data.map((item, index) => (
+            <MobileDataCard
+              key={keyExtractor(item)}
+              item={item}
+              index={index}
+              data={data}
+              columns={columns}
+              renderBeforeRow={renderBeforeRow}
+            />
+          ))}
+        </Box>
       )}
     </TableContainer>
   );
@@ -150,6 +166,35 @@ function DataRow<T>({
           return <TableCell key={i} data-label={label} className={col.className}>{col.render(item, index)}</TableCell>;
         })}
       </TableRow>
+    </>
+  );
+}
+
+function MobileDataCard<T>({
+  item,
+  index,
+  data,
+  columns,
+  renderBeforeRow,
+}: Readonly<{
+  item: T;
+  index: number;
+  data: T[];
+  columns: Column<T>[];
+  renderBeforeRow?: (item: T, index: number, data: T[]) => ReactNode;
+}>) {
+  const before = renderBeforeRow?.(item, index, data);
+  return (
+    <>
+      {before && <div className="mobileDataSection">{before}</div>}
+      <dl className="mobileDataCard" role="listitem">
+        {columns.map((col, i) => (
+          <div key={i} className={`mobileDataField ${col.className ?? ""}`.trim()}>
+            <dt>{col.header}</dt>
+            <dd>{col.render(item, index)}</dd>
+          </div>
+        ))}
+      </dl>
     </>
   );
 }

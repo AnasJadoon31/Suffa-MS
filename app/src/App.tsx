@@ -7,6 +7,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { DelegateButton } from "./components/DelegateButton";
 import { SessionReadOnlyBanner, SessionSwitcher } from "./components/SessionSwitcher";
 import { initialsOf, RoleBadge, Sidebar } from "./components/Sidebar";
+import { PwaStatus } from "./components/PwaStatus";
 import { NotFoundView } from "./components/NotFoundView";
 import { LoadingState } from "./components/ui/AsyncState";
 import { Button } from "./components/ui/Button";
@@ -279,6 +280,7 @@ function Workspace() {
               </span>
             )}
             <SessionSwitcher />
+            <PwaStatus />
             <Button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>
               <Languages size={16} />
               {isUrdu ? "English" : "اردو"}
@@ -324,6 +326,7 @@ export default function App() {
     <Suspense fallback={<LoadingState />}>
       <Routes>
         <Route path="/set-password" element={<SetPasswordPage />} />
+        <Route path="/admission/:token" element={<PublicAdmissionPage />} />
         <Route path="/public/admission/:token" element={<PublicAdmissionPage />} />
         <Route path="*" element={<Workspace />} />
       </Routes>

@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { FormFieldDefinition } from "../lib/endpoints";
-import { Input, Select, Checkbox } from "./ui/Field";
+import { Input, Select, CheckboxField } from "./ui/Field";
 
 const FIELD_TYPES = ["text", "textarea", "phone", "radio", "checkbox_group", "dropdown", "label"];
 const OPTION_FIELD_TYPES = new Set(["radio", "checkbox_group", "dropdown"]);
@@ -127,15 +127,19 @@ export function FormFieldsEditor({
                 </Button>
               </fieldset>
             )}
-            <label className="checkboxLabel formFieldRequired">
-              <Checkbox checked={field.required} onChange={(event) => updateField(index, { required: event.target.checked })} />
-              {t("requiredLabel")}
-            </label>
+            <CheckboxField
+              className="formFieldRequired"
+              checked={field.required}
+              onChange={(event) => updateField(index, { required: event.target.checked })}
+              label={t("requiredLabel")}
+            />
             {field.built_in && (
-              <label className="checkboxLabel formFieldEnabled">
-                <Checkbox checked={field.enabled !== false} onChange={(event) => updateField(index, { enabled: event.target.checked })} />
-                {t("enabledLabel")}
-              </label>
+              <CheckboxField
+                className="formFieldEnabled"
+                checked={field.enabled !== false}
+                onChange={(event) => updateField(index, { enabled: event.target.checked })}
+                label={t("enabledLabel")}
+              />
             )}
             <Button
               className="iconBtn danger formFieldRemove"

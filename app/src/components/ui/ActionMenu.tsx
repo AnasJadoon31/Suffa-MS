@@ -81,11 +81,11 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={isOpen ? menuId.current : undefined}
+        sx={{ width: 44, height: 44 }}
         onClick={() => {
           updateMenuPosition();
           setIsOpen((open) => !open);
         }}
-        size="small"
       >
         {children ?? <MoreVertical size={16} />}
       </IconButton>
@@ -111,9 +111,8 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
           <MenuItem
             key={index}
             className="actionMenuItem"
-            dense
             disabled={item.disabled}
-            sx={{ color: item.destructive ? "error.main" : "inherit", minHeight: 34, py: 0.5 }}
+            sx={{ color: item.destructive ? "error.main" : "inherit", minHeight: 44, py: 1 }}
             onClick={() => {
               void item.onClick();
               setIsOpen(false);

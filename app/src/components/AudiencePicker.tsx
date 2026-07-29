@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Course, type Scope, type Section } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
-import { Select, Checkbox } from "./ui/Field";
+import { Select, CheckboxField } from "./ui/Field";
 
 type Mode = "all" | "teachers" | "students" | "classes" | "sections" | "courses" | "users";
 
@@ -108,14 +108,12 @@ export function AudiencePicker({
       {mode === "classes" && (
         <Paper variant="outlined" className="sectionPicker">
           {classes.map((c) => (
-            <label key={c.id} className="checkboxLabel">
-              <Checkbox
-                
-                checked={(value.classes ?? []).includes(c.id)}
-                onChange={() => toggleId("classes", c.id)}
-              />
-              {c.name}
-            </label>
+            <CheckboxField
+              key={c.id}
+              checked={(value.classes ?? []).includes(c.id)}
+              onChange={() => toggleId("classes", c.id)}
+              label={c.name}
+            />
           ))}
         </Paper>
       )}
@@ -123,14 +121,12 @@ export function AudiencePicker({
         <Paper variant="outlined" className="sectionPicker">
           {classes.flatMap((c) =>
             (sections[c.id] ?? []).map((s) => (
-              <label key={s.id} className="checkboxLabel">
-                <Checkbox
-                  
-                  checked={(value.sections ?? []).includes(s.id)}
-                  onChange={() => toggleId("sections", s.id)}
-                />
-                {c.name} / {s.name}
-              </label>
+              <CheckboxField
+                key={s.id}
+                checked={(value.sections ?? []).includes(s.id)}
+                onChange={() => toggleId("sections", s.id)}
+                label={`${c.name} / ${s.name}`}
+              />
             ))
           )}
         </Paper>
@@ -139,14 +135,12 @@ export function AudiencePicker({
         <Paper variant="outlined" className="sectionPicker">
           <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectCoursesHint")}</p>
           {courses.map((co) => (
-            <label key={co.id} className="checkboxLabel">
-              <Checkbox
-                
-                checked={(value.courses ?? []).includes(co.id)}
-                onChange={() => toggleId("courses", co.id)}
-              />
-              {co.name}
-            </label>
+            <CheckboxField
+              key={co.id}
+              checked={(value.courses ?? []).includes(co.id)}
+              onChange={() => toggleId("courses", co.id)}
+              label={co.name}
+            />
           ))}
         </Paper>
       )}
@@ -154,14 +148,12 @@ export function AudiencePicker({
         <Paper variant="outlined" className="sectionPicker">
           <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectUsersHint")}</p>
           {people.map((p) => (
-            <label key={p.user_id} className="checkboxLabel">
-              <Checkbox
-                
-                checked={(value.users ?? []).includes(p.user_id)}
-                onChange={() => toggleId("users", p.user_id)}
-              />
-              {p.name} <small style={{ color: "var(--muted)" }}>({p.role === "teacher" ? t("teachers") : t("students")})</small>
-            </label>
+            <CheckboxField
+              key={p.user_id}
+              checked={(value.users ?? []).includes(p.user_id)}
+              onChange={() => toggleId("users", p.user_id)}
+              label={<>{p.name} <small style={{ color: "var(--muted)" }}>({p.role === "teacher" ? t("teachers") : t("students")})</small></>}
+            />
           ))}
         </Paper>
       )}

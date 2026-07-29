@@ -8,7 +8,7 @@ import { useDialog } from "../lib/DialogContext";
 import { academicsApi, operationsApi, type AcademicClass, type Holiday } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { HijriTag } from "./HijriTag";
-import { Input, Select, Checkbox } from "./ui/Field";
+import { Input, Select, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
@@ -125,16 +125,14 @@ export function HolidaysView() {
     <Paper component="section" variant="outlined" className="sectionPicker" style={{ gridColumn: "1 / -1" }}>
       <small className="notice">{t("holidayClassesHint")}</small>
       {classes.map((c) => (
-        <label key={c.id} className="checkboxLabel">
-          <Checkbox
-            
-            checked={value.includes(c.id)}
-            onChange={() =>
-              onChange(value.includes(c.id) ? value.filter((x) => x !== c.id) : [...value, c.id])
-            }
-          />
-          {c.name}
-        </label>
+        <CheckboxField
+          key={c.id}
+          checked={value.includes(c.id)}
+          onChange={() =>
+            onChange(value.includes(c.id) ? value.filter((x) => x !== c.id) : [...value, c.id])
+          }
+          label={c.name}
+        />
       ))}
     </Paper>
   );
@@ -147,7 +145,7 @@ export function HolidaysView() {
         notice={t("descHolidays")}
       />
 
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         { key: "category", type: "select", value: filters.category, placeholder: t("allCategories"), options: categories.map((category) => ({ value: category, label: category })), onChange: (value) => setFilters({ ...filters, category: value }) },
         { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
         { key: "date-from", type: "input", inputType: "date", value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },

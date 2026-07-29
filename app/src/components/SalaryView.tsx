@@ -235,7 +235,7 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
         </>
       )}
 
-      <InlineFilter filters={[]}>
+      <InlineFilter className="pwaFilterStack salaryTeacherToolbar" filters={[]}>
         <SearchDropdown
           id="salary-teacher"
           label={t("teacherLabel")}

@@ -46,8 +46,12 @@ export const appTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 10,
-          minHeight: 40,
+          minHeight: 44,
           gap: 8,
+          "@media (max-width: 960px)": {
+            minHeight: 44,
+            minWidth: 44,
+          },
         },
       },
     },

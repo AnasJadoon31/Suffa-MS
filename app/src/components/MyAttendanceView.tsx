@@ -68,8 +68,8 @@ function MyTeacherAttendance() {
           {entries.length === 0 && <p className="emptyState">{t("noAttendanceHistory")}</p>}
           {entries.map((entry) => (
             <div className="dataRow" key={entry.id}>
-              <span>{entry.attendance_date}</span><span>{t(entry.status)}</span>
-              <span>{entry.check_in?.slice(0, 5) ?? "—"}</span><span>{entry.check_out?.slice(0, 5) ?? "—"}</span>
+              <span data-label={t("dateCol")}>{entry.attendance_date}</span><span data-label={t("statusCol")}>{t(entry.status)}</span>
+              <span data-label={t("timeInLabel")}>{entry.check_in?.slice(0, 5) ?? "—"}</span><span data-label={t("timeOutLabel")}>{entry.check_out?.slice(0, 5) ?? "—"}</span>
             </div>
           ))}
         </div>
@@ -123,12 +123,12 @@ function MyStudentAttendance() {
             {selectedDate && selectedEntries.length === 0 && <p className="emptyState">{t("noAttendanceHistory")}</p>}
             {selectedEntries.map((entry) => (
               <div className="dataRow" key={entry.id}>
-                <span>{entry.attendance_date}</span>
-                <span>{entry.legacy_general
+                <span data-label={t("dateCol")}>{entry.attendance_date}</span>
+                <span data-label={t("courseAndPeriodLabel")}>{entry.legacy_general
                   ? t("legacyGeneralAttendance")
                   : `${entry.course?.name ?? "—"} · ${t("periodLabel", { period: entry.timetable_slot?.period })}`}</span>
-                <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
-                <span>{entry.marked_by.display_name}</span>
+                <span data-label={t("statusCol")} className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
+                <span data-label={t("markedByCol")}>{entry.marked_by.display_name}</span>
               </div>
             ))}
           </div>

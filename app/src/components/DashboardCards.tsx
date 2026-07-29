@@ -516,10 +516,10 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
           {logs.length === 0 && <p className="emptyState">{t("noTeacherAttendanceLogs")}</p>}
           {logs.slice(0, 10).map((entry) => (
             <div className="dataRow" key={entry.id}>
-              <span>{entry.attendance_date}</span>
-              <span>{t(entry.status)}</span>
-              <span>{formatTime(entry.check_in)}</span>
-              <span>{formatTime(entry.check_out)}</span>
+              <span data-label={t("dateCol")}>{entry.attendance_date}</span>
+              <span data-label={t("statusCol")}>{t(entry.status)}</span>
+              <span data-label={t("timeInLabel")}>{formatTime(entry.check_in)}</span>
+              <span data-label={t("timeOutLabel")}>{formatTime(entry.check_out)}</span>
             </div>
           ))}
         </div>

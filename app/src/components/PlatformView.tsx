@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { platformApi, type FeatureFlag, type PlatformMadrasa } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
-import { Input, Checkbox } from "./ui/Field";
+import { Input, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { Modal, FormModal } from "./ui/Modal";
@@ -131,10 +131,12 @@ export function PlatformView() {
             <p className="notice">{t("featuresHint")}</p>
             <div className="delegateList">
               {features.map((flag) => (
-                <label key={flag.key} className="checkboxLabel">
-                  <Checkbox  checked={flag.enabled} onChange={() => void toggleFeature(flag)} />
-                  {flag.label} <small className="notice">({flag.key})</small>
-                </label>
+                <CheckboxField
+                  key={flag.key}
+                  checked={flag.enabled}
+                  onChange={() => void toggleFeature(flag)}
+                  label={<>{flag.label} <small className="notice">({flag.key})</small></>}
+                />
               ))}
             </div>
           </PageSection>

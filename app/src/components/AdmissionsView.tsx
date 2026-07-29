@@ -414,7 +414,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination, categoryFilter, programFilter]);
 
-  const publicUrl = (token: string) => `${window.location.origin}/public/admission/${token}`;
+  const publicUrl = (token: string) => `${window.location.origin}/admission/${token}`;
 
   const copyLink = async (adm: AdmissionForm) => {
     await navigator.clipboard.writeText(publicUrl(adm.public_token));
@@ -426,7 +426,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
     <>
       <p className="notice">{t("admissionFormsHint")}</p>
       
-      <InlineFilter filters={[
+      <InlineFilter className="pwaFilterStack" filters={[
         {
           key: "category",
           type: "select",
@@ -640,7 +640,7 @@ function EnquiriesTab({ canMutate }: Readonly<{ canMutate: boolean }>) {
         { header: t("statusCol"), render: (e) => e.status },
         { header: t("actionsCol"), render: (e) => (
           canMutate && e.status === "new" ? (
-            <Button className="tableAction" type="button" onClick={async () => { await operationsApi.setEnquiryStatus(e.id, "reviewed"); await load(); }}>
+            <Button className="tableAction" type="button" aria-label={t("markReviewedBtn", "Mark reviewed")} title={t("markReviewedBtn", "Mark reviewed")} onClick={async () => { await operationsApi.setEnquiryStatus(e.id, "reviewed"); await load(); }}>
               <CheckCircle2 size={14} />
             </Button>
           ) : null

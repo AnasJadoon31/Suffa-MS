@@ -286,18 +286,58 @@ async function assertMobileToolbarGeometry(page, selector, label, viewportWidth 
 async function assertCheckboxLabelCohesion(page, selector, label) {
   const geometry = await page.locator(selector).evaluate((element) => {
     const control = element.querySelector(".MuiCheckbox-root") ?? element.querySelector('input[type="checkbox"]');
+    const text = element.querySelector(".checkboxFieldText") ?? element.querySelector("span:last-child");
     const controlRect = control?.getBoundingClientRect();
+    const textRect = text?.getBoundingClientRect();
     const labelRect = element.getBoundingClientRect();
+    const verticalOverlap = controlRect && textRect
+      ? Math.min(controlRect.bottom, textRect.bottom) - Math.max(controlRect.top, textRect.top)
+      : null;
     return {
       display: getComputedStyle(element).display,
-      controlCenter: controlRect ? (controlRect.top + controlRect.bottom) / 2 : null,
-      labelCenter: (labelRect.top + labelRect.bottom) / 2,
+      alignItems: getComputedStyle(element).alignItems,
+      labelWidth: labelRect.width,
+      labelHeight: labelRect.height,
+      control: controlRect ? {
+        left: controlRect.left,
+        top: controlRect.top,
+        right: controlRect.right,
+        bottom: controlRect.bottom,
+        width: controlRect.width,
+        height: controlRect.height,
+      } : null,
+      text: textRect ? {
+        left: textRect.left,
+        top: textRect.top,
+        right: textRect.right,
+        bottom: textRect.bottom,
+        width: textRect.width,
+        height: textRect.height,
+      } : null,
+      label: {
+        left: labelRect.left,
+        top: labelRect.top,
+        right: labelRect.right,
+        bottom: labelRect.bottom,
+      },
+      verticalOverlap,
     };
   });
   if (
     !["flex", "inline-flex"].includes(geometry.display)
-    || geometry.controlCenter === null
-    || Math.abs(geometry.controlCenter - geometry.labelCenter) > 8
+    || geometry.alignItems !== "center"
+    || geometry.control === null
+    || geometry.text === null
+    || geometry.control.width < 44
+    || geometry.control.height < 44
+    || geometry.control.left < geometry.label.left - 1
+    || geometry.control.right > geometry.label.right + 1
+    || geometry.control.top < geometry.label.top - 1
+    || geometry.control.bottom > geometry.label.bottom + 1
+    || geometry.text.left < geometry.label.left - 1
+    || geometry.text.right > geometry.label.right + 1
+    || geometry.verticalOverlap === null
+    || geometry.verticalOverlap < Math.min(geometry.text.height, geometry.control.height) * 0.5
   ) {
     throw new Error(`${label} checkbox label cohesion failed: ${JSON.stringify(geometry)}`);
   }
@@ -560,6 +600,45 @@ async function mobileFinanceJourney(browser) {
   return errors;
 }
 
+async function compactTabletUrduJourneys(browser) {
+  const width = 700;
+  const { context, page, errors } = await newPage(browser, { width, height: 900 }, "ur");
+  await open(page, "/announcements");
+  await page.locator(".inlineFilter").waitFor();
+  await assertMobileToolbarGeometry(page, ".announcementsPanel .moduleHeader", "Announcements compact-tablet header", width);
+  await assertMobileToolbarGeometry(page, ".announcementsPanel .pwaFilterStack", "Announcements compact-tablet filters", width);
+  await shot(page, "CURRENT-02_shared-inline-filter_tablet-urdu.png");
+
+  await open(page, "/forms");
+  await page.locator(".formsPanel .pwaFilterStack").waitFor();
+  await assertMobileToolbarGeometry(page, ".formsPanel .tabs", "Forms compact-tablet tabs", width);
+  await assertMobileToolbarGeometry(page, ".formsPanel .formsCreateActions", "Forms compact-tablet create actions", width);
+  await assertMobileToolbarGeometry(page, ".formsPanel .pwaFilterStack", "Forms compact-tablet filters", width);
+  await shot(page, "CURRENT-02_forms-filter_tablet-urdu.png");
+
+  await open(page, "/resources");
+  await page.locator(".resourcesFilter").waitFor();
+  await assertMobileToolbarGeometry(page, ".resourcesPanel .moduleHeader", "Resources compact-tablet header", width);
+  await assertMobileToolbarGeometry(page, ".resourcesFilter", "Resources compact-tablet filters", width);
+  await assertCheckboxLabelCohesion(page, ".resourceMineToggle", "Resources compact-tablet mine-only filter");
+  const visibleTables = await page.locator("table").evaluateAll((tables) => tables.filter((table) => {
+    const rect = table.getBoundingClientRect();
+    const style = getComputedStyle(table);
+    return rect.width > 1 && rect.height > 1 && style.display !== "none" && style.visibility !== "hidden";
+  }).length);
+  if (visibleTables > 0) throw new Error(`Resources compact-tablet rendered visible table count ${visibleTables}`);
+  await shot(page, "CURRENT-02_resources-filter_tablet-urdu.png");
+
+  await page.locator(".resourceHeaderActions .secondaryAction").click();
+  const categoryDialog = page.getByRole("dialog").last();
+  await categoryDialog.waitFor();
+  await assertCheckboxLabelCohesion(page, ".modalCard .checkboxLabel", "Resources compact-tablet category global option");
+  await shot(page, "CURRENT-02_resources-category-checkbox_tablet-urdu.png", categoryDialog);
+
+  await context.close();
+  return errors;
+}
+
 async function tabletFinanceJourney(browser) {
   const { context, page, errors } = await newPage(browser, { width: 700, height: 900 });
   await open(page, "/finance/donations");
@@ -594,7 +673,7 @@ await mkdir(outputDir, { recursive: true });
 await ensureServer();
 const browser = await chromium.launch({ headless: true });
 try {
-  const errors = [...await desktopJourneys(browser), ...await teacherJourneys(browser), ...await mobileUrduJourneys(browser), ...await mobileFinanceJourney(browser), ...await tabletFinanceJourney(browser), ...await loginRedirectJourney(browser)];
+  const errors = [...await desktopJourneys(browser), ...await teacherJourneys(browser), ...await mobileUrduJourneys(browser), ...await mobileFinanceJourney(browser), ...await compactTabletUrduJourneys(browser), ...await tabletFinanceJourney(browser), ...await loginRedirectJourney(browser)];
   if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
   console.log("visual issue verification: all scripted journeys passed");
 } finally {

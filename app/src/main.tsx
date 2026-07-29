@@ -8,19 +8,17 @@ import { BrowserRouter } from "react-router";
 import App from "./App";
 import { AuthProvider } from "./lib/AuthContext";
 import { appTheme } from "./theme";
+import { ensurePwaRegistration } from "./lib/pwaRegistration";
 import "./i18n";
 import "./styles.css";
-import { registerSW } from "virtual:pwa-register";
-
-// Auto-updating service worker (vite-plugin-pwa); reloads seamlessly on new
-// deploys instead of serving stale bundles.
-registerSW({ immediate: true });
 
 import { DialogProvider } from "./lib/DialogContext";
 import { SnackbarProvider } from "./components/ui/Snackbar";
 import { NavigationGuardProvider } from "./lib/NavigationGuardContext";
 
 const queryClient = new QueryClient();
+
+ensurePwaRegistration();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

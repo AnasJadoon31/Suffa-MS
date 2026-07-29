@@ -49,7 +49,7 @@ export function SessionSwitcher() {
       value={selectedId}
       onChange={handleChange}
       disabled={saving}
-      style={{ fontSize: "0.85rem", minHeight: "34px", width: "auto" }}
+      style={{ fontSize: "0.85rem", minHeight: "44px", width: "auto" }}
     >
       {sessions.map((s) => (
         <option key={s.id} value={s.id}>
