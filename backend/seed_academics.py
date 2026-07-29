@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.core.config import settings
+from app.db import core_models  # type: ignore # Import to register models like file_objects
 from app.modules.academics.models import Madrasa, AcademicSession
 from app.modules.people.models import StudentProfile
 from app.modules.auth.models import User
