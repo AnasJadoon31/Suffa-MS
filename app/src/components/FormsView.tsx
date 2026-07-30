@@ -34,6 +34,7 @@ import { cleanFormFields, emptyFormField, FormFieldsEditor, validateFormFields }
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
 import { PhoneInput } from "./ui/PhoneInput";
+import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 
 export function FormsView() {
   const { t } = useTranslation();
@@ -225,16 +226,22 @@ export function FormsView() {
             submitLabel={t("createFormBtn")}
             submitIcon={<Plus size={16} />}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", margin: 0, padding: 0, border: "none", background: "none" }}>
-                      <label>{t("titleLabel")}<Input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></label>
-                      <label>{t("descriptionLabel")}<Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} /></label>
-                      <label>{t("formCategoryLabel")}<Input value={formCategory} onChange={(e) => setFormCategory(e.target.value)} placeholder={t("formCategoryPlaceholder") ?? ""} list="form-categories" /></label>
-                      <CheckboxField
-                        checked={allowMultiple}
-                        onChange={(e) => setAllowMultiple(e.target.checked)}
-                        label={t("allowMultipleLabel")}
-                      />
-                    </div>
+            <FormStack>
+              <FormField label={t("titleLabel")}>
+                <Input required value={formTitle} onChange={(e) => setFormTitle(e.target.value)} />
+              </FormField>
+              <FormField label={t("descriptionLabel")}>
+                <Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} />
+              </FormField>
+              <FormField label={t("formCategoryLabel")}>
+                <Input value={formCategory} onChange={(e) => setFormCategory(e.target.value)} placeholder={t("formCategoryPlaceholder") ?? ""} list="form-categories" />
+              </FormField>
+              <CheckboxField
+                checked={allowMultiple}
+                onChange={(e) => setAllowMultiple(e.target.checked)}
+                label={t("allowMultipleLabel")}
+              />
+            </FormStack>
 
           <StagedAudiencePicker value={audience} onChange={setAudience} />
 
@@ -404,9 +411,17 @@ export function FormsView() {
             }
           }}
         >
-          <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
-          <label>{t("descriptionLabel")}<Input value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
-          <label>{t("formCategoryLabel")}<Input value={editing.category ?? ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })} list="form-categories" /></label>
+          <FormStack>
+            <FormField label={t("titleLabel")}>
+              <Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
+            </FormField>
+            <FormField label={t("descriptionLabel")}>
+              <Input value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+            </FormField>
+            <FormField label={t("formCategoryLabel")}>
+              <Input value={editing.category ?? ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })} list="form-categories" />
+            </FormField>
+          </FormStack>
           <StagedAudiencePicker value={editAudience} onChange={setEditAudience} />
         </FormModal>
       )}

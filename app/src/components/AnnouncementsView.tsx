@@ -13,6 +13,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
+import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 
 
 function toScope(audience: string): Scope {
@@ -146,33 +147,41 @@ export function AnnouncementsView() {
                 submitLabel={t("postAnnouncementBtn")}
                 submitIcon={<Plus size={16} />}
               >
-                <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-
-              <label>{t("targetAudienceLabel")}
-                          <Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
-                            <option value="all">{t("audienceEveryone")}</option>
-                            <option value="teachers">{t("teachers")}</option>
-                            <option value="students">{t("students")}</option>
-                          </Select>
-                        </label>
-
-              <label>{t("announcementCategoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("announcementCategoryPlaceholder") ?? ""} list="announcement-categories" /></label>
-
-              <label>{t("attachmentLinkLabel")}<Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder={t("optionalPlaceholder")} /></label>
-
-              <div className="dateFieldGrid">
-                          <label>{t("publishAtLabel")}<Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} /></label>
-                          <label>{t("expiresAtLabel")}<Input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} /></label>
-                        </div>
-
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>{t("bodyLabel")}</span>
-                          <RichTextEditor
-                            value={form.body}
-                            onChange={(html) => setForm({ ...form, body: html })}
-                            placeholder={t("announcementContentPlaceholder")}
-                          />
-                        </div>
+                <FormStack>
+                  <FormField label={t("titleLabel")}>
+                    <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                  </FormField>
+                  <FormRow>
+                    <FormField label={t("targetAudienceLabel")}>
+                      <Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
+                        <option value="all">{t("audienceEveryone")}</option>
+                        <option value="teachers">{t("teachers")}</option>
+                        <option value="students">{t("students")}</option>
+                      </Select>
+                    </FormField>
+                    <FormField label={t("announcementCategoryLabel")}>
+                      <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("announcementCategoryPlaceholder") ?? ""} list="announcement-categories" />
+                    </FormField>
+                  </FormRow>
+                  <FormField label={t("attachmentLinkLabel")}>
+                    <Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder={t("optionalPlaceholder")} />
+                  </FormField>
+                  <FormRow>
+                    <FormField label={t("publishAtLabel")}>
+                      <Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} />
+                    </FormField>
+                    <FormField label={t("expiresAtLabel")}>
+                      <Input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} />
+                    </FormField>
+                  </FormRow>
+                  <FormField label={t("bodyLabel")}>
+                    <RichTextEditor
+                      value={form.body}
+                      onChange={(html) => setForm({ ...form, body: html })}
+                      placeholder={t("announcementContentPlaceholder")}
+                    />
+                  </FormField>
+                </FormStack>
               </FormModal>
       )}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
@@ -270,27 +279,40 @@ export function AnnouncementsView() {
           submitLabel={t("saveChangesBtn")}
           error={editError}
         >
-          <label>{t("titleLabel")}<Input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></label>
-          <label>{t("targetAudienceLabel")}
-            <Select value={editForm.audience} onChange={(e) => setEditForm({ ...editForm, audience: e.target.value })}>
-              <option value="all">{t("audienceEveryone")}</option>
-              <option value="teachers">{t("teachers")}</option>
-              <option value="students">{t("students")}</option>
-            </Select>
-          </label>
-          <label>{t("announcementCategoryLabel")}<Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} list="announcement-categories" /></label>
-          <label>{t("attachmentLinkLabel")}<Input value={editForm.attachment_link} onChange={(e) => setEditForm({ ...editForm, attachment_link: e.target.value })} /></label>
-          <div className="dateFieldGrid">
-            <label>{t("publishAtLabel")}<Input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} /></label>
-            <label>{t("expiresAtLabel")}<Input type="datetime-local" value={editForm.expires_at} onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })} /></label>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>{t("bodyLabel")}</span>
-            <RichTextEditor
-              value={editForm.body}
-              onChange={(html) => setEditForm({ ...editForm, body: html })}
-            />
-          </div>
+          <FormStack>
+            <FormField label={t("titleLabel")}>
+              <Input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            </FormField>
+            <FormRow>
+              <FormField label={t("targetAudienceLabel")}>
+                <Select value={editForm.audience} onChange={(e) => setEditForm({ ...editForm, audience: e.target.value })}>
+                  <option value="all">{t("audienceEveryone")}</option>
+                  <option value="teachers">{t("teachers")}</option>
+                  <option value="students">{t("students")}</option>
+                </Select>
+              </FormField>
+              <FormField label={t("announcementCategoryLabel")}>
+                <Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} list="announcement-categories" />
+              </FormField>
+            </FormRow>
+            <FormField label={t("attachmentLinkLabel")}>
+              <Input value={editForm.attachment_link} onChange={(e) => setEditForm({ ...editForm, attachment_link: e.target.value })} />
+            </FormField>
+            <FormRow>
+              <FormField label={t("publishAtLabel")}>
+                <Input type="datetime-local" value={editForm.publish_at} onChange={(e) => setEditForm({ ...editForm, publish_at: e.target.value })} />
+              </FormField>
+              <FormField label={t("expiresAtLabel")}>
+                <Input type="datetime-local" value={editForm.expires_at} onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })} />
+              </FormField>
+            </FormRow>
+            <FormField label={t("bodyLabel")}>
+              <RichTextEditor
+                value={editForm.body}
+                onChange={(html) => setEditForm({ ...editForm, body: html })}
+              />
+            </FormField>
+          </FormStack>
         </FormModal>
       )}
     </PageSection>

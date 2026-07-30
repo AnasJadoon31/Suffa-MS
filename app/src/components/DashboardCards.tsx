@@ -1,15 +1,33 @@
-import { Button } from "./ui/Button";
-import { AlertTriangle, CalendarDays, CircleDollarSign, ClipboardCheck, ExternalLink, FileDown, GraduationCap, LogIn, LogOut, UserRoundCog } from "lucide-react";
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CircleDollarSign,
+  ClipboardCheck,
+  ExternalLink,
+  FileDown,
+  GraduationCap,
+  LogIn,
+  LogOut,
+  TrendingDown,
+  TrendingUp,
+  UserRoundCog,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
 import { AttendanceCalendar, toDateKey, type StudentDayStatus } from "./AttendanceCalendar";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
-import { isNavItemAccessible, navItems, type ViewId } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
 import { PageSection, PageHeader } from "./ui/Layout";
-import { MetricGrid, MetricCard } from "./ui/Card";
+import { QuickActions } from "./QuickActions";
+import { ActivityFeed } from "./ActivityFeed";
 
 import {
   type DashboardData,
@@ -29,36 +47,135 @@ import { setPendingClassNav } from "../lib/pendingNav";
 import { Input } from "./ui/Field";
 import { useSessionReadOnly } from "./SessionSwitcher";
 
-
-export type DashboardCardsProps = Readonly<{ onNavigate?: (view: ViewId) => void }>;
+export type DashboardCardsProps = Readonly<{ onNavigate?: (view: import("../data/mockData").ViewId) => void }>;
 
 function formatTime(value: string | null | undefined): string {
   return value ? value.slice(0, 5) : "—";
 }
 
-function QuickLinks({ onNavigate }: Readonly<{ onNavigate?: (view: ViewId) => void }>) {
-  const { t } = useTranslation();
-  const { hasPermission, hasFeature, user } = useAuth();
-  if (!onNavigate) return null;
-  const priorityViews: ViewId[] = ["attendance", "timetable", "announcements", "assessments", "people", "finance"];
-  const visible = navItems.filter(
-    (item) => item.id !== "dashboard" && isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate),
-  ).sort((a, b) => priorityViews.indexOf(a.id) - priorityViews.indexOf(b.id))
-    .filter((item) => priorityViews.includes(item.id));
+// ─── Styled Components ────────────────────────────────────────────────
+
+const DashboardContainer = styled(Box)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(2),
+  padding: theme.spacing(2),
+  [theme.breakpoints.up(768)]: {
+    padding: theme.spacing(3),
+    gap: theme.spacing(3),
+  },
+}));
+
+const MetricGridContainer = styled(Box)(({ theme }) => ({
+  display: "flex",
+  gap: theme.spacing(1.5),
+  overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
+  scrollbarWidth: "none",
+  paddingBottom: 4,
+  "&::-webkit-scrollbar": {
+    display: "none",
+  },
+  [theme.breakpoints.up(768)]: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: theme.spacing(2),
+    overflowX: "visible",
+    paddingBottom: 0,
+  },
+}));
+
+const MetricCardPaper = styled(Paper)(({ theme }) => ({
+  minWidth: 160,
+  flex: "0 0 auto",
+  padding: theme.spacing(2),
+  borderRadius: 16,
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(0.5),
+  position: "relative",
+  overflow: "hidden",
+  border: `1px solid ${theme.palette.divider}`,
+  [theme.breakpoints.up(768)]: {
+    minWidth: 0,
+  },
+}));
+
+const MetricIconWrapper = styled("div")<{ color: string }>(({ color }) => ({
+  position: "absolute",
+  top: 12,
+  right: 12,
+  width: 36,
+  height: 36,
+  borderRadius: 10,
+  backgroundColor: `${color}14`,
+  color: color,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+}));
+
+const TrendRow = styled("div")({
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  marginTop: 4,
+});
+
+// ─── Metric Card ──────────────────────────────────────────────────────
+
+type MetricCardProps = Readonly<{
+  label: string;
+  value: React.ReactNode;
+  icon: LucideIcon;
+  iconColor: string;
+  trend?: React.ReactNode;
+  trendDirection?: "up" | "down" | "neutral";
+}>;
+
+function MetricCard({ label, value, icon: Icon, iconColor, trend, trendDirection }: MetricCardProps) {
   return (
-    <nav className="quickLinks" aria-label={t("quickLinksLabel")}>
-      {visible.map((item) => {
-        const Icon = item.icon;
-        return (
-          <Button key={item.id} type="button" className="quickLink" onClick={() => onNavigate(item.id)}>
-            <Icon size={18} />
-            <span>{t(item.labelKey)}</span>
-          </Button>
-        );
-      })}
-    </nav>
+    <MetricCardPaper>
+      <MetricIconWrapper color={iconColor}>
+        <Icon size={18} />
+      </MetricIconWrapper>
+      <Typography
+        variant="caption"
+        sx={{
+          fontSize: "0.8rem",
+          fontWeight: 500,
+          color: "text.secondary",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        variant="h4"
+        sx={{
+          fontSize: "1.75rem",
+          fontWeight: 700,
+          lineHeight: 1.2,
+          color: "text.primary",
+        }}
+      >
+        {value}
+      </Typography>
+      {trend && (
+        <TrendRow>
+          {trendDirection === "up" && <TrendingUp size={14} color="#3f7f4c" />}
+          {trendDirection === "down" && <TrendingDown size={14} color="#b94a48" />}
+          <Typography variant="caption" color="text.secondary">
+            {trend}
+          </Typography>
+        </TrendRow>
+      )}
+    </MetricCardPaper>
   );
 }
+
+// ─── Main Component ───────────────────────────────────────────────────
 
 export function DashboardCards({ onNavigate }: DashboardCardsProps) {
   const { t } = useTranslation();
@@ -66,9 +183,9 @@ export function DashboardCards({ onNavigate }: DashboardCardsProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const isDesktop = useMediaQuery("@media (min-width:768px)");
 
   useEffect(() => {
-    // Cached so today's timetable / dashboard stays viewable offline (FR-TT-02).
     void cachedFetch("dashboard", () => reportingApi.dashboard())
       .then(({ data: payload }) => setData(payload))
       .catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDashboard")))
@@ -79,23 +196,27 @@ export function DashboardCards({ onNavigate }: DashboardCardsProps) {
   if (isLoading) return <LoadingState />;
   if (error) return <ErrorState message={error} />;
   if (!data) return null;
+
   return (
-    <>
-      <QuickLinks onNavigate={onNavigate} />
+    <DashboardContainer>
+      <QuickActions onNavigate={onNavigate} />
       {data.role === "teacher" ? (
-        <TeacherDashboardCards data={data} onNavigate={onNavigate} readOnly={readOnly} />
+        <TeacherDashboardCards data={data} onNavigate={onNavigate} readOnly={readOnly} isDesktop={isDesktop} />
       ) : data.role === "student" ? (
-        <StudentDashboardCards data={data} readOnly={readOnly} />
+        <StudentDashboardCards data={data} readOnly={readOnly} isDesktop={isDesktop} />
       ) : data.role === "parent" ? (
-        <ParentDashboardCards data={data} />
+        <ParentDashboardCards data={data} isDesktop={isDesktop} />
       ) : (
-        <PrincipalDashboardCards data={data} />
+        <PrincipalDashboardCards data={data} isDesktop={isDesktop} />
       )}
-    </>
+      <ActivityFeed />
+    </DashboardContainer>
   );
 }
 
-function ParentDashboardCards({ data }: Readonly<{ data: ParentDashboard }>) {
+// ─── Parent Dashboard ─────────────────────────────────────────────────
+
+function ParentDashboardCards({ data, isDesktop }: Readonly<{ data: ParentDashboard; isDesktop: boolean }>) {
   const { t } = useTranslation();
   const [selectedChildId, setSelectedChildId] = useState(data.children[0]?.id ?? "");
   const child = data.children.find((candidate) => candidate.id === selectedChildId) ?? data.children[0];
@@ -104,7 +225,7 @@ function ParentDashboardCards({ data }: Readonly<{ data: ParentDashboard }>) {
     return (
       <PageSection>
         <PageHeader title={t("myChildrenHeading")} />
-        <p className="emptyState">{t("noLinkedChildren")}</p>
+        <p>{t("noLinkedChildren")}</p>
       </PageSection>
     );
   }
@@ -122,141 +243,162 @@ function ParentDashboardCards({ data }: Readonly<{ data: ParentDashboard }>) {
     <>
       <PageSection>
         <PageHeader title={t("myChildrenHeading")} notice={t("guardianDashboardHint")} />
-        <div className="guardianChildSwitcher" role="tablist" aria-label={t("childSwitcherLabel")}>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }} role="tablist" aria-label={t("childSwitcherLabel")}>
           {data.children.map((candidate) => (
-            <Button
+            <Box
               key={candidate.id}
-              type="button"
               role="tab"
               aria-selected={candidate.id === child.id}
-              className={candidate.id === child.id ? "primaryAction" : "secondaryAction"}
               onClick={() => setSelectedChildId(candidate.id)}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                padding: "8px 14px",
+                borderRadius: 999,
+                cursor: "pointer",
+                backgroundColor: candidate.id === child.id ? "primary.main" : "background.paper",
+                color: candidate.id === child.id ? "primary.contrastText" : "text.primary",
+                border: 1,
+                borderColor: candidate.id === child.id ? "primary.main" : "divider",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                "&:hover": { backgroundColor: candidate.id === child.id ? "primary.dark" : "action.hover" },
+              }}
             >
-              <GraduationCap size={18} />
+              <GraduationCap size={16} />
               <span>
                 <strong>{candidate.name}</strong>
-                <small>{candidate.current_class ?? t("notAssignedLabel")}</small>
               </span>
-            </Button>
+            </Box>
           ))}
-        </div>
+        </Box>
       </PageSection>
 
-      <MetricGrid aria-label={t("dashboardSummaryLabel")}>
+      <MetricGridContainer>
         <MetricCard
-          title={t("classLabel")}
+          label={t("classLabel")}
           value={child.current_class ?? "—"}
-          trend={<small>{t("admissionNumberCol")}: {child.admission_number}</small>}
+          icon={GraduationCap}
+          iconColor="#0f766e"
+          trend={`${t("admissionNumberCol")}: ${child.admission_number}`}
         />
         <MetricCard
-          title={t("attendance")}
+          label={t("attendance")}
           value={`${attendanceCounts.present ?? 0} / ${Object.keys(statuses).length || "—"}`}
-          trend={<small>{t("attendanceSummaryLine", { absent: attendanceCounts.absent ?? 0, leave: attendanceCounts.leave ?? 0 })}</small>}
+          icon={ClipboardCheck}
+          iconColor="#3f7f4c"
+          trend={t("attendanceSummaryLine", { absent: attendanceCounts.absent ?? 0, leave: attendanceCounts.leave ?? 0 })}
         />
         <MetricCard
-          title={t("overallScoreLabel")}
+          label={t("overallScoreLabel")}
           value={child.latest_result?.overall_score ?? "—"}
-          trend={<small>{child.latest_result ? t("publishedLabel") : t("notPublishedLabel")}</small>}
+          icon={TrendingUp}
+          iconColor="#c77d1a"
+          trend={child.latest_result ? t("publishedLabel") : t("notPublishedLabel")}
         />
         <MetricCard
-          title={t("feesPaidLabel")}
+          label={t("feesPaidLabel")}
           value={paymentTotals}
-          trend={<small>{t("paymentCount", { count: child.payments.length })}</small>}
+          icon={CircleDollarSign}
+          iconColor="#c77d1a"
+          trend={t("paymentCount", { count: child.payments.length })}
         />
-      </MetricGrid>
+      </MetricGridContainer>
 
-      <div className="dashboardColumns guardianDashboardColumns">
+      <Box sx={{ display: isDesktop ? "grid" : "flex", gridTemplateColumns: "1fr 1fr", gap: 2, flexDirection: "column" }}>
         <StudentAttendancePanel
           title={t("attendanceForStudentLabel", { name: child.name })}
           statuses={statuses}
           periods={child.my_attendance_periods}
         />
 
-        <div>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <ParentResults child={child} />
 
           <PageSection>
             <PageHeader title={t("feeHistoryHeading")} />
-            {child.payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
-            <div className="dataTable">
+            {child.payments.length === 0 && <p>{t("noPaymentsYet")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.payments.map((payment) => (
-                <div className="dataRow guardianPaymentRow" key={payment.id}>
-                  <span><strong>{payment.category}</strong><small>{payment.note}</small></span>
+                <Box key={payment.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
+                  <span><strong>{payment.category}</strong><br /><small>{payment.note}</small></span>
                   <span>{payment.payment_date}</span>
                   <span><strong>{payment.amount.toLocaleString()} {payment.currency}</strong></span>
-                </div>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("todaysTimetableHeading")} />
-            {child.today_timetable.length === 0 && <p className="emptyState">{t("noPeriodsToday")}</p>}
-            <div className="dataTable">
+            {child.today_timetable.length === 0 && <p>{t("noPeriodsToday")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.today_timetable.map((slot, index) => (
-                <div className="dataRow" key={`${slot.course_id}-${slot.period}-${index}`}>
+                <Box key={`${slot.course_id}-${slot.period}-${index}`} sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
                   <span><strong>{t("periodLabel", { period: slot.period })}</strong></span>
                   <span>{slot.start_time} – {slot.end_time}</span>
-                </div>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("dueAssignmentsHeading")} />
-            {child.due_assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
-            <div className="dataTable">
+            {child.due_assignments.length === 0 && <p>{t("nothingDue")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.due_assignments.map((assignment) => (
-                <div className="dataRow" key={assignment.id}>
+                <Box key={assignment.id} sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
                   <span><strong>{assignment.title}</strong></span>
                   <span>{assignment.due_date.slice(0, 10)}</span>
-                </div>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("announcements")} />
-            {child.announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsYet")}</p>}
-            <div className="dataTable">
+            {child.announcements.length === 0 && <p>{t("noAnnouncementsYet")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.announcements.map((announcement) => (
-                <div className="dataRow" key={announcement.id}>
-                  <span><strong>{announcement.title}</strong><small>{announcement.body}</small></span>
-                </div>
+                <Box key={announcement.id} sx={{ padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
+                  <span><strong>{announcement.title}</strong><br /><small>{announcement.body}</small></span>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("forms")} notice={t("wardFormsHint", { name: child.name })} />
-            {child.forms.length === 0 && <p className="emptyState">{t("noFormsYet")}</p>}
-            <div className="dataTable">
+            {child.forms.length === 0 && <p>{t("noFormsYet")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.forms.map((form) => (
-                <div className="dataRow" key={form.id}>
+                <Box key={form.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
                   <span>
                     <strong>{form.title}</strong>
+                    <br />
                     <small>{form.description || form.category || t("forms")}</small>
                   </span>
                   <span>{form.open_until ? form.open_until.slice(0, 10) : t("openBtn")}</span>
-                  <Link className="tableAction" to="/forms">{t("openBtn")}</Link>
-                </div>
+                  <Link to="/forms">{t("openBtn")}</Link>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("resources")} />
-            {child.resources.length === 0 && <p className="emptyState">{t("noResourcesShared")}</p>}
-            <div className="dataTable">
+            {child.resources.length === 0 && <p>{t("noResourcesShared")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.resources.map((resource) => (
-                <div className="dataRow" key={resource.id}>
+                <Box key={resource.id} sx={{ padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
                   <span><strong>{resource.title}</strong></span>
-                </div>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
-        </div>
-      </div>
+        </Box>
+      </Box>
     </>
   );
 }
@@ -267,16 +409,16 @@ function ParentResults({ child }: Readonly<{ child: ParentChildDashboard }>) {
   return (
     <PageSection>
       <PageHeader title={t("latestResultsHeading")} />
-      {results.length === 0 && <p className="emptyState">{t("noPublishedResults")}</p>}
-      <div className="dataTable">
+      {results.length === 0 && <p>{t("noPublishedResults")}</p>}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         {results.map((result) => (
-          <div className="dataRow" key={result.course_id}>
+          <Box key={result.course_id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
             <span><strong>{result.course_name ?? t("courseLabel")}</strong></span>
             <span>{result.raw_score == null ? "—" : `${result.raw_score}%`}</span>
-            <span className="statusPill">{result.band ?? "—"}</span>
-          </div>
+            <span>{result.band ?? "—"}</span>
+          </Box>
         ))}
-      </div>
+      </Box>
     </PageSection>
   );
 }
@@ -306,22 +448,24 @@ function StudentAttendancePanel({
         studentDayStatus={statuses}
       />
       {selectedDate && (
-        <div className="dataTable dashboardPeriodAttendance">
-          {selectedPeriods.length === 0 && <p className="emptyState">{t("noAttendanceHistory")}</p>}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
+          {selectedPeriods.length === 0 && <p>{t("noAttendanceHistory")}</p>}
           {selectedPeriods.map((entry, index) => (
-            <div className="dataRow" key={entry.timetable_slot_id ?? `${entry.date}-legacy-${index}`}>
+            <Box key={entry.timetable_slot_id ?? `${entry.date}-legacy-${index}`} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
               <span><strong>{entry.legacy_general ? t("legacyGeneralAttendance") : entry.course_name}</strong></span>
               <span>{entry.legacy_general ? "—" : t("periodLabel", { period: entry.period })}</span>
-              <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
-            </div>
+              <span>{t(entry.status)}</span>
+            </Box>
           ))}
-        </div>
+        </Box>
       )}
     </PageSection>
   );
 }
 
-function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }>) {
+// ─── Principal Dashboard ──────────────────────────────────────────────
+
+function PrincipalDashboardCards({ data, isDesktop }: Readonly<{ data: PrincipalDashboard; isDesktop: boolean }>) {
   const { t } = useTranslation();
   const studentCount = data.counts.students ?? 0;
   const teacherCount = data.counts.teachers ?? 0;
@@ -334,48 +478,68 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
         total: attendanceRosterTotal,
       })
     : t("noActiveRoster");
+
   const cards = [
     {
       label: t("students"),
       value: String(studentCount),
       detail: t("activeClassesCount", { count: data.counts.classes }),
       icon: GraduationCap,
+      color: "#0f766e",
+      trendDirection: "up" as const,
     },
     {
       label: t("teachers"),
       value: String(teacherCount),
       detail: t("activeTeacherProfiles"),
       icon: UserRoundCog,
+      color: "#3f7f4c",
+      trendDirection: "neutral" as const,
     },
     {
       label: t("todayAttendance"),
       value: `${data.attendance.present} / ${attendanceRosterTotal || "—"}`,
       detail: attendanceDetail,
       icon: ClipboardCheck,
+      color: "#0f766e",
+      trendDirection: "up" as const,
     },
-    { label: t("missingSync"), value: String(data.attendance.missing_sync_teachers), detail: t("teachersWithoutTodayMark"), icon: AlertTriangle },
-    { label: t("monthlyIncome"), value: `${data.finance.month_total.toLocaleString()} ${data.finance.currency}`, detail: t("contributionsAndDonations"), icon: CircleDollarSign },
+    {
+      label: t("missingSync"),
+      value: String(data.attendance.missing_sync_teachers),
+      detail: t("teachersWithoutTodayMark"),
+      icon: AlertTriangle,
+      color: "#c77d1a",
+      trendDirection: data.attendance.missing_sync_teachers > 0 ? ("down" as const) : ("neutral" as const),
+    },
+    {
+      label: t("monthlyIncome"),
+      value: `${data.finance.month_total.toLocaleString()} ${data.finance.currency}`,
+      detail: t("contributionsAndDonations"),
+      icon: CircleDollarSign,
+      color: "#c77d1a",
+      trendDirection: "up" as const,
+    },
   ];
 
   return (
     <>
-      <MetricGrid aria-label={t("dashboardSummaryLabel")}>
+      <MetricGridContainer>
         {cards.map((card) => {
           const Icon = card.icon;
           return (
             <MetricCard
               key={card.label}
-              title={
-                <>
-                  <Icon size={20} /> {card.label}
-                </>
-              }
+              label={card.label}
               value={card.value}
-              trend={<small>{card.detail}</small>}
+              icon={Icon}
+              iconColor={card.color}
+              trend={card.detail}
+              trendDirection={card.trendDirection}
             />
           );
         })}
-      </MetricGrid>
+      </MetricGridContainer>
       {data.attendance.missing_sync_teacher_list.length > 0 && (
         <PageSection>
           <PageHeader title={t("missingAttendanceSyncHeading")} />
@@ -396,7 +560,9 @@ function PrincipalDashboardCards({ data }: Readonly<{ data: PrincipalDashboard }
   );
 }
 
-function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: TeacherDashboard; onNavigate?: (view: ViewId) => void; readOnly: boolean }>) {
+// ─── Teacher Dashboard ────────────────────────────────────────────────
+
+function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readonly<{ data: TeacherDashboard; onNavigate?: (view: import("../data/mockData").ViewId) => void; readOnly: boolean; isDesktop: boolean }>) {
   const { t } = useTranslation();
   const [attendance, setAttendance] = useState(data.today_attendance);
   const [logs, setLogs] = useState<TeacherAttendanceLogEntry[]>([]);
@@ -437,72 +603,100 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
 
   return (
     <>
-      <MetricGrid aria-label={t("dashboardSummaryLabel")}>
+      <MetricGridContainer>
         <MetricCard
-          title={t("myClassesHeading")}
+          label={t("myClassesHeading")}
           value={data.my_classes.length}
-          trend={<small>{data.my_classes.map((c) => `${c.class_name} · ${c.course_name}`).join(", ") || t("noAssignmentsYet")}</small>}
+          icon={GraduationCap}
+          iconColor="#0f766e"
+          trend={data.my_classes.map((c) => `${c.class_name} · ${c.course_name}`).join(", ") || t("noAssignmentsYet")}
         />
         <MetricCard
-          title={t("pendingSubmissionsHeading")}
+          label={t("pendingSubmissionsHeading")}
           value={data.pending_submissions}
-          trend={<small>{t("ungradedAcrossClasses")}</small>}
+          icon={ClipboardCheck}
+          iconColor="#c77d1a"
+          trend={t("ungradedAcrossClasses")}
+          trendDirection={data.pending_submissions > 0 ? "down" : "neutral"}
         />
         <MetricCard
-          title={t("todayAttendance")}
+          label={t("todayAttendance")}
           value={attendance?.check_in ? formatTime(attendance.check_in) : t("notCheckedIn")}
-          trend={<small>{t("checkedOutAt", { time: formatTime(attendance?.check_out) })}</small>}
+          icon={LogIn}
+          iconColor="#3f7f4c"
+          trend={t("checkedOutAt", { time: formatTime(attendance?.check_out) })}
         />
-      </MetricGrid>
+      </MetricGridContainer>
       <PageSection>
         <PageHeader title={t("myClassesHeading")} />
-        {data.my_classes.length === 0 && <p className="emptyState">{t("noCoursesAssigned")}</p>}
-        <div className="dataTable">
+        {data.my_classes.length === 0 && <p>{t("noCoursesAssigned")}</p>}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           {data.my_classes.map((entry, index) => (
-            <div className="dataRow" key={index}>
+            <Box key={index} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider", flexWrap: "wrap", gap: 1 }}>
               <span>{entry.class_name}{entry.section_name ? ` / ${entry.section_name}` : ""}</span>
               <span>{entry.course_name}</span>
-              <span>
-                <Button
-                  className="tableAction"
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <button
                   type="button"
                   onClick={() => {
                     setPendingClassNav({ classId: entry.class_id, sectionId: entry.section_id, courseId: entry.course_id });
                     onNavigate?.("attendance");
                   }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: "1px solid #e0e6df", background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
                 >
                   <ExternalLink size={14} /> {t("openClassListBtn")}
-                </Button>
-                <Button
-                  className="tableAction"
+                </button>
+                <button
                   type="button"
                   onClick={() => {
                     setPendingClassNav({ classId: entry.class_id, sectionId: entry.section_id, courseId: entry.course_id });
                     onNavigate?.("assessments");
                   }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: "1px solid #e0e6df", background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
                 >
                   <ExternalLink size={14} /> {t("assessments")}
-                </Button>
-              </span>
-            </div>
+                </button>
+              </Box>
+            </Box>
           ))}
-        </div>
+        </Box>
       </PageSection>
       <PageSection>
         <PageHeader title={t("timeInOutHeading")} />
-        <div className="formActions">
-          <Button className="primaryAction" type="button" disabled={readOnly || !!attendance?.check_in} onClick={() => checkIn()}>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            disabled={readOnly || !!attendance?.check_in}
+            onClick={() => checkIn()}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 999,
+              border: "none", backgroundColor: readOnly || attendance?.check_in ? "#e0e6df" : "#0f766e",
+              color: readOnly || attendance?.check_in ? "#9bb8b0" : "#fff", cursor: readOnly || attendance?.check_in ? "not-allowed" : "pointer",
+              fontWeight: 600, fontSize: "0.875rem",
+            }}
+          >
             <LogIn size={16} /> {t("timeInLabel")}
-          </Button>
-          <Button className="secondaryAction" type="button" disabled={readOnly || !attendance?.check_in || !!attendance?.check_out} onClick={() => checkOut()}>
+          </button>
+          <button
+            type="button"
+            disabled={readOnly || !attendance?.check_in || !!attendance?.check_out}
+            onClick={() => checkOut()}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 999,
+              border: "1px solid #e0e6df", backgroundColor: readOnly || !attendance?.check_in || attendance?.check_out ? "transparent" : "#fff",
+              color: readOnly || !attendance?.check_in || attendance?.check_out ? "#9bb8b0" : "#16211d",
+              cursor: readOnly || !attendance?.check_in || attendance?.check_out ? "not-allowed" : "pointer",
+              fontWeight: 600, fontSize: "0.875rem",
+            }}
+          >
             <LogOut size={16} /> {t("timeOutLabel")}
-          </Button>
-        </div>
-        {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+          </button>
+        </Box>
+        {error && <p style={{ color: "#b94a48" }}>{error}</p>}
       </PageSection>
       <PageSection>
         <PageHeader title={t("todaysTimetableHeading")} />
-        {data.today_timetable.length === 0 && <p className="emptyState">{t("noPeriodsToday")}</p>}
+        {data.today_timetable.length === 0 && <p>{t("noPeriodsToday")}</p>}
         <ul>
           {data.today_timetable.map((slot, i) => (
             <li key={i}>{slot.start_time} – {slot.end_time} ({t("periodLabel", { period: slot.period })})</li>
@@ -511,22 +705,29 @@ function TeacherDashboardCards({ data, onNavigate, readOnly }: Readonly<{ data: 
       </PageSection>
       <PageSection>
         <PageHeader title={t("myAttendanceLogHeading")} />
-        <div className="dataTable">
-          <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("statusCol")}</span><span>{t("timeInLabel")}</span><span>{t("timeOutLabel")}</span></div>
-          {logs.length === 0 && <p className="emptyState">{t("noTeacherAttendanceLogs")}</p>}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontWeight: 700, fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: 2, borderColor: "divider" }}>
+            <span>{t("dateCol")}</span>
+            <span>{t("statusCol")}</span>
+            <span>{t("timeInLabel")}</span>
+            <span>{t("timeOutLabel")}</span>
+          </Box>
+          {logs.length === 0 && <p>{t("noTeacherAttendanceLogs")}</p>}
           {logs.slice(0, 10).map((entry) => (
-            <div className="dataRow" key={entry.id}>
-              <span data-label={t("dateCol")}>{entry.attendance_date}</span>
-              <span data-label={t("statusCol")}>{t(entry.status)}</span>
-              <span data-label={t("timeInLabel")}>{formatTime(entry.check_in)}</span>
-              <span data-label={t("timeOutLabel")}>{formatTime(entry.check_out)}</span>
-            </div>
+            <Box key={entry.id} sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
+              <span>{entry.attendance_date}</span>
+              <span>{t(entry.status)}</span>
+              <span>{formatTime(entry.check_in)}</span>
+              <span>{formatTime(entry.check_out)}</span>
+            </Box>
           ))}
-        </div>
+        </Box>
       </PageSection>
     </>
   );
 }
+
+// ─── Student Dashboard ────────────────────────────────────────────────
 
 function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assignment: StudentDashboard["due_assignments"][number]; onSubmitted: () => void; readOnly: boolean }>) {
   const { t } = useTranslation();
@@ -553,12 +754,12 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
   };
 
   return (
-    <div className="dataRow">
+    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider", flexWrap: "wrap", gap: 1 }}>
       <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <strong>{assignment.title}</strong>
-        <span className="notice">Due {assignment.due_date.slice(0, 10)}</span>
+        <span>Due {assignment.due_date.slice(0, 10)}</span>
         {assignment.feedback && (
-          <span className="notice" style={{ color: "var(--primary)", marginTop: 4 }}>
+          <span style={{ color: "#0f766e", marginTop: 4 }}>
             <strong>{t("remarksLabel", "Remarks")}:</strong> {assignment.feedback}
           </span>
         )}
@@ -566,38 +767,48 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
       <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
         {submitted ? (
           <span style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-            <span className="notice">{t("submittedLabel")}</span>
+            <span>{t("submittedLabel")}</span>
             {assignment.mark !== undefined && assignment.mark !== null && assignment.max_marks && (
-              <span className="badge success">{assignment.mark} / {assignment.max_marks}</span>
+              <span>{assignment.mark} / {assignment.max_marks}</span>
             )}
             {submittedFileKey && (
-              <Button
-                className="tableAction"
+              <button
                 type="button"
                 onClick={async () => {
                   const { url } = await filesApi.presignDownload(submittedFileKey);
                   window.open(url, "_blank", "noreferrer");
                 }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: "1px solid #e0e6df", background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
               >
                 <FileDown size={14} /> {t("downloadBtn")}
-              </Button>
+              </button>
             )}
           </span>
         ) : (
           <>
             <Input type="file" disabled={readOnly} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            <Button className="primaryAction" type="button" disabled={readOnly || !file} onClick={() => submit()}>
+            <button
+              type="button"
+              disabled={readOnly || !file}
+              onClick={() => submit()}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 999,
+                border: "none", backgroundColor: readOnly || !file ? "#e0e6df" : "#0f766e",
+                color: readOnly || !file ? "#9bb8b0" : "#fff", cursor: readOnly || !file ? "not-allowed" : "pointer",
+                fontWeight: 600, fontSize: "0.875rem",
+              }}
+            >
               {t("submitBtn")}
-            </Button>
+            </button>
           </>
         )}
       </span>
-      {error && <span className="notice" style={{ color: "var(--rose)", width: "100%" }}>{error}</span>}
-    </div>
+      {error && <span style={{ color: "#b94a48", width: "100%" }}>{error}</span>}
+    </Box>
   );
 }
 
-function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashboard; readOnly: boolean }>) {
+function StudentDashboardCards({ data, readOnly, isDesktop }: Readonly<{ data: StudentDashboard; readOnly: boolean; isDesktop: boolean }>) {
   const { t } = useTranslation();
 
   const statuses = (data.my_attendance ?? {}) as StudentDayStatus;
@@ -608,94 +819,87 @@ function StudentDashboardCards({ data, readOnly }: Readonly<{ data: StudentDashb
 
   return (
     <>
-      <MetricGrid aria-label={t("dashboardSummaryLabel")}>
+      <MetricGridContainer>
         <MetricCard
-          title={t("overallScoreLabel")}
+          label={t("overallScoreLabel")}
           value={data.latest_result?.overall_score ?? "—"}
-          trend={<small>{data.latest_result?.published ? t("publishedLabel") : t("notPublishedLabel")}</small>}
-        >
-          {data.latest_result?.published && (
-            <Button
-              className="secondaryAction"
-              type="button"
-              onClick={() => assessmentsApi.downloadMyResultCard(data.latest_result!.session_id)}
-            >
-              {t("downloadResultCardBtn")}
-            </Button>
-          )}
-        </MetricCard>
+          icon={TrendingUp}
+          iconColor="#c77d1a"
+          trend={data.latest_result?.published ? t("publishedLabel") : t("notPublishedLabel")}
+        />
         <MetricCard
-          title={t("dueAssignmentsHeading")}
+          label={t("dueAssignmentsHeading")}
           value={data.due_assignments.length}
-          trend={<small>{t("notSubmittedLabel")}</small>}
+          icon={ClipboardCheck}
+          iconColor="#0f766e"
+          trend={t("notSubmittedLabel")}
+          trendDirection={data.due_assignments.length > 0 ? "down" : "neutral"}
         />
         <MetricCard
-          title={
-            <>
-              <CalendarDays size={20} /> {t("attendance")}
-            </>
-          }
+          label={t("attendance")}
           value={`${counts.present ?? 0} / ${Object.keys(statuses).length || "—"}`}
-          trend={<small>{t("attendanceSummaryLine", { absent: counts.absent ?? 0, leave: counts.leave ?? 0 })}</small>}
+          icon={CalendarDays}
+          iconColor="#3f7f4c"
+          trend={t("attendanceSummaryLine", { absent: counts.absent ?? 0, leave: counts.leave ?? 0 })}
         />
-      </MetricGrid>
+      </MetricGridContainer>
 
-      <div className="dashboardColumns">
+      <Box sx={{ display: isDesktop ? "grid" : "flex", gridTemplateColumns: "1fr 1fr", gap: 2, flexDirection: "column" }}>
         <StudentAttendancePanel
           title={t("myAttendanceHeading")}
           statuses={statuses}
           periods={data.my_attendance_periods ?? []}
         />
 
-        <div>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <PageSection>
             <PageHeader title={t("todaysTimetableHeading")} />
-            {data.today_timetable.length === 0 && <p className="emptyState">{t("noPeriodsToday")}</p>}
-            <div className="dataTable">
+            {data.today_timetable.length === 0 && <p>{t("noPeriodsToday")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {data.today_timetable.map((slot, i) => (
-                <div className="dataRow" key={i}>
+                <Box key={i} sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
                   <span><strong>{t("periodLabel", { period: slot.period })}</strong></span>
                   <span>{slot.start_time} – {slot.end_time}</span>
-                </div>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("dueAssignmentsHeading")} />
-            {data.due_assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
-            <div className="dataTable">
+            {data.due_assignments.length === 0 && <p>{t("nothingDue")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {data.due_assignments.map((a) => (
                 <DueAssignmentRow key={a.id} assignment={a} readOnly={readOnly} onSubmitted={() => { /* refreshes next load */ }} />
               ))}
-            </div>
+            </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("announcements")} />
-            {data.announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsYet")}</p>}
-            <div className="dataTable">
+            {data.announcements.length === 0 && <p>{t("noAnnouncementsYet")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {data.announcements.map((a) => (
-                <div className="dataRow" key={a.id}>
+                <Box key={a.id} sx={{ padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
                   <span>{a.title}</span>
-                </div>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("resources")} />
-            {data.resources.length === 0 && <p className="emptyState">{t("noResourcesShared")}</p>}
-            <div className="dataTable">
+            {data.resources.length === 0 && <p>{t("noResourcesShared")}</p>}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {data.resources.map((r) => (
-                <div className="dataRow" key={r.id}>
+                <Box key={r.id} sx={{ padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
                   <span>{r.title}</span>
-                </div>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
-        </div>
-      </div>
+        </Box>
+      </Box>
     </>
   );
 }

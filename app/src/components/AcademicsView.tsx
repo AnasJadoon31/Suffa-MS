@@ -21,6 +21,7 @@ import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
+import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 
 
 export type AcademicTab = "programs" | "classes" | "courses" | "sessions";
@@ -207,10 +208,11 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                             submitLabel={t("addProgramBtn")}
                             submitIcon={<Plus size={16} />}
                           >
-                            <label>
-                                            {t("programNameLabel")}
-                                            <Input required value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder={t("programExample")} />
-                                          </label>
+                            <FormStack>
+                              <FormField label={t("programNameLabel")}>
+                                <Input required value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder={t("programExample")} />
+                              </FormField>
+                            </FormStack>
                           </FormModal>}
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("actionsCol")}</span></div>
@@ -268,26 +270,23 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                             submitLabel={t("addClassBtn")}
                             submitIcon={<Plus size={16} />}
                           >
-                            <label>
-                                            {t("programLabel")}
-                                            <Select required value={classProgramId} onChange={(e) => setClassProgramId(e.target.value)}>
-                                              <option value="">{t("selectEllipsis")}</option>
-                                              {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                            </Select>
-                                          </label>
-
-                          <label>
-                                            {t("classNameLabel")}
-                                            <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder={t("classExample")} />
-                                          </label>
-
-                          <CheckboxField
-                            title={t("classPortalEnabledHint") ?? ""}
-                            checked={classPortalEnabled}
-                            onChange={(e) => setClassPortalEnabled(e.target.checked)}
-                            label={t("classPortalEnabledLabel")}
-                          />
-
+                            <FormStack>
+                              <FormField label={t("programLabel")}>
+                                <Select required value={classProgramId} onChange={(e) => setClassProgramId(e.target.value)}>
+                                  <option value="">{t("selectEllipsis")}</option>
+                                  {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </Select>
+                              </FormField>
+                              <FormField label={t("classNameLabel")}>
+                                <Input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder={t("classExample")} />
+                              </FormField>
+                              <CheckboxField
+                                title={t("classPortalEnabledHint") ?? ""}
+                                checked={classPortalEnabled}
+                                onChange={(e) => setClassPortalEnabled(e.target.checked)}
+                                label={t("classPortalEnabledLabel")}
+                              />
+                            </FormStack>
                           </FormModal>}
               <InlineFilter className="pwaFilterStack" filters={[
                 { key: "class-search", type: "input", inputType: "search", ariaLabel: t("searchLabel"), placeholder: t("searchClassesPlaceholder"), value: classSearch, onChange: setClassSearch },
@@ -369,10 +368,11 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                             submitLabel={t("addCourseBtn")}
                             submitIcon={<Plus size={16} />}
                           >
-                            <label>
-                                            {t("courseNameLabel")}
-                                            <Input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder={t("courseExample")} />
-                                          </label>
+                            <FormStack>
+                              <FormField label={t("courseNameLabel")}>
+                                <Input required value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder={t("courseExample")} />
+                              </FormField>
+                            </FormStack>
                           </FormModal>}
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("actionsCol")}</span></div>
@@ -429,18 +429,17 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                             submitLabel={t("addSectionBtn")}
                             submitIcon={<Plus size={16} />}
                           >
-                            <label>
-                                            {t("classLabel")}
-                                            <Select required value={sectionClassId} onChange={(e) => setSectionClassId(e.target.value)}>
-                                              <option value="">{t("selectEllipsis")}</option>
-                                              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                            </Select>
-                                          </label>
-
-                          <label>
-                                            {t("sectionNameLabel")}
-                                            <Input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder={t("sectionExample")} />
-                                          </label>
+                            <FormStack>
+                              <FormField label={t("classLabel")}>
+                                <Select required value={sectionClassId} onChange={(e) => setSectionClassId(e.target.value)}>
+                                  <option value="">{t("selectEllipsis")}</option>
+                                  {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </Select>
+                              </FormField>
+                              <FormField label={t("sectionNameLabel")}>
+                                <Input required value={sectionName} onChange={(e) => setSectionName(e.target.value)} placeholder={t("sectionExample")} />
+                              </FormField>
+                            </FormStack>
                           </FormModal>}
               <InlineFilter className="pwaFilterStack" filters={[
                 { key: "mapping-search", type: "input", inputType: "search", ariaLabel: t("searchLabel"), placeholder: t("searchClassesPlaceholder"), value: courseMapSearch, onChange: setCourseMapSearch },
@@ -523,13 +522,22 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                             submitLabel={t("addSessionBtn")}
                             submitIcon={<Plus size={16} />}
                           >
-                            <label>{t("nameLabel")}<Input required value={sessionForm.name} onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })} placeholder="2026" /></label>
-
-                          <label>{t("startLabel")}<Input required type="date" value={sessionForm.gregorian_start} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_start: e.target.value })} /></label>
-
-                          <label>{t("endLabel")}<Input required type="date" value={sessionForm.gregorian_end} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_end: e.target.value })} /></label>
-
-                          <label>{t("hijriSpanLabel")}<Input required value={sessionForm.hijri_span} onChange={(e) => setSessionForm({ ...sessionForm, hijri_span: e.target.value })} placeholder="1447-1448" /></label>
+                            <FormStack>
+                              <FormField label={t("nameLabel")}>
+                                <Input required value={sessionForm.name} onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })} placeholder="2026" />
+                              </FormField>
+                              <FormRow>
+                                <FormField label={t("startLabel")}>
+                                  <Input required type="date" value={sessionForm.gregorian_start} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_start: e.target.value })} />
+                                </FormField>
+                                <FormField label={t("endLabel")}>
+                                  <Input required type="date" value={sessionForm.gregorian_end} onChange={(e) => setSessionForm({ ...sessionForm, gregorian_end: e.target.value })} />
+                                </FormField>
+                              </FormRow>
+                              <FormField label={t("hijriSpanLabel")}>
+                                <Input required value={sessionForm.hijri_span} onChange={(e) => setSessionForm({ ...sessionForm, hijri_span: e.target.value })} placeholder="1447-1448" />
+                              </FormField>
+                            </FormStack>
                           </FormModal>}
               <div className="dataTable">
                 <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("spanCol")}</span><span>{t("activeCol")}</span><span>{t("actionsCol")}</span></div>

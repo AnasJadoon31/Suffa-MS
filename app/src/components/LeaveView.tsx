@@ -1,5 +1,6 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
+import Box from "@mui/material/Box";
 import { Plus, Search, CalendarDays } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -14,6 +15,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
+import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 
 
 function resolvePerson(record: Leave, personByUserId: Map<string, { name: string; role: string }>, unknownPerson: string) {
@@ -190,80 +192,76 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
             submitLabel={t("requestLeaveBtn")}
             submitIcon={<Plus size={16} />}
           >
-            {canManage && (
-                    <>
-                      <label>
-                        {t("personTypeLabel")}
-                        <Select
-                          required
-                          value={personType}
-                          onChange={(e) => {
-                            setPersonType(e.target.value as PersonType);
-                            resetPersonSearch();
-                          }}
-                        >
-                          <option value="">{t("selectTypePlaceholder")}</option>
-                          <option value="teacher">{t("leaveType_teacher")}</option>
-                          <option value="student">{t("leaveType_student")}</option>
-                        </Select>
-                      </label>
-                      <SearchDropdown
-                        id="leave-person-search"
-                        label={t("findPersonLabel")}
-                        disabled={!personType}
-                        placeholder={personType === "teacher" ? t("teacherSearchPlaceholder") : personType === "student" ? t("studentSearchPlaceholder") : t("selectTypeFirst")}
-                        items={filteredPersonOptions}
-                        value={personSearchDraft}
-                        getKey={(person) => person.userId}
-                        getLabel={(person) => person.name}
-                        getDescription={(person) => `${typeLabel(person.type)} · ${person.code}`}
-                        onQueryChange={(query) => {
-                          setPersonSearchDraft(query);
-                          setForm({ ...form, user_id: "" });
-                        }}
-                        onSelect={(person) => {
-                          setPersonSearchDraft(`${person.name} (${person.code})`);
-                          setForm({ ...form, user_id: person.userId });
-                        }}
-                        emptyLabel={personType ? t("noMatchingPeople") : t("selectTypeFirst")}
-                      />
-                      {(personSearchDraft || form.user_id) && (
-                        <div className="headerActions">
-                          <Button
-                            className="secondaryAction"
-                            type="button"
-                            onClick={resetPersonSearch}
-                          >
-                            {t("clearBtn")}
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-          <label>
-                    {t("startLabel")}
-                    <Input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
-                  </label>
-
-          <label>
-                    {t("endLabel")}
-                    <Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
-                  </label>
-
-          <label>
-                    {t("reasonLabel")}
-                    <Select required value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}>
-                      <option value="">{t("selectReasonPlaceholder")}</option>
-                      <option value="Sick Leave">{t("leaveReason_sick")}</option>
-                      <option value="Casual Leave">{t("leaveReason_casual")}</option>
-                      <option value="Maternity Leave">{t("leaveReason_maternity")}</option>
-                      <option value="Paternity Leave">{t("leaveReason_paternity")}</option>
-                      <option value="Bereavement Leave">{t("leaveReason_bereavement")}</option>
-                      <option value="Unpaid Leave">{t("leaveReason_unpaid")}</option>
-                      <option value="Other">{t("otherLabel")}</option>
+            <FormStack>
+              {canManage && (
+                <>
+                  <FormField label={t("personTypeLabel")}>
+                    <Select
+                      required
+                      value={personType}
+                      onChange={(e) => {
+                        setPersonType(e.target.value as PersonType);
+                        resetPersonSearch();
+                      }}
+                    >
+                      <option value="">{t("selectTypePlaceholder")}</option>
+                      <option value="teacher">{t("leaveType_teacher")}</option>
+                      <option value="student">{t("leaveType_student")}</option>
                     </Select>
-                  </label>
+                  </FormField>
+                  <SearchDropdown
+                    id="leave-person-search"
+                    label={t("findPersonLabel")}
+                    disabled={!personType}
+                    placeholder={personType === "teacher" ? t("teacherSearchPlaceholder") : personType === "student" ? t("studentSearchPlaceholder") : t("selectTypeFirst")}
+                    items={filteredPersonOptions}
+                    value={personSearchDraft}
+                    getKey={(person) => person.userId}
+                    getLabel={(person) => person.name}
+                    getDescription={(person) => `${typeLabel(person.type)} · ${person.code}`}
+                    onQueryChange={(query) => {
+                      setPersonSearchDraft(query);
+                      setForm({ ...form, user_id: "" });
+                    }}
+                    onSelect={(person) => {
+                      setPersonSearchDraft(`${person.name} (${person.code})`);
+                      setForm({ ...form, user_id: person.userId });
+                    }}
+                    emptyLabel={personType ? t("noMatchingPeople") : t("selectTypeFirst")}
+                  />
+                  {(personSearchDraft || form.user_id) && (
+                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                      <Button
+                        type="button"
+                        onClick={resetPersonSearch}
+                      >
+                        {t("clearBtn")}
+                      </Button>
+                    </Box>
+                  )}
+                </>
+              )}
+              <FormRow>
+                <FormField label={t("startLabel")}>
+                  <Input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+                </FormField>
+                <FormField label={t("endLabel")}>
+                  <Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+                </FormField>
+              </FormRow>
+              <FormField label={t("reasonLabel")}>
+                <Select required value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}>
+                  <option value="">{t("selectReasonPlaceholder")}</option>
+                  <option value="Sick Leave">{t("leaveReason_sick")}</option>
+                  <option value="Casual Leave">{t("leaveReason_casual")}</option>
+                  <option value="Maternity Leave">{t("leaveReason_maternity")}</option>
+                  <option value="Paternity Leave">{t("leaveReason_paternity")}</option>
+                  <option value="Bereavement Leave">{t("leaveReason_bereavement")}</option>
+                  <option value="Unpaid Leave">{t("leaveReason_unpaid")}</option>
+                  <option value="Other">{t("otherLabel")}</option>
+                </Select>
+              </FormField>
+            </FormStack>
           </FormModal>}
 
       {!isLoading && error && <ErrorState message={error} />}

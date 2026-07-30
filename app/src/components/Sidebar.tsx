@@ -1,16 +1,139 @@
 import { useState } from "react";
-import { Button } from "./ui/Button";
-import Paper from "@mui/material/Paper";
-import { LogOut, Settings, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router";
-
+import { styled } from "@mui/material/styles";
+import Drawer from "@mui/material/Drawer";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
+import IconButton from "@mui/material/IconButton";
+import Avatar from "@mui/material/Avatar";
+import Typography from "@mui/material/Typography";
+import Collapse from "@mui/material/Collapse";
+import Tooltip from "@mui/material/Tooltip";
+import { LogOut, ChevronDown, ChevronRight } from "lucide-react";
 import { isNavItemAccessible, navGroups, portalRoutes, resolveNavItemPath } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
 
+const DRAWER_WIDTH = 240;
+const COLLAPSED_WIDTH = 60;
+
+const StyledDrawer = styled(Drawer)(({ theme }) => ({
+  display: "none",
+  [theme.breakpoints.up(768)]: {
+    display: "block",
+  },
+  "& .MuiDrawer-paper": {
+    borderRight: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
+    overflowX: "hidden",
+  },
+}));
+
+const BrandArea = styled("div")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "16px 14px",
+  borderBottom: `1px solid ${theme.palette.divider}`,
+}));
+
+const BrandLogo = styled("span")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 36,
+  height: 36,
+  borderRadius: 10,
+  backgroundColor: theme.palette.teal?.main ?? theme.palette.primary.main,
+  color: theme.palette.teal?.contrastText ?? theme.palette.primary.contrastText,
+  fontSize: "1.1rem",
+  fontWeight: 700,
+  flexShrink: 0,
+}));
+
+const NavItemButton = styled(ListItemButton, {
+  shouldForwardProp: (prop) => prop !== "isActive",
+})<{ isActive: boolean }>(({ theme, isActive }) => ({
+  borderRadius: 10,
+  marginInline: 6,
+  marginBottom: 2,
+  paddingInline: 10,
+  minHeight: 40,
+  "&::before": {
+    content: '""',
+    position: "absolute",
+    left: 0,
+    top: "50%",
+    transform: "translateY(-50%)",
+    width: 3,
+    height: isActive ? 20 : 0,
+    borderRadius: 0,
+    backgroundColor: theme.palette.teal?.main ?? theme.palette.primary.main,
+    transition: "height 0.2s",
+  },
+  ...(isActive && {
+    backgroundColor: theme.palette.teal?.light
+      ? `${theme.palette.teal.light}22`
+      : `${theme.palette.primary.main}15`,
+    color: theme.palette.teal?.main ?? theme.palette.primary.main,
+    "& .MuiListItemIcon-root": {
+      color: theme.palette.teal?.main ?? theme.palette.primary.main,
+    },
+  }),
+}));
+
+const NavIcon = styled(ListItemIcon)({
+  minWidth: 36,
+  "& svg": {
+    width: 18,
+    height: 18,
+  },
+});
+
+const GroupHeader = styled(ListItem)(({ theme }) => ({
+  paddingInline: 16,
+  paddingTop: 12,
+  paddingBottom: 4,
+  cursor: "pointer",
+  userSelect: "none",
+  opacity: 0.7,
+}));
+
+const ProfileArea = styled("div")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "12px 14px",
+  borderTop: `1px solid ${theme.palette.divider}`,
+  marginTop: "auto",
+}));
+
+const CollapseButton = styled(IconButton)(({ theme }) => ({
+  position: "absolute",
+  top: 14,
+  right: 8,
+  width: 28,
+  height: 28,
+  backgroundColor: theme.palette.background.default,
+  "&:hover": {
+    backgroundColor: theme.palette.divider,
+  },
+}));
+
+const NavLinkWrapper = styled(NavLink)({
+  display: "block",
+  textDecoration: "none",
+  color: "inherit",
+  "&.active": {
+    color: "inherit",
+  },
+});
+
 export type SidebarProps = Readonly<{
   onNavigate?: () => void;
-  mobileOpen?: boolean;
 }>;
 
 export function initialsOf(name: string): string {
@@ -22,35 +145,71 @@ export function initialsOf(name: string): string {
 export function RoleBadge({ role }: Readonly<{ role: string }>) {
   const { t } = useTranslation();
   const labelKey = { principal: "rolePrincipal", teacher: "roleTeacher", student: "roleStudent", parent: "roleParent" }[role] ?? role;
-  return <span className={`roleBadge role-${role}`}>{t(labelKey)}</span>;
+  return (
+    <Typography
+      component="span"
+      sx={{
+        fontSize: "0.65rem",
+        fontWeight: 600,
+        padding: "1px 6px",
+        borderRadius: 999,
+        backgroundColor: "action.selected",
+        color: "text.secondary",
+      }}
+    >
+      {t(labelKey)}
+    </Typography>
+  );
 }
 
-export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
+export function Sidebar({ onNavigate }: SidebarProps) {
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const activeView = portalRoutes.find((route) => route.path === location.pathname)?.view;
   const { hasPermission, hasFeature, user, madrasa, logout } = useAuth();
-  
+  const [collapsed, setCollapsed] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
-  return (
-    <aside className={mobileOpen ? "sidebar sidebarOpen" : "sidebar"}>
-      <div className="brandContainer">
-        <div className="brand">
-          {madrasa?.logo_url
-            ? <img className="brandLogo" src={madrasa.logo_url} alt="" />
-            : <span className="brandMark">م</span>}
-          <div className="brandText">
-            <strong>{(i18n.language === "ur" ? madrasa?.name_ur : madrasa?.name_en) || madrasa?.name || t("appName")}</strong>
-            <small>{t("appName")}</small>
-          </div>
-        </div>
-        <svg className="brandCurve" viewBox="0 0 100 20" preserveAspectRatio="none">
-          <path d="M0,10 Q50,20 100,10" fill="none" stroke="#efb45f" strokeWidth="0.5" opacity="0.5" />
-        </svg>
-      </div>
+  const toggleGroup = (labelKey: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(labelKey)) {
+        next.delete(labelKey);
+      } else {
+        next.add(labelKey);
+      }
+      return next;
+    });
+  };
 
-      <nav className="navScroll" aria-label={t("primaryNavigationLabel")}>
+  return (
+    <StyledDrawer
+      variant="permanent"
+      sx={{
+        width: collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH,
+        "& .MuiDrawer-paper": {
+          width: collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH,
+        },
+      }}
+    >
+      <BrandArea>
+        <BrandLogo>{madrasa?.name?.[0]?.toUpperCase() ?? "م"}</BrandLogo>
+        {!collapsed && (
+          <div style={{ overflow: "hidden" }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+              {(i18n.language === "ur" ? madrasa?.name_ur : madrasa?.name_en) || madrasa?.name || t("appName")}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {t("appName")}
+            </Typography>
+          </div>
+        )}
+        <CollapseButton size="small" onClick={() => setCollapsed((v) => !v)} sx={{ display: collapsed ? "none" : "inline-flex" }}>
+          <ChevronRight size={14} style={{ transform: "rotate(180deg)" }} />
+        </CollapseButton>
+      </BrandArea>
+
+      <List sx={{ flex: 1, overflowY: "auto", py: 1, px: 0 }}>
         {navGroups.map((group) => {
           const visible = group.items.filter(
             (item) => isNavItemAccessible(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate),
@@ -63,85 +222,101 @@ export function Sidebar({ onNavigate, mobileOpen = false }: SidebarProps) {
           });
           const isCollapsed = !isGroupActive && collapsedGroups.has(group.labelKey);
 
-          const toggleGroup = () => {
-            if (isGroupActive) return;
-            setCollapsedGroups((prev) => {
-              const next = new Set(prev);
-              if (next.has(group.labelKey)) {
-                next.delete(group.labelKey);
-              } else {
-                next.add(group.labelKey);
-              }
-              return next;
-            });
-          };
-
           return (
-            <div className="navGroup" key={group.labelKey}>
-              <div 
-                className="navGroupHeader" 
-                onClick={toggleGroup} 
-                style={{ 
-                  cursor: isGroupActive ? "default" : "pointer", 
-                  opacity: isGroupActive ? 1 : 0.8,
-                  userSelect: "none"
-                }}
-              >
-                <span className="navGroupLabel">{t(group.labelKey)}</span>
-                <div className="navGroupDivider">
-                  <div className="navGroupDividerLine" />
-                  <Settings 
-                    size={10} 
-                    className="navGroupDividerIcon" 
-                    style={{ 
-                      transform: isCollapsed ? "rotate(90deg)" : "rotate(0deg)", 
-                      transition: "transform 0.2s" 
-                    }} 
+            <div key={group.labelKey}>
+              {!collapsed && (
+                <GroupHeader onClick={() => toggleGroup(group.labelKey)}>
+                  <ListItemText
+                    primary={
+                      <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                        {t(group.labelKey)}
+                      </Typography>
+                    }
                   />
-                  <div className="navGroupDividerLine" />
-                </div>
-              </div>
-              <div 
-                className="navList"
-                style={{
-                  display: isCollapsed ? "none" : "grid"
-                }}
-              >
+                  {isCollapsed ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </GroupHeader>
+              )}
+              <Collapse in={!isCollapsed} timeout="auto" unmountOnExit={false}>
                 {visible.map((item) => {
                   const Icon = item.icon;
+                  const isActive = activeView === item.id;
+                  const path = resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate);
+
+                  if (collapsed) {
+                    return (
+                      <Tooltip key={item.id} title={t(item.labelKey)} placement="right">
+                        <ListItem disablePadding sx={{ px: 0 }}>
+                          <NavLinkWrapper to={path} onClick={onNavigate}>
+                            <NavItemButton
+                              isActive={isActive}
+                              sx={{ justifyContent: "center", px: 0 }}
+                            >
+                              <NavIcon>
+                                <Icon size={18} />
+                              </NavIcon>
+                            </NavItemButton>
+                          </NavLinkWrapper>
+                        </ListItem>
+                      </Tooltip>
+                    );
+                  }
+
                   return (
-                    <NavLink
-                      className={({ isActive }) => {
-                        return isActive || activeView === item.id ? "navItem active" : "navItem";
-                      }}
-                      key={item.id}
-                      onClick={onNavigate}
-                      to={resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate)}
-                    >
-                      <Icon size={17} />
-                      <span className="navItemText">{t(item.labelKey)}</span>
-                      <ChevronRight size={16} className="navItemChevron" />
-                    </NavLink>
+                    <ListItem key={item.id} disablePadding sx={{ px: 0 }}>
+                      <NavLinkWrapper to={path} onClick={onNavigate}>
+                        <NavItemButton isActive={isActive}>
+                          <NavIcon>
+                            <Icon size={18} />
+                          </NavIcon>
+                          <ListItemText
+                            primary={
+                              <Typography variant="body2" sx={{ fontWeight: isActive ? 600 : 400 }}>
+                                {t(item.labelKey)}
+                              </Typography>
+                            }
+                          />
+                        </NavItemButton>
+                      </NavLinkWrapper>
+                    </ListItem>
                   );
                 })}
-              </div>
+              </Collapse>
             </div>
           );
         })}
-      </nav>
+      </List>
 
       {user && (
-        <div className="profileCard">
-          <span className="avatar" aria-hidden="true">{initialsOf(user.username)}</span>
-          <div className="profileText">
-            <strong>{user.username}</strong>
-            <RoleBadge role={user.role} />
-          </div>
-          <Button className="iconButton" type="button" title={t("logout")} aria-label={t("logout")} onClick={logout}>
-            <LogOut size={16} />
-          </Button>
-        </div>
+        <ProfileArea>
+          <Avatar
+            sx={{
+              width: 32,
+              height: 32,
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              bgcolor: "teal.main",
+              color: "teal.contrastText",
+              cursor: "pointer",
+            }}
+            onClick={() => {}}
+          >
+            {initialsOf(user.username)}
+          </Avatar>
+          {!collapsed && (
+            <>
+              <div style={{ flex: 1, overflow: "hidden" }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                  {user.username}
+                </Typography>
+                <RoleBadge role={user.role} />
+              </div>
+              <IconButton size="small" onClick={logout} aria-label={t("logout")} title={t("logout")}>
+                <LogOut size={16} />
+              </IconButton>
+            </>
+          )}
+        </ProfileArea>
       )}
-    </aside>
+    </StyledDrawer>
   );
 }

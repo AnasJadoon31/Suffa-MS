@@ -11,6 +11,7 @@ import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
+import { FormStack, FormField } from "./ui/FormLayout";
 
 export function SettingsView() {
   const { t } = useTranslation();
@@ -290,7 +291,11 @@ export function SettingsView() {
                       submitLabel={t("saveBtn")}
                       onSubmit={(event: React.FormEvent) => { event.preventDefault(); void save(item).then(() => setEditingKey(null)); }}
                     >
-                      {item.type === "bool" ? <Select value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })}><option value="true">{t("yesLabel")}</option><option value="false">{t("noLabel")}</option></Select> : <Input type={item.type === "int" ? "number" : "text"} value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })} />}
+                      <FormStack>
+                        <FormField label={item.label}>
+                          {item.type === "bool" ? <Select value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })}><option value="true">{t("yesLabel")}</option><option value="false">{t("noLabel")}</option></Select> : <Input type={item.type === "int" ? "number" : "text"} value={draftValue(item)} onChange={(event) => setDrafts({ ...drafts, [item.key]: event.target.value })} />}
+                        </FormField>
+                      </FormStack>
                     </FormModal>
                   )
                 )}

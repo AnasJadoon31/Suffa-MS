@@ -16,6 +16,7 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
+import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 
 /** Read-only self-view for teachers without teachers.salary.manage — own
  * salary record + payment history only, no ability to browse other teachers. */
@@ -293,9 +294,16 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
                     submitLabel={t("saveSalaryBtn")}
                     submitIcon={<Plus size={16} />}
                   >
-                    <label>{t("monthlyAmountLabel")}<Input required type="number" min={0} value={salaryForm.amount} onChange={(e) => setSalaryForm({ ...salaryForm, amount: e.target.value })} placeholder={record ? String(record.amount) : ""} /></label>
-
-                  <label>{t("effectiveFromLabel")}<Input required type="date" value={salaryForm.effective_from} onChange={(e) => setSalaryForm({ ...salaryForm, effective_from: e.target.value })} /></label>
+                    <FormStack>
+                      <FormRow>
+                        <FormField label={t("monthlyAmountLabel")}>
+                          <Input required type="number" min={0} value={salaryForm.amount} onChange={(e) => setSalaryForm({ ...salaryForm, amount: e.target.value })} placeholder={record ? String(record.amount) : ""} />
+                        </FormField>
+                        <FormField label={t("effectiveFromLabel")}>
+                          <Input required type="date" value={salaryForm.effective_from} onChange={(e) => setSalaryForm({ ...salaryForm, effective_from: e.target.value })} />
+                        </FormField>
+                      </FormRow>
+                    </FormStack>
                   </FormModal>}
           {record && (
             <p className="notice">{t("currentSalaryLine", { currency: record.currency, amount: record.amount, date: record.effective_from })}</p>
@@ -355,37 +363,50 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
         submitLabel={t("recordSalaryBtn")}
         submitIcon={<Plus size={16} />}
       >
-        <SearchDropdown
-          id="salary-record-teacher"
-          label={t("teacherLabel")}
-          placeholder={t("teacherSearchPlaceholder")}
-          items={recordSalaryTeachers}
-          value={recordSalaryTeacherSearch}
-          getKey={(teacher) => teacher.id}
-          getLabel={(teacher) => teacher.name}
-          getDescription={(teacher) => teacher.employee_code}
-          onQueryChange={(query) => {
-            setRecordSalaryTeacherSearch(query);
-            setRecordSalaryTeacherId("");
-          }}
-          onSelect={(teacher) => {
-            setRecordSalaryTeacherId(teacher.id);
-            setRecordSalaryTeacherSearch(`${teacher.name} (${teacher.employee_code})`);
-          }}
-          emptyLabel={t("noTeachersYet")}
-        />
-        <label>{t("amountCol")}<Input required type="number" min={0} value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} /></label>
-        <label>{t("dateCol")}<Input required type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} /></label>
-        <label>{t("periodCoveredCol")}<Input required value={paymentForm.period_covered} onChange={(e) => setPaymentForm({ ...paymentForm, period_covered: e.target.value })} placeholder={t("monthYearExample")} /></label>
-        <label>
-          {t("methodCol")}
-          <Select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}>
-            <option value="cash">{t("methodCash")}</option>
-            <option value="bank_transfer">{t("methodBank")}</option>
-            <option value="cheque">{t("methodCheque")}</option>
-          </Select>
-        </label>
-        <label>{t("notesLabel")}<Input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} /></label>
+        <FormStack>
+          <SearchDropdown
+            id="salary-record-teacher"
+            label={t("teacherLabel")}
+            placeholder={t("teacherSearchPlaceholder")}
+            items={recordSalaryTeachers}
+            value={recordSalaryTeacherSearch}
+            getKey={(teacher) => teacher.id}
+            getLabel={(teacher) => teacher.name}
+            getDescription={(teacher) => teacher.employee_code}
+            onQueryChange={(query) => {
+              setRecordSalaryTeacherSearch(query);
+              setRecordSalaryTeacherId("");
+            }}
+            onSelect={(teacher) => {
+              setRecordSalaryTeacherId(teacher.id);
+              setRecordSalaryTeacherSearch(`${teacher.name} (${teacher.employee_code})`);
+            }}
+            emptyLabel={t("noTeachersYet")}
+          />
+          <FormRow>
+            <FormField label={t("amountCol")}>
+              <Input required type="number" min={0} value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+            </FormField>
+            <FormField label={t("dateCol")}>
+              <Input required type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} />
+            </FormField>
+          </FormRow>
+          <FormRow>
+            <FormField label={t("periodCoveredCol")}>
+              <Input required value={paymentForm.period_covered} onChange={(e) => setPaymentForm({ ...paymentForm, period_covered: e.target.value })} placeholder={t("monthYearExample")} />
+            </FormField>
+            <FormField label={t("methodCol")}>
+              <Select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}>
+                <option value="cash">{t("methodCash")}</option>
+                <option value="bank_transfer">{t("methodBank")}</option>
+                <option value="cheque">{t("methodCheque")}</option>
+              </Select>
+            </FormField>
+          </FormRow>
+          <FormField label={t("notesLabel")}>
+            <Input value={paymentForm.note} onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })} />
+          </FormField>
+        </FormStack>
       </FormModal>}
 
       {canWrite && editingPayment && <FormModal
@@ -411,18 +432,31 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
         }}
         submitLabel={t("saveBtn")}
       >
-        <label>{t("amountCol")}<Input required type="number" min={0} value={paymentEditForm.amount} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, amount: e.target.value })} /></label>
-        <label>{t("dateCol")}<Input required type="date" value={paymentEditForm.payment_date} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, payment_date: e.target.value })} /></label>
-        <label>{t("periodCoveredCol")}<Input required value={paymentEditForm.period_covered} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, period_covered: e.target.value })} /></label>
-        <label>
-          {t("methodCol")}
-          <Select value={paymentEditForm.method} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, method: e.target.value })}>
-            <option value="cash">{t("methodCash")}</option>
-            <option value="bank_transfer">{t("methodBank")}</option>
-            <option value="cheque">{t("methodCheque")}</option>
-          </Select>
-        </label>
-        <label>{t("notesLabel")}<Input value={paymentEditForm.note} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, note: e.target.value })} /></label>
+        <FormStack>
+          <FormRow>
+            <FormField label={t("amountCol")}>
+              <Input required type="number" min={0} value={paymentEditForm.amount} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, amount: e.target.value })} />
+            </FormField>
+            <FormField label={t("dateCol")}>
+              <Input required type="date" value={paymentEditForm.payment_date} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, payment_date: e.target.value })} />
+            </FormField>
+          </FormRow>
+          <FormRow>
+            <FormField label={t("periodCoveredCol")}>
+              <Input required value={paymentEditForm.period_covered} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, period_covered: e.target.value })} />
+            </FormField>
+            <FormField label={t("methodCol")}>
+              <Select value={paymentEditForm.method} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, method: e.target.value })}>
+                <option value="cash">{t("methodCash")}</option>
+                <option value="bank_transfer">{t("methodBank")}</option>
+                <option value="cheque">{t("methodCheque")}</option>
+              </Select>
+            </FormField>
+          </FormRow>
+          <FormField label={t("notesLabel")}>
+            <Input value={paymentEditForm.note} onChange={(e) => setPaymentEditForm({ ...paymentEditForm, note: e.target.value })} />
+          </FormField>
+        </FormStack>
       </FormModal>}
     </PageSection>
   );

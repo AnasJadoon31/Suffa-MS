@@ -16,6 +16,7 @@ import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
+import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 
 type HolidayForm = {
   name: string;
@@ -177,15 +178,23 @@ export function HolidaysView() {
                 submitLabel={t("addHolidayBtn")}
                 submitIcon={<Plus size={16} />}
               >
-                <label>{t("nameLabel")}<Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-
-              <label>{t("categoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("holidayCategoryPlaceholder")} /></label>
-
-              <label>{t("startLabel")}<Input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
-
-              <label>{t("endLabel")}<Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
-
-              {classes.length > 0 && classPicker(form.class_ids, (class_ids) => setForm({ ...form, class_ids }))}
+                <FormStack>
+                  <FormField label={t("nameLabel")}>
+                    <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  </FormField>
+                  <FormField label={t("categoryLabel")}>
+                    <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("holidayCategoryPlaceholder")} />
+                  </FormField>
+                  <FormRow>
+                    <FormField label={t("startLabel")}>
+                      <Input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+                    </FormField>
+                    <FormField label={t("endLabel")}>
+                      <Input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+                    </FormField>
+                  </FormRow>
+                  {classes.length > 0 && classPicker(form.class_ids, (class_ids) => setForm({ ...form, class_ids }))}
+                </FormStack>
               </FormModal>
       )}
 

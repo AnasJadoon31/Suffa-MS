@@ -1,5 +1,6 @@
 import { Button } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { BookOpen, ClipboardList, FileDown, Pencil, Plus, Send, Trash2, Save } from "lucide-react";
@@ -38,6 +39,7 @@ import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { ActionMenu } from "./ui/ActionMenu";
 import { InlineFilter } from "./ui/InlineFilter";
+import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 
 export type AssessmentTab = "assignments" | "grading" | "results" | "setup";
 
@@ -430,80 +432,75 @@ function AssignmentCreateForm({
         }
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      {canPublishAll && (
-        <CheckboxField
-          checked={allClasses}
-          onChange={(e) => {
-            setAllClasses(e.target.checked);
-            if (e.target.checked) {
-              setForm({ ...form, class_id: "" });
-              setSectionIds([]);
-            }
-          }}
-          label={t("publishAllClassesLabel")}
-        />
-      )}
-      {allClasses && <small className="notice">{t("publishAllClassesHint")}</small>}
-      {!allClasses && (
-        <label>
-          {t("classLabel")}
-          <Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })}>
+      <FormStack>
+        {canPublishAll && (
+          <CheckboxField
+            checked={allClasses}
+            onChange={(e) => {
+              setAllClasses(e.target.checked);
+              if (e.target.checked) {
+                setForm({ ...form, class_id: "" });
+                setSectionIds([]);
+              }
+            }}
+            label={t("publishAllClassesLabel")}
+          />
+        )}
+        {allClasses && <small className="notice">{t("publishAllClassesHint")}</small>}
+        {!allClasses && (
+          <FormField label={t("classLabel")}>
+            <Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })}>
+              <option value="">{t("selectEllipsis")}</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </FormField>
+        )}
+        <FormField label={t("courseLabel")}>
+          <Select required value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
             <option value="">{t("selectEllipsis")}</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
-        </label>
-      )}
-      <label>
-        {t("courseLabel")}
-        <Select required value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
-          <option value="">{t("selectEllipsis")}</option>
-          {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-      </label>
-      {!allClasses && sections.length > 0 && (
-        <Paper component="fieldset" variant="outlined" className="sectionPicker">
-          <legend>{t("sectionsLegend")}</legend>
-          <small className="notice">{t("sectionsHint")}</small>
-          {sections.map((s) => (
-            <CheckboxField
-              key={s.id}
-              checked={sectionIds.includes(s.id)}
-              onChange={() => toggleSection(s.id)}
-              label={s.name}
-            />
-          ))}
-        </Paper>
-      )}
-      <label>
-        {t("titleLabel")}
-        <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-      </label>
-      <label>
-        {t("categoryLabel")}
-        <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("categoryPlaceholder")} />
-      </label>
-      <label>
-        {t("instructionsLabel")}
-        <Input required value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} />
-      </label>
-      <label>
-        {t("dueDateLabel")}
-        <Input required type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
-      </label>
-      <label>
-        Max Marks
-        <Input type="number" step="any" min="0" value={form.max_marks} onChange={(e) => setForm({ ...form, max_marks: e.target.value })} placeholder="e.g. 100" />
-      </label>
-      <label>
-        Weightage (%)
-        <Input type="number" step="any" min="0" max="100" value={form.weightage} onChange={(e) => setForm({ ...form, weightage: e.target.value })} placeholder="e.g. 20" />
-      </label>
-      <label>
-        {t("attachmentLabel")}
-        <Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
-      </label>
-      </div>
+        </FormField>
+        {!allClasses && sections.length > 0 && (
+          <Paper component="fieldset" variant="outlined" className="sectionPicker">
+            <legend>{t("sectionsLegend")}</legend>
+            <small className="notice">{t("sectionsHint")}</small>
+            {sections.map((s) => (
+              <CheckboxField
+                key={s.id}
+                checked={sectionIds.includes(s.id)}
+                onChange={() => toggleSection(s.id)}
+                label={s.name}
+              />
+            ))}
+          </Paper>
+        )}
+        <FormField label={t("titleLabel")}>
+          <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </FormField>
+        <FormField label={t("categoryLabel")}>
+          <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("categoryPlaceholder")} />
+        </FormField>
+        <FormField label={t("instructionsLabel")}>
+          <Input required value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} />
+        </FormField>
+        <FormRow>
+          <FormField label={t("dueDateLabel")}>
+            <Input required type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
+          </FormField>
+          <FormField label="Max Marks">
+            <Input type="number" step="any" min="0" value={form.max_marks} onChange={(e) => setForm({ ...form, max_marks: e.target.value })} placeholder="e.g. 100" />
+          </FormField>
+        </FormRow>
+        <FormRow>
+          <FormField label="Weightage (%)">
+            <Input type="number" step="any" min="0" max="100" value={form.weightage} onChange={(e) => setForm({ ...form, weightage: e.target.value })} placeholder="e.g. 20" />
+          </FormField>
+          <FormField label={t("attachmentLabel")}>
+            <Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
+          </FormField>
+        </FormRow>
+      </FormStack>
     </FormModal>
   );
 }
@@ -550,21 +547,39 @@ function AssignmentEditForm({
         }
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-      <label>{t("categoryLabel")}<Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
-      <label>{t("instructionsLabel")}<Input required value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} /></label>
-      <label>{t("dueDateLabel")}<Input required type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
-      <label>Max Marks<Input type="number" step="any" min="0" value={form.max_marks} onChange={(e) => setForm({ ...form, max_marks: e.target.value })} placeholder="e.g. 100" /></label>
-      <label>Weightage (%)<Input type="number" step="any" min="0" max="100" value={form.weightage} onChange={(e) => setForm({ ...form, weightage: e.target.value })} placeholder="e.g. 20" /></label>
-      {assignment.batch_id && (
-        <CheckboxField
-          checked={form.apply_to_batch}
-          onChange={(e) => setForm({ ...form, apply_to_batch: e.target.checked })}
-          label={t("applyToBatchLabel")}
-        />
-      )}
-      </div>
+      <FormStack>
+        <FormField label={t("titleLabel")}>
+          <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </FormField>
+        <FormField label={t("categoryLabel")}>
+          <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+        </FormField>
+        <FormField label={t("instructionsLabel")}>
+          <Input required value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} />
+        </FormField>
+        <FormRow>
+          <FormField label={t("dueDateLabel")}>
+            <Input required type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
+          </FormField>
+          <FormField label="Max Marks">
+            <Input type="number" step="any" min="0" value={form.max_marks} onChange={(e) => setForm({ ...form, max_marks: e.target.value })} placeholder="e.g. 100" />
+          </FormField>
+        </FormRow>
+        <FormRow>
+          <FormField label="Weightage (%)">
+            <Input type="number" step="any" min="0" max="100" value={form.weightage} onChange={(e) => setForm({ ...form, weightage: e.target.value })} placeholder="e.g. 20" />
+          </FormField>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            {assignment.batch_id && (
+              <CheckboxField
+                checked={form.apply_to_batch}
+                onChange={(e) => setForm({ ...form, apply_to_batch: e.target.checked })}
+                label={t("applyToBatchLabel")}
+              />
+            )}
+          </Box>
+        </FormRow>
+      </FormStack>
     </FormModal>
   );
 }

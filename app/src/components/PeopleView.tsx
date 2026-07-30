@@ -4,6 +4,8 @@ import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import { Copy, Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X, Edit2, Pencil, UserMinus } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import Fab from "@mui/material/Fab";
+import { styled } from "@mui/material/styles";
 
 import { useDialog } from "../lib/DialogContext";
 import { useAuth } from "../lib/AuthContext";
@@ -39,9 +41,51 @@ import { useSessionReadOnly } from "./SessionSwitcher";
 import { DelegateModal } from "./DelegateButton";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
-import { InlineFilter } from "./ui/InlineFilter";
 import { PhoneInput } from "./ui/PhoneInput";
 import { ActionMenu } from "./ui/ActionMenu";
+import { DataCard, type DataField } from "./ui/DataCard";
+import { DataViewToggle, type ViewMode } from "./ui/DataViewToggle";
+import { FilterBar } from "./ui/FilterBar";
+
+const StyledPageSection = styled(PageSection)(({ theme }) => ({
+  position: "relative",
+  paddingBottom: theme.spacing(10),
+}));
+
+const TabBar = styled(Box)(({ theme }) => ({
+  display: "flex",
+  gap: theme.spacing(1),
+  marginBottom: theme.spacing(2),
+  flexWrap: "wrap",
+}));
+
+const ToolbarRow = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: theme.spacing(1),
+  marginBottom: theme.spacing(2),
+  flexWrap: "wrap",
+}));
+
+const SearchWrap = styled(Box)(() => ({
+  flex: 1,
+  minWidth: 200,
+}));
+
+const CardsList = styled(Box)(() => ({
+  display: "flex",
+  flexDirection: "column",
+}));
+
+const StyledFab = styled(Fab)(({ theme }) => ({
+  position: "fixed",
+  bottom: theme.spacing(9),
+  right: theme.spacing(2),
+  zIndex: 10,
+  [theme.breakpoints.up("md")]: {
+    bottom: theme.spacing(3),
+  },
+}));
 
 function SendCredentialsButton({
   subjectType,
@@ -69,11 +113,11 @@ function SendCredentialsButton({
   };
 
   return (
-    <div className="credentialDeliveryActions" role="status" aria-label={t("credentialsReadyLabel")}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", my: 1 }}>
       <span>{t("credentialsReadyLabel")}</span>
       <Button
-        className="secondaryAction"
         type="button"
+        className="secondaryAction"
         onClick={async () => {
           await navigator.clipboard.writeText(fullUrl);
           setCopied(true);
@@ -82,11 +126,11 @@ function SendCredentialsButton({
       >
         <Copy size={15} /> {copied ? t("linkCopied") : t("copyLinkBtn")}
       </Button>
-      <Button className="secondaryAction" type="button" disabled={readOnly} onClick={() => send()}>
+      <Button type="button" className="secondaryAction" disabled={readOnly} onClick={() => send()}>
         {t("sendCredentialsBtn")}
       </Button>
-      {error && <span className="notice" style={{ color: "var(--rose)" }}>{error}</span>}
-    </div>
+      {error && <span style={{ color: "var(--rose)" }}>{error}</span>}
+    </Box>
   );
 }
 
@@ -125,7 +169,7 @@ function ReissueCredentialsButton({
   };
 
   return (
-    <Button className="tableAction" type="button" disabled={readOnly} title={t("loginLinkTitle")} onClick={() => reissue()}>
+    <Button type="button" className="secondaryAction" disabled={readOnly} title={t("loginLinkTitle")} onClick={() => reissue()}>
       <KeyRound size={14} /> {state === "copied" ? t("linkCopied") : state === "error" ? t("failedLabel") : t("loginLinkBtn")}
     </Button>
   );
@@ -159,29 +203,37 @@ export function PeopleView({
   };
 
   return (
-    <PageSection>
+    <StyledPageSection>
       <PageHeader title={t("peopleTitle")} notice={t("peopleSubtitle")} />
-      {showTabs && <div className="formActions" style={{ marginBottom: 16 }}>
-        {hasPermission("teachers.view") && <Button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("teachers")}>
-          <UserRoundCog size={16} /> {t("teachers")}
-        </Button>}
-        {hasPermission("students.view") && <Button className={tab === "students" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("students")}>
-          <GraduationCap size={16} /> {t("students")}
-        </Button>}
-        {hasPermission("students.view") && <Button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("guardians")}>
-          <UsersRound size={16} /> {t("guardians")}
-        </Button>}
-        {canViewFinance && (
-          <Button className={tab === "donators" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => changeTab("donators")}>
-            <HandCoins size={16} /> {t("donatorsTab")}
-          </Button>
-        )}
-      </div>}
+      {showTabs && (
+        <TabBar>
+          {hasPermission("teachers.view") && (
+            <Button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} onClick={() => changeTab("teachers")}>
+              <UserRoundCog size={16} /> {t("teachers")}
+            </Button>
+          )}
+          {hasPermission("students.view") && (
+            <Button className={tab === "students" ? "primaryAction" : "secondaryAction"} onClick={() => changeTab("students")}>
+              <GraduationCap size={16} /> {t("students")}
+            </Button>
+          )}
+          {hasPermission("students.view") && (
+            <Button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} onClick={() => changeTab("guardians")}>
+              <UsersRound size={16} /> {t("guardians")}
+            </Button>
+          )}
+          {canViewFinance && (
+            <Button className={tab === "donators" ? "primaryAction" : "secondaryAction"} onClick={() => changeTab("donators")}>
+              <HandCoins size={16} /> {t("donatorsTab")}
+            </Button>
+          )}
+        </TabBar>
+      )}
       {tab === "teachers" && <TeachersTab canCreate={!readOnly && hasPermission("teachers.add")} canSalary={canSalary} />}
       {tab === "students" && <StudentsTab canCreate={!readOnly && hasPermission("students.add")} canFinance={canFinance} />}
       {tab === "guardians" && <GuardiansTab canCreate={!readOnly && hasPermission("students.add")} canSendCredentials={!readOnly && hasPermission("students.send_credentials")} />}
       {tab === "donators" && canViewFinance && <DonatorsTab canWrite={canFinance} />}
-    </PageSection>
+    </StyledPageSection>
   );
 }
 
@@ -204,6 +256,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
   const reissueCredentials = async (teacher: Teacher) => {
     try {
@@ -309,42 +362,44 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
     }
   };
 
+  const teacherFields = (teacher: Teacher): DataField[] => [
+    { label: t("codeCol"), value: teacher.employee_code },
+    { label: t("whatsappCol"), value: teacher.whatsapp_number || "—" },
+    { label: t("statusCol"), value: teacher.status },
+  ];
+
   return (
     <>
-      <InlineFilter className="studentsToolbar" filters={[]}>
-        <SearchDropdown
-          id="teacher-search"
-          label={t("searchLabel")}
-          placeholder={t("teacherSearchPlaceholder")}
-          items={teachers}
-          value={search}
-          getKey={(teacher) => teacher.id}
-          getLabel={(teacher) => teacher.name}
-          getDescription={(teacher) => `${teacher.employee_code} · ${teacher.status}`}
-          onQueryChange={(query) => {
-            setSearch(query);
-            if (pagination.page === 0) void load(query);
-            else setPagination((current) => ({ ...current, page: 0 }));
-          }}
-          onSelect={(teacher) => {
-            setSearch(`${teacher.name} (${teacher.employee_code})`);
-            setTeachers([teacher]);
-          }}
-          emptyLabel={t("noTeachersYet")}
-        />
-        <div className="formActions">
-          {search && (
-            <Button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
-              {t("cancelBtn")}
-            </Button>
-          )}
-          {canCreate && (
-            <Button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
-              <UserPlus size={16} /> {t("addTeacherBtn")}
-            </Button>
-          )}
-        </div>
-      </InlineFilter>
+      <ToolbarRow>
+        <SearchWrap>
+          <SearchDropdown
+            id="teacher-search"
+            label={t("searchLabel")}
+            placeholder={t("teacherSearchPlaceholder")}
+            items={teachers}
+            value={search}
+            getKey={(teacher) => teacher.id}
+            getLabel={(teacher) => teacher.name}
+            getDescription={(teacher) => `${teacher.employee_code} · ${teacher.status}`}
+            onQueryChange={(query) => {
+              setSearch(query);
+              if (pagination.page === 0) void load(query);
+              else setPagination((current) => ({ ...current, page: 0 }));
+            }}
+            onSelect={(teacher) => {
+              setSearch(`${teacher.name} (${teacher.employee_code})`);
+              setTeachers([teacher]);
+            }}
+            emptyLabel={t("noTeachersYet")}
+          />
+        </SearchWrap>
+        <DataViewToggle viewKey="people-teachers" onChange={setViewMode} />
+        {search && (
+          <Button className="secondaryAction" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
+            {t("cancelBtn")}
+          </Button>
+        )}
+      </ToolbarRow>
 
       {showCreate && canCreate && (
         <FormModal
@@ -398,50 +453,98 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           />
         </FormModal>
       )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      {notice && <p className="notice">{notice}</p>}
+      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+      {notice && <p>{notice}</p>}
       {justCreated?.set_password_url && (
         <SendCredentialsButton subjectType="teacher" subjectId={justCreated.id} setPasswordUrl={justCreated.set_password_url} />
       )}
 
-      <DataTable<Teacher>
-        columns={[
-          { header: t("codeCol"), render: (teacher) => teacher.employee_code },
-          { header: t("nameLabel"), render: (teacher) => teacher.name },
-          { header: t("whatsappCol"), render: (teacher) => teacher.whatsapp_number || "—" },
-          { header: t("statusCol"), render: (teacher) => teacher.status },
-          { header: t("actionsCol"), render: (teacher) => (
-            <ActionMenu items={[
-              ...(canCreate ? [{
-                label: t("editBtn"),
-                icon: <Edit2 size={14} />,
-                onClick: () => {
-                  setEditingTeacher(teacher);
-                  setEditForm({
-                    name: teacher.name,
-                    whatsapp_number: teacher.whatsapp_number,
-                    qualifications: teacher.qualifications || "",
-                    join_date: teacher.join_date || "",
-                    cnic: teacher.cnic || "",
-                    address: teacher.address || "",
-                    emergency_contact: teacher.emergency_contact || "",
-                    is_principal_delegate: teacher.is_principal_delegate || false,
-                  });
-                },
-              }] : []),
-              { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(teacher) },
-              { label: t("loginLinkBtn"), icon: <KeyRound size={14} />, onClick: () => reissueCredentials(teacher) },
-            ]} ariaLabel={`${t("actionsCol")}: ${teacher.name}`} />
-          )},
-        ]}
-        data={teachers}
-        keyExtractor={(teacher) => teacher.id}
-        isLoading={isLoading}
-        emptyMessage={t("noTeachersYet")}
-      />
+      {viewMode === "cards" ? (
+        <CardsList>
+          {isLoading && <LoadingState />}
+          {!isLoading && teachers.length === 0 && <p>{t("noTeachersYet")}</p>}
+          {!isLoading && teachers.map((teacher) => (
+            <DataCard
+              key={teacher.id}
+              title={teacher.name}
+              subtitle={teacher.employee_code}
+              avatar={teacher.name.charAt(0)}
+              fields={teacherFields(teacher)}
+              status={teacher.status}
+              actions={
+                <>
+                  {canCreate && (
+                    <Button className="secondaryAction" onClick={() => {
+                      setEditingTeacher(teacher);
+                      setEditForm({
+                        name: teacher.name,
+                        whatsapp_number: teacher.whatsapp_number,
+                        qualifications: teacher.qualifications || "",
+                        join_date: teacher.join_date || "",
+                        cnic: teacher.cnic || "",
+                        address: teacher.address || "",
+                        emergency_contact: teacher.emergency_contact || "",
+                        is_principal_delegate: teacher.is_principal_delegate || false,
+                      });
+                    }}>
+                      <Edit2 size={14} /> {t("editBtn")}
+                    </Button>
+                  )}
+                  <Button className="secondaryAction" onClick={() => setDetail(teacher)}>
+                    <Eye size={14} /> {t("viewBtn")}
+                  </Button>
+                  <ReissueCredentialsButton subjectType="teacher" subjectId={teacher.id} />
+                </>
+              }
+            />
+          ))}
+        </CardsList>
+      ) : (
+        <DataTable<Teacher>
+          columns={[
+            { header: t("codeCol"), render: (teacher) => teacher.employee_code },
+            { header: t("nameLabel"), render: (teacher) => teacher.name },
+            { header: t("whatsappCol"), render: (teacher) => teacher.whatsapp_number || "—" },
+            { header: t("statusCol"), render: (teacher) => teacher.status },
+            { header: t("actionsCol"), render: (teacher) => (
+              <ActionMenu items={[
+                ...(canCreate ? [{
+                  label: t("editBtn"),
+                  icon: <Edit2 size={14} />,
+                  onClick: () => {
+                    setEditingTeacher(teacher);
+                    setEditForm({
+                      name: teacher.name,
+                      whatsapp_number: teacher.whatsapp_number,
+                      qualifications: teacher.qualifications || "",
+                      join_date: teacher.join_date || "",
+                      cnic: teacher.cnic || "",
+                      address: teacher.address || "",
+                      emergency_contact: teacher.emergency_contact || "",
+                      is_principal_delegate: teacher.is_principal_delegate || false,
+                    });
+                  },
+                }] : []),
+                { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(teacher) },
+                { label: t("loginLinkBtn"), icon: <KeyRound size={14} />, onClick: () => reissueCredentials(teacher) },
+              ]} ariaLabel={`${t("actionsCol")}: ${teacher.name}`} />
+            )},
+          ]}
+          data={teachers}
+          keyExtractor={(teacher) => teacher.id}
+          isLoading={isLoading}
+          emptyMessage={t("noTeachersYet")}
+        />
+      )}
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {detail && <TeacherDetail teacher={detail} canSalary={canSalary} onClose={() => setDetail(null)} onUpdate={() => { setDetail(null); void load(); }} />}
+
+      {canCreate && (
+        <StyledFab color="primary" aria-label={t("addTeacherBtn")} onClick={() => setShowCreate(true)}>
+          <Plus size={24} />
+        </StyledFab>
+      )}
     </>
   );
 }
@@ -487,25 +590,25 @@ function TeacherDetail({
       actions={
         <>
           {canEdit && (
-            <Button className="secondaryAction" type="button" onClick={() => setShowEdit(true)}>
+            <Button className="secondaryAction" onClick={() => setShowEdit(true)}>
               <Pencil size={16} /> {t("edit", "Edit")}
             </Button>
           )}
           {user?.role === "principal" && (
-            <Button className="secondaryAction" type="button" onClick={() => setShowDelegate(true)}>
+            <Button className="secondaryAction" onClick={() => setShowDelegate(true)}>
               <ShieldCheck size={16} /> {t("delegateBtn")}
             </Button>
           )}
         </>
       }
     >
-      <div className="detailPanel" style={{ padding: "1.5rem" }}>
-        <dl className="detailGrid">
-        <dt>{t("whatsappCol")}</dt><dd>{teacher.whatsapp_number || "—"}</dd>
-        <dt>{t("qualificationsLabel")}</dt><dd>{teacher.qualifications ?? "—"}</dd>
-        <dt>{t("joinDateLabel")}</dt><dd>{teacher.join_date ?? "—"}</dd>
-        <dt>{t("statusCol")}</dt><dd>{teacher.status}</dd>
-      </dl>
+      <Box sx={{ p: 3 }}>
+        <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px" }}>
+          <dt>{t("whatsappCol")}</dt><dd>{teacher.whatsapp_number || "—"}</dd>
+          <dt>{t("qualificationsLabel")}</dt><dd>{teacher.qualifications ?? "—"}</dd>
+          <dt>{t("joinDateLabel")}</dt><dd>{teacher.join_date ?? "—"}</dd>
+          <dt>{t("statusCol")}</dt><dd>{teacher.status}</dd>
+        </Box>
       {showDelegate && (
         <DelegateModal
           initialTeacherUserId={teacher.user_id}
@@ -516,23 +619,23 @@ function TeacherDetail({
       {canSalary && (
         <>
           <h4>{t("salaryHistoryHeading")}</h4>
-          <div className="dataTable">
-            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("amountCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("methodCol")}</span></div>
-            {payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {payments.length === 0 && <p>{t("noPaymentsYet")}</p>}
             {payments.map((p) => (
-              <div className="dataRow" key={p.id}>
-                <span data-label={t("dateCol")}>{p.payment_date}</span>
-                <span data-label={t("amountCol")}>{p.amount} {p.currency}</span>
-                <span data-label={t("periodCoveredCol")}>{p.period_covered}</span>
-                <span data-label={t("methodCol")}>{p.method}</span>
-              </div>
+              <Paper key={p.id} variant="outlined" sx={{ p: 1.5 }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>{p.payment_date}</span>
+                  <strong>{p.amount} {p.currency}</strong>
+                </Box>
+                <small>{p.period_covered} · {p.method}</small>
+              </Paper>
             ))}
-          </div>
-          <div className="formActions" style={{ marginTop: "1rem" }}>
-            <Button className="primaryAction" type="button" onClick={() => setShowPayModal(true)}>
+          </Box>
+          <Box sx={{ mt: 2 }}>
+            <Button className="primaryAction" onClick={() => setShowPayModal(true)}>
               <Plus size={16} /> {t("recordSalaryBtn")}
             </Button>
-          </div>
+          </Box>
 
           {showPayModal && (
             <FormModal
@@ -567,7 +670,7 @@ function TeacherDetail({
           )}
         </>
       )}
-      </div>
+      </Box>
       {showEdit && (
         <FormModal
           title={t("editTeacher", "Edit Teacher")}
@@ -633,6 +736,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
   const reissueCredentials = async (student: Student) => {
     try {
@@ -769,46 +873,38 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
     }
   };
 
+  const studentFields = (s: Student): DataField[] => [
+    { label: t("admissionNumberCol"), value: s.admission_number },
+    { label: t("dobCol"), value: s.date_of_birth },
+    { label: t("portalCol"), value: s.portal_enabled ? t("enabledLabel") : t("disabledLabel") },
+    { label: t("statusCol"), value: s.status },
+  ];
+
   return (
     <>
-      <InlineFilter className="studentsToolbar" filters={[{
-        key: "student-class", type: "select", label: t("classLabel"), value: classFilter,
-        placeholder: t("allClasses"), options: classOptions.map((academicClass) => ({ value: academicClass.id, label: academicClass.name })),
-        onChange: setClassFilter,
-      }]}>
-        <SearchDropdown
-          id="student-search"
-          label={t("searchLabel")}
-          placeholder={t("studentSearchPlaceholder")}
-          items={students}
-          value={search}
-          getKey={(student) => student.id}
-          getLabel={(student) => student.name}
-          getDescription={(student) => `${student.admission_number} · ${student.status}`}
-          onQueryChange={(query) => {
-            setSearch(query);
-            if (pagination.page === 0) void load(query);
-            else setPagination((current) => ({ ...current, page: 0 }));
-          }}
-          onSelect={(student) => {
-            setSearch(`${student.name} (${student.admission_number})`);
-            setStudents([student]);
-          }}
-          emptyLabel={t("noStudentsYet")}
-        />
-        <div className="formActions">
-          {search && (
-            <Button className="secondaryAction" type="button" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
-              {t("cancelBtn")}
-            </Button>
-          )}
-          {canCreate && (
-            <Button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
-              <UserPlus size={16} /> {t("addStudentBtn")}
-            </Button>
-          )}
-        </div>
-      </InlineFilter>
+      <FilterBar
+        searchValue={search}
+        onSearchChange={(query) => {
+          setSearch(query);
+          if (pagination.page === 0) void load(query);
+          else setPagination((current) => ({ ...current, page: 0 }));
+        }}
+        searchPlaceholder={t("studentSearchPlaceholder")}
+        fields={[
+          {
+            key: "student-class",
+            type: "select",
+            label: t("classLabel"),
+            value: classFilter,
+            placeholder: t("allClasses"),
+            options: classOptions.map((academicClass) => ({ value: academicClass.id, label: academicClass.name })),
+            onChange: setClassFilter,
+          },
+        ]}
+        onClearAll={() => { setSearch(""); setClassFilter(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}
+      >
+        <DataViewToggle viewKey="people-students" onChange={setViewMode} />
+      </FilterBar>
 
       {showCreate && canCreate && (
         <FormModal
@@ -835,7 +931,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                 </Select>
               </label>
               {guardianMode === "link" && (
-                <fieldset className="choiceField">
+                <fieldset style={{ border: "none", padding: 0 }}>
                   <legend>{t("linkGuardiansLabel")}</legend>
                   <SearchDropdown
                     id="existing-guardian-search"
@@ -855,23 +951,23 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                     }}
                     emptyLabel={t("noGuardiansYet")}
                   />
-                  <div className="selectionChips">
+                  <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 1 }}>
                     {guardianIds.map((guardianId) => {
                       const guardian = guardians.find((item) => item.id === guardianId);
                       return guardian ? (
-                        <Button key={guardian.id} className="secondaryAction" type="button" onClick={() => setGuardianIds((current) => current.filter((id) => id !== guardian.id))}>
+                        <Button key={guardian.id} className="secondaryAction" onClick={() => setGuardianIds((current) => current.filter((id) => id !== guardian.id))}>
                           {guardian.name} <X size={14} />
                         </Button>
                       ) : null;
                     })}
-                  </div>
+                  </Box>
                 </fieldset>
               )}
               {guardianMode === "create" && (
-                <p className="notice">{t("guardianCreatedFromAdmissionFields", "Guardian details will be created from the selected admission form fields.")}</p>
+                <p>{t("guardianCreatedFromAdmissionFields", "Guardian details will be created from the selected admission form fields.")}</p>
               )}
               {guardianMode === "independent" && !selectedAdmissionFields.some((field) => field.key === BUILT_IN_ADMISSION_KEYS.studentPhone) && (
-                <p className="notice notice-warning">{t("independentStudentPhoneFieldHint", "Enable Student phone on this admission form before creating an independent portal account.")}</p>
+                <p>{t("independentStudentPhoneFieldHint", "Enable Student phone on this admission form before creating an independent portal account.")}</p>
               )}
               <AdmissionAnswersFields
                 fields={selectedAdmissionForm?.fields_definition ?? []}
@@ -897,54 +993,98 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           <label>{t("addressLabel")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
         </FormModal>
       )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      {notice && <p className="notice">{notice}</p>}
+      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+      {notice && <p>{notice}</p>}
       {justCreated?.set_password_url && (
         <SendCredentialsButton subjectType="student" subjectId={justCreated.id} setPasswordUrl={justCreated.set_password_url} />
       )}
 
-      <DataTable<Student>
-        className="studentsTable"
-        columns={[
-          { header: t("admissionNumberCol"), className: "colAdmission", render: (s) => s.admission_number },
-          { header: t("studentNameLabel"), className: "colStudentName", render: (s) => s.name },
-          { header: t("dobCol"), className: "colDob", render: (s) => s.date_of_birth },
-          { header: t("portalCol"), className: "colPortal", render: (s) => s.portal_enabled ? t("enabledLabel") : t("disabledLabel") },
-          { header: t("statusCol"), className: "colStatus", render: (s) => s.status },
-          { header: t("actionsCol"), className: "colActions", render: (s) => (
-            <ActionMenu items={[
-              ...(canCreate ? [{
-                label: t("editBtn"),
-                icon: <Edit2 size={14} />,
-                onClick: () => {
-                  setEditingStudent(s);
-                  setEditForm({
-                    name: s.name,
-                    date_of_birth: s.date_of_birth,
-                    b_form_number: s.b_form_number || "",
-                    address: s.address || "",
-                  });
-                },
-              }] : []),
-              ...(!s.active_enrollment && !s.current_class ? [{
-                label: t("assignClassBtn"),
-                icon: <GraduationCap size={14} />,
-                onClick: () => setAssignClassStudent(s),
-              }] : []),
-              { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(s) },
-              ...(s.portal_enabled ? [{
-                label: t("loginLinkBtn"),
-                icon: <KeyRound size={14} />,
-                onClick: () => reissueCredentials(s),
-              }] : []),
-            ]} ariaLabel={`${t("actionsCol")}: ${s.name}`} />
-          )},
-        ]}
-        data={visible}
-        keyExtractor={(s) => s.id}
-        isLoading={isLoading}
-        emptyMessage={t("noStudentsYet")}
-      />
+      {viewMode === "cards" ? (
+        <CardsList>
+          {isLoading && <LoadingState />}
+          {!isLoading && visible.length === 0 && <p>{t("noStudentsYet")}</p>}
+          {!isLoading && visible.map((s) => (
+            <DataCard
+              key={s.id}
+              title={s.name}
+              subtitle={s.admission_number}
+              avatar={s.name.charAt(0)}
+              fields={studentFields(s)}
+              status={s.status}
+              actions={
+                <>
+                  {canCreate && (
+                    <Button className="secondaryAction" onClick={() => {
+                      setEditingStudent(s);
+                      setEditForm({
+                        name: s.name,
+                        date_of_birth: s.date_of_birth,
+                        b_form_number: s.b_form_number || "",
+                        address: s.address || "",
+                      });
+                    }}>
+                      <Edit2 size={14} /> {t("editBtn")}
+                    </Button>
+                  )}
+                  {!s.active_enrollment && !s.current_class && (
+                    <Button className="secondaryAction" onClick={() => setAssignClassStudent(s)}>
+                      <GraduationCap size={14} /> {t("assignClassBtn")}
+                    </Button>
+                  )}
+                  <Button className="secondaryAction" onClick={() => setDetail(s)}>
+                    <Eye size={14} /> {t("viewBtn")}
+                  </Button>
+                  {s.portal_enabled && (
+                    <ReissueCredentialsButton subjectType="student" subjectId={s.id} />
+                  )}
+                </>
+              }
+            />
+          ))}
+        </CardsList>
+      ) : (
+        <DataTable<Student>
+          columns={[
+            { header: t("admissionNumberCol"), render: (s) => s.admission_number },
+            { header: t("studentNameLabel"), render: (s) => s.name },
+            { header: t("dobCol"), render: (s) => s.date_of_birth },
+            { header: t("portalCol"), render: (s) => s.portal_enabled ? t("enabledLabel") : t("disabledLabel") },
+            { header: t("statusCol"), render: (s) => s.status },
+            { header: t("actionsCol"), render: (s) => (
+              <ActionMenu items={[
+                ...(canCreate ? [{
+                  label: t("editBtn"),
+                  icon: <Edit2 size={14} />,
+                  onClick: () => {
+                    setEditingStudent(s);
+                    setEditForm({
+                      name: s.name,
+                      date_of_birth: s.date_of_birth,
+                      b_form_number: s.b_form_number || "",
+                      address: s.address || "",
+                    });
+                  },
+                }] : []),
+                ...(!s.active_enrollment && !s.current_class ? [{
+                  label: t("assignClassBtn"),
+                  icon: <GraduationCap size={14} />,
+                  onClick: () => setAssignClassStudent(s),
+                }] : []),
+                { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(s) },
+                ...(s.portal_enabled ? [{
+                  label: t("loginLinkBtn"),
+                  icon: <KeyRound size={14} />,
+                  onClick: () => reissueCredentials(s),
+                }] : []),
+              ]} ariaLabel={`${t("actionsCol")}: ${s.name}`} />
+            )},
+          ]}
+          data={visible}
+          keyExtractor={(s) => s.id}
+          isLoading={isLoading}
+          emptyMessage={t("noStudentsYet")}
+        />
+      )}
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {assignClassStudent && (
@@ -956,6 +1096,12 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
       )}
 
       {detail && <StudentDetail student={detail} canFinance={canFinance} onClose={() => setDetail(null)} onUpdate={() => { setDetail(null); void load(); }} />}
+
+      {canCreate && (
+        <StyledFab color="primary" aria-label={t("addStudentBtn")} onClick={() => setShowCreate(true)}>
+          <Plus size={24} />
+        </StyledFab>
+      )}
     </>
   );
 }
@@ -1013,7 +1159,7 @@ function StudentDetail({
             </Button>
           )}
           {!activeEnrollment && !student.current_class && <Button className="secondaryAction" onClick={() => setShowEnrollModal(true)}>{t("assignClassBtn")}</Button>}
-          {activeEnrollment && <Button className="secondaryAction dangerAction" onClick={async () => {
+          {activeEnrollment && <Button className="dangerAction" onClick={async () => {
             if (!(await confirm(t("unassignStudentConfirm", { class: activeEnrollment.class_name })))) return;
             try {
               await academicsApi.unassignStudent(student.id, activeEnrollment.session_id);
@@ -1021,78 +1167,80 @@ function StudentDetail({
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedToUnassignStudent"));
             }
-          }}><UserMinus size={16} /> {t("unassignClassBtn")}</Button>}
+          }}><UserMinus size={16} /> {t("assignClassBtn")}</Button>}
         </>
       }
     >
-      <div className="detailPanel" style={{ padding: "1.5rem" }}>
-        <section className="personHero" aria-label={t("studentIdentityHeading")}>
-          <div><span>{t("fullNameLabel")}</span><strong>{student.name}</strong></div>
-          <div><span>{t("usernameLabel")}</span><strong>{student.username || "—"}</strong></div>
-          <div><span>{t("currentClassLabel")}</span><strong>{activeEnrollment ? `${activeEnrollment.class_name} / ${activeEnrollment.section_name}` : (student.current_class || t("notAssignedLabel"))}</strong></div>
-        </section>
-        <section className="detailSection">
-          <h4>{t("studentIdentityHeading")}</h4>
-          <dl className="detailGrid">
-            <dt>{t("admissionNumberCol")}</dt><dd>{student.admission_number}</dd>
-            <dt>{t("studentPhoneLabel")}</dt><dd>{student.phone || "—"}</dd>
-            <dt>{t("studentTypeLabel")}</dt><dd>{student.is_independent ? t("independentStudentLabel") : t("guardianLinkedStudentLabel")}</dd>
-            <dt>{t("dobCol")}</dt><dd>{student.date_of_birth}</dd>
-            <dt>{t("bFormLabel")}</dt><dd>{student.b_form_number || "—"}</dd>
-            <dt>{t("addressLabel")}</dt><dd>{student.address || "—"}</dd>
-            <dt>{t("portalCol")}</dt><dd>{student.portal_enabled ? t("enabledLabel") : t("disabledLabel")}</dd>
-            <dt>{t("statusCol")}</dt><dd>{student.status}</dd>
-            <dt>{t("notesLabel")}</dt><dd>{student.notes || "—"}</dd>
-          </dl>
-        </section>
+      <Box sx={{ p: 3 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px", mb: 2 }}>
+          <dt>{t("fullNameLabel")}</dt><dd><strong>{student.name}</strong></dd>
+          <dt>{t("usernameLabel")}</dt><dd><strong>{student.username || "—"}</strong></dd>
+          <dt>{t("currentClassLabel")}</dt><dd><strong>{activeEnrollment ? `${activeEnrollment.class_name} / ${activeEnrollment.section_name}` : (student.current_class || t("notAssignedLabel"))}</strong></dd>
+        </Box>
 
-      {student.admission_record && <section className="detailSection">
-        <h4>{t("admissionOriginHeading")}</h4>
-        <dl className="detailGrid">
-          <dt>{t("admissionFormLabel")}</dt><dd>{student.admission_record.form_title || t("sourceWalkIn")}</dd>
-          {student.admission_record.fields_definition.map((field) => <div className="detailGridRow" key={field.key}>
-            <dt>{field.label}</dt><dd>{String(student.admission_record?.answers[field.key] ?? "—")}</dd>
-          </div>)}
-        </dl>
-      </section>}
+        <h4>{t("studentIdentityHeading")}</h4>
+        <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px" }}>
+          <dt>{t("admissionNumberCol")}</dt><dd>{student.admission_number}</dd>
+          <dt>{t("studentPhoneLabel")}</dt><dd>{student.phone || "—"}</dd>
+          <dt>{t("studentTypeLabel")}</dt><dd>{student.is_independent ? t("independentStudentLabel") : t("guardianLinkedStudentLabel")}</dd>
+          <dt>{t("dobCol")}</dt><dd>{student.date_of_birth}</dd>
+          <dt>{t("bFormLabel")}</dt><dd>{student.b_form_number || "—"}</dd>
+          <dt>{t("addressLabel")}</dt><dd>{student.address || "—"}</dd>
+          <dt>{t("portalCol")}</dt><dd>{student.portal_enabled ? t("enabledLabel") : t("disabledLabel")}</dd>
+          <dt>{t("statusCol")}</dt><dd>{student.status}</dd>
+          <dt>{t("notesLabel")}</dt><dd>{student.notes || "—"}</dd>
+        </Box>
+
+      {student.admission_record && (
+        <Box sx={{ mt: 2 }}>
+          <h4>{t("admissionOriginHeading")}</h4>
+          <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px" }}>
+            <dt>{t("admissionFormLabel")}</dt><dd>{student.admission_record.form_title || t("sourceWalkIn")}</dd>
+            {student.admission_record.fields_definition.map((field) => (
+              <Box key={field.key} sx={{ display: "contents" }}>
+                <dt>{field.label}</dt><dd>{String(student.admission_record?.answers[field.key] ?? "—")}</dd>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      )}
 
       <h4>{t("guardians")}</h4>
-      <div className="dataTable">
-        <div className="dataRow header"><span>{t("nameLabel")}</span><span>{t("relationshipLabel")}</span><span>{t("phoneCol")}</span><span></span></div>
-        {guardians.length === 0 && <p className="emptyState">{t("noGuardiansYet")}</p>}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {guardians.length === 0 && <p>{t("noGuardiansYet")}</p>}
         {guardians.map((g) => (
-          <div className="dataRow" key={g.id}>
-            <span data-label={t("nameLabel")}>{g.name}</span>
-            <span data-label={t("relationshipLabel")}>{g.relationship}</span>
-            <span data-label={t("phoneCol")}>{g.phone_numbers}</span>
-            <span data-label={t("actionsCol")}>
-              <Button className="tableAction" type="button" aria-label={t("viewBtn")} title={t("viewBtn")} onClick={() => setSelectedGuardian(g)}>
-                <Eye size={14} />
-              </Button>
-            </span>
-          </div>
+          <Paper key={g.id} variant="outlined" sx={{ p: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <strong>{g.name}</strong>
+              <small>{g.relationship} · {g.phone_numbers}</small>
+            </div>
+            <Button className="secondaryAction" aria-label={t("viewBtn")} title={t("viewBtn")} onClick={() => setSelectedGuardian(g)}>
+              <Eye size={14} />
+            </Button>
+          </Paper>
         ))}
-      </div>
+      </Box>
 
       {canFinance && (
         <>
           <h4>{t("feeHistoryHeading")}</h4>
-          <div className="dataTable">
-            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("amountCol")}</span><span>{t("categoryCol")}</span></div>
-            {payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {payments.length === 0 && <p>{t("noPaymentsYet")}</p>}
             {payments.map((p) => (
-              <div className="dataRow" key={p.id}>
-                <span data-label={t("dateCol")}>{p.payment_date}</span>
-                <span data-label={t("amountCol")}>{p.amount} {p.currency}</span>
-                <span data-label={t("categoryCol")}>{categories.find((c) => c.id === p.category_id)?.name ?? "—"}</span>
-              </div>
+              <Paper key={p.id} variant="outlined" sx={{ p: 1.5 }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>{p.payment_date}</span>
+                  <strong>{p.amount} {p.currency}</strong>
+                </Box>
+                <small>{categories.find((c) => c.id === p.category_id)?.name ?? "—"}</small>
+              </Paper>
             ))}
-          </div>
-          <div className="formActions" style={{ marginTop: "1rem" }}>
-            <Button className="primaryAction" type="button" onClick={() => setShowFeeModal(true)}>
+          </Box>
+          <Box sx={{ mt: 2 }}>
+            <Button className="primaryAction" onClick={() => setShowFeeModal(true)}>
               <Plus size={16} /> {t("recordFeeBtn")}
             </Button>
-          </div>
+          </Box>
 
           {showFeeModal && (
             <FormModal
@@ -1146,7 +1294,7 @@ function StudentDetail({
           onUpdate={() => { setSelectedGuardian(null); void load(); }}
         />
       )}
-      </div>
+      </Box>
       
       {showEdit && (
         <FormModal
@@ -1193,9 +1341,9 @@ function StudentDetail({
             label={t("portalEnabledLabel")}
           />
           {student.admission_record && (
-            <fieldset className="choiceField">
+            <fieldset style={{ border: "none", padding: 0 }}>
               <legend>{t("admissionInformationHeading", "Admission information")}</legend>
-              <p className="notice">{student.admission_record.form_title || t("sourceWalkIn")}</p>
+              <p>{student.admission_record.form_title || t("sourceWalkIn")}</p>
               <AdmissionAnswersFields
                 fields={student.admission_record.fields_definition}
                 answers={editAdmissionAnswers}
@@ -1318,6 +1466,7 @@ function GuardiansTab({
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PageState>({ page: 0, pageSize: DEFAULT_PAGE_SIZE });
   const [total, setTotal] = useState(0);
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
   const load = async () => {
     setIsLoading(true);
@@ -1396,9 +1545,45 @@ function GuardiansTab({
     }
   };
 
+  const guardianFields = (g: Guardian): DataField[] => [
+    { label: t("relationshipLabel"), value: g.relationship },
+    { label: t("phoneCol"), value: g.phone_numbers },
+    { label: t("portalCol"), value: g.user_id ? t("enabledLabel") : t("disabledLabel") },
+  ];
+
   return (
     <>
-      {canCreate && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><UserPlus size={16} /> {t("addGuardianBtn")}</Button>}
+      <ToolbarRow>
+        <SearchWrap>
+          <SearchDropdown
+            id="guardian-search"
+            label={t("searchLabel")}
+            placeholder={t("guardianSearchPlaceholder")}
+            items={guardians}
+            value={search}
+            getKey={(g) => g.id}
+            getLabel={(g) => g.name}
+            getDescription={(g) => `${g.relationship} · ${g.phone_numbers}`}
+            onQueryChange={(query) => {
+              setSearch(query);
+              if (pagination.page === 0) void load();
+              else setPagination((current) => ({ ...current, page: 0 }));
+            }}
+            onSelect={(g) => {
+              setSearch(`${g.name} (${g.relationship})`);
+              setGuardians([g]);
+            }}
+            emptyLabel={t("noGuardiansYet")}
+          />
+        </SearchWrap>
+        <DataViewToggle viewKey="people-guardians" onChange={setViewMode} />
+        {search && (
+          <Button className="secondaryAction" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(); }}>
+            {t("cancelBtn")}
+          </Button>
+        )}
+      </ToolbarRow>
+
       {canCreate && showCreate && (
         <FormModal
                 title={t("addGuardianBtn")} onClose={() => setShowCreate(false)}
@@ -1437,60 +1622,95 @@ function GuardiansTab({
 
               <label>{t("addressCol")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
               
-              <div style={{ marginTop: "1rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
-                <label style={{ marginBottom: "0.5rem", display: "block", fontWeight: 500 }}>
+              <Box sx={{ mt: 2, borderTop: "1px solid", borderColor: "divider", pt: 2 }}>
+                <label style={{ marginBottom: 1, display: "block", fontWeight: 500 }}>
                   {t("linkStudentLabel", "Link Student (Optional)")}
                 </label>
                 {selectedStudent ? (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem", border: "1px solid var(--border)", borderRadius: "4px" }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 1, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
                     <span>{selectedStudent.name} ({selectedStudent.username || selectedStudent.admission_number})</span>
-                    <Button className="iconBtn danger" type="button" aria-label={t("unlinkBtn")} title={t("unlinkBtn")} onClick={() => setSelectedStudent(null)}><UserMinus size={14} /></Button>
-                  </div>
+                    <Button className="dangerAction" aria-label={t("unlinkBtn")} title={t("unlinkBtn")} onClick={() => setSelectedStudent(null)}><UserMinus size={14} /></Button>
+                  </Box>
                 ) : (
                   <>
                     <Input placeholder={t("searchStudents", "Search students...")} value={search} onChange={(e) => searchStudents(e.target.value)} />
                     {students.length > 0 && (
-                      <div className="searchResults" style={{ marginTop: "0.5rem", border: "1px solid var(--border)", borderRadius: "4px", maxHeight: "150px", overflowY: "auto" }}>
+                      <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 1, maxHeight: 150, overflowY: "auto" }}>
                         {students.map((s) => (
-                          <div key={s.id} style={{ padding: "0.5rem", cursor: "pointer", borderBottom: "1px solid var(--border)" }} onClick={() => { setSelectedStudent(s); setStudents([]); setSearch(""); }}>
+                          <Box key={s.id} sx={{ p: 1, cursor: "pointer", borderBottom: "1px solid", borderColor: "divider" }} onClick={() => { setSelectedStudent(s); setStudents([]); setSearch(""); }}>
                             {s.name} ({s.username || s.admission_number})
-                          </div>
+                          </Box>
                         ))}
-                      </div>
+                      </Box>
                     )}
                   </>
                 )}
-              </div>
+              </Box>
             </FormModal>
       )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      {notice && <p className="notice">{notice}</p>}
-      <DataTable<Guardian>
-        columns={[
-          { header: t("nameLabel"), render: (g) => g.name },
-          { header: t("relationshipLabel"), render: (g) => g.relationship },
-          { header: t("phoneCol"), render: (g) => g.phone_numbers },
-          { header: t("portalCol"), render: (g) => g.user_id ? t("enabledLabel") : t("disabledLabel") },
-          { header: t("actionsCol"), render: (g) => (
-            <ActionMenu items={[
-              { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(g) },
-              ...(canSendCredentials ? [{
-                label: t("loginLinkBtn"),
-                icon: <KeyRound size={14} />,
-                onClick: () => provisionLogin(g),
-              }] : []),
-            ]} ariaLabel={`${t("actionsCol")}: ${g.name}`} />
-          )},
-        ]}
-        data={guardians}
-        keyExtractor={(g) => g.id}
-        isLoading={isLoading}
-        emptyMessage={t("noGuardiansYet")}
-      />
+      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+      {notice && <p>{notice}</p>}
+
+      {viewMode === "cards" ? (
+        <CardsList>
+          {isLoading && <LoadingState />}
+          {!isLoading && guardians.length === 0 && <p>{t("noGuardiansYet")}</p>}
+          {!isLoading && guardians.map((g) => (
+            <DataCard
+              key={g.id}
+              title={g.name}
+              subtitle={g.relationship}
+              avatar={g.name.charAt(0)}
+              fields={guardianFields(g)}
+              actions={
+                <>
+                  <Button className="secondaryAction" onClick={() => setDetail(g)}>
+                    <Eye size={14} /> {t("viewBtn")}
+                  </Button>
+                  {canSendCredentials && (
+                    <Button className="secondaryAction" onClick={() => provisionLogin(g)}>
+                      <KeyRound size={14} /> {t("loginLinkBtn")}
+                    </Button>
+                  )}
+                </>
+              }
+            />
+          ))}
+        </CardsList>
+      ) : (
+        <DataTable<Guardian>
+          columns={[
+            { header: t("nameLabel"), render: (g) => g.name },
+            { header: t("relationshipLabel"), render: (g) => g.relationship },
+            { header: t("phoneCol"), render: (g) => g.phone_numbers },
+            { header: t("portalCol"), render: (g) => g.user_id ? t("enabledLabel") : t("disabledLabel") },
+            { header: t("actionsCol"), render: (g) => (
+              <ActionMenu items={[
+                { label: t("viewBtn"), icon: <Eye size={14} />, onClick: () => setDetail(g) },
+                ...(canSendCredentials ? [{
+                  label: t("loginLinkBtn"),
+                  icon: <KeyRound size={14} />,
+                  onClick: () => provisionLogin(g),
+                }] : []),
+              ]} ariaLabel={`${t("actionsCol")}: ${g.name}`} />
+            )},
+          ]}
+          data={guardians}
+          keyExtractor={(g) => g.id}
+          isLoading={isLoading}
+          emptyMessage={t("noGuardiansYet")}
+        />
+      )}
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
       {detail && (
         <GuardianDetail guardian={detail} onClose={() => setDetail(null)} onUpdate={() => { setDetail(null); void load(); }} />
+      )}
+
+      {canCreate && (
+        <StyledFab color="primary" aria-label={t("addGuardianBtn")} onClick={() => setShowCreate(true)}>
+          <Plus size={24} />
+        </StyledFab>
       )}
     </>
   );
@@ -1571,38 +1791,23 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
         ) : null
       }
     >
-      <Box className="detailPanel" sx={{ p: 3 }}>
-      <Paper component="section" variant="outlined" className="guardianIdentityCard">
-        <div className="personHero compactPersonHero">
-          <div><span>{t("fullNameLabel")}</span><strong>{guardian.name}</strong></div>
-          <div><span>{t("relationshipLabel")}</span><strong>{guardian.relationship}</strong></div>
-          <div><span>{t("portalCol")}</span><strong>{guardian.user_id ? t("enabledLabel") : t("disabledLabel")}</strong></div>
-        </div>
-      <div className="infoGrid">
-        <div className="infoGroup">
-          <label>{t("relationshipLabel")}</label>
-          <div>{guardian.relationship}</div>
-        </div>
-        <div className="infoGroup">
-          <label>{t("phoneCol")}</label>
-          <div>{guardian.phone_numbers}</div>
-        </div>
-        <div className="infoGroup">
-          <label>{t("cnicLabel")}</label>
-          <div>{guardian.cnic || "—"}</div>
-        </div>
-        <div className="infoGroup">
-          <label>{t("addressLabel")}</label>
-          <div>{guardian.address || "—"}</div>
-        </div>
-      </div>
+      <Box sx={{ p: 3 }}>
+      <Paper component="section" variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px" }}>
+          <dt>{t("fullNameLabel")}</dt><dd><strong>{guardian.name}</strong></dd>
+          <dt>{t("relationshipLabel")}</dt><dd><strong>{guardian.relationship}</strong></dd>
+          <dt>{t("portalCol")}</dt><dd><strong>{guardian.user_id ? t("enabledLabel") : t("disabledLabel")}</strong></dd>
+          <dt>{t("phoneCol")}</dt><dd>{guardian.phone_numbers}</dd>
+          <dt>{t("cnicLabel")}</dt><dd>{guardian.cnic || "—"}</dd>
+          <dt>{t("addressLabel")}</dt><dd>{guardian.address || "—"}</dd>
+        </Box>
       </Paper>
 
-      <div style={{ marginTop: "2rem" }}>
+      <Box sx={{ mt: 3 }}>
         <h3>{t("linkedStudents", "Linked Students")}</h3>
-        {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+        {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
         
-        <div style={{ marginBottom: "1rem" }}>
+        <Box sx={{ mb: 2 }}>
           <SearchDropdown
             id="guardian-student-search"
             label={t("searchStudentBtn", "Find Student to Link")}
@@ -1616,26 +1821,26 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
             onSelect={(s) => void linkStudent(s)}
             emptyLabel={search.length < 2 ? t("typeToSearch", "Type to search...") : t("noStudentsFound", "No students found")}
           />
-        </div>
+        </Box>
 
-        <div className="dataList">
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           {linkedStudents.length === 0 ? (
-            <p className="notice">{t("noStudentsLinked", "No students linked yet.")}</p>
+            <p>{t("noStudentsLinked", "No students linked yet.")}</p>
           ) : (
             linkedStudents.map((s) => (
-              <Paper key={s.id} variant="outlined" className="linkedPersonCard">
+              <Paper key={s.id} variant="outlined" sx={{ p: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <strong>{s.name}</strong>
                   <span>{s.admission_number} · {s.current_class || t("notAssignedLabel")}</span>
                 </div>
-                <Button className="tableAction" type="button" aria-label={t("unlinkBtn")} onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn")}>
+                <Button className="secondaryAction" aria-label={t("unlinkBtn")} onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn")}>
                   <X size={14} />
                 </Button>
               </Paper>
             ))
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
       </Box>
       
       {showEdit && (
@@ -1688,6 +1893,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", contact: "" });
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
   const loadDonors = async (query = search) => {
     setIsLoading(true);
@@ -1716,29 +1922,56 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
     setDonations(await financeApi.listDonations({ donor_id: donor.id }));
   };
 
+  const donorFields = (d: Donor): DataField[] => [
+    { label: t("contactCol"), value: d.contact },
+  ];
+
   return (
     <>
-      <InlineFilter filters={[{
-        key: "donor-search", type: "input", inputType: "search", value: search,
-        ariaLabel: t("searchLabel"), placeholder: t("donorSearchPlaceholder"),
-        onChange: (value) => { setSearch(value); void loadDonors(value); },
-      }]} />
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <DataTable<Donor>
-        columns={[
-          { header: t("nameLabel"), render: (d) => d.name },
-          { header: t("contactCol"), render: (d) => d.contact },
-          { header: t("actionsCol"), render: (d) => (
-            <Button className="tableAction" type="button" onClick={() => openDonor(d)}>
-              <Eye size={14} /> {t("viewBtn")}
-            </Button>
-          )},
-        ]}
-        data={donors}
-        keyExtractor={(d) => d.id}
-        isLoading={isLoading}
-        emptyMessage={t("noDonorsYet")}
-      />
+      <FilterBar
+        searchValue={search}
+        onSearchChange={(value) => { setSearch(value); void loadDonors(value); }}
+        searchPlaceholder={t("donorSearchPlaceholder")}
+      >
+        <DataViewToggle viewKey="people-donators" onChange={setViewMode} />
+      </FilterBar>
+      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+
+      {viewMode === "cards" ? (
+        <CardsList>
+          {isLoading && <LoadingState />}
+          {!isLoading && donors.length === 0 && <p>{t("noDonorsYet")}</p>}
+          {!isLoading && donors.map((d) => (
+            <DataCard
+              key={d.id}
+              title={d.name}
+              avatar={d.name.charAt(0)}
+              fields={donorFields(d)}
+              actions={
+                <Button className="secondaryAction" onClick={() => openDonor(d)}>
+                  <Eye size={14} /> {t("viewBtn")}
+                </Button>
+              }
+            />
+          ))}
+        </CardsList>
+      ) : (
+        <DataTable<Donor>
+          columns={[
+            { header: t("nameLabel"), render: (d) => d.name },
+            { header: t("contactCol"), render: (d) => d.contact },
+            { header: t("actionsCol"), render: (d) => (
+              <Button className="secondaryAction" onClick={() => openDonor(d)}>
+                <Eye size={14} /> {t("viewBtn")}
+              </Button>
+            )},
+          ]}
+          data={donors}
+          keyExtractor={(d) => d.id}
+          isLoading={isLoading}
+          emptyMessage={t("noDonorsYet")}
+        />
+      )}
 
       {selected && (
         <Modal 
@@ -1752,65 +1985,66 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
             ) : null
           }
         >
-          <div className="detailPanel">
+          <Box sx={{ p: 3 }}>
             <h4>{t("donationHistoryHeading")}</h4>
-          <div className="dataTable">
-            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("amountCol")}</span><span>{t("categoryCol")}</span></div>
-            {donations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
-            {donations.map((d) => (
-              <div className="dataRow" key={d.id}>
-                <span data-label={t("dateCol")}>{d.donation_date}</span>
-                <span data-label={t("amountCol")}>{d.amount} {d.currency}</span>
-                <span data-label={t("categoryCol")}>{categories.find((c) => c.id === d.category_id)?.name ?? "—"}</span>
-              </div>
-            ))}
-          </div>
-          {canWrite && (
-            <div className="formActions" style={{ marginTop: "1rem" }}>
-              <Button className="primaryAction" type="button" onClick={() => setShowDonationModal(true)}>
-                <Plus size={16} /> {t("addDonationBtn")}
-              </Button>
-            </div>
-          )}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {donations.length === 0 && <p>{t("noDonationsYet")}</p>}
+              {donations.map((d) => (
+                <Paper key={d.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>{d.donation_date}</span>
+                    <strong>{d.amount} {d.currency}</strong>
+                  </Box>
+                  <small>{categories.find((c) => c.id === d.category_id)?.name ?? "—"}</small>
+                </Paper>
+              ))}
+            </Box>
+            {canWrite && (
+              <Box sx={{ mt: 2 }}>
+                <Button className="primaryAction" onClick={() => setShowDonationModal(true)}>
+                  <Plus size={16} /> {t("addDonationBtn")}
+                </Button>
+              </Box>
+            )}
 
-          {canWrite && showDonationModal && (
-            <FormModal
-              title={t("addDonationBtn")}
-              onClose={() => setShowDonationModal(false)}
-              submitLabel={t("addDonationBtn")}
-              submitIcon={<Plus size={16} />}
-              error={error}
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setError("");
-                try {
-                  await financeApi.createDonation({
-                    donor_id: selected.id,
-                    category_id: donationForm.category_id,
-                    amount: Number(donationForm.amount),
-                    donation_date: donationForm.donation_date,
-                  });
-                  setDonationForm({ category_id: "", amount: "", donation_date: "" });
-                  await openDonor(selected);
-                  setShowDonationModal(false);
-                } catch (err: any) {
-                  setError(err.response?.data?.detail ?? t("failedRecordPayment"));
-                }
-              }}
-            >
-              <label>
-                {t("categoryCol")}
-                <Select required value={donationForm.category_id} onChange={(e) => setDonationForm({ ...donationForm, category_id: e.target.value })}>
-                  <option value="">{t("selectEllipsis")}</option>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
-              </label>
-              <label>{t("amountCol")}<Input required type="number" value={donationForm.amount} onChange={(e) => setDonationForm({ ...donationForm, amount: e.target.value })} /></label>
-              <label>{t("dateCol")}<Input required type="date" value={donationForm.donation_date} onChange={(e) => setDonationForm({ ...donationForm, donation_date: e.target.value })} /></label>
-            </FormModal>
-          )}
-          {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-          </div>
+            {canWrite && showDonationModal && (
+              <FormModal
+                title={t("addDonationBtn")}
+                onClose={() => setShowDonationModal(false)}
+                submitLabel={t("addDonationBtn")}
+                submitIcon={<Plus size={16} />}
+                error={error}
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setError("");
+                  try {
+                    await financeApi.createDonation({
+                      donor_id: selected.id,
+                      category_id: donationForm.category_id,
+                      amount: Number(donationForm.amount),
+                      donation_date: donationForm.donation_date,
+                    });
+                    setDonationForm({ category_id: "", amount: "", donation_date: "" });
+                    await openDonor(selected);
+                    setShowDonationModal(false);
+                  } catch (err: any) {
+                    setError(err.response?.data?.detail ?? t("failedRecordPayment"));
+                  }
+                }}
+              >
+                <label>
+                  {t("categoryCol")}
+                  <Select required value={donationForm.category_id} onChange={(e) => setDonationForm({ ...donationForm, category_id: e.target.value })}>
+                    <option value="">{t("selectEllipsis")}</option>
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </Select>
+                </label>
+                <label>{t("amountCol")}<Input required type="number" value={donationForm.amount} onChange={(e) => setDonationForm({ ...donationForm, amount: e.target.value })} /></label>
+                <label>{t("dateCol")}<Input required type="date" value={donationForm.donation_date} onChange={(e) => setDonationForm({ ...donationForm, donation_date: e.target.value })} /></label>
+              </FormModal>
+            )}
+            {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+          </Box>
           
           {showEdit && (
             <FormModal

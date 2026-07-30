@@ -26,6 +26,7 @@ import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
+import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 
 const emptyForm = { category_id: "", title: "", description: "", video_url: "" };
 
@@ -141,15 +142,18 @@ export function ResourcesView() {
             submitLabel={t("addCategoryBtn")}
             submitIcon={<FolderPlus size={16} />}
           >
-            <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("resourceCategoryExample")} /></label>
-
-          {canManageAll && (
-                      <CheckboxField
-                        checked={categoryIsGlobal}
-                        onChange={(e) => setCategoryIsGlobal(e.target.checked)}
-                        label={t("globalLabel")}
-                      />
-                    )}
+            <FormStack>
+              <FormField label={t("categoryNameLabel")}>
+                <Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("resourceCategoryExample")} />
+              </FormField>
+              {canManageAll && (
+                <CheckboxField
+                  checked={categoryIsGlobal}
+                  onChange={(e) => setCategoryIsGlobal(e.target.checked)}
+                  label={t("globalLabel")}
+                />
+              )}
+            </FormStack>
           </FormModal>}
 
       <InlineFilter className="pwaFilterStack resourcesFilter" filters={[
@@ -218,23 +222,27 @@ export function ResourcesView() {
             submitLabel={t("addResourceBtn")}
             submitIcon={<Plus size={16} />}
           >
-            <label>
-                      {t("categoryCol")}
-                      <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
-                        <option value="">{t("selectEllipsis")}</option>
-                        {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </Select>
-                    </label>
-
-          <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-
-          <label>{t("descriptionLabel")}<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-
-          <label>{t("videoUrlLabel")}<Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder={t("optionalPlaceholder")} /></label>
-
-          <label>{t("fileLabel")}<Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
-
-          <AudiencePicker value={audience} onChange={setAudience} />
+            <FormStack>
+              <FormField label={t("categoryCol")}>
+                <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+                  <option value="">{t("selectEllipsis")}</option>
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </FormField>
+              <FormField label={t("titleLabel")}>
+                <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              </FormField>
+              <FormField label={t("descriptionLabel")}>
+                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              </FormField>
+              <FormField label={t("videoUrlLabel")}>
+                <Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder={t("optionalPlaceholder")} />
+              </FormField>
+              <FormField label={t("fileLabel")}>
+                <Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              </FormField>
+              <AudiencePicker value={audience} onChange={setAudience} />
+            </FormStack>
           </FormModal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -322,15 +330,20 @@ export function ResourcesView() {
             }
           }}
         >
-          <label>{t("titleLabel")}<Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
-          <label>
-            {t("categoryCol")}
-            <Select value={editing.category_id} onChange={(e) => setEditing({ ...editing, category_id: e.target.value })}>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </label>
-          <label>{t("descriptionLabel")}<Input value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
-          <AudiencePicker value={editAudience} onChange={setEditAudience} />
+          <FormStack>
+            <FormField label={t("titleLabel")}>
+              <Input required value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
+            </FormField>
+            <FormField label={t("categoryCol")}>
+              <Select value={editing.category_id} onChange={(e) => setEditing({ ...editing, category_id: e.target.value })}>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            </FormField>
+            <FormField label={t("descriptionLabel")}>
+              <Input value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+            </FormField>
+            <AudiencePicker value={editAudience} onChange={setEditAudience} />
+          </FormStack>
         </FormModal>
       )}
     </PageSection>

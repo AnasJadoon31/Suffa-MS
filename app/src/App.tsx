@@ -2,13 +2,20 @@ import { CalendarDays, Languages, Menu } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ComponentType, type LazyExoticComponent } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
+import { styled, keyframes } from "@mui/material/styles";
+import Box from "@mui/material/Box";
+import useMediaQuery from "@mui/material/useMediaQuery";
 
 import { LoginScreen } from "./components/LoginScreen";
 import { DelegateButton } from "./components/DelegateButton";
 import { SessionReadOnlyBanner, SessionSwitcher } from "./components/SessionSwitcher";
 import { initialsOf, RoleBadge, Sidebar } from "./components/Sidebar";
+import { BottomTabBar } from "./components/BottomTabBar";
+import { AppBar } from "./components/AppBar";
+import { NavDrawer } from "./components/NavDrawer";
 import { PwaStatus } from "./components/PwaStatus";
 import { NotFoundView } from "./components/NotFoundView";
+import { InstallPrompt } from "./components/InstallPrompt";
 import { LoadingState } from "./components/ui/AsyncState";
 import { Button } from "./components/ui/Button";
 import { useAuth } from "./lib/AuthContext";
@@ -78,6 +85,59 @@ const VIEW_MODULES: Partial<Record<ViewId, string[]>> = {
   settings: ["settings"],
 };
 
+const WorkspaceContainer = styled("main")(({ theme }) => ({
+  display: "flex",
+  minHeight: "100vh",
+  backgroundColor: theme.palette.background.default,
+}));
+
+const MainContent = styled("section")(({ theme }) => ({
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  minWidth: 0,
+  [theme.breakpoints.down(768)]: {
+    paddingBottom: 64, // Space for bottom tab bar
+  },
+}));
+
+const Topbar = styled("header")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "12px 16px",
+  backgroundColor: theme.palette.background.paper,
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  [theme.breakpoints.up(768)]: {
+    display: "none",
+  },
+}));
+
+const TopbarContext = styled("div")({
+  flex: 1,
+  minWidth: 0,
+});
+
+const TopbarActions = styled("div")({
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+});
+
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
+const ContentArea = styled("div")({
+  flex: 1,
+  overflow: "auto",
+  animation: `${fadeIn} 0.2s ease-out`,
+  "@media (prefers-reduced-motion: reduce)": {
+    animation: "none",
+  },
+});
+
 function Workspace() {
   const { t, i18n } = useTranslation();
   const { isAuthenticated, isLoading, user, madrasa, hasPermission, hasFeature, updateProfile } = useAuth();
@@ -87,6 +147,7 @@ function Workspace() {
   const [navOpen, setNavOpen] = useState(false);
   const [today, setToday] = useState<{ gregorian: string; hijri: string } | null>(null);
   const isUrdu = i18n.language === "ur";
+  const isDesktop = useMediaQuery("@media (min-width:768px)");
 
   const guardedNavigate = async (to: string) => {
     if (await confirmNavigation()) navigate(to);
@@ -250,74 +311,35 @@ function Workspace() {
   const activeItem = navItems.find((item) => item.id === activeView);
 
   return (
-    <main className="appShell">
+    <WorkspaceContainer>
       <a className="skipLink" href="#main-content">{t("skipToContent")}</a>
-      <Sidebar onNavigate={() => setNavOpen(false)} mobileOpen={navOpen} />
-      {navOpen && <div className="navOverlay" onClick={() => setNavOpen(false)} />}
-      <section className="workspace" id="main-content" tabIndex={-1}>
-        <header className="topbar">
-          <Button
-            className="iconButton navToggle"
-            type="button"
-            aria-label={t("openMenu")}
-            onClick={() => setNavOpen((v) => !v)}
-          >
-            <Menu size={20} />
-          </Button>
-          <div className="topbarContext">
-            <h1>{activeItem ? t(activeItem.labelKey) : t("appName")}</h1>
-            <p className="viewDescription">{activeItem ? t(activeItem.descKey) : ""}</p>
-          </div>
-          {!user?.selected_session_id && activeView && VIEW_MODULES[activeView] && <DelegateButton modules={VIEW_MODULES[activeView]!} />}
-          <div className="topbar-actions">
-            {today && (
-              <span className="dateChip" title={t("todayLabel")}>
-                <CalendarDays size={15} />
-                <span className="dateChipText">
-                  <strong>{today.gregorian}</strong>
-                  <small>{today.hijri}</small>
-                </span>
-              </span>
-            )}
-            <SessionSwitcher />
-            <PwaStatus />
-            <Button className="iconTextButton" type="button" onClick={() => void toggleLanguage()}>
-              <Languages size={16} />
-              {isUrdu ? "English" : "اردو"}
-            </Button>
-            {user && (
-              <Button
-                className="profileChip profileChipButton"
-                type="button"
-                title={t("myProfile")}
-                aria-label={`${t("myProfile")}: ${user.username}`}
-                onClick={() => void guardedNavigate("/my-profile")}
-              >
-                <span className="avatar avatarSmall" aria-hidden="true">{initialsOf(user.username)}</span>
-                <span className="profileChipText">
-                  <strong>{user.username}</strong>
-                  <RoleBadge role={user.role} />
-                </span>
-              </Button>
-            )}
-          </div>
-        </header>
+      <Sidebar onNavigate={() => setNavOpen(false)} />
+      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} />
+      <MainContent id="main-content" tabIndex={-1}>
+        <AppBar
+          onMenuClick={() => setNavOpen(true)}
+          today={today}
+        />
         <SessionReadOnlyBanner />
-        <Suspense fallback={<LoadingState />}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            {portalRoutes.map((route) => (
-              <Route
-                key={route.key}
-                path={route.path}
-                element={isPortalRouteAccessible(route, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment) ? renderRoute(route) : <NotFoundView />}
-              />
-            ))}
-            <Route path="*" element={<NotFoundView />} />
-          </Routes>
-        </Suspense>
-      </section>
-    </main>
+        <ContentArea>
+          <Suspense fallback={<LoadingState />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              {portalRoutes.map((route) => (
+                <Route
+                  key={route.key}
+                  path={route.path}
+                  element={isPortalRouteAccessible(route, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment) ? renderRoute(route) : <NotFoundView />}
+                />
+              ))}
+              <Route path="*" element={<NotFoundView />} />
+            </Routes>
+          </Suspense>
+        </ContentArea>
+        <BottomTabBar onMoreClick={() => setNavOpen(true)} />
+        <InstallPrompt />
+      </MainContent>
+    </WorkspaceContainer>
   );
 }
 

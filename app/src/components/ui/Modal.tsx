@@ -5,12 +5,17 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { Button } from "./Button";
 
 export function Modal({ title, onClose, maxWidth, actions, children }: Readonly<{ title: string | ReactNode; onClose: () => void; maxWidth?: number | string; actions?: ReactNode; children: ReactNode }>) {
   const { t } = useTranslation();
   const titleId = useId();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   return (
     <Dialog
       open
@@ -18,18 +23,43 @@ export function Modal({ title, onClose, maxWidth, actions, children }: Readonly<
       aria-labelledby={titleId}
       fullWidth
       maxWidth={false}
-      slotProps={{ paper: { className: "modalCard", sx: { width: "100%", maxWidth: maxWidth ?? 720 } } }}
+      slotProps={{
+        paper: {
+          sx: {
+            width: "100%",
+            maxWidth: maxWidth ?? 720,
+            margin: isMobile ? 0 : 16,
+            borderRadius: isMobile ? "20px 20px 0 0" : 20,
+            ...(isMobile && { marginBottom: 0, maxHeight: "calc(100% - 48px)" }),
+          },
+        },
+      }}
+      sx={{
+        ...(isMobile && { alignItems: "flex-end" }),
+      }}
     >
-      <DialogTitle id={titleId} className="moduleHeader modalHeader" component="div">
+      {isMobile && (
+        <Box
+          sx={{
+            width: 40,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: "divider",
+            margin: "12px auto 0",
+            flexShrink: 0,
+          }}
+        />
+      )}
+      <DialogTitle id={titleId} component="div">
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
           <h3>{title}</h3>
-          <Box className="modalHeaderActions" sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
             {actions}
-            <IconButton className="tableAction" type="button" aria-label={t("closeBtn")} onClick={onClose} size="small"><X size={16} /></IconButton>
+            <IconButton type="button" aria-label={t("closeBtn")} onClick={onClose} size="small"><X size={16} /></IconButton>
           </Box>
         </Box>
       </DialogTitle>
-      <DialogContent className="modalBody">{children}</DialogContent>
+      <DialogContent>{children}</DialogContent>
     </Dialog>
   );
 }
@@ -55,7 +85,10 @@ export function FormModal({
   maxWidth?: number | string;
   children: ReactNode;
 }>) {
+  const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,14 +104,45 @@ export function FormModal({
 
   return (
     <Modal title={title} onClose={onClose} maxWidth={maxWidth}>
-      <form className="inlineForm formStack" onSubmit={handleSubmit}>
-        {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      <form onSubmit={handleSubmit}>
+        {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
         {children}
-        <div className="formActions">
-          <Button className="primaryAction" type="submit" disabled={submitDisabled} isLoading={isSubmitting}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            gap: 2,
+            marginTop: 3,
+            paddingTop: 2,
+            borderTop: "1px solid",
+            borderColor: "divider",
+            ...(isMobile && {
+              position: "sticky",
+              bottom: 0,
+              backgroundColor: "background.paper",
+              marginX: -2,
+              paddingX: 2,
+              paddingBottom: 2,
+              zIndex: 1,
+            }),
+          }}
+        >
+          <Button
+            type="button"
+            onClick={onClose}
+            style={{ flex: isMobile ? 1 : undefined }}
+          >
+            {t("cancelBtn")}
+          </Button>
+          <Button
+            type="submit"
+            disabled={submitDisabled}
+            isLoading={isSubmitting}
+            style={{ flex: isMobile ? 1 : undefined }}
+          >
             {submitIcon} {submitLabel}
           </Button>
-        </div>
+        </Box>
       </form>
     </Modal>
   );

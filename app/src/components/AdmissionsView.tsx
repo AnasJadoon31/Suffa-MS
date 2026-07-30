@@ -33,6 +33,7 @@ import { cleanFormFields, FormFieldsEditor, validateFormFields } from "./FormFie
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
 import { answerString, BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields, mergeAdmissionBuiltIns } from "../lib/admissionBuiltIns";
+import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 
 type Tab = "registrations" | "forms" | "enquiries";
 
@@ -166,30 +167,29 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
             submitLabel={t("submitApplicationBtn")}
             submitIcon={<Plus size={16} />}
           >
-            <label>
-              {t("admissionFormLabel")}
-              <Select required value={form.form_id} onChange={(e) => {
-                const selected = admissionForms.find((item) => item.id === e.target.value);
-                setForm({ ...form, form_id: e.target.value, program_id: selected?.program_id ?? "" });
-                setFormAnswers({});
-              }}>
-                <option value="">{t("selectEllipsis")}</option>
-                {admissionForms.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-              </Select>
-            </label>
-            {admissionForms.length === 0 && <p className="notice notice-warning">{t("noOpenAdmissionForms")}</p>}
-
-          <label>
-                    {t("programLabel")}
-                    <Select disabled value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
-                      <option value="">{t("selectEllipsis")}</option>
-                      {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </Select>
-                  </label>
-
-          <AdmissionAnswersFields fields={selectedCreateAdmissionForm?.fields_definition ?? []} answers={formAnswers} onChange={setFormAnswers} idPrefix="walk-in-admission" />
-
-          <label>{t("notesLabel")}<Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
+            <FormStack>
+              <FormField label={t("admissionFormLabel")}>
+                <Select required value={form.form_id} onChange={(e) => {
+                  const selected = admissionForms.find((item) => item.id === e.target.value);
+                  setForm({ ...form, form_id: e.target.value, program_id: selected?.program_id ?? "" });
+                  setFormAnswers({});
+                }}>
+                  <option value="">{t("selectEllipsis")}</option>
+                  {admissionForms.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+                </Select>
+              </FormField>
+              {admissionForms.length === 0 && <p className="notice notice-warning">{t("noOpenAdmissionForms")}</p>}
+              <FormField label={t("programLabel")}>
+                <Select disabled value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+                  <option value="">{t("selectEllipsis")}</option>
+                  {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
+              </FormField>
+              <AdmissionAnswersFields fields={selectedCreateAdmissionForm?.fields_definition ?? []} answers={formAnswers} onChange={setFormAnswers} idPrefix="walk-in-admission" />
+              <FormField label={t("notesLabel")}>
+                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </FormField>
+            </FormStack>
           </FormModal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -243,12 +243,26 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
         }); setEditing(null); await load(); }
         catch (err: any) { setError(err.response?.data?.detail ?? t("failedUpdateApplication")); }
       }}>
-        <label>{t("applicantNameLabel")}<Input required value={editing.applicant_name} onChange={(e) => setEditing({ ...editing, applicant_name: e.target.value })} /></label>
-        <PhoneInput id="admission-edit-guardian-contact" required label={t("guardianContactLabel")} value={editing.guardian_contact} onChange={(value) => setEditing({ ...editing, guardian_contact: value })} />
-        <label>{t("programLabel")}<Select value={editing.program_id ?? ""} onChange={(e) => setEditing({ ...editing, program_id: e.target.value || null })}><option value="">{t("selectEllipsis")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</Select></label>
-        <label>{t("dobLabel")}<Input type="date" value={editing.date_of_birth ?? ""} onChange={(e) => setEditing({ ...editing, date_of_birth: e.target.value || null })} /></label>
-        {Object.entries(editing.extra_data ?? {}).map(([key, value]) => <label key={key}>{key.replaceAll("_", " ")}<Input value={String(value ?? "")} onChange={(e) => setEditing({ ...editing, extra_data: { ...(editing.extra_data ?? {}), [key]: e.target.value } })} /></label>)}
-        <label>{t("notesLabel")}<Input value={editing.notes ?? ""} onChange={(e) => setEditing({ ...editing, notes: e.target.value || null })} /></label>
+        <FormStack>
+          <FormField label={t("applicantNameLabel")}>
+            <Input required value={editing.applicant_name} onChange={(e) => setEditing({ ...editing, applicant_name: e.target.value })} />
+          </FormField>
+          <PhoneInput id="admission-edit-guardian-contact" required label={t("guardianContactLabel")} value={editing.guardian_contact} onChange={(value) => setEditing({ ...editing, guardian_contact: value })} />
+          <FormField label={t("programLabel")}>
+            <Select value={editing.program_id ?? ""} onChange={(e) => setEditing({ ...editing, program_id: e.target.value || null })}><option value="">{t("selectEllipsis")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</Select>
+          </FormField>
+          <FormField label={t("dobLabel")}>
+            <Input type="date" value={editing.date_of_birth ?? ""} onChange={(e) => setEditing({ ...editing, date_of_birth: e.target.value || null })} />
+          </FormField>
+          {Object.entries(editing.extra_data ?? {}).map(([key, value]) => (
+            <FormField key={key} label={key.replaceAll("_", " ")}>
+              <Input value={String(value ?? "")} onChange={(e) => setEditing({ ...editing, extra_data: { ...(editing.extra_data ?? {}), [key]: e.target.value } })} />
+            </FormField>
+          ))}
+          <FormField label={t("notesLabel")}>
+            <Input value={editing.notes ?? ""} onChange={(e) => setEditing({ ...editing, notes: e.target.value || null })} />
+          </FormField>
+        </FormStack>
       </FormModal>}
       {converting && <AdmissionConversionModal application={converting} programs={programs} onClose={() => setConverting(null)} onSuccess={async () => { setConverting(null); setNotice(t("applicationConvertedNotice")); await load(); }} />}
     </>
@@ -494,21 +508,23 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
             submitLabel={t("createAdmissionFormBtn")}
             submitIcon={<Plus size={16} />}
           >
-            {form.category === "General" && (
-              <label>
-                {t("programLabel")}
-                <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
-                  <option value="">{t("selectEllipsis")}</option>
-                  {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </Select>
-              </label>
-            )}
-
-          <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-
-          <label>{t("descriptionLabel")}<Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-
-          <FormFieldsEditor fields={fields} onChange={setFields} />
+            <FormStack>
+              {form.category === "General" && (
+                <FormField label={t("programLabel")}>
+                  <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+                    <option value="">{t("selectEllipsis")}</option>
+                    {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </Select>
+                </FormField>
+              )}
+              <FormField label={t("titleLabel")}>
+                <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              </FormField>
+              <FormField label={t("descriptionLabel")}>
+                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              </FormField>
+              <FormFieldsEditor fields={fields} onChange={setFields} />
+            </FormStack>
           </FormModal>}
       {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
 

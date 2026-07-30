@@ -7,22 +7,39 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate", // fixes the stale-bundle problem the old manual SW had
+      registerType: "autoUpdate",
       includeAssets: ["apple-touch-icon.png"],
       manifest: {
         name: "Madrasa Management System",
         short_name: "MMS",
-        description: "Mobile-first madrasa operations for attendance, academics, resources, finance, and parent communication.",
+        description:
+          "Mobile-first madrasa operations for attendance, academics, resources, finance, and parent communication.",
         start_url: "/",
         scope: "/",
         display: "standalone",
         orientation: "portrait-primary",
-        background_color: "#f7f7f2",
+        background_color: "#f2f4ef",
         theme_color: "#0f766e",
         categories: ["education", "productivity", "utilities"],
         icons: [
-          { src: "/pwa-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-          { src: "/pwa-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+          {
+            src: "/pwa-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            src: "/pwa-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+          {
+            src: "/pwa-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
         ],
         screenshots: [
           {
@@ -65,9 +82,6 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // App shell only. API responses must never enter Cache Storage because
-        // its cache key does not include the authenticated account. Selected
-        // offline reads use the account-scoped IndexedDB cache instead.
         navigateFallbackDenylist: [/^\/api\//],
       },
     }),
@@ -78,7 +92,8 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
           if (id.includes("@mui") || id.includes("@emotion")) return "vendor-mui";
-          if (id.includes("react") || id.includes("@tanstack/react-query") || id.includes("i18next")) return "vendor-react";
+          if (id.includes("react") || id.includes("@tanstack/react-query") || id.includes("i18next"))
+            return "vendor-react";
           if (id.includes("lucide-react")) return "vendor-icons";
           if (id.includes("axios") || id.includes("dexie")) return "vendor-data";
           if (id.includes("workbox") || id.includes("vite-plugin-pwa")) return "vendor-pwa";

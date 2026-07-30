@@ -11,6 +11,11 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButton";
+import { styled } from "@mui/material/styles";
 
 import type { AttendanceStatus } from "../data/mockData";
 import { AttendanceCalendar, monthRange, toDateKey, type ClassDayStats, type HolidayMarkers, type StudentDayStatus } from "./AttendanceCalendar";
@@ -42,10 +47,10 @@ import { HijriTag } from "./HijriTag";
 import { SearchDropdown } from "./SearchDropdown";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Input } from "./ui/Field";
-import { DataTable } from "./ui/DataTable";
-import { InlineFilter } from "./ui/InlineFilter";
 import { useDialog } from "../lib/DialogContext";
 import { useNavigationGuard } from "../lib/NavigationGuardContext";
+import { DataCard } from "./ui/DataCard";
+import { FilterBar } from "./ui/FilterBar";
 
 
 const attendanceOptions = ["present", "absent", "leave"] as const;
@@ -54,6 +59,67 @@ type AttendanceTab = "calendar" | "studentHistory";
 type AttendanceMode = "students" | "teachers";
 
 export type AttendanceBoardProps = Readonly<Record<string, never>>;
+
+const ClassGrid = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+  gap: theme.spacing(1.5),
+  marginBottom: theme.spacing(2),
+}));
+
+const ClassCard = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderRadius: 16,
+  cursor: "pointer",
+  transition: "box-shadow 0.2s ease, transform 0.15s ease",
+  display: "flex",
+  alignItems: "center",
+  gap: theme.spacing(1.5),
+  "&:hover": {
+    boxShadow: theme.shadows[4],
+    transform: "translateY(-1px)",
+  },
+}));
+
+const RosterList = styled(Box)(() => ({
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+}));
+
+const StatusToggleGroup = styled(ToggleButtonGroup)(({ theme }) => ({
+  display: "flex",
+  width: "100%",
+  "& .MuiToggleButton-root": {
+    flex: 1,
+    border: "1px solid",
+    borderColor: theme.palette.divider,
+    borderRadius: 0,
+    padding: "8px 4px",
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    textTransform: "none",
+    color: theme.palette.text.secondary,
+    "&:first-of-type": { borderRadius: "8px 0 0 8px" },
+    "&:last-of-type": { borderRadius: "0 8px 8px 0" },
+    "&.Mui-selected": {
+      backgroundColor: theme.palette.teal.main,
+      color: theme.palette.teal.contrastText,
+      borderColor: theme.palette.teal.main,
+    },
+  },
+}));
+
+const SaveBar = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: theme.spacing(1),
+  padding: theme.spacing(1.5),
+  backgroundColor: theme.palette.background.default,
+  borderRadius: 12,
+  marginTop: theme.spacing(2),
+  flexWrap: "wrap",
+}));
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -103,65 +169,46 @@ function TeacherAttendancePanel() {
   return (
     <PageSection>
       <PageHeader title={t("teacherAttendanceHeading")} notice={t("teacherAttendanceDescription")} />
-      <InlineFilter filters={[]}>
-        <SearchDropdown
-          id="teacher-attendance-search"
-          label={t("teacherLabel")}
-          placeholder={t("searchTeacherPlaceholder")}
-          items={matchingTeachers}
-          value={teacherSearch}
-          getKey={(teacher) => teacher.id}
-          getLabel={(teacher) => teacher.name}
-          getDescription={(teacher) => teacher.employee_code}
-          onQueryChange={(query) => {
-            setTeacherSearch(query);
-            setSelectedTeacherId("");
-          }}
-          onSelect={(teacher) => {
-            setTeacherSearch(`${teacher.name} (${teacher.employee_code})`);
-            setSelectedTeacherId(teacher.id);
-          }}
-          emptyLabel={t("noMatchingTeachers")}
-        />
+      <FilterBar
+        searchValue={teacherSearch}
+        onSearchChange={(query) => {
+          setTeacherSearch(query);
+          setSelectedTeacherId("");
+        }}
+        searchPlaceholder={t("searchTeacherPlaceholder")}
+      >
         {(teacherSearch || selectedTeacherId) && (
-          <div className="formActions">
-            <Button
-              className="secondaryAction"
-              type="button"
-              onClick={() => {
-                setTeacherSearch("");
-                setSelectedTeacherId("");
-              }}
-            >
-              {t("clearBtn")}
-            </Button>
-          </div>
+          <Button
+            className="secondaryAction"
+            type="button"
+            onClick={() => {
+              setTeacherSearch("");
+              setSelectedTeacherId("");
+            }}
+          >
+            {t("clearBtn")}
+          </Button>
         )}
-      </InlineFilter>
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <DataTable<TeacherAttendanceLogEntry>
-        columns={[
-          { header: t("teacherLabel"), render: (entry) => (
-            <>
-              <strong>{entry.teacher_name}</strong>
-              <small>{entry.employee_code}</small>
-            </>
-          ) },
-          { header: t("dateCol"), render: (entry) => entry.attendance_date },
-          { header: t("statusCol"), render: (entry) => t(entry.status) },
-          { header: t("timeInLabel"), render: (entry) => formatTime(entry.check_in) },
-          { header: t("timeOutLabel"), render: (entry) => formatTime(entry.check_out) },
-          { header: t("markedByCol"), render: (entry) => (
-            <>
-              <strong>{entry.marked_by.display_name}</strong>
-              <small>{entry.marked_by.username}</small>
-            </>
-          ) },
-        ]}
-        data={logs}
-        keyExtractor={(entry) => entry.id}
-        emptyMessage={t("noTeacherAttendanceLogs")}
-      />
+      </FilterBar>
+      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+
+      <RosterList>
+        {logs.length === 0 && <p>{t("noTeacherAttendanceLogs")}</p>}
+        {logs.map((entry) => (
+          <DataCard
+            key={entry.id}
+            title={entry.teacher_name}
+            subtitle={entry.employee_code}
+            fields={[
+              { label: t("dateCol"), value: entry.attendance_date },
+              { label: t("statusCol"), value: t(entry.status) },
+              { label: t("timeInLabel"), value: formatTime(entry.check_in) },
+              { label: t("timeOutLabel"), value: formatTime(entry.check_out) },
+              { label: t("markedByCol"), value: entry.marked_by.display_name },
+            ]}
+          />
+        ))}
+      </RosterList>
     </PageSection>
   );
 }
@@ -207,60 +254,30 @@ function buildHolidayMarkers(holidays: Holiday[]): HolidayMarkers {
   return markers;
 }
 
-function AttendanceHistoryTable({
+function AttendanceHistoryCards({
   entries,
   includeStudent,
 }: Readonly<{ entries: AttendanceLogEntry[]; includeStudent: boolean }>) {
   const { t } = useTranslation();
 
   return (
-    <DataTable<AttendanceLogEntry>
-      className={includeStudent ? "attendanceHistoryTable" : "attendanceHistoryTable compact"}
-      columns={[
-        { header: t("dateCol"), render: (entry) => entry.attendance_date },
-        ...(includeStudent ? [{ header: t("studentCol"), render: (entry: AttendanceLogEntry) => (
-          <>
-            <strong>{entry.student_name}</strong>
-            <small>{entry.admission_number}</small>
-          </>
-        ) }] : []),
-        { header: t("courseAndPeriodLabel"), render: (entry) => entry.legacy_general ? (
-          <span className="syncBadge">{t("legacyGeneralAttendance")}</span>
-        ) : (
-          <>
-            <strong>{entry.course?.name}</strong>
-            <small>{t("periodWithTime", {
-              period: entry.timetable_slot?.period,
-              start: formatTime(entry.timetable_slot?.start_time),
-              end: formatTime(entry.timetable_slot?.end_time),
-            })}</small>
-          </>
-        ) },
-        { header: t("statusCol"), render: (entry) => (
-          <>
-            <span className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
-            {entry.source === "approved_leave" && <small className="syncBadge">{t("approvedLeaveLabel")}</small>}
-            {entry.overridden && <small className="syncBadge">{t("overriddenLabel")}</small>}
-          </>
-        ) },
-        { header: t("markedByCol"), render: (entry) => (
-          <>
-            <strong>{entry.marked_by.display_name}</strong>
-            <small>{entry.marked_by.username} - {entry.marked_by.role}</small>
-          </>
-        ) },
-        { header: t("capturedAtCol"), render: (entry) => (
-          <>
-            {formatDateTime(entry.marked_at)}
-            {wasCapturedOffline(entry) && <small className="syncBadge">{t("offlineCaptureLabel")}</small>}
-          </>
-        ) },
-        { header: t("syncedAtCol"), render: (entry) => formatDateTime(entry.synced_at) },
-      ]}
-      data={entries}
-      keyExtractor={(entry) => entry.id}
-      emptyMessage={t("noAttendanceHistory")}
-    />
+    <RosterList>
+      {entries.length === 0 && <p>{t("noAttendanceHistory")}</p>}
+      {entries.map((entry) => (
+        <DataCard
+          key={entry.id}
+          title={includeStudent ? entry.student_name : entry.attendance_date}
+          subtitle={includeStudent ? entry.admission_number : undefined}
+          fields={[
+            ...(includeStudent ? [{ label: t("admissionNumberCol"), value: entry.admission_number }] : []),
+            { label: includeStudent ? t("dateCol") : t("courseAndPeriodLabel"), value: includeStudent ? entry.attendance_date : (entry.legacy_general ? t("legacyGeneralAttendance") : entry.course?.name ?? "—") },
+            { label: t("statusCol"), value: t(entry.status) },
+            { label: t("markedByCol"), value: entry.marked_by.display_name },
+            { label: t("capturedAtCol"), value: formatDateTime(entry.marked_at) },
+          ]}
+        />
+      ))}
+    </RosterList>
   );
 }
 
@@ -397,8 +414,6 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       try {
         const { data } = await cachedFetch("attendance-classes", attendanceApi.listClasses);
         setClasses(data);
-        // Deep link from the dashboard's "open class list" button (§C):
-        // jump straight into the roster instead of making the teacher pick again.
         const pending = consumePendingClassNav();
         const pendingClass = pending ? data.find((c) => c.id === pending.classId) : undefined;
         const pendingSection = pendingClass?.sections.find((section) => section.id === pending?.sectionId)
@@ -660,17 +675,17 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   }
 
   return (
-    <section className="attendancePanel">
-      <header className="panelHeader attendanceHeader">
+    <section>
+      <header style={{ marginBottom: 16 }}>
         <div>
-          <span className="eyebrow">{headerEyebrow}</span>
-          <h2>{headerTitle}</h2>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#0b4f49" }}>{headerEyebrow}</span>
+          <h2 style={{ margin: "4px 0" }}>{headerTitle}</h2>
           {selectedClass?.course_names.length ? (
-            <p className="panelSubtext">{selectedClass.course_names.join(", ")}</p>
+            <p style={{ color: "#5f6d67", margin: 0 }}>{selectedClass.course_names.join(", ")}</p>
           ) : null}
         </div>
         {selectedClassId && (
-          <div className="headerActions">
+          <div style={{ marginTop: 8 }}>
             <Button className="secondaryAction" type="button" onClick={() => void returnToClasses()}>
               <ArrowLeft size={17} />
               {t("classesHeading")}
@@ -679,11 +694,11 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         )}
       </header>
 
-      {error && <p className="notice notice-warning">{error}</p>}
-      {saveMessage && <p className="notice">{saveMessage}</p>}
+      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+      {saveMessage && <p>{saveMessage}</p>}
 
       {lockedEntries.length > 0 && (
-        <div className="notice notice-warning">
+        <div style={{ padding: 12, backgroundColor: "#fdf3e2", borderRadius: 12, marginBottom: 16 }}>
           <p>
             {lockedEntries.length} entr{lockedEntries.length === 1 ? "y" : "ies"} rejected - attendance day is locked
             or covered by approved leave.
@@ -706,7 +721,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       )}
 
       {canManageTeacherAttendance && (
-        <div className="formActions" style={{ marginTop: 16 }}>
+        <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
           <Button
             className={attendanceMode === "students" ? "primaryAction" : "secondaryAction"}
             type="button"
@@ -730,89 +745,96 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           >
             {t("teacherAttendanceHeading")}
           </Button>
-        </div>
+        </Box>
       )}
 
       {attendanceMode === "teachers" && <TeacherAttendancePanel />}
 
       {attendanceMode === "students" && !selectedClassId && (
-        <div className="attendanceClassGrid" aria-label={t("chooseAttendanceClass")}>
+        <ClassGrid>
           {classes.flatMap((item) => item.sections.map((section) => (
-            <Button className="attendanceClassButton" key={section.id} type="button" onClick={() => void selectClass(item.id, section.id)}>
-              <span className="attendanceClassIcon" aria-hidden="true"><BookOpen size={18} /></span>
-              <span className="attendanceClassBody">
+            <ClassCard key={section.id} variant="outlined" onClick={() => void selectClass(item.id, section.id)}>
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 12, backgroundColor: "#e0e6df" }}>
+                <BookOpen size={18} />
+              </span>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
                 <strong>{item.name} / {section.name}</strong>
-                <small>{item.course_names.join(", ") || t("noCoursesAssigned")}</small>
-                <span className="attendanceClassMeta">
+                <small style={{ display: "block", color: "#5f6d67" }}>{item.course_names.join(", ") || t("noCoursesAssigned")}</small>
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.8rem", color: "#5f6d67" }}>
                   <UsersRound size={15} />
                   {t("studentCount", { count: section.student_count })}
                 </span>
-              </span>
-              <ChevronRight size={18} aria-hidden="true" />
-            </Button>
+              </Box>
+              <ChevronRight size={18} />
+            </ClassCard>
           )))}
-          {!isLoadingClasses && classes.every((item) => item.sections.length === 0) && <p className="emptyState">{t("noAttendanceClasses")}</p>}
-          {isLoadingClasses && <p className="emptyState">{t("loadingLabel")}</p>}
-        </div>
+          {!isLoadingClasses && classes.every((item) => item.sections.length === 0) && <p>{t("noAttendanceClasses")}</p>}
+          {isLoadingClasses && <p>{t("loadingLabel")}</p>}
+        </ClassGrid>
       )}
 
       {attendanceMode === "students" && selectedClassId && (
         <>
-        <InlineFilter
-          className="attendancePeriodFilter"
-          filters={[
-            {
-              key: "course", type: "select", label: t("courseLabel"), value: selectedCourseId,
-              placeholder: t("selectCoursePrompt"),
-              options: (selectedClass?.courses ?? []).map((course) => ({ value: course.id, label: course.name })),
-              onChange: async (value) => {
-                if (!(await confirmDiscardUnsavedMarks())) return;
-                setSelectedCourseId(value);
-                setSelectedSlotId("");
-                setRoster(null);
-                setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: value, view: activeTab === "studentHistory" ? "history" : "calendar" });
+          <FilterBar
+            fields={[
+              {
+                key: "course",
+                type: "select",
+                label: t("courseLabel"),
+                value: selectedCourseId,
+                placeholder: t("selectCoursePrompt"),
+                options: (selectedClass?.courses ?? []).map((course) => ({ value: course.id, label: course.name })),
+                onChange: async (value) => {
+                  if (!(await confirmDiscardUnsavedMarks())) return;
+                  setSelectedCourseId(value);
+                  setSelectedSlotId("");
+                  setRoster(null);
+                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: value, view: activeTab === "studentHistory" ? "history" : "calendar" });
+                },
               },
-            },
-            {
-              key: "period", type: "select", label: t("periodCol"), value: selectedSlotId,
-              placeholder: t("selectPeriodPrompt"), disabled: !selectedCourseId,
-              options: timetableSlots.filter((slot) => slot.course_id === selectedCourseId).map((slot) => ({
-                value: slot.id,
-                label: t("scheduledPeriodOption", { day: t(attendanceDayKeys[slot.day_of_week] ?? "dayMon"), period: slot.period, start: formatTime(slot.start_time), end: formatTime(slot.end_time) }),
-              })),
-              onChange: async (value) => {
-                if (!(await confirmDiscardUnsavedMarks())) return;
-                setSelectedSlotId(value);
-                setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: value, view: activeTab === "studentHistory" ? "history" : "calendar" });
+              {
+                key: "period",
+                type: "select",
+                label: t("periodCol"),
+                value: selectedSlotId,
+                placeholder: t("selectPeriodPrompt"),
+                options: timetableSlots.filter((slot) => slot.course_id === selectedCourseId).map((slot) => ({
+                  value: slot.id,
+                  label: t("scheduledPeriodOption", { day: t(attendanceDayKeys[slot.day_of_week] ?? "dayMon"), period: slot.period, start: formatTime(slot.start_time), end: formatTime(slot.end_time) }),
+                })),
+                onChange: async (value) => {
+                  if (!(await confirmDiscardUnsavedMarks())) return;
+                  setSelectedSlotId(value);
+                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: value, view: activeTab === "studentHistory" ? "history" : "calendar" });
+                },
               },
-            },
-          ]}
-        />
-        <div className="formActions" style={{ marginTop: 16 }}>
-          <Button
-            className={activeTab === "calendar" ? "primaryAction" : "secondaryAction"}
-            type="button"
-            onClick={async () => {
-              if (!(await confirmDiscardUnsavedMarks())) return;
-              setActiveTab("calendar");
-              setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "calendar" });
-            }}
-          >
-            {t("calendarTab")}
-          </Button>
-          <Button
-            className={activeTab === "studentHistory" ? "primaryAction" : "secondaryAction"}
-            type="button"
-            onClick={async () => {
-              if (!(await confirmDiscardUnsavedMarks())) return;
-              setActiveTab("studentHistory");
-              setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
-            }}
-          >
-            {t("studentAttendanceHistory")}
-          </Button>
-        </div>
-        {!selectedCourseId || !selectedSlotId ? <p className="notice">{t("chooseCoursePeriodPrompt")}</p> : null}
+            ]}
+          />
+          <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+            <Button
+              className={activeTab === "calendar" ? "primaryAction" : "secondaryAction"}
+              type="button"
+              onClick={async () => {
+                if (!(await confirmDiscardUnsavedMarks())) return;
+                setActiveTab("calendar");
+                setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "calendar" });
+              }}
+            >
+              {t("calendarTab")}
+            </Button>
+            <Button
+              className={activeTab === "studentHistory" ? "primaryAction" : "secondaryAction"}
+              type="button"
+              onClick={async () => {
+                if (!(await confirmDiscardUnsavedMarks())) return;
+                setActiveTab("studentHistory");
+                setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
+              }}
+            >
+              {t("studentAttendanceHistory")}
+            </Button>
+          </Box>
+          {!selectedCourseId || !selectedSlotId ? <p>{t("chooseCoursePeriodPrompt")}</p> : null}
         </>
       )}
 
@@ -832,48 +854,57 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             holidayMarkers={holidayMarkers}
           />
 
-          <section className="attendanceModeSection">
-            {isLoadingClassHistory && <p className="emptyState">{t("loadingLabel")}</p>}
-            {!isLoadingClassHistory && !selectedDate && <p className="emptyState">{t("selectDayPrompt")}</p>}
+          <section>
+            {isLoadingClassHistory && <p>{t("loadingLabel")}</p>}
+            {!isLoadingClassHistory && !selectedDate && <p>{t("selectDayPrompt")}</p>}
             {!isLoadingClassHistory && selectedDate && (
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+              <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mb: 1 }}>
                 <strong>{selectedDate}</strong>
                 <HijriTag date={selectedDate} inline />
-              </div>
+              </Box>
             )}
 
             {!isLoadingClassHistory && selectedDate && showMarkForm && (
-              <div className="roster">
-                {isLoadingRoster && <p className="emptyState">{t("loadingLabel")}</p>}
+              <RosterList>
+                {isLoadingRoster && <p>{t("loadingLabel")}</p>}
                 {!isLoadingRoster && roster?.students.map((student) => {
                   const isApprovedLeaveLocked = approvedLeaveStudentIds.has(student.id);
                   const status = isApprovedLeaveLocked ? "leave" : marked[student.id];
                   return (
-                    <article className="rosterRow" key={student.id}>
-                      <div>
-                        <strong>{student.name}</strong>
-                        <small>{student.admission_number}{student.section_name ? ` - ${student.section_name}` : ""}</small>
-                        {isApprovedLeaveLocked && <span className="syncBadge">{t("approvedLeaveLabel")}</span>}
-                      </div>
-                      <div className="statusButtons" aria-label={t("attendanceForStudentLabel", { name: student.name })}>
-                        {attendanceOptions.map((option) => (
-                          <Button
-                            className={status === option ? `statusButton active ${option}` : "statusButton"}
-                            key={option}
-                            type="button"
-                            disabled={readOnly || !sessionId || isApprovedLeaveLocked}
-                            onClick={() => mark(student.id, option)}
-                          >
-                            {t(option)}
-                          </Button>
-                        ))}
-                      </div>
-                    </article>
+                    <DataCard
+                      key={student.id}
+                      title={student.name}
+                      subtitle={`${student.admission_number}${student.section_name ? ` - ${student.section_name}` : ""}`}
+                      avatar={student.name.charAt(0)}
+                      status={isApprovedLeaveLocked ? t("approvedLeaveLabel") : undefined}
+                      fields={[
+                        { label: t("statusCol"), value: status ? t(status) : "—" },
+                      ]}
+                      actions={
+                        <StatusToggleGroup
+                          value={status ?? ""}
+                          onChange={(_, value) => { if (value) mark(student.id, value as AttendanceStatus); }}
+                          aria-label={t("attendanceForStudentLabel", { name: student.name })}
+                          size="small"
+                        >
+                          {attendanceOptions.map((option) => (
+                            <ToggleButton
+                              key={option}
+                              value={option}
+                              aria-label={t(option)}
+                              disabled={readOnly || !sessionId || isApprovedLeaveLocked}
+                            >
+                              {t(option)}
+                            </ToggleButton>
+                          ))}
+                        </StatusToggleGroup>
+                      }
+                    />
                   );
                 })}
-                {!isLoadingRoster && roster?.students.length === 0 && <p className="emptyState">{t("noActiveStudentsToMark")}</p>}
+                {!isLoadingRoster && roster?.students.length === 0 && <p>{t("noActiveStudentsToMark")}</p>}
 
-                <footer className="outboxStrip">
+                <SaveBar>
                   <span>{t("outbox")}</span>
                   <strong>{entries.length}</strong>
                   <span>{t("markedStudents")}</span>
@@ -897,13 +928,13 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                     <CloudUpload size={18} />
                     {t("syncNow")}
                   </Button>
-                </footer>
-              </div>
+                </SaveBar>
+              </RosterList>
             )}
 
             {!isLoadingClassHistory && selectedDate && !showMarkForm && (
               <>
-                <AttendanceHistoryTable entries={selectedDayEntries} includeStudent />
+                <AttendanceHistoryCards entries={selectedDayEntries} includeStudent />
                 {isSelectedToday && (
                   <Button className="secondaryAction" type="button" onClick={startEditingToday}>
                     <Pencil size={16} />
@@ -917,34 +948,35 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       )}
 
       {attendanceMode === "students" && selectedClassId && selectedCourseId && selectedSlotId && activeTab === "studentHistory" && (
-        <div className="attendanceStudentSplit">
-          <div className="attendanceStudentList">
-            <Input
-              className="attendanceStudentSearchInput"
-              type="text"
-              placeholder={t("searchStudentPlaceholder") ?? ""}
-              value={studentSearch}
-              onChange={(event) => setStudentSearch(event.target.value)}
-            />
-            {filteredStudents.map((student) => (
-              <Button
-                className={student.id === selectedStudentId ? "attendanceStudentListButton active" : "attendanceStudentListButton"}
-                type="button"
-                key={student.id}
-                onClick={() => {
-                  setSelectedStudentId(student.id);
-                  setStudentSelectedDate(null);
-                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", student: student.id });
-                }}
-              >
-                <strong>{student.name}</strong>
-                <small>{student.admission_number}</small>
-              </Button>
-            ))}
-            {filteredStudents.length === 0 && <p className="emptyState">{t("noStudentsFound")}</p>}
-          </div>
+        <Box sx={{ display: { md: "grid" }, gridTemplateColumns: "280px 1fr", gap: 2 }}>
+          <Box>
+            <Box sx={{ mb: 1 }}>
+              <Input
+                type="text"
+                placeholder={t("searchStudentPlaceholder") ?? ""}
+                value={studentSearch}
+                onChange={(event) => setStudentSearch(event.target.value)}
+              />
+            </Box>
+            <RosterList>
+              {filteredStudents.map((student) => (
+                <DataCard
+                  key={student.id}
+                  title={student.name}
+                  subtitle={student.admission_number}
+                  avatar={student.name.charAt(0)}
+                  onClick={() => {
+                    setSelectedStudentId(student.id);
+                    setStudentSelectedDate(null);
+                    setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", student: student.id });
+                  }}
+                />
+              ))}
+            </RosterList>
+            {filteredStudents.length === 0 && <p>{t("noStudentsFound")}</p>}
+          </Box>
 
-          <div>
+          <Box>
             <AttendanceCalendar
               mode="student"
               month={studentMonth}
@@ -957,21 +989,21 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               studentDayStatus={studentDayStatus}
               holidayMarkers={holidayMarkers}
             />
-            <section className="attendanceModeSection">
-              {isLoadingStudentHistory && <p className="emptyState">{t("loadingLabel")}</p>}
-              {!isLoadingStudentHistory && !studentSelectedDate && <p className="emptyState">{t("selectDayPrompt")}</p>}
+            <section>
+              {isLoadingStudentHistory && <p>{t("loadingLabel")}</p>}
+              {!isLoadingStudentHistory && !studentSelectedDate && <p>{t("selectDayPrompt")}</p>}
               {!isLoadingStudentHistory && studentSelectedDate && (
                 <>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                  <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mb: 1 }}>
                     <strong>{studentSelectedDate}</strong>
                     <HijriTag date={studentSelectedDate} inline />
-                  </div>
-                  <AttendanceHistoryTable entries={studentDayEntries} includeStudent={false} />
+                  </Box>
+                  <AttendanceHistoryCards entries={studentDayEntries} includeStudent={false} />
                 </>
               )}
             </section>
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
     </section>
   );

@@ -2,6 +2,9 @@ import { Button } from "./ui/Button";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FileDown, Landmark, MessageCircle, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import { styled } from "@mui/material/styles";
 
 import { academicsApi, financeApi, type AcademicClass, type Donation, type Donor, type Payment, type PaymentCategory, type FinanceSummary, type StudentFinanceProfile, type DonorFinanceProfile } from "../lib/endpoints";
 import { peopleApi, type Student } from "../lib/endpoints";
@@ -12,11 +15,30 @@ import { Input, Select } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
-import { InlineFilter } from "./ui/InlineFilter";
 import { MetricGrid, MetricCard } from "./ui/Card";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { ActionMenu } from "./ui/ActionMenu";
+import { DataCard, type DataField } from "./ui/DataCard";
+import { DataViewToggle, type ViewMode } from "./ui/DataViewToggle";
+import { FilterBar } from "./ui/FilterBar";
 
+
+const StyledPageSection = styled(PageSection)(() => ({
+  position: "relative",
+}));
+
+const ToolbarRow = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: theme.spacing(1),
+  marginBottom: theme.spacing(2),
+  flexWrap: "wrap",
+}));
+
+const CardsList = styled(Box)(() => ({
+  display: "flex",
+  flexDirection: "column",
+}));
 
 export type FinanceTab = "contributions" | "donations" | "summary";
 
@@ -49,15 +71,17 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
   }, []);
 
   return (
-    <PageSection>
+    <StyledPageSection>
       <PageHeader
         title={t("financeTitle")}
         notice={t("financeSubtitle")}
       />
-      <InlineFilter
-        className="financePrimaryToolbar"
-        filters={[{
-          key: "finance-tab", type: "tab", value: tab, ariaLabel: t("financeSectionsLabel"),
+      <FilterBar
+        fields={[{
+          key: "finance-tab",
+          type: "select",
+          value: tab,
+          ariaLabel: t("financeSectionsLabel"),
           options: [
             { value: "contributions", label: t("contributionsTab") },
             { value: "donations", label: t("donationsTab") },
@@ -71,7 +95,7 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
             <Plus size={16} /> {t("addCategoryBtn")}
           </Button>
         )}
-      </InlineFilter>
+      </FilterBar>
       {canManage && showCategory && (
         <FormModal
                 title={t("addCategoryBtn")} onClose={() => setShowCategory(false)}
@@ -94,7 +118,7 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
                 <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("tuitionExample")} /></label>
               </FormModal>
       )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
 
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
@@ -105,7 +129,7 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
           {tab === "summary" && <SummaryTab />}
         </>
       )}
-    </PageSection>
+    </StyledPageSection>
   );
 }
 
@@ -122,6 +146,7 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
   const [isLoading, setIsLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [profile, setProfile] = useState<StudentFinanceProfile | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const paymentLoadSequence = useRef(0);
 
   const load = async () => {
@@ -171,18 +196,35 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
   }, [payments, recordSearch]);
   const hasFilters = Boolean(recordSearch || filters.class_id || filters.category_id || filters.date_from || filters.date_to);
 
+  const paymentFields = (p: Payment): DataField[] => [
+    { label: t("studentCol"), value: p.student_name ?? t("deletedPersonLabel") },
+    { label: t("categoryCol"), value: p.category_name ?? t("unknownLabel") },
+    { label: t("amountCol"), value: `${p.currency} ${p.amount}` },
+    { label: t("dateCol"), value: p.payment_date },
+    { label: t("notesLabel"), value: p.note ?? "—" },
+  ];
+
   return (
     <>
-      <InlineFilter className="pwaFilterStack financeRecordToolbar" filters={[
-        { key: "search", type: "input", inputType: "search", value: recordSearch, ariaLabel: t("searchContributionsLabel"), placeholder: t("searchContributionsPlaceholder"), onChange: setRecordSearch },
-        { key: "class", type: "select", value: filters.class_id, ariaLabel: t("classCol"), placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
-        { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
-        { key: "date-from", type: "input", inputType: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
-        { key: "date-to", type: "input", inputType: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
-      ]}>
-        {hasFilters && <Button className="secondaryAction" type="button" onClick={() => { setRecordSearch(""); setFilters({ class_id: "", category_id: "", date_from: "", date_to: "" }); }}>{t("clearFiltersBtn")}</Button>}
-        {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("recordPaymentBtn")}</Button>}
-      </InlineFilter>
+      <FilterBar
+        searchValue={recordSearch}
+        onSearchChange={setRecordSearch}
+        searchPlaceholder={t("searchContributionsPlaceholder")}
+        fields={[
+          { key: "class", type: "select", value: filters.class_id, ariaLabel: t("classCol"), placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
+          { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
+          { key: "date-from", type: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
+          { key: "date-to", type: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
+        ]}
+        onClearAll={() => { setRecordSearch(""); setFilters({ class_id: "", category_id: "", date_from: "", date_to: "" }); }}
+      >
+        <DataViewToggle viewKey="finance-contributions" onChange={setViewMode} />
+        {canManage && (
+          <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}>
+            <Plus size={16} /> {t("recordPaymentBtn")}
+          </Button>
+        )}
+      </FilterBar>
       {canManage && showCreate && (
         <FormModal
                 title={t("recordPaymentBtn")} onClose={() => setShowCreate(false)}
@@ -240,63 +282,113 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
               </FormModal>
       )}
       {!isLoading && error && <ErrorState message={error} />}
-      <div className="tableResponsive"><div className="dataTable financeTable">
-        <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("dateCol")}</span><span>{t("notesLabel")}</span><span>{t("receiptCol")}</span></div>
-        {isLoading && <LoadingState />}
-        {!isLoading && !error && visiblePayments.length === 0 && <p className="emptyState">{t("noContributionsYet")}</p>}
-        {!isLoading && !error && visiblePayments.map((p) => (
-          <div className="dataRow" key={p.id}>
-            <span data-label={t("studentCol")}>
-              <Button className="identityLink" type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadContributions")))}>
-                {p.student_name ?? t("deletedPersonLabel")}
-              </Button>
-            </span>
-            <span data-label={t("categoryCol")}>{p.category_name ?? t("unknownLabel")}</span>
-            <span data-label={t("amountCol")}>{p.currency} {p.amount}</span>
-            <span data-label={t("dateCol")}>{p.payment_date}<HijriTag date={p.payment_date} /></span>
-            <span data-label={t("notesLabel")}>{p.note ?? "—"}</span>
-            <span data-label={t("receiptCol")} className="financeReceiptActions">
-              <ActionMenu items={[
-                { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadPaymentReceipt(p.id) },
-                ...(canManage ? [{
-                  label: t("shareWhatsAppLabel"),
-                  icon: <MessageCircle size={14} />,
-                  onClick: async () => {
-                    try {
-                      const link = await financeApi.sharePaymentReceipt(p.id);
-                      if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
-                    } catch (err: any) {
-                      setError(err.response?.data?.detail ?? t("failedShareReceipt"));
-                    }
-                  },
-                }] : []),
-              ]} ariaLabel={`${t("actionsCol")}: ${p.student_name ?? t("deletedPersonLabel")}`} />
-            </span>
-          </div>
-        ))}
-      </div></div>
+
+      {viewMode === "cards" ? (
+        <CardsList>
+          {isLoading && <LoadingState />}
+          {!isLoading && !error && visiblePayments.length === 0 && <p>{t("noContributionsYet")}</p>}
+          {!isLoading && !error && visiblePayments.map((p) => (
+            <DataCard
+              key={p.id}
+              title={p.student_name ?? t("deletedPersonLabel")}
+              subtitle={`${p.currency} ${p.amount}`}
+              fields={paymentFields(p)}
+              actions={
+                <ActionMenu items={[
+                  { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadPaymentReceipt(p.id) },
+                  ...(canManage ? [{
+                    label: t("shareWhatsAppLabel"),
+                    icon: <MessageCircle size={14} />,
+                    onClick: async () => {
+                      try {
+                        const link = await financeApi.sharePaymentReceipt(p.id);
+                        if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
+                      } catch (err: any) {
+                        setError(err.response?.data?.detail ?? t("failedShareReceipt"));
+                      }
+                    },
+                  }] : []),
+                ]} ariaLabel={`${t("actionsCol")}: ${p.student_name ?? t("deletedPersonLabel")}`} />
+              }
+            />
+          ))}
+        </CardsList>
+      ) : (
+        <Box sx={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("studentCol")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("categoryCol")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("amountCol")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("dateCol")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("notesLabel")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("receiptCol")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr><td colSpan={6}><LoadingState /></td></tr>
+              )}
+              {!isLoading && !error && visiblePayments.length === 0 && (
+                <tr><td colSpan={6}><p>{t("noContributionsYet")}</p></td></tr>
+              )}
+              {!isLoading && !error && visiblePayments.map((p) => (
+                <tr key={p.id}>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>
+                    <Button className="secondaryAction" type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadContributions")))}>
+                      {p.student_name ?? t("deletedPersonLabel")}
+                    </Button>
+                  </td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{p.category_name ?? t("unknownLabel")}</td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{p.currency} {p.amount}</td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{p.payment_date}<HijriTag date={p.payment_date} /></td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{p.note ?? "—"}</td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>
+                    <ActionMenu items={[
+                      { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadPaymentReceipt(p.id) },
+                      ...(canManage ? [{
+                        label: t("shareWhatsAppLabel"),
+                        icon: <MessageCircle size={14} />,
+                        onClick: async () => {
+                          try {
+                            const link = await financeApi.sharePaymentReceipt(p.id);
+                            if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
+                          } catch (err: any) {
+                            setError(err.response?.data?.detail ?? t("failedShareReceipt"));
+                          }
+                        },
+                      }] : []),
+                    ]} ariaLabel={`${t("actionsCol")}: ${p.student_name ?? t("deletedPersonLabel")}`} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Box>
+      )}
       {profile && (
         <Modal title={profile.name} onClose={() => setProfile(null)}>
-          <dl className="detailGrid">
-            <dt>{t("admissionNumberCol")}</dt><dd>{profile.admission_number}</dd>
-            <dt>{t("phoneCol")}</dt><dd>{profile.phone || "—"}</dd>
-            <dt>{t("addressCol")}</dt><dd>{profile.address || "—"}</dd>
-          </dl>
-          <h4>{t("completePaymentHistoryLabel")}</h4>
-          <div className="dataTable financeHistoryTable">
-            <div className="dataRow header">
-              <span>{t("dateCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("notesLabel")}</span>
-            </div>
-            {profile.payments.length === 0 && <p className="emptyState">{t("noContributionsYet")}</p>}
-            {profile.payments.map((payment) => (
-              <div className="dataRow" key={payment.id}>
-                <span data-label={t("dateCol")}>{payment.payment_date}</span>
-                <span data-label={t("categoryCol")}>{payment.category_name ?? t("unknownLabel")}</span>
-                <span data-label={t("amountCol")}><strong>{payment.currency} {payment.amount}</strong></span>
-                <span data-label={t("notesLabel")}>{payment.note ?? "—"}</span>
-              </div>
-            ))}
-          </div>
+          <Box sx={{ p: 3 }}>
+            <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px" }}>
+              <dt>{t("admissionNumberCol")}</dt><dd>{profile.admission_number}</dd>
+              <dt>{t("phoneCol")}</dt><dd>{profile.phone || "—"}</dd>
+              <dt>{t("addressCol")}</dt><dd>{profile.address || "—"}</dd>
+            </Box>
+            <h4>{t("completePaymentHistoryLabel")}</h4>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {profile.payments.length === 0 && <p>{t("noContributionsYet")}</p>}
+              {profile.payments.map((payment) => (
+                <Paper key={payment.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>{payment.payment_date}</span>
+                    <strong>{payment.currency} {payment.amount}</strong>
+                  </Box>
+                  <small>{payment.category_name ?? t("unknownLabel")} · {payment.note ?? "—"}</small>
+                </Paper>
+              ))}
+            </Box>
+          </Box>
         </Modal>
       )}
     </>
@@ -317,6 +409,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
   const [isLoading, setIsLoading] = useState(true);
   const [createModal, setCreateModal] = useState<"donor" | "donation" | null>(null);
   const [profile, setProfile] = useState<DonorFinanceProfile | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const donationLoadSequence = useRef(0);
 
   const loadDonors = async () => {
@@ -374,19 +467,36 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
   }, [donations, recordSearch]);
   const hasFilters = Boolean(recordSearch || filters.donor_id || filters.category_id || filters.date_from || filters.date_to);
 
+  const donationFields = (d: Donation): DataField[] => [
+    { label: t("donorCol"), value: d.donor_name ?? t("deletedPersonLabel") },
+    { label: t("categoryCol"), value: d.category_name ?? t("unknownLabel") },
+    { label: t("amountCol"), value: `${d.currency} ${d.amount}` },
+    { label: t("dateCol"), value: d.donation_date },
+    { label: t("notesLabel"), value: d.note ?? "—" },
+  ];
+
   return (
     <>
-      <InlineFilter className="pwaFilterStack financeRecordToolbar" filters={[
-        { key: "search", type: "input", inputType: "search", value: recordSearch, ariaLabel: t("searchDonationsLabel"), placeholder: t("searchDonationsPlaceholder"), onChange: setRecordSearch },
-        { key: "donor", type: "select", value: filters.donor_id, ariaLabel: t("donorCol"), placeholder: t("allDonors"), options: donors.map((donor) => ({ value: donor.id, label: donor.name })), onChange: (value) => setFilters({ ...filters, donor_id: value }) },
-        { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((category) => ({ value: category.id, label: category.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
-        { key: "date-from", type: "input", inputType: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
-        { key: "date-to", type: "input", inputType: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
-      ]}>
-        {hasFilters && <Button className="secondaryAction" type="button" onClick={() => { setRecordSearch(""); setFilters({ donor_id: "", category_id: "", date_from: "", date_to: "" }); }}>{t("clearFiltersBtn")}</Button>}
-        {canManage && <Button className="secondaryAction" type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</Button>}
-        {canManage && <Button className="primaryAction" type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</Button>}
-      </InlineFilter>
+      <FilterBar
+        searchValue={recordSearch}
+        onSearchChange={setRecordSearch}
+        searchPlaceholder={t("searchDonationsPlaceholder")}
+        fields={[
+          { key: "donor", type: "select", value: filters.donor_id, ariaLabel: t("donorCol"), placeholder: t("allDonors"), options: donors.map((donor) => ({ value: donor.id, label: donor.name })), onChange: (value) => setFilters({ ...filters, donor_id: value }) },
+          { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((category) => ({ value: category.id, label: category.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
+          { key: "date-from", type: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
+          { key: "date-to", type: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
+        ]}
+        onClearAll={() => { setRecordSearch(""); setFilters({ donor_id: "", category_id: "", date_from: "", date_to: "" }); }}
+      >
+        <DataViewToggle viewKey="finance-donations" onChange={setViewMode} />
+        {canManage && (
+          <Button className="secondaryAction" type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</Button>
+        )}
+        {canManage && (
+          <Button className="primaryAction" type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</Button>
+        )}
+      </FilterBar>
       {canManage && createModal === "donor" && (
         <FormModal
                 title={t("addDonorBtn")} onClose={() => setCreateModal(null)}
@@ -470,59 +580,111 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
       )}
       {donorLoadError && <ErrorState message={donorLoadError} />}
       {!isLoading && error && <ErrorState message={error} />}
-      <div className="tableResponsive"><div className="dataTable financeTable">
-        <div className="dataRow header"><span>{t("donorCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("dateCol")}</span><span>{t("notesLabel")}</span><span>{t("receiptCol")}</span></div>
-        {isLoading && <LoadingState />}
-        {!isLoading && !error && visibleDonations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
-        {!isLoading && !error && visibleDonations.map((d) => (
-          <div className="dataRow" key={d.id}>
-            <span data-label={t("donorCol")}>
-              <Button className="identityLink" type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDonations")))}>
-                {d.donor_name ?? t("deletedPersonLabel")}
-              </Button>
-            </span>
-            <span data-label={t("categoryCol")}>{d.category_name ?? t("unknownLabel")}</span>
-            <span data-label={t("amountCol")}>{d.currency} {d.amount}</span>
-            <span data-label={t("dateCol")}>{d.donation_date}<HijriTag date={d.donation_date} /></span>
-            <span data-label={t("notesLabel")}>{d.note ?? "—"}</span>
-            <span data-label={t("receiptCol")} className="financeReceiptActions">
-              <ActionMenu items={[
-                { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadDonationReceipt(d.id) },
-                ...(canManage ? [{
-                  label: t("shareWhatsAppLabel"),
-                  icon: <MessageCircle size={14} />,
-                  onClick: async () => {
-                    try {
-                      const link = await financeApi.shareDonationReceipt(d.id);
-                      if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
-                    } catch (err: any) {
-                      setError(err.response?.data?.detail ?? t("failedShareReceipt"));
-                    }
-                  },
-                }] : []),
-              ]} ariaLabel={`${t("actionsCol")}: ${d.donor_name ?? t("deletedPersonLabel")}`} />
-            </span>
-          </div>
-        ))}
-      </div></div>
+
+      {viewMode === "cards" ? (
+        <CardsList>
+          {isLoading && <LoadingState />}
+          {!isLoading && !error && visibleDonations.length === 0 && <p>{t("noDonationsYet")}</p>}
+          {!isLoading && !error && visibleDonations.map((d) => (
+            <DataCard
+              key={d.id}
+              title={d.donor_name ?? t("deletedPersonLabel")}
+              subtitle={`${d.currency} ${d.amount}`}
+              fields={donationFields(d)}
+              actions={
+                <ActionMenu items={[
+                  { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadDonationReceipt(d.id) },
+                  ...(canManage ? [{
+                    label: t("shareWhatsAppLabel"),
+                    icon: <MessageCircle size={14} />,
+                    onClick: async () => {
+                      try {
+                        const link = await financeApi.shareDonationReceipt(d.id);
+                        if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
+                      } catch (err: any) {
+                        setError(err.response?.data?.detail ?? t("failedShareReceipt"));
+                      }
+                    },
+                  }] : []),
+                ]} ariaLabel={`${t("actionsCol")}: ${d.donor_name ?? t("deletedPersonLabel")}`} />
+              }
+            />
+          ))}
+        </CardsList>
+      ) : (
+        <Box sx={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("donorCol")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("categoryCol")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("amountCol")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("dateCol")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("notesLabel")}</th>
+                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("receiptCol")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr><td colSpan={6}><LoadingState /></td></tr>
+              )}
+              {!isLoading && !error && visibleDonations.length === 0 && (
+                <tr><td colSpan={6}><p>{t("noDonationsYet")}</p></td></tr>
+              )}
+              {!isLoading && !error && visibleDonations.map((d) => (
+                <tr key={d.id}>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>
+                    <Button className="secondaryAction" type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDonations")))}>
+                      {d.donor_name ?? t("deletedPersonLabel")}
+                    </Button>
+                  </td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{d.category_name ?? t("unknownLabel")}</td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{d.currency} {d.amount}</td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{d.donation_date}<HijriTag date={d.donation_date} /></td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{d.note ?? "—"}</td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>
+                    <ActionMenu items={[
+                      { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadDonationReceipt(d.id) },
+                      ...(canManage ? [{
+                        label: t("shareWhatsAppLabel"),
+                        icon: <MessageCircle size={14} />,
+                        onClick: async () => {
+                          try {
+                            const link = await financeApi.shareDonationReceipt(d.id);
+                            if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
+                          } catch (err: any) {
+                            setError(err.response?.data?.detail ?? t("failedShareReceipt"));
+                          }
+                        },
+                      }] : []),
+                    ]} ariaLabel={`${t("actionsCol")}: ${d.donor_name ?? t("deletedPersonLabel")}`} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Box>
+      )}
       {profile && (
         <Modal title={profile.name} onClose={() => setProfile(null)}>
-          <dl className="detailGrid"><dt>{t("phoneCol")}</dt><dd>{profile.contact}</dd></dl>
-          <h4>{t("completeDonationHistoryLabel")}</h4>
-          <div className="dataTable financeHistoryTable">
-            <div className="dataRow header">
-              <span>{t("dateCol")}</span><span>{t("categoryCol")}</span><span>{t("amountCol")}</span><span>{t("notesLabel")}</span>
-            </div>
-            {profile.donations.length === 0 && <p className="emptyState">{t("noDonationsYet")}</p>}
-            {profile.donations.map((donation) => (
-              <div className="dataRow" key={donation.id}>
-                <span data-label={t("dateCol")}>{donation.donation_date}</span>
-                <span data-label={t("categoryCol")}>{donation.category_name ?? t("unknownLabel")}</span>
-                <span data-label={t("amountCol")}><strong>{donation.currency} {donation.amount}</strong></span>
-                <span data-label={t("notesLabel")}>{donation.note ?? "—"}</span>
-              </div>
-            ))}
-          </div>
+          <Box sx={{ p: 3 }}>
+            <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px" }}>
+              <dt>{t("phoneCol")}</dt><dd>{profile.contact}</dd>
+            </Box>
+            <h4>{t("completeDonationHistoryLabel")}</h4>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {profile.donations.length === 0 && <p>{t("noDonationsYet")}</p>}
+              {profile.donations.map((donation) => (
+                <Paper key={donation.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>{donation.donation_date}</span>
+                    <strong>{donation.currency} {donation.amount}</strong>
+                  </Box>
+                  <small>{donation.category_name ?? t("unknownLabel")} · {donation.note ?? "—"}</small>
+                </Paper>
+              ))}
+            </Box>
+          </Box>
         </Modal>
       )}
     </>
@@ -555,28 +717,32 @@ function SummaryTab() {
 
   return (
     <>
-      <InlineFilter className="pwaFilterStack" filters={[
-        { key: "summary-from", type: "input", inputType: "date", label: t("fromLabel"), value: range.date_from, onChange: (value) => setRange({ ...range, date_from: value }) },
-        { key: "summary-to", type: "input", inputType: "date", label: t("toLabel"), value: range.date_to, onChange: (value) => setRange({ ...range, date_to: value }) },
-      ]}>
+      <FilterBar
+        fields={[
+          { key: "summary-from", type: "date", label: t("fromLabel"), value: range.date_from, onChange: (value) => setRange({ ...range, date_from: value }) },
+          { key: "summary-to", type: "date", label: t("toLabel"), value: range.date_to, onChange: (value) => setRange({ ...range, date_to: value }) },
+        ]}
+      >
         <Button className="secondaryAction" type="button" onClick={load}>{t("refreshBtn")}</Button>
-      </InlineFilter>
+      </FilterBar>
       {isLoading && <LoadingState />}
       {!isLoading && error && <ErrorState message={error} />}
       {!isLoading && !error && summary && (
-        <div className="modulePanel">
-          <div className="metricGrid" style={{ marginBottom: 16 }}>
+        <Box>
+          <MetricGrid aria-label={t("financeSummaryLabel", "Finance summary")}>
             <MetricCard title={t("contributionsTab")} value={summary.total_contributions} />
             <MetricCard title={t("donationsTab")} value={summary.total_donations} />
             <MetricCard title={t("totalLabel")} value={summary.total} />
-          </div>
-          <div className="dataTable">
-            <div className="dataRow header"><span>{t("categoryCol")}</span><span>{t("amountCol")}</span></div>
+          </MetricGrid>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 2 }}>
             {Object.entries(summary.by_category).map(([name, amount]) => (
-              <div className="dataRow" key={name}><span data-label={t("categoryCol")}>{name}</span><span data-label={t("amountCol")}>{amount}</span></div>
+              <Paper key={name} variant="outlined" sx={{ p: 1.5, display: "flex", justifyContent: "space-between" }}>
+                <span>{name}</span>
+                <strong>{amount}</strong>
+              </Paper>
             ))}
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
     </>
   );
