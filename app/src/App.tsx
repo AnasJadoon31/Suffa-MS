@@ -16,7 +16,7 @@ import { NavDrawer } from "./components/NavDrawer";
 import { PwaStatus } from "./components/PwaStatus";
 import { NotFoundView } from "./components/NotFoundView";
 import { InstallPrompt } from "./components/InstallPrompt";
-import { LoadingState } from "./components/ui/AsyncState";
+import { LoadingState, LoadingContainer } from "./components/ui/AsyncState";
 import { Button } from "./components/ui/Button";
 import { useAuth } from "./lib/AuthContext";
 import { academicsApi } from "./lib/endpoints";
@@ -137,6 +137,22 @@ const ContentArea = styled("div")({
     animation: "none",
   },
 });
+
+const SkipLink = styled("a")(({ theme }) => ({
+  position: "absolute",
+  top: -100,
+  left: theme.spacing(2),
+  zIndex: theme.zIndex.tooltip + 1,
+  padding: theme.spacing(1, 2),
+  backgroundColor: theme.palette.primary.main,
+  color: theme.palette.primary.contrastText,
+  borderRadius: theme.shape.borderRadius,
+  fontWeight: 600,
+  textDecoration: "none",
+  "&:focus": {
+    top: theme.spacing(2),
+  },
+}));
 
 function Workspace() {
   const { t, i18n } = useTranslation();
@@ -285,7 +301,7 @@ function Workspace() {
   }
 
   if (isLoading) {
-    return <div className="loading-screen">{t("loadingLabel")}</div>;
+    return <LoadingContainer>{t("loadingLabel")}</LoadingContainer>;
   }
 
   if (!isAuthenticated) {
@@ -312,7 +328,7 @@ function Workspace() {
 
   return (
     <WorkspaceContainer>
-      <a className="skipLink" href="#main-content">{t("skipToContent")}</a>
+      <SkipLink href="#main-content">{t("skipToContent")}</SkipLink>
       <Sidebar onNavigate={() => setNavOpen(false)} />
       <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} />
       <MainContent id="main-content" tabIndex={-1}>

@@ -1,11 +1,12 @@
-import { Button } from "./ui/Button";
+import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
 import { useEffect, useState } from "react";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
 import { Copy, Eye, GraduationCap, HandCoins, KeyRound, Plus, ShieldCheck, UserPlus, UserRoundCog, UsersRound, X, Edit2, Pencil, UserMinus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Fab from "@mui/material/Fab";
-import { styled } from "@mui/material/styles";
+import { styled, useTheme } from "@mui/material/styles";
 
 import { useDialog } from "../lib/DialogContext";
 import { useAuth } from "../lib/AuthContext";
@@ -114,10 +115,9 @@ function SendCredentialsButton({
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", my: 1 }}>
-      <span>{t("credentialsReadyLabel")}</span>
-      <Button
+      <Typography component="span">{t("credentialsReadyLabel")}</Typography>
+      <SecondaryButton
         type="button"
-        className="secondaryAction"
         onClick={async () => {
           await navigator.clipboard.writeText(fullUrl);
           setCopied(true);
@@ -125,11 +125,11 @@ function SendCredentialsButton({
         }}
       >
         <Copy size={15} /> {copied ? t("linkCopied") : t("copyLinkBtn")}
-      </Button>
-      <Button type="button" className="secondaryAction" disabled={readOnly} onClick={() => send()}>
+      </SecondaryButton>
+      <SecondaryButton type="button" disabled={readOnly} onClick={() => send()}>
         {t("sendCredentialsBtn")}
-      </Button>
-      {error && <span style={{ color: "var(--rose)" }}>{error}</span>}
+      </SecondaryButton>
+      {error && <Typography component="span" sx={{ color: "error.main" }}>{error}</Typography>}
     </Box>
   );
 }
@@ -169,9 +169,9 @@ function ReissueCredentialsButton({
   };
 
   return (
-    <Button type="button" className="secondaryAction" disabled={readOnly} title={t("loginLinkTitle")} onClick={() => reissue()}>
+    <SecondaryButton type="button" disabled={readOnly} title={t("loginLinkTitle")} onClick={() => reissue()}>
       <KeyRound size={14} /> {state === "copied" ? t("linkCopied") : state === "error" ? t("failedLabel") : t("loginLinkBtn")}
-    </Button>
+    </SecondaryButton>
   );
 }
 
@@ -208,24 +208,48 @@ export function PeopleView({
       {showTabs && (
         <TabBar>
           {hasPermission("teachers.view") && (
-            <Button className={tab === "teachers" ? "primaryAction" : "secondaryAction"} onClick={() => changeTab("teachers")}>
-              <UserRoundCog size={16} /> {t("teachers")}
-            </Button>
+            tab === "teachers" ? (
+              <PrimaryButton onClick={() => changeTab("teachers")}>
+                <UserRoundCog size={16} /> {t("teachers")}
+              </PrimaryButton>
+            ) : (
+              <SecondaryButton onClick={() => changeTab("teachers")}>
+                <UserRoundCog size={16} /> {t("teachers")}
+              </SecondaryButton>
+            )
           )}
           {hasPermission("students.view") && (
-            <Button className={tab === "students" ? "primaryAction" : "secondaryAction"} onClick={() => changeTab("students")}>
-              <GraduationCap size={16} /> {t("students")}
-            </Button>
+            tab === "students" ? (
+              <PrimaryButton onClick={() => changeTab("students")}>
+                <GraduationCap size={16} /> {t("students")}
+              </PrimaryButton>
+            ) : (
+              <SecondaryButton onClick={() => changeTab("students")}>
+                <GraduationCap size={16} /> {t("students")}
+              </SecondaryButton>
+            )
           )}
           {hasPermission("students.view") && (
-            <Button className={tab === "guardians" ? "primaryAction" : "secondaryAction"} onClick={() => changeTab("guardians")}>
-              <UsersRound size={16} /> {t("guardians")}
-            </Button>
+            tab === "guardians" ? (
+              <PrimaryButton onClick={() => changeTab("guardians")}>
+                <UsersRound size={16} /> {t("guardians")}
+              </PrimaryButton>
+            ) : (
+              <SecondaryButton onClick={() => changeTab("guardians")}>
+                <UsersRound size={16} /> {t("guardians")}
+              </SecondaryButton>
+            )
           )}
           {canViewFinance && (
-            <Button className={tab === "donators" ? "primaryAction" : "secondaryAction"} onClick={() => changeTab("donators")}>
-              <HandCoins size={16} /> {t("donatorsTab")}
-            </Button>
+            tab === "donators" ? (
+              <PrimaryButton onClick={() => changeTab("donators")}>
+                <HandCoins size={16} /> {t("donatorsTab")}
+              </PrimaryButton>
+            ) : (
+              <SecondaryButton onClick={() => changeTab("donators")}>
+                <HandCoins size={16} /> {t("donatorsTab")}
+              </SecondaryButton>
+            )
           )}
         </TabBar>
       )}
@@ -395,9 +419,9 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
         </SearchWrap>
         <DataViewToggle viewKey="people-teachers" onChange={setViewMode} />
         {search && (
-          <Button className="secondaryAction" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
+          <SecondaryButton onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(""); }}>
             {t("cancelBtn")}
-          </Button>
+          </SecondaryButton>
         )}
       </ToolbarRow>
 
@@ -453,8 +477,8 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
           />
         </FormModal>
       )}
-      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
-      {notice && <p>{notice}</p>}
+      {error && <Typography color="error.main">{error}</Typography>}
+      {notice && <Typography>{notice}</Typography>}
       {justCreated?.set_password_url && (
         <SendCredentialsButton subjectType="teacher" subjectId={justCreated.id} setPasswordUrl={justCreated.set_password_url} />
       )}
@@ -474,7 +498,7 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
               actions={
                 <>
                   {canCreate && (
-                    <Button className="secondaryAction" onClick={() => {
+                    <SecondaryButton onClick={() => {
                       setEditingTeacher(teacher);
                       setEditForm({
                         name: teacher.name,
@@ -488,11 +512,11 @@ function TeachersTab({ canCreate, canSalary }: Readonly<{ canCreate: boolean; ca
                       });
                     }}>
                       <Edit2 size={14} /> {t("editBtn")}
-                    </Button>
+                    </SecondaryButton>
                   )}
-                  <Button className="secondaryAction" onClick={() => setDetail(teacher)}>
+                  <SecondaryButton onClick={() => setDetail(teacher)}>
                     <Eye size={14} /> {t("viewBtn")}
-                  </Button>
+                  </SecondaryButton>
                   <ReissueCredentialsButton subjectType="teacher" subjectId={teacher.id} />
                 </>
               }
@@ -590,14 +614,14 @@ function TeacherDetail({
       actions={
         <>
           {canEdit && (
-            <Button className="secondaryAction" onClick={() => setShowEdit(true)}>
+            <SecondaryButton onClick={() => setShowEdit(true)}>
               <Pencil size={16} /> {t("edit", "Edit")}
-            </Button>
+            </SecondaryButton>
           )}
           {user?.role === "principal" && (
-            <Button className="secondaryAction" onClick={() => setShowDelegate(true)}>
+            <SecondaryButton onClick={() => setShowDelegate(true)}>
               <ShieldCheck size={16} /> {t("delegateBtn")}
-            </Button>
+            </SecondaryButton>
           )}
         </>
       }
@@ -632,9 +656,9 @@ function TeacherDetail({
             ))}
           </Box>
           <Box sx={{ mt: 2 }}>
-            <Button className="primaryAction" onClick={() => setShowPayModal(true)}>
+            <PrimaryButton onClick={() => setShowPayModal(true)}>
               <Plus size={16} /> {t("recordSalaryBtn")}
-            </Button>
+            </PrimaryButton>
           </Box>
 
           {showPayModal && (
@@ -931,8 +955,8 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                 </Select>
               </label>
               {guardianMode === "link" && (
-                <fieldset style={{ border: "none", padding: 0 }}>
-                  <legend>{t("linkGuardiansLabel")}</legend>
+                <Box component="fieldset" sx={{ border: "none", padding: 0 }}>
+                  <Box component="legend" sx={{ fontWeight: 600, mb: 1 }}>{t("linkGuardiansLabel")}</Box>
                   <SearchDropdown
                     id="existing-guardian-search"
                     label={t("searchGuardiansLabel")}
@@ -955,13 +979,13 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                     {guardianIds.map((guardianId) => {
                       const guardian = guardians.find((item) => item.id === guardianId);
                       return guardian ? (
-                        <Button key={guardian.id} className="secondaryAction" onClick={() => setGuardianIds((current) => current.filter((id) => id !== guardian.id))}>
+                        <SecondaryButton key={guardian.id} onClick={() => setGuardianIds((current) => current.filter((id) => id !== guardian.id))}>
                           {guardian.name} <X size={14} />
-                        </Button>
+                        </SecondaryButton>
                       ) : null;
                     })}
                   </Box>
-                </fieldset>
+                </Box>
               )}
               {guardianMode === "create" && (
                 <p>{t("guardianCreatedFromAdmissionFields", "Guardian details will be created from the selected admission form fields.")}</p>
@@ -993,8 +1017,8 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
           <label>{t("addressLabel")}<Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></label>
         </FormModal>
       )}
-      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
-      {notice && <p>{notice}</p>}
+      {error && <Typography color="error.main">{error}</Typography>}
+      {notice && <Typography>{notice}</Typography>}
       {justCreated?.set_password_url && (
         <SendCredentialsButton subjectType="student" subjectId={justCreated.id} setPasswordUrl={justCreated.set_password_url} />
       )}
@@ -1014,7 +1038,7 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
               actions={
                 <>
                   {canCreate && (
-                    <Button className="secondaryAction" onClick={() => {
+                    <SecondaryButton onClick={() => {
                       setEditingStudent(s);
                       setEditForm({
                         name: s.name,
@@ -1024,16 +1048,16 @@ function StudentsTab({ canCreate, canFinance }: Readonly<{ canCreate: boolean; c
                       });
                     }}>
                       <Edit2 size={14} /> {t("editBtn")}
-                    </Button>
+                    </SecondaryButton>
                   )}
                   {!s.active_enrollment && !s.current_class && (
-                    <Button className="secondaryAction" onClick={() => setAssignClassStudent(s)}>
+                    <SecondaryButton onClick={() => setAssignClassStudent(s)}>
                       <GraduationCap size={14} /> {t("assignClassBtn")}
-                    </Button>
+                    </SecondaryButton>
                   )}
-                  <Button className="secondaryAction" onClick={() => setDetail(s)}>
+                  <SecondaryButton onClick={() => setDetail(s)}>
                     <Eye size={14} /> {t("viewBtn")}
-                  </Button>
+                  </SecondaryButton>
                   {s.portal_enabled && (
                     <ReissueCredentialsButton subjectType="student" subjectId={s.id} />
                   )}
@@ -1154,12 +1178,12 @@ function StudentDetail({
       actions={
         <>
           {canEdit && (
-            <Button className="secondaryAction" onClick={() => setShowEdit(true)}>
+            <SecondaryButton onClick={() => setShowEdit(true)}>
               <Pencil size={16} /> {t("edit", "Edit")}
-            </Button>
+            </SecondaryButton>
           )}
-          {!activeEnrollment && !student.current_class && <Button className="secondaryAction" onClick={() => setShowEnrollModal(true)}>{t("assignClassBtn")}</Button>}
-          {activeEnrollment && <Button className="dangerAction" onClick={async () => {
+          {!activeEnrollment && !student.current_class && <SecondaryButton onClick={() => setShowEnrollModal(true)}>{t("assignClassBtn")}</SecondaryButton>}
+          {activeEnrollment && <DangerButton onClick={async () => {
             if (!(await confirm(t("unassignStudentConfirm", { class: activeEnrollment.class_name })))) return;
             try {
               await academicsApi.unassignStudent(student.id, activeEnrollment.session_id);
@@ -1167,7 +1191,7 @@ function StudentDetail({
             } catch (err: any) {
               setError(err.response?.data?.detail ?? t("failedToUnassignStudent"));
             }
-          }}><UserMinus size={16} /> {t("assignClassBtn")}</Button>}
+          }}><UserMinus size={16} /> {t("assignClassBtn")}</DangerButton>}
         </>
       }
     >
@@ -1214,9 +1238,9 @@ function StudentDetail({
               <strong>{g.name}</strong>
               <small>{g.relationship} · {g.phone_numbers}</small>
             </div>
-            <Button className="secondaryAction" aria-label={t("viewBtn")} title={t("viewBtn")} onClick={() => setSelectedGuardian(g)}>
+            <SecondaryButton aria-label={t("viewBtn")} title={t("viewBtn")} onClick={() => setSelectedGuardian(g)}>
               <Eye size={14} />
-            </Button>
+            </SecondaryButton>
           </Paper>
         ))}
       </Box>
@@ -1237,9 +1261,9 @@ function StudentDetail({
             ))}
           </Box>
           <Box sx={{ mt: 2 }}>
-            <Button className="primaryAction" onClick={() => setShowFeeModal(true)}>
+            <PrimaryButton onClick={() => setShowFeeModal(true)}>
               <Plus size={16} /> {t("recordFeeBtn")}
-            </Button>
+            </PrimaryButton>
           </Box>
 
           {showFeeModal && (
@@ -1341,8 +1365,8 @@ function StudentDetail({
             label={t("portalEnabledLabel")}
           />
           {student.admission_record && (
-            <fieldset style={{ border: "none", padding: 0 }}>
-              <legend>{t("admissionInformationHeading", "Admission information")}</legend>
+            <Box component="fieldset" sx={{ border: "none", padding: 0 }}>
+              <Box component="legend" sx={{ fontWeight: 600, mb: 1 }}>{t("admissionInformationHeading", "Admission information")}</Box>
               <p>{student.admission_record.form_title || t("sourceWalkIn")}</p>
               <AdmissionAnswersFields
                 fields={student.admission_record.fields_definition}
@@ -1351,7 +1375,7 @@ function StudentDetail({
                 idPrefix="student-edit-admission"
                 hideGuardianFields={editForm.is_independent}
               />
-            </fieldset>
+            </Box>
           )}
         </FormModal>
       )}
@@ -1578,9 +1602,9 @@ function GuardiansTab({
         </SearchWrap>
         <DataViewToggle viewKey="people-guardians" onChange={setViewMode} />
         {search && (
-          <Button className="secondaryAction" onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(); }}>
+          <SecondaryButton onClick={() => { setSearch(""); setPagination((current) => ({ ...current, page: 0 })); void load(); }}>
             {t("cancelBtn")}
-          </Button>
+          </SecondaryButton>
         )}
       </ToolbarRow>
 
@@ -1623,13 +1647,13 @@ function GuardiansTab({
               <label>{t("addressCol")}<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
               
               <Box sx={{ mt: 2, borderTop: "1px solid", borderColor: "divider", pt: 2 }}>
-                <label style={{ marginBottom: 1, display: "block", fontWeight: 500 }}>
+                <Typography component="label" sx={{ mb: 1, display: "block", fontWeight: 500 }}>
                   {t("linkStudentLabel", "Link Student (Optional)")}
-                </label>
+                </Typography>
                 {selectedStudent ? (
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 1, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
                     <span>{selectedStudent.name} ({selectedStudent.username || selectedStudent.admission_number})</span>
-                    <Button className="dangerAction" aria-label={t("unlinkBtn")} title={t("unlinkBtn")} onClick={() => setSelectedStudent(null)}><UserMinus size={14} /></Button>
+                    <DangerButton aria-label={t("unlinkBtn")} title={t("unlinkBtn")} onClick={() => setSelectedStudent(null)}><UserMinus size={14} /></DangerButton>
                   </Box>
                 ) : (
                   <>
@@ -1648,13 +1672,13 @@ function GuardiansTab({
               </Box>
             </FormModal>
       )}
-      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
-      {notice && <p>{notice}</p>}
+      {error && <Typography color="error.main">{error}</Typography>}
+      {notice && <Typography>{notice}</Typography>}
 
       {viewMode === "cards" ? (
         <CardsList>
           {isLoading && <LoadingState />}
-          {!isLoading && guardians.length === 0 && <p>{t("noGuardiansYet")}</p>}
+          {!isLoading && guardians.length === 0 && <Typography>{t("noGuardiansYet")}</Typography>}
           {!isLoading && guardians.map((g) => (
             <DataCard
               key={g.id}
@@ -1664,13 +1688,13 @@ function GuardiansTab({
               fields={guardianFields(g)}
               actions={
                 <>
-                  <Button className="secondaryAction" onClick={() => setDetail(g)}>
+                  <SecondaryButton onClick={() => setDetail(g)}>
                     <Eye size={14} /> {t("viewBtn")}
-                  </Button>
+                  </SecondaryButton>
                   {canSendCredentials && (
-                    <Button className="secondaryAction" onClick={() => provisionLogin(g)}>
+                    <SecondaryButton onClick={() => provisionLogin(g)}>
                       <KeyRound size={14} /> {t("loginLinkBtn")}
-                    </Button>
+                    </SecondaryButton>
                   )}
                 </>
               }
@@ -1785,9 +1809,9 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
       onClose={onClose}
       actions={
         canEdit ? (
-          <Button className="secondaryAction" onClick={() => setShowEdit(true)}>
+          <SecondaryButton onClick={() => setShowEdit(true)}>
             <Pencil size={16} /> {t("edit", "Edit")}
-          </Button>
+          </SecondaryButton>
         ) : null
       }
     >
@@ -1804,8 +1828,8 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
       </Paper>
 
       <Box sx={{ mt: 3 }}>
-        <h3>{t("linkedStudents", "Linked Students")}</h3>
-        {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+        <Typography variant="h6">{t("linkedStudents", "Linked Students")}</Typography>
+        {error && <Typography color="error.main">{error}</Typography>}
         
         <Box sx={{ mb: 2 }}>
           <SearchDropdown
@@ -1833,9 +1857,9 @@ function GuardianDetail({ guardian, onClose, onUpdate }: Readonly<{ guardian: Gu
                   <strong>{s.name}</strong>
                   <span>{s.admission_number} · {s.current_class || t("notAssignedLabel")}</span>
                 </div>
-                <Button className="secondaryAction" aria-label={t("unlinkBtn")} onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn")}>
+                <SecondaryButton aria-label={t("unlinkBtn")} onClick={() => unlinkStudent(s.id)} title={t("unlinkBtn")}>
                   <X size={14} />
-                </Button>
+                </SecondaryButton>
               </Paper>
             ))
           )}
@@ -1935,12 +1959,12 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
       >
         <DataViewToggle viewKey="people-donators" onChange={setViewMode} />
       </FilterBar>
-      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Typography color="error.main">{error}</Typography>}
 
       {viewMode === "cards" ? (
         <CardsList>
           {isLoading && <LoadingState />}
-          {!isLoading && donors.length === 0 && <p>{t("noDonorsYet")}</p>}
+          {!isLoading && donors.length === 0 && <Typography>{t("noDonorsYet")}</Typography>}
           {!isLoading && donors.map((d) => (
             <DataCard
               key={d.id}
@@ -1948,9 +1972,9 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
               avatar={d.name.charAt(0)}
               fields={donorFields(d)}
               actions={
-                <Button className="secondaryAction" onClick={() => openDonor(d)}>
+                <SecondaryButton onClick={() => openDonor(d)}>
                   <Eye size={14} /> {t("viewBtn")}
-                </Button>
+                </SecondaryButton>
               }
             />
           ))}
@@ -1961,9 +1985,9 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
             { header: t("nameLabel"), render: (d) => d.name },
             { header: t("contactCol"), render: (d) => d.contact },
             { header: t("actionsCol"), render: (d) => (
-              <Button className="secondaryAction" onClick={() => openDonor(d)}>
+              <SecondaryButton onClick={() => openDonor(d)}>
                 <Eye size={14} /> {t("viewBtn")}
-              </Button>
+              </SecondaryButton>
             )},
           ]}
           data={donors}
@@ -1979,9 +2003,9 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
           onClose={() => setSelected(null)}
           actions={
             canWrite ? (
-              <Button className="secondaryAction" onClick={() => setShowEdit(true)}>
+              <SecondaryButton onClick={() => setShowEdit(true)}>
                 <Pencil size={16} /> {t("edit", "Edit")}
-              </Button>
+              </SecondaryButton>
             ) : null
           }
         >
@@ -2001,9 +2025,9 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
             </Box>
             {canWrite && (
               <Box sx={{ mt: 2 }}>
-                <Button className="primaryAction" onClick={() => setShowDonationModal(true)}>
+                <PrimaryButton onClick={() => setShowDonationModal(true)}>
                   <Plus size={16} /> {t("addDonationBtn")}
-                </Button>
+                </PrimaryButton>
               </Box>
             )}
 
@@ -2043,7 +2067,7 @@ function DonatorsTab({ canWrite }: Readonly<{ canWrite: boolean }>) {
                 <label>{t("dateCol")}<Input required type="date" value={donationForm.donation_date} onChange={(e) => setDonationForm({ ...donationForm, donation_date: e.target.value })} /></label>
               </FormModal>
             )}
-            {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+            {error && <Typography color="error.main">{error}</Typography>}
           </Box>
           
           {showEdit && (

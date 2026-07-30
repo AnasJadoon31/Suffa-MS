@@ -1,4 +1,4 @@
-import { Button } from "./ui/Button";
+import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
 import { useEffect, useState } from "react";
 import { Bell, CheckCircle2, ClipboardList, Copy, Edit2, Eye, Plus, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -34,6 +34,69 @@ import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
 import { answerString, BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields, mergeAdmissionBuiltIns } from "../lib/admissionBuiltIns";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
+import AlertTitle from "@mui/material/AlertTitle";
+import { styled } from "@mui/material/styles";
+
+const FormActions = styled(Box)(({ theme }) => ({
+  display: "flex",
+  gap: theme.spacing(1),
+  marginBottom: theme.spacing(1.5),
+  flexWrap: "wrap",
+}));
+
+const DetailGrid = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "auto 1fr",
+  gap: "4px 16px",
+  marginBottom: theme.spacing(2),
+}));
+
+const StatusHistoryList = styled("ol")(({ theme }) => ({
+  listStyle: "none",
+  padding: 0,
+  margin: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(1),
+}));
+
+const StatusHistoryItem = styled("li")(({ theme }) => ({
+  display: "flex",
+  justifyContent: "space-between",
+  padding: theme.spacing(1),
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: 8,
+}));
+
+const CredentialSummary = styled(Box)(({ theme }) => ({
+  marginTop: theme.spacing(2),
+  padding: theme.spacing(2),
+  borderRadius: 12,
+  border: `1px solid ${theme.palette.divider}`,
+  backgroundColor: theme.palette.background.default,
+}));
+
+const TwoColumnGrid = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: theme.spacing(2),
+  [theme.breakpoints.down("sm")]: {
+    gridTemplateColumns: "1fr",
+  },
+}));
+
+const ModalChoiceGrid = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: theme.spacing(2),
+  [theme.breakpoints.down("sm")]: {
+    gridTemplateColumns: "1fr",
+  },
+}));
 
 type Tab = "registrations" | "forms" | "enquiries";
 
@@ -133,66 +196,79 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
 
   return (
     <>
-      {notifications.some((item) => !item.is_read) && <section className="adminNotifications" aria-label={t("adminNotificationsHeading")}>
-        <h3><Bell size={16} /> {t("adminNotificationsHeading")}</h3>
-        {notifications.filter((item) => !item.is_read).map((item) => <Button type="button" key={item.id} onClick={async () => { await operationsApi.markAdminNotificationRead(item.id); await load(); }}><strong>{item.title === "notificationAdmissionConvertedTitle" ? t("notificationAdmissionConvertedTitle", { name: item.message }) : item.title}</strong>{item.title !== "notificationAdmissionConvertedTitle" && <span>{item.message}</span>}</Button>)}
-      </section>}
-      {canMutate && <div className="formActions" style={{ marginBottom: 12 }}>
-        <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("submitApplicationBtn")}</Button>
-      </div>}
-      {canMutate && showCreate && <FormModal
-            title={t("submitApplicationBtn")} onClose={() => setShowCreate(false)}
-            onSubmit={async (e) => {
-                    e.preventDefault();
-                    setError("");
-                    setNotice("");
-                    try {
-                      await operationsApi.createAdmission({
-                        applicant_name: answerString(formAnswers, BUILT_IN_ADMISSION_KEYS.studentName),
-                        guardian_contact: answerString(formAnswers, BUILT_IN_ADMISSION_KEYS.guardianPhoneNumbers),
-                        form_id: form.form_id,
-                        date_of_birth: answerString(formAnswers, BUILT_IN_ADMISSION_KEYS.studentDateOfBirth) || undefined,
-                        notes: form.notes || undefined,
-                        extra_data: formAnswers,
-                      });
-                      setForm(emptyForm);
-                      setFormAnswers({});
-                      setShowCreate(false);
-                      setNotice(t("applicationSubmitted"));
-                      await load();
-                    } catch (err: any) {
-                      setError(err.response?.data?.detail ?? t("failedSubmitApplication"));
-                    }
-                  }}
-            submitLabel={t("submitApplicationBtn")}
-            submitIcon={<Plus size={16} />}
-          >
-            <FormStack>
-              <FormField label={t("admissionFormLabel")}>
-                <Select required value={form.form_id} onChange={(e) => {
-                  const selected = admissionForms.find((item) => item.id === e.target.value);
-                  setForm({ ...form, form_id: e.target.value, program_id: selected?.program_id ?? "" });
-                  setFormAnswers({});
-                }}>
-                  <option value="">{t("selectEllipsis")}</option>
-                  {admissionForms.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-                </Select>
-              </FormField>
-              {admissionForms.length === 0 && <p className="notice notice-warning">{t("noOpenAdmissionForms")}</p>}
-              <FormField label={t("programLabel")}>
-                <Select disabled value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
-                  <option value="">{t("selectEllipsis")}</option>
-                  {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </Select>
-              </FormField>
-              <AdmissionAnswersFields fields={selectedCreateAdmissionForm?.fields_definition ?? []} answers={formAnswers} onChange={setFormAnswers} idPrefix="walk-in-admission" />
-              <FormField label={t("notesLabel")}>
-                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-              </FormField>
-            </FormStack>
-          </FormModal>}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      {notice && <p className="notice">{notice}</p>}
+      {notifications.some((item) => !item.is_read) && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <AlertTitle>{t("adminNotificationsHeading")}</AlertTitle>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {notifications.filter((item) => !item.is_read).map((item) => (
+              <Button type="button" key={item.id} onClick={async () => { await operationsApi.markAdminNotificationRead(item.id); await load(); }}>
+                <strong>{item.title === "notificationAdmissionConvertedTitle" ? t("notificationAdmissionConvertedTitle", { name: item.message }) : item.title}</strong>
+                {item.title !== "notificationAdmissionConvertedTitle" && <Typography component="span">{item.message}</Typography>}
+              </Button>
+            ))}
+          </Box>
+        </Alert>
+      )}
+      {canMutate && (
+        <FormActions>
+          <PrimaryButton type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("submitApplicationBtn")}</PrimaryButton>
+        </FormActions>
+      )}
+      {canMutate && showCreate && (
+        <FormModal
+          title={t("submitApplicationBtn")} onClose={() => setShowCreate(false)}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            setNotice("");
+            try {
+              await operationsApi.createAdmission({
+                applicant_name: answerString(formAnswers, BUILT_IN_ADMISSION_KEYS.studentName),
+                guardian_contact: answerString(formAnswers, BUILT_IN_ADMISSION_KEYS.guardianPhoneNumbers),
+                form_id: form.form_id,
+                date_of_birth: answerString(formAnswers, BUILT_IN_ADMISSION_KEYS.studentDateOfBirth) || undefined,
+                notes: form.notes || undefined,
+                extra_data: formAnswers,
+              });
+              setForm(emptyForm);
+              setFormAnswers({});
+              setShowCreate(false);
+              setNotice(t("applicationSubmitted"));
+              await load();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedSubmitApplication"));
+            }
+          }}
+          submitLabel={t("submitApplicationBtn")}
+          submitIcon={<Plus size={16} />}
+        >
+          <FormStack>
+            <FormField label={t("admissionFormLabel")}>
+              <Select required value={form.form_id} onChange={(e) => {
+                const selected = admissionForms.find((item) => item.id === e.target.value);
+                setForm({ ...form, form_id: e.target.value, program_id: selected?.program_id ?? "" });
+                setFormAnswers({});
+              }}>
+                <option value="">{t("selectEllipsis")}</option>
+                {admissionForms.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </Select>
+            </FormField>
+            {admissionForms.length === 0 && <Alert severity="warning" sx={{ mb: 1 }}><Typography>{t("noOpenAdmissionForms")}</Typography></Alert>}
+            <FormField label={t("programLabel")}>
+              <Select disabled value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+                <option value="">{t("selectEllipsis")}</option>
+                {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </Select>
+            </FormField>
+            <AdmissionAnswersFields fields={selectedCreateAdmissionForm?.fields_definition ?? []} answers={formAnswers} onChange={setFormAnswers} idPrefix="walk-in-admission" />
+            <FormField label={t("notesLabel")}>
+              <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </FormField>
+          </FormStack>
+        </FormModal>
+      )}
+      {error && <Alert severity="error" sx={{ mb: 1 }}><Typography>{error}</Typography></Alert>}
+      {notice && <Alert severity="success" sx={{ mb: 1 }}><Typography>{notice}</Typography></Alert>}
 
       {canReview && (
         <DataTable<AdmissionApplication>
@@ -221,49 +297,62 @@ function RegistrationsTab({ programs, canReview, canMutate }: Readonly<{ program
         />
       )}
       {canReview && <PaginationControls state={pagination} total={total} onChange={setPagination} />}
-      {detail && <Modal title={detail.applicant_name} onClose={() => setDetail(null)}>
-        <dl className="detailGrid">
-          <dt>{t("guardianContactLabel")}</dt><dd>{detail.guardian_contact}</dd>
-          <dt>{t("dobLabel")}</dt><dd>{detail.date_of_birth ?? "—"}</dd>
-          <dt>{t("notesLabel")}</dt><dd>{detail.notes ?? "—"}</dd>
-          {Object.entries(detail.extra_data ?? {}).map(([key, value]) => <div key={key} style={{ display: "contents" }}><dt>{key.replaceAll("_", " ")}</dt><dd>{String(value || "—")}</dd></div>)}
-        </dl>
-        <section className="detailSection">
-          <h4>{t("statusHistoryHeading")}</h4>
-          <ol className="statusHistoryList">
-            {(detail.status_history ?? []).map((event, index) => <li key={`${event.changed_at}-${index}`}><strong>{t(event.status)}</strong><span>{new Date(event.changed_at).toLocaleString()}</span></li>)}
-          </ol>
-        </section>
-      </Modal>}
-      {editing && <FormModal title={t("editApplicationHeading")} onClose={() => setEditing(null)} submitLabel={t("saveBtn")} submitIcon={<Edit2 size={16} />} error={error} onSubmit={async () => {
-        try { await operationsApi.updateAdmission(editing.id, {
-          applicant_name: editing.applicant_name, guardian_contact: editing.guardian_contact,
-          program_id: editing.program_id, date_of_birth: editing.date_of_birth, notes: editing.notes,
-          extra_data: editing.extra_data,
-        }); setEditing(null); await load(); }
-        catch (err: any) { setError(err.response?.data?.detail ?? t("failedUpdateApplication")); }
-      }}>
-        <FormStack>
-          <FormField label={t("applicantNameLabel")}>
-            <Input required value={editing.applicant_name} onChange={(e) => setEditing({ ...editing, applicant_name: e.target.value })} />
-          </FormField>
-          <PhoneInput id="admission-edit-guardian-contact" required label={t("guardianContactLabel")} value={editing.guardian_contact} onChange={(value) => setEditing({ ...editing, guardian_contact: value })} />
-          <FormField label={t("programLabel")}>
-            <Select value={editing.program_id ?? ""} onChange={(e) => setEditing({ ...editing, program_id: e.target.value || null })}><option value="">{t("selectEllipsis")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</Select>
-          </FormField>
-          <FormField label={t("dobLabel")}>
-            <Input type="date" value={editing.date_of_birth ?? ""} onChange={(e) => setEditing({ ...editing, date_of_birth: e.target.value || null })} />
-          </FormField>
-          {Object.entries(editing.extra_data ?? {}).map(([key, value]) => (
-            <FormField key={key} label={key.replaceAll("_", " ")}>
-              <Input value={String(value ?? "")} onChange={(e) => setEditing({ ...editing, extra_data: { ...(editing.extra_data ?? {}), [key]: e.target.value } })} />
+      {detail && (
+        <Modal title={detail.applicant_name} onClose={() => setDetail(null)}>
+          <DetailGrid>
+            <dt>{t("guardianContactLabel")}</dt><dd>{detail.guardian_contact}</dd>
+            <dt>{t("dobLabel")}</dt><dd>{detail.date_of_birth ?? "—"}</dd>
+            <dt>{t("notesLabel")}</dt><dd>{detail.notes ?? "—"}</dd>
+            {Object.entries(detail.extra_data ?? {}).map(([key, value]) => (
+              <Box key={key} sx={{ display: "contents" }}>
+                <dt>{key.replaceAll("_", " ")}</dt><dd>{String(value || "—")}</dd>
+              </Box>
+            ))}
+          </DetailGrid>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("statusHistoryHeading")}</Typography>
+            <StatusHistoryList>
+              {(detail.status_history ?? []).map((event, index) => (
+                <StatusHistoryItem key={`${event.changed_at}-${index}`}>
+                  <strong>{t(event.status)}</strong>
+                  <Typography component="span">{new Date(event.changed_at).toLocaleString()}</Typography>
+                </StatusHistoryItem>
+              ))}
+            </StatusHistoryList>
+          </Paper>
+        </Modal>
+      )}
+      {editing && (
+        <FormModal title={t("editApplicationHeading")} onClose={() => setEditing(null)} submitLabel={t("saveBtn")} submitIcon={<Edit2 size={16} />} error={error} onSubmit={async () => {
+          try { await operationsApi.updateAdmission(editing.id, {
+            applicant_name: editing.applicant_name, guardian_contact: editing.guardian_contact,
+            program_id: editing.program_id, date_of_birth: editing.date_of_birth, notes: editing.notes,
+            extra_data: editing.extra_data,
+          }); setEditing(null); await load(); }
+          catch (err: any) { setError(err.response?.data?.detail ?? t("failedUpdateApplication")); }
+        }}>
+          <FormStack>
+            <FormField label={t("applicantNameLabel")}>
+              <Input required value={editing.applicant_name} onChange={(e) => setEditing({ ...editing, applicant_name: e.target.value })} />
             </FormField>
-          ))}
-          <FormField label={t("notesLabel")}>
-            <Input value={editing.notes ?? ""} onChange={(e) => setEditing({ ...editing, notes: e.target.value || null })} />
-          </FormField>
-        </FormStack>
-      </FormModal>}
+            <PhoneInput id="admission-edit-guardian-contact" required label={t("guardianContactLabel")} value={editing.guardian_contact} onChange={(value) => setEditing({ ...editing, guardian_contact: value })} />
+            <FormField label={t("programLabel")}>
+              <Select value={editing.program_id ?? ""} onChange={(e) => setEditing({ ...editing, program_id: e.target.value || null })}><option value="">{t("selectEllipsis")}</option>{programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</Select>
+            </FormField>
+            <FormField label={t("dobLabel")}>
+              <Input type="date" value={editing.date_of_birth ?? ""} onChange={(e) => setEditing({ ...editing, date_of_birth: e.target.value || null })} />
+            </FormField>
+            {Object.entries(editing.extra_data ?? {}).map(([key, value]) => (
+              <FormField key={key} label={key.replaceAll("_", " ")}>
+                <Input value={String(value ?? "")} onChange={(e) => setEditing({ ...editing, extra_data: { ...(editing.extra_data ?? {}), [key]: e.target.value } })} />
+              </FormField>
+            ))}
+            <FormField label={t("notesLabel")}>
+              <Input value={editing.notes ?? ""} onChange={(e) => setEditing({ ...editing, notes: e.target.value || null })} />
+            </FormField>
+          </FormStack>
+        </FormModal>
+      )}
       {converting && <AdmissionConversionModal application={converting} programs={programs} onClose={() => setConverting(null)} onSuccess={async () => { setConverting(null); setNotice(t("applicationConvertedNotice")); await load(); }} />}
     </>
   );
@@ -333,55 +422,59 @@ function AdmissionConversionModal({ application, programs, onClose, onSuccess }:
     }
   };
 
-  return <FormModal title={t("acceptApplicationHeading")} maxWidth={800} onClose={onClose} submitLabel={converted ? t("doneBtn", "Done") : t("acceptAndCreatePeopleBtn")} submitIcon={<CheckCircle2 size={16} />} error={error} onSubmit={async () => {
-    if (converted) {
-      await onSuccess();
-      return;
-    }
-    setError("");
-    setDeliveryResults([
-      { subject: t("studentLabel", "Student"), status: "skipped", message: t("credentialDeliveryPending", "Waiting for acceptance...") },
-      { subject: t("guardianLabel", "Guardian"), status: "skipped", message: t("credentialDeliveryPending", "Waiting for acceptance...") },
-    ]);
-    try {
-      const result = await operationsApi.convertAdmission(application.id, {
-        student_username: form.student_username,
-        guardian_username: form.guardian_portal_enabled === "enabled" ? form.guardian_username : undefined,
-        student_portal_enabled: form.student_portal_enabled === "enabled",
-        guardian_portal_enabled: form.guardian_portal_enabled === "enabled",
-        session_id: form.session_id,
-        class_id: form.class_id,
-        section_id: form.section_id,
-      });
-      setConverted(result);
-      await sendConvertedCredentials(result);
-    }
-    catch (err: any) { setError(err.response?.data?.detail ?? t("failedConvertApplication")); }
-  }}>
-    <p className="notice">{t("acceptApplicationHint", { name: application.applicant_name })}</p>
-    {!converted && <div className="formGridTwo">
-      <label>{t("studentUsernameLabel")}<Input required value={form.student_username} onChange={(e) => setForm({ ...form, student_username: e.target.value })} /></label>
-      <label>{t("studentPortalDecisionLabel", "Student portal")}<Select required value={form.student_portal_enabled} onChange={(e) => setForm({ ...form, student_portal_enabled: e.target.value })}><option value="enabled">{t("enabledLabel")}</option><option value="disabled">{t("disabledLabel")}</option></Select></label>
-      {form.student_portal_enabled === "enabled" && <label>{t("studentDeliveryTargetLabel", "Student delivery target")}<Select value={form.student_delivery_phone} onChange={(e) => setForm({ ...form, student_delivery_phone: e.target.value })}><option value="">{t("copyFallbackOnlyLabel", "Copy fallback only")}</option>{studentPhoneOptions.map((phone) => <option key={phone} value={phone}>{phone}</option>)}</Select></label>}
-      <label>{t("guardianPortalDecisionLabel", "Guardian portal")}<Select required value={form.guardian_portal_enabled} onChange={(e) => setForm({ ...form, guardian_portal_enabled: e.target.value, guardian_username: e.target.value === "disabled" ? "" : form.guardian_username })}><option value="enabled">{t("enabledLabel")}</option><option value="disabled">{t("disabledLabel")}</option></Select></label>
-      {form.guardian_portal_enabled === "enabled" && <label>{t("guardianUsernameLabel")}<Input required value={form.guardian_username} onChange={(e) => setForm({ ...form, guardian_username: e.target.value })} /></label>}
-      {form.guardian_portal_enabled === "enabled" && <label>{t("guardianDeliveryTargetLabel", "Guardian delivery target")}<Select value={form.guardian_delivery_phone} onChange={(e) => setForm({ ...form, guardian_delivery_phone: e.target.value })}><option value="">{t("copyFallbackOnlyLabel", "Copy fallback only")}</option>{guardianPhoneOptions.map((phone) => <option key={phone} value={phone}>{phone}</option>)}</Select></label>}
-      <label>{t("sessionLabel")}<Select required value={form.session_id} onChange={(e) => setForm({ ...form, session_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sessions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
-      <label>{t("classLabel")}<Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: "" })}><option value="">{t("selectEllipsis")}</option>{classes.filter((item) => !application.program_id || item.program_id === application.program_id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
-      <label>{t("sectionLabel")}<Select required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
-    </div>}
-    {deliveryResults.length > 0 && (
-      <div className="credentialDeliverySummary" role="status" aria-live="polite">
-        <h4>{t("credentialDeliveryResultsHeading", "Credential delivery")}</h4>
-        {deliveryResults.map((item) => (
-          <p key={`${item.subject}-${item.status}`}>
-            <strong>{item.subject}</strong>
-            <span>{item.message}</span>
-          </p>
-        ))}
-      </div>
-    )}
-  </FormModal>;
+  return (
+    <FormModal title={t("acceptApplicationHeading")} maxWidth={800} onClose={onClose} submitLabel={converted ? t("doneBtn", "Done") : t("acceptAndCreatePeopleBtn")} submitIcon={<CheckCircle2 size={16} />} error={error} onSubmit={async () => {
+      if (converted) {
+        await onSuccess();
+        return;
+      }
+      setError("");
+      setDeliveryResults([
+        { subject: t("studentLabel", "Student"), status: "skipped", message: t("credentialDeliveryPending", "Waiting for acceptance...") },
+        { subject: t("guardianLabel", "Guardian"), status: "skipped", message: t("credentialDeliveryPending", "Waiting for acceptance...") },
+      ]);
+      try {
+        const result = await operationsApi.convertAdmission(application.id, {
+          student_username: form.student_username,
+          guardian_username: form.guardian_portal_enabled === "enabled" ? form.guardian_username : undefined,
+          student_portal_enabled: form.student_portal_enabled === "enabled",
+          guardian_portal_enabled: form.guardian_portal_enabled === "enabled",
+          session_id: form.session_id,
+          class_id: form.class_id,
+          section_id: form.section_id,
+        });
+        setConverted(result);
+        await sendConvertedCredentials(result);
+      }
+      catch (err: any) { setError(err.response?.data?.detail ?? t("failedConvertApplication")); }
+    }}>
+      <Alert severity="info" sx={{ mb: 2 }}><Typography>{t("acceptApplicationHint", { name: application.applicant_name })}</Typography></Alert>
+      {!converted && (
+        <TwoColumnGrid>
+          <label>{t("studentUsernameLabel")}<Input required value={form.student_username} onChange={(e) => setForm({ ...form, student_username: e.target.value })} /></label>
+          <label>{t("studentPortalDecisionLabel", "Student portal")}<Select required value={form.student_portal_enabled} onChange={(e) => setForm({ ...form, student_portal_enabled: e.target.value })}><option value="enabled">{t("enabledLabel")}</option><option value="disabled">{t("disabledLabel")}</option></Select></label>
+          {form.student_portal_enabled === "enabled" && <label>{t("studentDeliveryTargetLabel", "Student delivery target")}<Select value={form.student_delivery_phone} onChange={(e) => setForm({ ...form, student_delivery_phone: e.target.value })}><option value="">{t("copyFallbackOnlyLabel", "Copy fallback only")}</option>{studentPhoneOptions.map((phone) => <option key={phone} value={phone}>{phone}</option>)}</Select></label>}
+          <label>{t("guardianPortalDecisionLabel", "Guardian portal")}<Select required value={form.guardian_portal_enabled} onChange={(e) => setForm({ ...form, guardian_portal_enabled: e.target.value, guardian_username: e.target.value === "disabled" ? "" : form.guardian_username })}><option value="enabled">{t("enabledLabel")}</option><option value="disabled">{t("disabledLabel")}</option></Select></label>
+          {form.guardian_portal_enabled === "enabled" && <label>{t("guardianUsernameLabel")}<Input required value={form.guardian_username} onChange={(e) => setForm({ ...form, guardian_username: e.target.value })} /></label>}
+          {form.guardian_portal_enabled === "enabled" && <label>{t("guardianDeliveryTargetLabel", "Guardian delivery target")}<Select value={form.guardian_delivery_phone} onChange={(e) => setForm({ ...form, guardian_delivery_phone: e.target.value })}><option value="">{t("copyFallbackOnlyLabel", "Copy fallback only")}</option>{guardianPhoneOptions.map((phone) => <option key={phone} value={phone}>{phone}</option>)}</Select></label>}
+          <label>{t("sessionLabel")}<Select required value={form.session_id} onChange={(e) => setForm({ ...form, session_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sessions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+          <label>{t("classLabel")}<Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: "" })}><option value="">{t("selectEllipsis")}</option>{classes.filter((item) => !application.program_id || item.program_id === application.program_id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+          <label>{t("sectionLabel")}<Select required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}><option value="">{t("selectEllipsis")}</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+        </TwoColumnGrid>
+      )}
+      {deliveryResults.length > 0 && (
+        <CredentialSummary role="status" aria-live="polite">
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("credentialDeliveryResultsHeading", "Credential delivery")}</Typography>
+          {deliveryResults.map((item) => (
+            <Box key={`${item.subject}-${item.status}`} sx={{ mb: 0.5 }}>
+              <strong>{item.subject}</strong>
+              <Typography component="span">{item.message}</Typography>
+            </Box>
+          ))}
+        </CredentialSummary>
+      )}
+    </FormModal>
+  );
 }
 
 // ---------------------------------------------------- Public admission forms
@@ -438,9 +531,9 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
 
   return (
     <>
-      <p className="notice">{t("admissionFormsHint")}</p>
+      <Alert severity="info" sx={{ mb: 1 }}><Typography>{t("admissionFormsHint")}</Typography></Alert>
       
-      <InlineFilter className="pwaFilterStack" filters={[
+      <InlineFilter filters={[
         {
           key: "category",
           type: "select",
@@ -462,71 +555,75 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
         },
       ]} />
 
-      {canMutate && <div className="formActions" style={{ marginBottom: 12 }}>
-        <Button className="primaryAction" type="button" onClick={() => setShowTypeSelection(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</Button>
-      </div>}
+      {canMutate && (
+        <FormActions>
+          <PrimaryButton type="button" onClick={() => setShowTypeSelection(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</PrimaryButton>
+        </FormActions>
+      )}
       
       {showTypeSelection && (
         <Modal title={t("chooseAdmissionFormType")} onClose={() => setShowTypeSelection(false)}>
-          <div className="modalChoiceGrid">
-            <Button className="primaryAction" onClick={() => { setForm({ ...form, category: "General" }); setShowTypeSelection(false); setShowCreate(true); }}>
+          <ModalChoiceGrid>
+            <PrimaryButton onClick={() => { setForm({ ...form, category: "General" }); setShowTypeSelection(false); setShowCreate(true); }}>
               {t("generalFormLabel")}
-            </Button>
-            <Button className="primaryAction" onClick={() => { setForm({ ...form, category: "Inquiry" }); setShowTypeSelection(false); setShowCreate(true); }}>
+            </PrimaryButton>
+            <PrimaryButton onClick={() => { setForm({ ...form, category: "Inquiry" }); setShowTypeSelection(false); setShowCreate(true); }}>
               {t("inquiryFormLabel")}
-            </Button>
-          </div>
+            </PrimaryButton>
+          </ModalChoiceGrid>
         </Modal>
       )}
 
-      {canMutate && showCreate && <FormModal
-            title={t("createAdmissionFormBtn")} onClose={() => setShowCreate(false)} maxWidth={800}
-            onSubmit={async (e) => {
-                    e.preventDefault();
-                    setError("");
-                    const fieldError = validateFormFields(fields);
-                    if (fieldError) {
-                      setError(t(fieldError));
-                      return;
-                    }
-                    try {
-                      await operationsApi.createAdmissionForm({
-                        program_id: form.program_id || undefined,
-                        title: form.title,
-                        category: form.category,
-                        description: form.description,
-                        fields: cleanFormFields(fields),
-                      });
-                      setForm({ program_id: "", title: "", description: "", category: "General" });
-                      setFields(mergeAdmissionBuiltIns([]));
-                      setShowCreate(false);
-                      await load();
-                    } catch (err: any) {
-                      setError(err.response?.data?.detail ?? t("failedCreateForm"));
-                    }
-                  }}
-            submitLabel={t("createAdmissionFormBtn")}
-            submitIcon={<Plus size={16} />}
-          >
-            <FormStack>
-              {form.category === "General" && (
-                <FormField label={t("programLabel")}>
-                  <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
-                    <option value="">{t("selectEllipsis")}</option>
-                    {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </Select>
-                </FormField>
-              )}
-              <FormField label={t("titleLabel")}>
-                <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+      {canMutate && showCreate && (
+        <FormModal
+          title={t("createAdmissionFormBtn")} onClose={() => setShowCreate(false)} maxWidth={800}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            const fieldError = validateFormFields(fields);
+            if (fieldError) {
+              setError(t(fieldError));
+              return;
+            }
+            try {
+              await operationsApi.createAdmissionForm({
+                program_id: form.program_id || undefined,
+                title: form.title,
+                category: form.category,
+                description: form.description,
+                fields: cleanFormFields(fields),
+              });
+              setForm({ program_id: "", title: "", description: "", category: "General" });
+              setFields(mergeAdmissionBuiltIns([]));
+              setShowCreate(false);
+              await load();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedCreateForm"));
+            }
+          }}
+          submitLabel={t("createAdmissionFormBtn")}
+          submitIcon={<Plus size={16} />}
+        >
+          <FormStack>
+            {form.category === "General" && (
+              <FormField label={t("programLabel")}>
+                <Select required value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+                  <option value="">{t("selectEllipsis")}</option>
+                  {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
               </FormField>
-              <FormField label={t("descriptionLabel")}>
-                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-              </FormField>
-              <FormFieldsEditor fields={fields} onChange={setFields} />
-            </FormStack>
-          </FormModal>}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+            )}
+            <FormField label={t("titleLabel")}>
+              <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            </FormField>
+            <FormField label={t("descriptionLabel")}>
+              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </FormField>
+            <FormFieldsEditor fields={fields} onChange={setFields} />
+          </FormStack>
+        </FormModal>
+      )}
+      {error && <Alert severity="error" sx={{ mb: 1 }}><Typography>{error}</Typography></Alert>}
 
       <DataTable<AdmissionForm>
         columns={[
@@ -577,42 +674,40 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
       />
       <PaginationControls state={pagination} total={total} onChange={setPagination} />
 
-      {editing && <FormModal
-            title={t("editAdmissionFormHeading")} onClose={() => setEditing(null)} maxWidth={800}
-            onSubmit={async (event) => {
-                      event.preventDefault();
-                      setError("");
-                      const fieldError = validateFormFields(editFields);
-                      if (fieldError) {
-                        setError(t(fieldError));
-                        return;
-                      }
-                      try {
-                        await operationsApi.updateAdmissionForm(editing.id, {
-                          title: editing.title,
-                          description: editing.description,
-                          fields: cleanFormFields(editFields),
-                        });
-                        setEditing(null);
-                        await load();
-                      } catch (err: any) {
-                        setError(err.response?.data?.detail ?? t("failedUpdateForm"));
-                      }
-                    }}
-            submitLabel={t("saveBtn")}
-          >
-            {editing.category === "General" && (
-              <label>{t("programLabel")}<Input disabled value={editing.program_name ?? ""} /></label>
-            )}
-
+      {editing && (
+        <FormModal
+          title={t("editAdmissionFormHeading")} onClose={() => setEditing(null)} maxWidth={800}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setError("");
+            const fieldError = validateFormFields(editFields);
+            if (fieldError) {
+              setError(t(fieldError));
+              return;
+            }
+            try {
+              await operationsApi.updateAdmissionForm(editing.id, {
+                title: editing.title,
+                description: editing.description,
+                fields: cleanFormFields(editFields),
+              });
+              setEditing(null);
+              await load();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedUpdateForm"));
+            }
+          }}
+          submitLabel={t("saveBtn")}
+        >
+          {editing.category === "General" && (
+            <label>{t("programLabel")}<Input disabled value={editing.program_name ?? ""} /></label>
+          )}
           <label>{t("titleLabel")}<Input required value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></label>
-
           <label>{t("descriptionLabel")}<Input value={editing.description} onChange={(event) => setEditing({ ...editing, description: event.target.value })} /></label>
-
           <FormFieldsEditor fields={editFields} onChange={setEditFields} />
-
-          {error && <p className="notice notice-warning">{error}</p>}
-          </FormModal>}
+          {error && <Alert severity="warning" sx={{ mt: 1 }}><Typography>{error}</Typography></Alert>}
+        </FormModal>
+      )}
     </>
   );
 }
@@ -648,27 +743,27 @@ function EnquiriesTab({ canMutate }: Readonly<{ canMutate: boolean }>) {
 
   return (
     <>
-    <DataTable<ContactEnquiry>
-      columns={[
-        { header: t("nameLabel"), render: (e) => e.name },
-        { header: t("contactCol"), render: (e) => e.contact },
-        { header: t("messageCol"), render: (e) => e.message },
-        { header: t("statusCol"), render: (e) => e.status },
-        { header: t("actionsCol"), render: (e) => (
-          canMutate && e.status === "new" ? (
-            <Button className="tableAction" type="button" aria-label={t("markReviewedBtn", "Mark reviewed")} title={t("markReviewedBtn", "Mark reviewed")} onClick={async () => { await operationsApi.setEnquiryStatus(e.id, "reviewed"); await load(); }}>
-              <CheckCircle2 size={14} />
-            </Button>
-          ) : null
-        )},
-      ]}
-      data={enquiries}
-      keyExtractor={(e) => e.id}
-      isLoading={isLoading}
-      error={loadError}
-      emptyMessage={t("noEnquiriesYet")}
-    />
-    <PaginationControls state={pagination} total={total} onChange={setPagination} />
+      <DataTable<ContactEnquiry>
+        columns={[
+          { header: t("nameLabel"), render: (e) => e.name },
+          { header: t("contactCol"), render: (e) => e.contact },
+          { header: t("messageCol"), render: (e) => e.message },
+          { header: t("statusCol"), render: (e) => e.status },
+          { header: t("actionsCol"), render: (e) => (
+            canMutate && e.status === "new" ? (
+              <TableAction type="button" aria-label={t("markReviewedBtn", "Mark reviewed")} title={t("markReviewedBtn", "Mark reviewed")} onClick={async () => { await operationsApi.setEnquiryStatus(e.id, "reviewed"); await load(); }}>
+                <CheckCircle2 size={14} />
+              </TableAction>
+            ) : null
+          )},
+        ]}
+        data={enquiries}
+        keyExtractor={(e) => e.id}
+        isLoading={isLoading}
+        error={loadError}
+        emptyMessage={t("noEnquiriesYet")}
+      />
+      <PaginationControls state={pagination} total={total} onChange={setPagination} />
     </>
   );
 }

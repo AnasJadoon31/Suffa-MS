@@ -9,7 +9,7 @@ import Chip from "@mui/material/Chip";
 import { Menu, CalendarDays, Languages } from "lucide-react";
 import { navItems, portalRoutes } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 
 const StyledAppBar = styled(MuiAppBar)(({ theme }) => ({
   position: "sticky",
@@ -82,6 +82,12 @@ const LanguageButton = styled(IconButton)({
   height: 36,
 });
 
+const DateLabel = styled("span")({
+  display: "flex",
+  flexDirection: "column",
+  lineHeight: 1.2,
+});
+
 export type AppBarProps = Readonly<{
   onMenuClick?: () => void;
   today?: { gregorian: string; hijri: string } | null;
@@ -97,9 +103,10 @@ export function AppBar({ onMenuClick, today }: AppBarProps) {
   const { t, i18n } = useTranslation();
   const { user, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const isUrdu = i18n.language === "ur";
 
-  const activeRoute = portalRoutes.find((route) => route.path === window.location.pathname);
+  const activeRoute = portalRoutes.find((route) => route.path === location.pathname);
   const activeView = activeRoute?.view;
   const activeItem = navItems.find((item) => item.id === activeView);
 
@@ -138,10 +145,10 @@ export function AppBar({ onMenuClick, today }: AppBarProps) {
             <DateChipStyled
               icon={<CalendarDays size={14} />}
               label={
-                <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
+                <DateLabel>
                   <strong>{today.gregorian}</strong>
                   <small>{today.hijri}</small>
-                </span>
+                </DateLabel>
               }
               title={t("todayLabel")}
             />

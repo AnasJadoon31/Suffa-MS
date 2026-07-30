@@ -1,6 +1,8 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
 import Paper from "@mui/material/Paper";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import { Pencil, Plus, Save, Trash2, X, Palmtree } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -123,8 +125,14 @@ export function HolidaysView() {
   };
 
   const classPicker = (value: string[], onChange: (next: string[]) => void) => (
-    <Paper component="section" variant="outlined" className="sectionPicker" style={{ gridColumn: "1 / -1" }}>
-      <small className="notice">{t("holidayClassesHint")}</small>
+    <Paper
+      component="section"
+      variant="outlined"
+      sx={{ gridColumn: "1 / -1", border: 1, borderColor: "divider", borderRadius: 2, p: 2, mb: 2 }}
+    >
+      <Typography component="span" sx={{ display: "block", mb: 1, fontSize: "0.875rem", color: "text.secondary" }}>
+        {t("holidayClassesHint")}
+      </Typography>
       {classes.map((c) => (
         <CheckboxField
           key={c.id}
@@ -146,14 +154,14 @@ export function HolidaysView() {
         notice={t("descHolidays")}
       />
 
-      <InlineFilter className="pwaFilterStack" filters={[
+      <InlineFilter filters={[
         { key: "category", type: "select", value: filters.category, placeholder: t("allCategories"), options: categories.map((category) => ({ value: category, label: category })), onChange: (value) => setFilters({ ...filters, category: value }) },
         { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
         { key: "date-from", type: "input", inputType: "date", value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
         { key: "date-to", type: "input", inputType: "date", value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
       ]} />
 
-      {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addHolidayBtn")}</Button>}
+      {canManage && <Button type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addHolidayBtn")}</Button>}
       {canManage && showCreate && (
         <FormModal
                 title={t("addHolidayBtn")} onClose={() => setShowCreate(false)}
@@ -227,10 +235,10 @@ export function HolidaysView() {
           { header: t("appliesToCol"), render: (holiday) => classNames(holiday.class_ids) },
           ...(canManage ? [{ header: t("actionsCol"), render: (holiday: Holiday) => editingId === holiday.id ? (
             <>
-              <Button className="tableAction" type="button" onClick={() => saveHoliday(holiday.id)}>
+              <Button type="button" onClick={() => saveHoliday(holiday.id)}>
                 <Save size={14} /> {t("saveBtn")}
               </Button>
-              <Button className="tableAction" type="button" onClick={cancelEditing}>
+              <Button type="button" onClick={cancelEditing}>
                 <X size={14} /> {t("cancelBtn")}
               </Button>
             </>
@@ -259,8 +267,8 @@ export function HolidaysView() {
         emptyMessage={t("noHolidays")}
       />
       {editingId && classes.length > 0 && (
-        <PageSection style={{ marginTop: 12 }}>
-          <strong>{t("appliesToCol")}</strong>
+        <PageSection sx={{ marginTop: 12 }}>
+          <Typography component="span" sx={{ fontWeight: 700 }}>{t("appliesToCol")}</Typography>
           {classPicker(editForm.class_ids, (class_ids) => setEditForm({ ...editForm, class_ids }))}
         </PageSection>
       )}

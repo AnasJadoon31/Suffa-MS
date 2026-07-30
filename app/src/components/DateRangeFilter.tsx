@@ -1,10 +1,38 @@
 import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
 
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Field";
 import { DATE_RANGE_PRESETS, presetRange } from "../lib/dateRanges";
+
+const FilterWrapper = styled("div")({
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+});
+
+const QuickRangeButtons = styled("div")({
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+});
+
+const DateRangeFields = styled("div")({
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 12,
+  alignItems: "flex-end",
+});
+
+const FieldLabel = styled("label")({
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  fontSize: "0.875rem",
+});
 
 export function DateRangeFilter({
   from,
@@ -29,12 +57,11 @@ export function DateRangeFilter({
   );
 
   return (
-    <div className="dateRangeFilter">
-      <div className="quickRangeButtons" aria-label={t("quickRangesLabel")}>
+    <FilterWrapper>
+      <QuickRangeButtons aria-label={t("quickRangesLabel")}>
         {DATE_RANGE_PRESETS.map((preset) => (
           <Button
             key={preset.id}
-            className={activePreset === preset.id ? "primaryAction" : "secondaryAction"}
             type="button"
             aria-pressed={activePreset === preset.id}
             onClick={() => onChange(presetRange(preset.id, timezone))}
@@ -42,12 +69,12 @@ export function DateRangeFilter({
             {t(`datePreset_${preset.id}`)}
           </Button>
         ))}
-      </div>
-      <div className="dateRangeFields">
-        <label>{t("fromLabel")}<Input type="date" value={from} onChange={(event) => onChange({ from: event.target.value, to })} /></label>
-        <label>{t("toLabel")}<Input type="date" value={to} onChange={(event) => onChange({ from, to: event.target.value })} /></label>
+      </QuickRangeButtons>
+      <DateRangeFields>
+        <FieldLabel>{t("fromLabel")}<Input type="date" value={from} onChange={(event) => onChange({ from: event.target.value, to })} /></FieldLabel>
+        <FieldLabel>{t("toLabel")}<Input type="date" value={to} onChange={(event) => onChange({ from, to: event.target.value })} /></FieldLabel>
         {children}
-      </div>
-    </div>
+      </DateRangeFields>
+    </FilterWrapper>
   );
 }

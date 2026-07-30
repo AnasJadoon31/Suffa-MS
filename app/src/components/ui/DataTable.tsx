@@ -8,6 +8,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import { styled } from "@mui/material/styles";
 import { LoadingState, ErrorState } from "./AsyncState";
 
 /* ------------------------------------------------------------------ types */
@@ -44,14 +45,54 @@ export interface DataTableProps<T> {
   renderBeforeRow?: (item: T, index: number, data: T[]) => ReactNode;
 }
 
+/* ------------------------------------------------------------------ styled components */
+
+export const StyledTable = styled(Table)(({ theme }) => ({
+  borderCollapse: "separate",
+  borderSpacing: 0,
+  width: "100%",
+}));
+
+export const StyledTableRow = styled(TableRow)(({ theme }) => ({
+  "&:hover": {
+    backgroundColor: theme.palette.action.hover,
+  },
+  "&:last-child td, &:last-child th": {
+    borderBottom: 0,
+  },
+}));
+
+export const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  padding: theme.spacing(1.5, 2),
+  borderColor: theme.palette.divider,
+}));
+
+export const StyledTableHeader = styled(TableCell)(({ theme }) => ({
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  fontSize: "0.75rem",
+  color: theme.palette.teal.main,
+  backgroundColor: "transparent",
+  borderBottom: `2px solid ${theme.palette.divider}`,
+  padding: theme.spacing(1.5, 2),
+}));
+
+export const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
+  width: "100%",
+  overflowX: "auto",
+  overflowY: "visible",
+  borderColor: theme.palette.divider,
+  boxShadow: "none",
+  borderRadius: 16,
+  border: `1px solid ${theme.palette.divider}`,
+}));
+
 /* ------------------------------------------------------------------ component */
 
 /**
  * Generic data-table primitive that replaces the repeated
  * `<div className="dataTable"> … header … loading … empty … rows` boilerplate.
- *
- * Reuses the existing `dataTable` / `dataRow` / `header` CSS classes —
- * zero visual change, just less copy-paste.
  */
 export function DataTable<T>({
   columns,
@@ -70,13 +111,14 @@ export function DataTable<T>({
     <TableContainer
       component={Paper}
       variant="outlined"
-      className={className ? `muiDataTable ${className}` : "muiDataTable"}
+      className={className}
       sx={{
         width: "100%",
         overflowX: "auto",
         overflowY: "visible",
         borderColor: "divider",
         boxShadow: "none",
+        borderRadius: 2,
       }}
     >
       {isLoading && (
@@ -90,18 +132,18 @@ export function DataTable<T>({
         </Box>
       )}
       {showData && data.length === 0 && emptyMessage && (
-        <Box className="emptyState" sx={{ p: 3 }}>
+        <Box sx={{ p: 3 }}>
           {emptyMessage}
         </Box>
       )}
       {showData && data.length > 0 && !renderCards && (
-        <Table className="desktopDataTable" size="small" stickyHeader aria-label="data table" sx={{ minWidth: 720 }}>
+        <Table size="small" stickyHeader aria-label="data table" sx={{ minWidth: 720 }}>
             <TableHead>
               <TableRow>
                 {columns.map((col, i) => (
-                  <TableCell key={i} className={col.className}>
+                  <StyledTableHeader key={i} className={col.className}>
                     {col.header}
-                  </TableCell>
+                  </StyledTableHeader>
                 ))}
               </TableRow>
             </TableHead>
@@ -120,7 +162,7 @@ export function DataTable<T>({
           </Table>
       )}
       {showData && data.length > 0 && renderCards && (
-        <Box className="mobileDataCards" role="list" aria-label="data cards">
+        <Box role="list" aria-label="data cards">
           {data.map((item, index) => (
             <MobileDataCard
               key={keyExtractor(item)}
@@ -156,16 +198,16 @@ function DataRow<T>({
   return (
     <>
       {before && (
-        <TableRow className="dataRow sectionRow">
+        <StyledTableRow>
           <TableCell colSpan={columns.length}>{before}</TableCell>
-        </TableRow>
+        </StyledTableRow>
       )}
-      <TableRow hover className="dataRow">
+      <StyledTableRow>
         {columns.map((col, i) => {
           const label = typeof col.header === "string" ? col.header : undefined;
-          return <TableCell key={i} data-label={label} className={col.className}>{col.render(item, index)}</TableCell>;
+          return <StyledTableCell key={i} data-label={label} className={col.className}>{col.render(item, index)}</StyledTableCell>;
         })}
-      </TableRow>
+      </StyledTableRow>
     </>
   );
 }
@@ -186,10 +228,10 @@ function MobileDataCard<T>({
   const before = renderBeforeRow?.(item, index, data);
   return (
     <>
-      {before && <div className="mobileDataSection">{before}</div>}
-      <dl className="mobileDataCard" role="listitem">
+      {before && <div>{before}</div>}
+      <dl role="listitem">
         {columns.map((col, i) => (
-          <div key={i} className={`mobileDataField ${col.className ?? ""}`.trim()}>
+          <div key={i}>
             <dt>{col.header}</dt>
             <dd>{col.render(item, index)}</dd>
           </div>

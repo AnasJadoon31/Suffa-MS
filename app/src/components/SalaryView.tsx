@@ -1,5 +1,10 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
+import Chip from "@mui/material/Chip";
 import { Banknote, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -45,24 +50,32 @@ function MySalaryView() {
       {isLoading && <LoadingState />}
       {!isLoading && error && <ErrorState message={error} />}
       {!isLoading && !error && data?.record ? (
-        <p className="notice">{t("currentSalaryLine", { currency: data.record.currency, amount: data.record.amount, date: data.record.effective_from })}</p>
+        <Alert severity="info" sx={{ mt: 1 }}>
+          {t("currentSalaryLine", { currency: data.record.currency, amount: data.record.amount, date: data.record.effective_from })}
+        </Alert>
       ) : (
-        !isLoading && !error && data && <p className="emptyState">{t("noSalarySetYet")}</p>
+        !isLoading && !error && data && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noSalarySetYet")}</Typography>
       )}
       {!isLoading && !error && (
-      <div className="dataTable">
-        <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span></div>
-        {data && data.payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
+      <Box sx={{ mt: 2 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
+          <span>{t("dateCol")}</span>
+          <span>{t("periodCoveredCol")}</span>
+          <span>{t("amountCol")}</span>
+          <span>{t("methodCol")}</span>
+          <span>{t("notesLabel")}</span>
+        </Box>
+        {data && data.payments.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noPaymentsYet")}</Typography>}
         {data?.payments.map((p) => (
-          <div className="dataRow" key={p.id}>
-            <span data-label={t("dateCol")}>{p.payment_date}<HijriTag date={p.payment_date} /></span>
-            <span data-label={t("periodCoveredCol")}>{p.period_covered}</span>
-            <span data-label={t("amountCol")}>{p.currency} {p.amount}</span>
-            <span data-label={t("methodCol")}>{p.method}</span>
-            <span data-label={t("notesLabel")}>{p.note || "—"}</span>
-          </div>
+          <Box key={p.id} sx={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 1, py: 1, borderBottom: 1, borderColor: "divider" }}>
+            <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
+            <span>{p.period_covered}</span>
+            <span>{p.currency} {p.amount}</span>
+            <span>{p.method}</span>
+            <span>{p.note || "—"}</span>
+          </Box>
         ))}
-      </div>
+      </Box>
       )}
     </PageSection>
   );
@@ -197,26 +210,32 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
       {!isLoading && !loadError && (
         <>
           {canWrite && (
-            <div className="formActions salaryPrimaryActions">
-              <Button className="primaryAction" type="button" onClick={() => openRecordSalaryModal()}>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+              <Button type="button" onClick={() => openRecordSalaryModal()}>
                 <Plus size={16} /> {t("recordSalaryBtn")}
               </Button>
-            </div>
+            </Box>
           )}
-          <div className="dataTable salaryHistoryTable">
-            <div className="dataRow header">
-              <span>{t("teacherLabel")}</span><span>{t("amountCol")}</span>
-              <span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span>
-              <span>{t("methodCol")}</span><span>{t("statusCol")}</span><span>{t("actionsCol")}</span>
-            </div>
-            {history.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
+              <span>{t("teacherLabel")}</span>
+              <span>{t("amountCol")}</span>
+              <span>{t("dateCol")}</span>
+              <span>{t("periodCoveredCol")}</span>
+              <span>{t("methodCol")}</span>
+              <span>{t("statusCol")}</span>
+              <span>{t("actionsCol")}</span>
+            </Box>
+            {history.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noPaymentsYet")}</Typography>}
             {history.map((payment) => (
-              <div className="dataRow" key={payment.id}>
-                <span data-label={t("teacherLabel")}><strong>{payment.teacher_name}</strong><small>{payment.employee_code}</small></span>
-                <span data-label={t("amountCol")}>{payment.currency} {payment.amount}</span>
-                <span data-label={t("dateCol")}>{payment.payment_date}</span><span data-label={t("periodCoveredCol")}>{payment.period_covered}</span>
-                <span data-label={t("methodCol")}>{payment.method}</span><span data-label={t("statusCol")}><span className="badge success">{payment.status}</span></span>
-                <span data-label={t("actionsCol")}><ActionMenu ariaLabel={t("actionsCol")} items={[
+              <Box key={payment.id} sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, py: 1, borderBottom: 1, borderColor: "divider", alignItems: "center" }}>
+                <span><strong>{payment.teacher_name}</strong><br /><small>{payment.employee_code}</small></span>
+                <span>{payment.currency} {payment.amount}</span>
+                <span>{payment.payment_date}</span>
+                <span>{payment.period_covered}</span>
+                <span>{payment.method}</span>
+                <span><Chip label={payment.status} size="small" color="success" /></span>
+                <span><ActionMenu ariaLabel={t("actionsCol")} items={[
                   {
                     label: t("viewBtn"),
                     onClick: () => {
@@ -230,13 +249,13 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
                     { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, onClick: () => deletePayment(payment) },
                   ] : []),
                 ]} /></span>
-              </div>
+              </Box>
             ))}
-          </div>
+          </Box>
         </>
       )}
 
-      <InlineFilter className="pwaFilterStack salaryTeacherToolbar" filters={[]}>
+      <InlineFilter filters={[]}>
         <SearchDropdown
           id="salary-teacher"
           label={t("teacherLabel")}
@@ -257,9 +276,8 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
           emptyLabel={t("noTeachersYet")}
         />
         {(teacherSearch || teacherId) && (
-          <div className="formActions">
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Button
-              className="secondaryAction"
               type="button"
               onClick={() => {
                 setTeacherSearch("");
@@ -268,13 +286,18 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
             >
               {t("cancelBtn")}
             </Button>
-          </div>
+          </Box>
         )}
       </InlineFilter>
 
       {teacherId && (
         <>
-          {canWrite && <div className="formActions"><Button className="primaryAction" type="button" onClick={() => setEditModal("salary")}><Plus size={16} /> {t("saveSalaryBtn")}</Button><Button className="primaryAction" type="button" onClick={() => openRecordSalaryModal(teacherId)}><Plus size={16} /> {t("recordSalaryBtn")}</Button></div>}
+          {canWrite && (
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", my: 2 }}>
+              <Button type="button" onClick={() => setEditModal("salary")}><Plus size={16} /> {t("saveSalaryBtn")}</Button>
+              <Button type="button" onClick={() => openRecordSalaryModal(teacherId)}><Plus size={16} /> {t("recordSalaryBtn")}</Button>
+            </Box>
+          )}
           {canWrite && editModal === "salary" && <FormModal
                     title={t("saveSalaryBtn")} onClose={() => setEditModal(null)}
                     onSubmit={async (e) => {
@@ -306,30 +329,39 @@ function AdminSalaryView({ canWrite }: Readonly<{ canWrite: boolean }>) {
                     </FormStack>
                   </FormModal>}
           {record && (
-            <p className="notice">{t("currentSalaryLine", { currency: record.currency, amount: record.amount, date: record.effective_from })}</p>
+            <Alert severity="info" sx={{ mt: 1 }}>
+              {t("currentSalaryLine", { currency: record.currency, amount: record.amount, date: record.effective_from })}
+            </Alert>
           )}
-          {notice && <p className="notice">{notice}</p>}
-          {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+          {notice && <Alert severity="success" sx={{ mt: 1 }}>{notice}</Alert>}
+          {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
 
-          <div className="dataTable">
-            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("periodCoveredCol")}</span><span>{t("amountCol")}</span><span>{t("methodCol")}</span><span>{t("notesLabel")}</span><span>{t("actionsCol")}</span></div>
-            {payments.length === 0 && <p className="emptyState">{t("noPaymentsYet")}</p>}
+          <Box sx={{ mt: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
+              <span>{t("dateCol")}</span>
+              <span>{t("periodCoveredCol")}</span>
+              <span>{t("amountCol")}</span>
+              <span>{t("methodCol")}</span>
+              <span>{t("notesLabel")}</span>
+              <span>{t("actionsCol")}</span>
+            </Box>
+            {payments.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noPaymentsYet")}</Typography>}
             {payments.map((p) => (
-              <div className="dataRow" key={p.id}>
-                <span data-label={t("dateCol")}>{p.payment_date}<HijriTag date={p.payment_date} /></span>
-                <span data-label={t("periodCoveredCol")}>{p.period_covered}</span>
-                <span data-label={t("amountCol")}>{p.currency} {p.amount}</span>
-                <span data-label={t("methodCol")}>{p.method}</span>
-                <span data-label={t("notesLabel")}>{p.note || "—"}</span>
-                <span data-label={t("actionsCol")}>
+              <Box key={p.id} sx={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 1, py: 1, borderBottom: 1, borderColor: "divider", alignItems: "center" }}>
+                <span>{p.payment_date}<HijriTag date={p.payment_date} /></span>
+                <span>{p.period_covered}</span>
+                <span>{p.currency} {p.amount}</span>
+                <span>{p.method}</span>
+                <span>{p.note || "—"}</span>
+                <span>
                   <ActionMenu ariaLabel={t("actionsCol")} items={[
                     { label: t("editBtn"), icon: <Pencil size={14} />, disabled: !canWrite, onClick: () => startEditPayment(p) },
                     { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: !canWrite, onClick: () => deletePayment(p) },
                   ]} />
                 </span>
-              </div>
+              </Box>
             ))}
-          </div>
+          </Box>
         </>
       )}
 

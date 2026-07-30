@@ -1,4 +1,7 @@
 import { useTranslation } from "react-i18next";
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 
 import { BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields } from "../lib/admissionBuiltIns";
 import type { FormFieldDefinition } from "../lib/endpoints";
@@ -7,6 +10,50 @@ import { CheckboxField, Input, RadioField, Select, Textarea } from "./ui/Field";
 import { PhoneInput } from "./ui/PhoneInput";
 
 type AdmissionAnswers = Record<string, unknown>;
+
+const ChoiceField = styled("fieldset")({
+  border: "none",
+  padding: 0,
+  margin: 0,
+  marginBottom: 16,
+});
+
+const FieldLabel = styled("label")({
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  fontSize: "0.875rem",
+  marginBottom: 12,
+});
+
+const Legend = styled("legend")({
+  fontSize: "0.875rem",
+  fontWeight: 500,
+  marginBottom: 8,
+});
+
+const SectionLabel = styled("p")(({ theme }) => ({
+  fontSize: "1rem",
+  fontWeight: 600,
+  color: theme.palette.text.primary,
+  margin: "16px 0 8px",
+}));
+
+const GuardianSection = styled("section")({
+  marginTop: 24,
+});
+
+const FormFieldsHeader = styled("div")({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  marginBottom: 16,
+});
+
+const FieldHint = styled("p")({
+  margin: 0,
+  fontSize: "0.875rem",
+});
 
 export function AdmissionAnswersFields({
   fields,
@@ -46,10 +93,10 @@ export function AdmissionAnswersFields({
     onValueChange: (value: unknown) => void,
     keyPrefix: string,
   ) => {
-        if (field.type === "label") return <p className="formSectionLabel" key={field.key}>{field.label}</p>;
+        if (field.type === "label") return <SectionLabel key={field.key}>{field.label}</SectionLabel>;
         if (field.key === BUILT_IN_ADMISSION_KEYS.studentDateOfBirth) {
           return (
-            <label key={`${keyPrefix}-${field.key}`}>
+            <FieldLabel key={`${keyPrefix}-${field.key}`}>
               {field.label}
               <Input
                 required={field.required}
@@ -57,15 +104,15 @@ export function AdmissionAnswersFields({
                 value={String(value ?? "")}
                 onChange={(event) => onValueChange(event.target.value)}
               />
-            </label>
+            </FieldLabel>
           );
         }
         if (field.type === "textarea") {
           return (
-            <label key={`${keyPrefix}-${field.key}`}>
+            <FieldLabel key={`${keyPrefix}-${field.key}`}>
               {field.label}
               <Textarea required={field.required} value={String(value ?? "")} onChange={(event) => onValueChange(event.target.value)} />
-            </label>
+            </FieldLabel>
           );
         }
         if (field.type === "phone") {
@@ -82,19 +129,19 @@ export function AdmissionAnswersFields({
         }
         if (field.type === "dropdown") {
           return (
-            <label key={`${keyPrefix}-${field.key}`}>
+            <FieldLabel key={`${keyPrefix}-${field.key}`}>
               {field.label}
               <Select required={field.required} value={String(value ?? "")} onChange={(event) => onValueChange(event.target.value)}>
                 <option value="">{t("selectEllipsis")}</option>
                 {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
               </Select>
-            </label>
+            </FieldLabel>
           );
         }
         if (field.type === "radio") {
           return (
-            <fieldset className="choiceField" key={`${keyPrefix}-${field.key}`}>
-              <legend>{field.label}</legend>
+            <ChoiceField key={`${keyPrefix}-${field.key}`}>
+              <Legend>{field.label}</Legend>
               {field.options.map((option) => (
                 <RadioField
                   key={option}
@@ -106,14 +153,14 @@ export function AdmissionAnswersFields({
                   label={option}
                 />
               ))}
-            </fieldset>
+            </ChoiceField>
           );
         }
         if (field.type === "checkbox_group") {
           const chosen = Array.isArray(value) ? value as string[] : [];
           return (
-            <fieldset className="choiceField" key={`${keyPrefix}-${field.key}`}>
-              <legend>{field.label}</legend>
+            <ChoiceField key={`${keyPrefix}-${field.key}`}>
+              <Legend>{field.label}</Legend>
               {field.options.map((option) => (
                 <CheckboxField
                   key={option}
@@ -122,14 +169,14 @@ export function AdmissionAnswersFields({
                   label={option}
                 />
               ))}
-            </fieldset>
+            </ChoiceField>
           );
         }
         return (
-          <label key={`${keyPrefix}-${field.key}`}>
+          <FieldLabel key={`${keyPrefix}-${field.key}`}>
             {field.label}
             <Input required={field.required} value={String(value ?? "")} onChange={(event) => onValueChange(event.target.value)} />
-          </label>
+          </FieldLabel>
         );
   };
 
@@ -137,26 +184,26 @@ export function AdmissionAnswersFields({
     <>
       {visibleFields.map((field) => renderField(field, answers[field.key], (value) => updateAnswer(field.key, value), "primary"))}
       {!hideGuardianFields && allowAdditionalGuardians && guardianFields.length > 0 && (
-        <section className="choiceField">
-          <div className="formFieldsHeader">
+        <GuardianSection>
+          <FormFieldsHeader>
             <div>
-              <h4>{t("additionalGuardiansHeading", "Additional guardians")}</h4>
-              <p>{t("additionalGuardiansHint", "Use this when the applicant has more than one guardian to create and link.")}</p>
+              <Typography variant="h6" component="h4">{t("additionalGuardiansHeading", "Additional guardians")}</Typography>
+              <FieldHint>{t("additionalGuardiansHint", "Use this when the applicant has more than one guardian to create and link.")}</FieldHint>
             </div>
-            <Button className="secondaryAction" type="button" onClick={() => onChange({ ...answers, guardians: [...additionalGuardians, {}] })}>
+            <Button type="button" onClick={() => onChange({ ...answers, guardians: [...additionalGuardians, {}] })}>
               + {t("addGuardianBtn")}
             </Button>
-          </div>
+          </FormFieldsHeader>
           {additionalGuardians.map((guardian, index) => (
-            <fieldset className="choiceField" key={index}>
-              <legend>{t("guardianNumberLabel", "Guardian {{number}}", { number: index + 2 })}</legend>
+            <ChoiceField key={index}>
+              <Legend>{t("guardianNumberLabel", "Guardian {{number}}", { number: index + 2 })}</Legend>
               {guardianFields.map((field) => renderField(field, guardian[field.key], (value) => updateGuardian(index, field.key, value), `guardian-${index}`))}
-              <Button className="secondaryAction danger" type="button" onClick={() => onChange({ ...answers, guardians: additionalGuardians.filter((_, itemIndex) => itemIndex !== index) })}>
+              <Button type="button" onClick={() => onChange({ ...answers, guardians: additionalGuardians.filter((_, itemIndex) => itemIndex !== index) })}>
                 {t("removeGuardianBtn", "Remove guardian")}
               </Button>
-            </fieldset>
+            </ChoiceField>
           ))}
-        </section>
+        </GuardianSection>
       )}
     </>
   );

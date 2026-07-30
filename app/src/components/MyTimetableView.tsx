@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 
 import { operationsApi, type TimetableSlot } from "../lib/endpoints";
@@ -33,34 +36,39 @@ export function MyTimetableView() {
     <PageSection>
       <PageHeader title={t("myTimetable")} notice={t("descMyTimetable")} />
       {classOptions.length > 1 && (
-        <label className="classSwitcher">{t("classLabel")}<Select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>{classOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></label>
+        <Box component="label" sx={{ display: "flex", alignItems: "center", gap: 8, mb: 2 }}>
+          {t("classLabel")}
+          <Select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>
+            {classOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </Select>
+        </Box>
       )}
-      {selectedClassName && <h2 className="contextHeading">{selectedClassName}</h2>}
+      {selectedClassName && <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>{selectedClassName}</Typography>}
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
-      {!loading && !error && slots.length === 0 && <p className="emptyState">{t("noSlotsYet")}</p>}
+      {!loading && !error && slots.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noSlotsYet")}</Typography>}
       {!loading && !error && DAY_KEYS.map((dayKey, day) => {
         const daySlots = visibleSlots.filter((slot) => slot.day_of_week === day);
         if (daySlots.length === 0) return null;
         return (
-          <PageSection key={dayKey} style={{ marginTop: 12 }}>
-            <h3>{t(dayKey)}</h3>
-            <div className="dataTable">
-              <div className="dataRow header">
+          <PageSection key={dayKey} sx={{ marginTop: 12 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>{t(dayKey)}</Typography>
+            <Box>
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
                 <span>{t("timeCol")}</span>
                 <span>{t("courseCol")}</span>
                 <span>{t("sectionPeriodCol")}</span>
                 <span>{t("teacherLocationCol")}</span>
-              </div>
+              </Box>
               {daySlots.map((slot) => (
-                <div className="dataRow" key={slot.id}>
-                  <span data-label={t("timeCol")}>{slot.start_time} – {slot.end_time}</span>
-                  <span data-label={t("courseCol")}>{slot.course_name ?? "—"}</span>
-                  <span data-label={t("sectionPeriodCol")}>{slot.section_name ?? "—"} · {t("periodLabel", { period: slot.period })}</span>
-                  <span data-label={t("teacherLocationCol")}>{slot.teacher_name ?? "—"}</span>
-                </div>
+                <Box key={slot.id} sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, py: 1, borderBottom: 1, borderColor: "divider" }}>
+                  <span>{slot.start_time} – {slot.end_time}</span>
+                  <span>{slot.course_name ?? "—"}</span>
+                  <span>{slot.section_name ?? "—"} · {t("periodLabel", { period: slot.period })}</span>
+                  <span>{slot.teacher_name ?? "—"}</span>
+                </Box>
               ))}
-            </div>
+            </Box>
           </PageSection>
         );
       })}

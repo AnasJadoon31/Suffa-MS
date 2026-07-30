@@ -1,6 +1,8 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
 import { Plus, Search, CalendarDays } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -162,7 +164,7 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
         title={t("leaveTitle")}
         icon={<CalendarDays size={18} />}
         notice={canManage ? t("leaveManageSubtitle") : t("leaveSelfSubtitle")}
-        actions={canWrite && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("requestLeaveBtn")}</Button>}
+        actions={canWrite && <Button type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("requestLeaveBtn")}</Button>}
       />
       {canWrite && showCreate && <FormModal
             title={t("requestLeaveBtn")} onClose={() => setShowCreate(false)}
@@ -268,7 +270,6 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
 
       {canManage && (
         <InlineFilter
-          className="pwaFilterStack"
           filters={[
             {
               key: "tabs",
@@ -310,13 +311,12 @@ export function LeaveView({ mode = "manage" }: Readonly<{ mode?: "manage" | "sel
           setSearchQuery(searchDraft);
         }}
       >
-        <InlineFilter className="pwaFilterStack" filters={[{
+        <InlineFilter filters={[{
           key: "leave-search", type: "input", inputType: "search", label: t("searchLeaveLabel"),
           placeholder: t("searchLeavePlaceholder"), value: searchDraft, onChange: setSearchDraft,
         }]}>
           {searchQuery && (
             <Button
-              className="secondaryAction"
               type="button"
               onClick={() => {
                 setSearchDraft("");

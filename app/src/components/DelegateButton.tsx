@@ -2,6 +2,9 @@ import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 
 import {
   academicsApi,
@@ -15,6 +18,37 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { Select, CheckboxField } from "./ui/Field";
 import { Modal } from "./ui/Modal";
+
+const DelegateList = styled("div")({
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  marginBottom: 16,
+});
+
+const FormActions = styled("div")({
+  display: "flex",
+  gap: 8,
+  justifyContent: "flex-end",
+  marginTop: 16,
+});
+
+const FieldLabel = styled("label")({
+  display: "block",
+  marginBottom: 12,
+});
+
+const ErrorText = styled("p")(({ theme }) => ({
+  color: theme.palette.error.main,
+  fontSize: "0.875rem",
+  margin: "8px 0",
+}));
+
+const NoticeText = styled("p")(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  fontSize: "0.875rem",
+  margin: "8px 0",
+}));
 
 /**
  * "Mini-admin" delegation (IMPLEMENT.md §3): principals drop this button into
@@ -31,7 +65,7 @@ export function DelegateButton({ modules }: Readonly<{ modules: string[] }>) {
 
   return (
     <>
-      <Button className="secondaryAction" type="button" onClick={() => setOpen(true)}>
+      <Button type="button" onClick={() => setOpen(true)}>
         <ShieldCheck size={16} /> {t("delegateBtn")}
       </Button>
       {open && <DelegateModal modules={modules} onClose={() => setOpen(false)} />}
@@ -156,9 +190,9 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
 
   return (
     <Modal title={t("delegateHeading")} onClose={onClose}>
-        <p className="notice">{t("delegateHint")}</p>
+        <NoticeText>{t("delegateHint")}</NoticeText>
 
-        <label style={{ display: "block", marginBottom: 12 }}>
+        <FieldLabel>
           {t("teacherLabel")}
           <Select value={teacherUserId} onChange={(e) => setTeacherUserId(e.target.value)}>
             <option value="">{t("selectEllipsis")}</option>
@@ -166,21 +200,21 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
               <option key={teacher.user_id} value={teacher.user_id}>{teacher.name} ({teacher.employee_code})</option>
             ))}
           </Select>
-        </label>
+        </FieldLabel>
 
         {teacherUserId && (
           <>
             {relevant.some((permission) => permission.scoped) && (
-              <label style={{ display: "block", marginBottom: 12 }}>
+              <FieldLabel>
                 {t("delegateScopeLabel")}
                 <Select value={scopeClassId} onChange={(e) => setScopeClassId(e.target.value)}>
                   <option value="">{t("wholeMadrasaOption")}</option>
                   {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
-              </label>
+              </FieldLabel>
             )}
 
-            <div className="delegateList">
+            <DelegateList>
               {relevant.map((p) => (
                 <CheckboxField
                   key={p.code}
@@ -188,21 +222,21 @@ export function DelegateModal({ modules, initialTeacherUserId, onClose }: Readon
                   onChange={() => toggle(p.code)}
                   label={(
                     <>
-                    {p.label} <small className="notice">({p.code})</small>
-                    {!p.scoped && <small className="notice"> · {t("madrasaWideOnly")}</small>}
+                    {p.label} <small>({p.code})</small>
+                    {!p.scoped && <small> · {t("madrasaWideOnly")}</small>}
                     </>
                   )}
                 />
               ))}
-              {relevant.length === 0 && <p className="emptyState">{t("noDelegatablePermissions")}</p>}
-            </div>
+              {relevant.length === 0 && <Typography variant="body2" color="text.secondary">{t("noDelegatablePermissions")}</Typography>}
+            </DelegateList>
 
-            {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-            {notice && <p className="notice">{notice}</p>}
-            <div className="formActions">
-              <Button className="primaryAction" type="button" onClick={() => save()}>{t("saveBtn")}</Button>
-              <Button className="secondaryAction" type="button" onClick={onClose}>{t("cancelBtn")}</Button>
-            </div>
+            {error && <ErrorText>{error}</ErrorText>}
+            {notice && <NoticeText>{notice}</NoticeText>}
+            <FormActions>
+              <Button type="button" onClick={() => save()}>{t("saveBtn")}</Button>
+              <Button type="button" onClick={onClose}>{t("cancelBtn")}</Button>
+            </FormActions>
           </>
         )}
     </Modal>

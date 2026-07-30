@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { Modal } from "../components/ui/Modal";
-import { Button } from "../components/ui/Button";
+import { Button, PrimaryButton, DangerButton } from "../components/ui/Button";
 import { Input } from "../components/ui/Field";
+import Box from "@mui/material/Box";
 import { useTranslation } from "react-i18next";
 
 type DialogType = "alert" | "confirm" | "warning" | "prompt";
@@ -125,13 +126,13 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           title={dialogState.options.title || t(titleKey)}
           onClose={() => handleClose(false)}
         >
-          <div style={{ padding: "0", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <p style={{ margin: 0, fontSize: "1rem", lineHeight: 1.5, color: "var(--foreground)" }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box component="p" sx={{ margin: 0, fontSize: "1rem", lineHeight: 1.5 }}>
               {dialogState.options.targetName && (
-                <strong style={{ display: "block", marginBottom: 4 }}>{dialogState.options.targetName}</strong>
+                <Box component="strong" sx={{ display: "block", mb: 1 }}>{dialogState.options.targetName}</Box>
               )}
               {dialogState.message}
-            </p>
+            </Box>
             {dialogState.type === "prompt" && (
               <Input
                 type={dialogState.options.inputType ?? "text"}
@@ -141,25 +142,33 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               />
             )}
             {dialogState.options.blockedMessage && (
-              <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--muted)" }}>
+              <Box component="p" sx={{ margin: 0, fontSize: "0.85rem", color: "text.secondary" }}>
                 {dialogState.options.blockedMessage}
-              </p>
+              </Box>
             )}
-            <div className="formActions" style={{ justifyContent: "flex-end" }}>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
               {dialogState.type !== "alert" && (
                 <Button type="button" onClick={() => handleClose(false)}>
                   {dialogState.options.cancelLabel || t("cancelBtn")}
                 </Button>
               )}
-              <Button
-                type="button"
-                className={isDestructive ? "dangerAction" : "primaryAction"}
-                onClick={() => handleClose(dialogState.type === "prompt" ? promptValue : true)}
-              >
-                {dialogState.options.confirmLabel || t("okBtn")}
-              </Button>
-            </div>
-          </div>
+              {isDestructive ? (
+                <DangerButton
+                  type="button"
+                  onClick={() => handleClose(dialogState.type === "prompt" ? promptValue : true)}
+                >
+                  {dialogState.options.confirmLabel || t("okBtn")}
+                </DangerButton>
+              ) : (
+                <PrimaryButton
+                  type="button"
+                  onClick={() => handleClose(dialogState.type === "prompt" ? promptValue : true)}
+                >
+                  {dialogState.options.confirmLabel || t("okBtn")}
+                </PrimaryButton>
+              )}
+            </Box>
+          </Box>
         </Modal>
       )}
     </DialogContext.Provider>

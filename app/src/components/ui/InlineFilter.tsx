@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
+import Box from "@mui/material/Box";
 import { Input, Select } from "./Field";
 import { Button } from "./Button";
-import { FilterBar } from "./Layout";
+import { FilterBarContainer } from "./Layout";
 
 export type FilterOption = { value: string; label: string };
 
@@ -35,13 +36,13 @@ export type InlineFilterConfig = {
   onChange: (value: string) => void;
 };
 
-export function InlineFilter({ filters, children, className = "" }: { filters: InlineFilterConfig[], children?: ReactNode, className?: string }) {
+export function InlineFilter({ filters, children, sx }: { filters: InlineFilterConfig[], children?: ReactNode; sx?: any }) {
   return (
-    <FilterBar className={`inlineFilter ${className}`.trim()}>
+    <FilterBarContainer sx={{ ...sx }}>
       {filters.map((filter) => {
         if (filter.type === "select") {
           return (
-            <label className="inlineFilterField" key={filter.key}>
+            <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }} key={filter.key}>
               {filter.label && <span>{filter.label}</span>}
               <Select
                 aria-label={filter.ariaLabel ?? filter.label ?? filter.placeholder}
@@ -54,11 +55,11 @@ export function InlineFilter({ filters, children, className = "" }: { filters: I
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </Select>
-            </label>
+            </Box>
           );
         } else if (filter.type === "input") {
           return (
-            <label className="inlineFilterField" key={filter.key}>
+            <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }} key={filter.key}>
               {filter.label && <span>{filter.label}</span>}
               <Input
                 aria-label={filter.ariaLabel ?? filter.label ?? filter.placeholder}
@@ -68,15 +69,15 @@ export function InlineFilter({ filters, children, className = "" }: { filters: I
                 disabled={filter.disabled}
                 onChange={(event) => filter.onChange(event.target.value)}
               />
-            </label>
+            </Box>
           );
         } else if (filter.type === "tab") {
           return (
-            <div className="inlineFilterTabs" role="group" aria-label={filter.ariaLabel ?? filter.label} key={filter.key}>
+            <Box role="group" aria-label={filter.ariaLabel ?? filter.label} key={filter.key} sx={{ display: "flex", gap: 1 }}>
               {filter.options.map(opt => (
                 <Button
                   key={`${filter.key}-${opt.value}`}
-                  className={filter.value === opt.value ? "primaryAction" : "secondaryAction"}
+                  variant={filter.value === opt.value ? "contained" : "outlined"}
                   type="button"
                   aria-pressed={filter.value === opt.value}
                   onClick={() => filter.onChange(opt.value)}
@@ -84,12 +85,12 @@ export function InlineFilter({ filters, children, className = "" }: { filters: I
                   {opt.label}
                 </Button>
               ))}
-            </div>
+            </Box>
           );
         }
         return null;
       })}
-      {children && <div className="inlineFilterActions">{children}</div>}
-    </FilterBar>
+      {children && <Box sx={{ display: "flex", gap: 1 }}>{children}</Box>}
+    </FilterBarContainer>
   );
 }

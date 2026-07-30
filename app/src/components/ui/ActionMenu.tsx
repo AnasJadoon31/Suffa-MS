@@ -4,6 +4,8 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import MenuItem from "@mui/material/MenuItem";
 import MenuList from "@mui/material/MenuList";
 import { MoreVertical } from "lucide-react";
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 
@@ -72,47 +74,32 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
   }, [isOpen, updateMenuPosition]);
 
   return (
-    <div className="actionMenu">
-      <IconButton
+    <ActionMenuWrapper>
+      <ActionMenuTrigger
         ref={buttonRef}
         type="button"
-        className="iconButton actionMenuTrigger"
         aria-label={ariaLabel ?? t("actionsCol")}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={isOpen ? menuId.current : undefined}
-        sx={{ width: 44, height: 44 }}
         onClick={() => {
           updateMenuPosition();
           setIsOpen((open) => !open);
         }}
       >
         {children ?? <MoreVertical size={16} />}
-      </IconButton>
-      {isOpen && createPortal(<MenuList
+      </ActionMenuTrigger>
+      {isOpen && createPortal(<ActionMenuDropdown
         id={menuId.current}
         ref={menuRef}
         role="menu"
-        className="actionMenuDropdown"
         style={menuStyle}
-        sx={{
-          listStyle: "none",
-          p: 0.75,
-          m: 0,
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 1,
-          bgcolor: "background.paper",
-          boxShadow: 8,
-          zIndex: (theme) => theme.zIndex.modal + 1,
-        }}
       >
         {items.map((item, index) => (
-          <MenuItem
+          <ActionMenuItemStyled
             key={index}
-            className="actionMenuItem"
+            destructive={item.destructive}
             disabled={item.disabled}
-            sx={{ color: item.destructive ? "error.main" : "inherit", minHeight: 44, py: 1 }}
             onClick={() => {
               void item.onClick();
               setIsOpen(false);
@@ -120,9 +107,49 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
           >
             {item.icon && <ListItemIcon sx={{ color: "inherit", minWidth: 32 }}>{item.icon}</ListItemIcon>}
             {item.label}
-          </MenuItem>
+          </ActionMenuItemStyled>
         ))}
-      </MenuList>, document.body)}
-    </div>
+      </ActionMenuDropdown>, document.body)}
+    </ActionMenuWrapper>
   );
 }
+
+/* ------------------------------------------------------------------ styled components */
+
+const ActionMenuWrapper = styled(Box)({
+  display: "inline-flex",
+  position: "relative",
+});
+
+export const ActionMenuTrigger = styled(IconButton)(({ theme }) => ({
+  width: 44,
+  height: 44,
+  color: theme.palette.text.secondary,
+  "&:hover": {
+    backgroundColor: theme.palette.action.hover,
+    color: theme.palette.text.primary,
+  },
+}));
+
+export const ActionMenuDropdown = styled(MenuList)(({ theme }) => ({
+  listStyle: "none",
+  padding: theme.spacing(0.75),
+  margin: 0,
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: 12,
+  backgroundColor: theme.palette.background.paper,
+  boxShadow: theme.shadows[8],
+  zIndex: theme.zIndex.modal + 1,
+}));
+
+export const ActionMenuItemStyled = styled(MenuItem, {
+  shouldForwardProp: (prop) => prop !== "destructive",
+})<{ destructive?: boolean }>(({ theme, destructive }) => ({
+  color: destructive ? theme.palette.error.main : "inherit",
+  minHeight: 44,
+  padding: theme.spacing(1, 1.5),
+  borderRadius: 8,
+  "&:hover": {
+    backgroundColor: destructive ? theme.palette.error.light : theme.palette.action.hover,
+  },
+}));

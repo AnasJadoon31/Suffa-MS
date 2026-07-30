@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, CheckCircle, Info, X } from "lucide-react";
 import IconButton from "@mui/material/IconButton";
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
 import { useTranslation } from "react-i18next";
 import { API_NOTIFICATION_EVENT, type ApiNotificationDetail } from "../../lib/apiNotifications";
 
@@ -80,11 +82,11 @@ export function SnackbarProvider({ children }: Readonly<{ children: ReactNode }>
   return (
     <SnackbarContext.Provider value={value}>
       {children}
-      <div className="snackbarContainer" aria-live="polite" aria-atomic="false">
+      <SnackbarContainer aria-live="polite" aria-atomic="false">
         {items.map((item) => (
           <SnackbarToast key={item.id} item={item} onDismiss={dismiss} t={t} />
         ))}
-      </div>
+      </SnackbarContainer>
     </SnackbarContext.Provider>
   );
 }
@@ -111,14 +113,53 @@ function SnackbarToast({
   }[item.variant];
 
   return (
-    <div className={`snackbarToast ${item.variant}`} role="status" aria-describedby={descriptionId}>
-      <span className="snackbarIcon" aria-hidden="true">{icon}</span>
-      <span id={descriptionId} className="snackbarMessage">{item.message}</span>
+    <SnackbarToastRoot variant={item.variant} role="status" aria-describedby={descriptionId}>
+      <Box aria-hidden="true" sx={{ display: "flex", alignItems: "center" }}>{icon}</Box>
+      <Box id={descriptionId} component="span" sx={{ flex: 1 }}>{item.message}</Box>
       {item.dismissible && (
-        <IconButton type="button" className="iconButton snackbarDismiss" aria-label={t("dismissLabel")} onClick={() => onDismiss(item.id)} size="small">
+        <IconButton type="button" aria-label={t("dismissLabel")} onClick={() => onDismiss(item.id)} size="small">
           <X size={16} />
         </IconButton>
       )}
-    </div>
+    </SnackbarToastRoot>
   );
 }
+
+/* ------------------------------------------------------------------ styled components */
+
+export const SnackbarContainer = styled(Box)(({ theme }) => ({
+  position: "fixed",
+  bottom: theme.spacing(2),
+  left: "50%",
+  transform: "translateX(-50%)",
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(1),
+  zIndex: theme.zIndex.snackbar,
+  maxWidth: "90vw",
+  width: 400,
+}));
+
+export const SnackbarToastRoot = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "variant",
+})<{ variant: SnackbarVariant }>(({ theme, variant }) => {
+  const variantColors = {
+    success: { bg: theme.palette.success.main, text: theme.palette.success.contrastText },
+    error: { bg: theme.palette.error.main, text: theme.palette.error.contrastText },
+    warning: { bg: theme.palette.warning.main, text: theme.palette.warning.contrastText },
+    info: { bg: theme.palette.grey[800], text: theme.palette.grey[50] },
+  }[variant];
+
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(1.5),
+    padding: theme.spacing(1.5, 2),
+    borderRadius: 12,
+    backgroundColor: variantColors.bg,
+    color: variantColors.text,
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    boxShadow: theme.shadows[8],
+  };
+});

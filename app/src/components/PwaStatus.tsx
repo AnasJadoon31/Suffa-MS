@@ -1,6 +1,7 @@
 import { Download, RefreshCw, Smartphone, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { styled } from "@mui/material/styles";
 
 import { applyPwaUpdate, subscribePwaRegistration } from "../lib/pwaRegistration";
 import { Button } from "./ui/Button";
@@ -10,6 +11,14 @@ type InstallPromptEvent = Event & {
   prompt?: () => Promise<void>;
   userChoice?: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
+
+const PwaButton = styled(Button)(({ theme }) => ({
+  borderRadius: 999,
+  padding: theme.spacing(0.75, 1.5),
+  fontSize: "0.75rem",
+  minHeight: 32,
+  gap: theme.spacing(0.5),
+}));
 
 function isStandaloneMode() {
   if (typeof window === "undefined") return false;
@@ -86,12 +95,12 @@ export function PwaStatus() {
     if (choice?.outcome !== "dismissed") setInstallPrompt(null);
   }
 
-  if (!status) return <span className="pwaStatusProbe" data-pwa-status="idle" hidden />;
+  if (!status) return <span data-pwa-status="idle" hidden />;
 
   return (
-    <Button className={`pwaStatusChip pwaStatusChip-${status.key}`} type="button" title={status.title} aria-label={status.title} onClick={status.action}>
+    <PwaButton type="button" title={status.title} aria-label={status.title} onClick={status.action}>
       {status.icon}
       <span>{status.label}</span>
-    </Button>
+    </PwaButton>
   );
 }

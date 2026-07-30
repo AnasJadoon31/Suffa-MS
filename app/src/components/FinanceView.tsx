@@ -1,9 +1,15 @@
-import { Button } from "./ui/Button";
+import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FileDown, Landmark, MessageCircle, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Table from "@mui/material/Table";
+import TableHead from "@mui/material/TableHead";
+import TableBody from "@mui/material/TableBody";
+import TableRow from "@mui/material/TableRow";
+import TableCell from "@mui/material/TableCell";
 import { styled } from "@mui/material/styles";
 
 import { academicsApi, financeApi, type AcademicClass, type Donation, type Donor, type Payment, type PaymentCategory, type FinanceSummary, type StudentFinanceProfile, type DonorFinanceProfile } from "../lib/endpoints";
@@ -91,34 +97,34 @@ export function FinanceView({ tab = "contributions", onTabChange }: Readonly<{ t
         }]}
       >
         {canManage && tab !== "summary" && (
-          <Button className="secondaryAction" type="button" onClick={() => setShowCategory(true)}>
+          <SecondaryButton type="button" onClick={() => setShowCategory(true)}>
             <Plus size={16} /> {t("addCategoryBtn")}
-          </Button>
+          </SecondaryButton>
         )}
       </FilterBar>
       {canManage && showCategory && (
         <FormModal
-                title={t("addCategoryBtn")} onClose={() => setShowCategory(false)}
-                onSubmit={async (e) => {
-                          e.preventDefault();
-                          setError("");
-                          if (!categoryName) return;
-                          try {
-                            await financeApi.createCategory(categoryName);
-                            setCategoryName("");
-                            setShowCategory(false);
-                            await loadCategories();
-                          } catch (err: any) {
-                            setError(err.response?.data?.detail ?? t("failedAddCategory"));
-                          }
-                        }}
-                submitLabel={t("addCategoryBtn")}
-                submitIcon={<Plus size={16} />}
-              >
-                <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("tuitionExample")} /></label>
-              </FormModal>
+          title={t("addCategoryBtn")} onClose={() => setShowCategory(false)}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            if (!categoryName) return;
+            try {
+              await financeApi.createCategory(categoryName);
+              setCategoryName("");
+              setShowCategory(false);
+              await loadCategories();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedAddCategory"));
+            }
+          }}
+          submitLabel={t("addCategoryBtn")}
+          submitIcon={<Plus size={16} />}
+        >
+          <label>{t("categoryNameLabel")}<Input required value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder={t("tuitionExample")} /></label>
+        </FormModal>
       )}
-      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Typography color="error.main">{error}</Typography>}
 
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
@@ -220,73 +226,69 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
       >
         <DataViewToggle viewKey="finance-contributions" onChange={setViewMode} />
         {canManage && (
-          <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}>
+          <PrimaryButton type="button" onClick={() => setShowCreate(true)}>
             <Plus size={16} /> {t("recordPaymentBtn")}
-          </Button>
+          </PrimaryButton>
         )}
       </FilterBar>
       {canManage && showCreate && (
         <FormModal
-                title={t("recordPaymentBtn")} onClose={() => setShowCreate(false)}
-                onSubmit={async (e) => {
-                          e.preventDefault();
-                          setError("");
-                          const { student_id, category_id, amount, payment_date } = form;
-                          if (!student_id || !category_id || !amount || !payment_date) return;
-                          try {
-                            await financeApi.createPayment({ student_id, category_id, amount: Number(amount), payment_date, note: form.note || undefined });
-                            setForm({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
-                            setStudentSearch("");
-                            setShowCreate(false);
-                            await load();
-                          } catch (err: any) {
-                            setError(err.response?.data?.detail ?? t("failedRecordPayment"));
-                          }
-                        }}
-                submitLabel={t("recordPaymentBtn")}
-                submitIcon={<Plus size={16} />}
-              >
-                <SearchDropdown
-                          id="contribution-student"
-                          label={t("studentCol")}
-                          placeholder={t("studentSearchPlaceholder")}
-                          items={matchingStudents}
-                          value={studentSearch}
-                          getKey={(student) => student.id}
-                          getLabel={(student) => student.name}
-                          getDescription={(student) => student.admission_number}
-                          onQueryChange={(query) => {
-                            setStudentSearch(query);
-                            setForm({ ...form, student_id: "" });
-                          }}
-                          onSelect={(student) => {
-                            setStudentSearch(`${student.name} (${student.admission_number})`);
-                            setForm({ ...form, student_id: student.id });
-                          }}
-                          emptyLabel={t("noStudentsFound")}
-                        />
-
-              <label>
-                          {t("categoryCol")}
-                          <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
-                            <option value="">{t("selectEllipsis")}</option>
-                            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </Select>
-                        </label>
-
-              <label>{t("amountCol")}<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
-
-              <label>{t("dateCol")}<Input required type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></label>
-
-              <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
-              </FormModal>
+          title={t("recordPaymentBtn")} onClose={() => setShowCreate(false)}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            const { student_id, category_id, amount, payment_date } = form;
+            if (!student_id || !category_id || !amount || !payment_date) return;
+            try {
+              await financeApi.createPayment({ student_id, category_id, amount: Number(amount), payment_date, note: form.note || undefined });
+              setForm({ student_id: "", category_id: "", amount: "", payment_date: "", note: "" });
+              setStudentSearch("");
+              setShowCreate(false);
+              await load();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedRecordPayment"));
+            }
+          }}
+          submitLabel={t("recordPaymentBtn")}
+          submitIcon={<Plus size={16} />}
+        >
+          <SearchDropdown
+            id="contribution-student"
+            label={t("studentCol")}
+            placeholder={t("studentSearchPlaceholder")}
+            items={matchingStudents}
+            value={studentSearch}
+            getKey={(student) => student.id}
+            getLabel={(student) => student.name}
+            getDescription={(student) => student.admission_number}
+            onQueryChange={(query) => {
+              setStudentSearch(query);
+              setForm({ ...form, student_id: "" });
+            }}
+            onSelect={(student) => {
+              setStudentSearch(`${student.name} (${student.admission_number})`);
+              setForm({ ...form, student_id: student.id });
+            }}
+            emptyLabel={t("noStudentsFound")}
+          />
+          <label>
+            {t("categoryCol")}
+            <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+              <option value="">{t("selectEllipsis")}</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </label>
+          <label>{t("amountCol")}<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+          <label>{t("dateCol")}<Input required type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></label>
+          <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+        </FormModal>
       )}
       {!isLoading && error && <ErrorState message={error} />}
 
       {viewMode === "cards" ? (
         <CardsList>
           {isLoading && <LoadingState />}
-          {!isLoading && !error && visiblePayments.length === 0 && <p>{t("noContributionsYet")}</p>}
+          {!isLoading && !error && visiblePayments.length === 0 && <Typography>{t("noContributionsYet")}</Typography>}
           {!isLoading && !error && visiblePayments.map((p) => (
             <DataCard
               key={p.id}
@@ -315,36 +317,36 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
         </CardsList>
       ) : (
         <Box sx={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("studentCol")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("categoryCol")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("amountCol")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("dateCol")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("notesLabel")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("receiptCol")}</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table sx={{ width: "100%", borderCollapse: "collapse" }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("studentCol")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("categoryCol")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("amountCol")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("dateCol")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("notesLabel")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("receiptCol")}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {isLoading && (
-                <tr><td colSpan={6}><LoadingState /></td></tr>
+                <TableRow><TableCell colSpan={6}><LoadingState /></TableCell></TableRow>
               )}
               {!isLoading && !error && visiblePayments.length === 0 && (
-                <tr><td colSpan={6}><p>{t("noContributionsYet")}</p></td></tr>
+                <TableRow><TableCell colSpan={6}><Typography>{t("noContributionsYet")}</Typography></TableCell></TableRow>
               )}
               {!isLoading && !error && visiblePayments.map((p) => (
-                <tr key={p.id}>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>
-                    <Button className="secondaryAction" type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadContributions")))}>
+                <TableRow key={p.id}>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>
+                    <SecondaryButton type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadContributions")))}>
                       {p.student_name ?? t("deletedPersonLabel")}
-                    </Button>
-                  </td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{p.category_name ?? t("unknownLabel")}</td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{p.currency} {p.amount}</td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{p.payment_date}<HijriTag date={p.payment_date} /></td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{p.note ?? "—"}</td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>
+                    </SecondaryButton>
+                  </TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{p.category_name ?? t("unknownLabel")}</TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{p.currency} {p.amount}</TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{p.payment_date}<HijriTag date={p.payment_date} /></TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{p.note ?? "—"}</TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>
                     <ActionMenu items={[
                       { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadPaymentReceipt(p.id) },
                       ...(canManage ? [{
@@ -360,11 +362,11 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
                         },
                       }] : []),
                     ]} ariaLabel={`${t("actionsCol")}: ${p.student_name ?? t("deletedPersonLabel")}`} />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </Box>
       )}
       {profile && (
@@ -375,16 +377,16 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
               <dt>{t("phoneCol")}</dt><dd>{profile.phone || "—"}</dd>
               <dt>{t("addressCol")}</dt><dd>{profile.address || "—"}</dd>
             </Box>
-            <h4>{t("completePaymentHistoryLabel")}</h4>
+            <Typography variant="h6">{t("completePaymentHistoryLabel")}</Typography>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {profile.payments.length === 0 && <p>{t("noContributionsYet")}</p>}
+              {profile.payments.length === 0 && <Typography>{t("noContributionsYet")}</Typography>}
               {profile.payments.map((payment) => (
                 <Paper key={payment.id} variant="outlined" sx={{ p: 1.5 }}>
                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>{payment.payment_date}</span>
+                    <Typography component="span">{payment.payment_date}</Typography>
                     <strong>{payment.currency} {payment.amount}</strong>
                   </Box>
-                  <small>{payment.category_name ?? t("unknownLabel")} · {payment.note ?? "—"}</small>
+                  <Typography component="small" variant="caption">{payment.category_name ?? t("unknownLabel")} · {payment.note ?? "—"}</Typography>
                 </Paper>
               ))}
             </Box>
@@ -491,92 +493,87 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
       >
         <DataViewToggle viewKey="finance-donations" onChange={setViewMode} />
         {canManage && (
-          <Button className="secondaryAction" type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</Button>
+          <SecondaryButton type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</SecondaryButton>
         )}
         {canManage && (
-          <Button className="primaryAction" type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</Button>
+          <PrimaryButton type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</PrimaryButton>
         )}
       </FilterBar>
       {canManage && createModal === "donor" && (
         <FormModal
-                title={t("addDonorBtn")} onClose={() => setCreateModal(null)}
-                onSubmit={async (e) => {
-                          e.preventDefault();
-                          setError("");
-                          if (!donorForm.name || !donorForm.contact) return;
-                          try {
-                            await financeApi.createDonor(donorForm);
-                            setDonorForm({ name: "", contact: "" });
-                            setCreateModal(null);
-                            await Promise.all([loadDonors(), loadDonations()]);
-                          } catch (err: any) {
-                            setError(err.response?.data?.detail ?? t("failedAddDonor"));
-                          }
-                        }}
-                submitLabel={t("addDonorBtn")}
-                submitIcon={<Plus size={16} />}
-              >
-                <label>{t("donorNameLabel")}<Input required value={donorForm.name} onChange={(e) => setDonorForm({ ...donorForm, name: e.target.value })} /></label>
-
-              <label>{t("contactCol")}<Input required value={donorForm.contact} onChange={(e) => setDonorForm({ ...donorForm, contact: e.target.value })} /></label>
-              </FormModal>
+          title={t("addDonorBtn")} onClose={() => setCreateModal(null)}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            if (!donorForm.name || !donorForm.contact) return;
+            try {
+              await financeApi.createDonor(donorForm);
+              setDonorForm({ name: "", contact: "" });
+              setCreateModal(null);
+              await Promise.all([loadDonors(), loadDonations()]);
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedAddDonor"));
+            }
+          }}
+          submitLabel={t("addDonorBtn")}
+          submitIcon={<Plus size={16} />}
+        >
+          <label>{t("donorNameLabel")}<Input required value={donorForm.name} onChange={(e) => setDonorForm({ ...donorForm, name: e.target.value })} /></label>
+          <label>{t("contactCol")}<Input required value={donorForm.contact} onChange={(e) => setDonorForm({ ...donorForm, contact: e.target.value })} /></label>
+        </FormModal>
       )}
 
       {canManage && createModal === "donation" && (
         <FormModal
-                title={t("recordDonationBtn")} onClose={() => setCreateModal(null)}
-                onSubmit={async (e) => {
-                          e.preventDefault();
-                          setError("");
-                          const { donor_id, category_id, amount, donation_date } = form;
-                          if (!donor_id || !category_id || !amount || !donation_date) return;
-                          try {
-                            await financeApi.createDonation({ donor_id, category_id, amount: Number(amount), donation_date, note: form.note || undefined });
-                            setForm({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
-                            setDonorSearch("");
-                            setCreateModal(null);
-                            await loadDonations();
-                          } catch (err: any) {
-                            setError(err.response?.data?.detail ?? t("failedRecordPayment"));
-                          }
-                        }}
-                submitLabel={t("recordDonationBtn")}
-                submitIcon={<Plus size={16} />}
-              >
-                <SearchDropdown
-                          id="donation-donor"
-                          label={t("donorCol")}
-                          placeholder={t("donorSearchPlaceholder")}
-                          items={matchingDonors}
-                          value={donorSearch}
-                          getKey={(donor) => donor.id}
-                          getLabel={(donor) => donor.name}
-                          getDescription={(donor) => donor.contact}
-                          onQueryChange={(query) => {
-                            setDonorSearch(query);
-                            setForm({ ...form, donor_id: "" });
-                          }}
-                          onSelect={(donor) => {
-                            setDonorSearch(`${donor.name} (${donor.contact})`);
-                            setForm({ ...form, donor_id: donor.id });
-                          }}
-                          emptyLabel={t("noDonorsYet")}
-                        />
-
-              <label>
-                          {t("categoryCol")}
-                          <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
-                            <option value="">{t("selectEllipsis")}</option>
-                            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </Select>
-                        </label>
-
-              <label>{t("amountCol")}<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
-
-              <label>{t("dateCol")}<Input required type="date" value={form.donation_date} onChange={(e) => setForm({ ...form, donation_date: e.target.value })} /></label>
-
-              <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
-              </FormModal>
+          title={t("recordDonationBtn")} onClose={() => setCreateModal(null)}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            const { donor_id, category_id, amount, donation_date } = form;
+            if (!donor_id || !category_id || !amount || !donation_date) return;
+            try {
+              await financeApi.createDonation({ donor_id, category_id, amount: Number(amount), donation_date, note: form.note || undefined });
+              setForm({ donor_id: "", category_id: "", amount: "", donation_date: "", note: "" });
+              setDonorSearch("");
+              setCreateModal(null);
+              await loadDonations();
+            } catch (err: any) {
+              setError(err.response?.data?.detail ?? t("failedRecordPayment"));
+            }
+          }}
+          submitLabel={t("recordDonationBtn")}
+          submitIcon={<Plus size={16} />}
+        >
+          <SearchDropdown
+            id="donation-donor"
+            label={t("donorCol")}
+            placeholder={t("donorSearchPlaceholder")}
+            items={matchingDonors}
+            value={donorSearch}
+            getKey={(donor) => donor.id}
+            getLabel={(donor) => donor.name}
+            getDescription={(donor) => donor.contact}
+            onQueryChange={(query) => {
+              setDonorSearch(query);
+              setForm({ ...form, donor_id: "" });
+            }}
+            onSelect={(donor) => {
+              setDonorSearch(`${donor.name} (${donor.contact})`);
+              setForm({ ...form, donor_id: donor.id });
+            }}
+            emptyLabel={t("noDonorsYet")}
+          />
+          <label>
+            {t("categoryCol")}
+            <Select required value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+              <option value="">{t("selectEllipsis")}</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </label>
+          <label>{t("amountCol")}<Input required type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+          <label>{t("dateCol")}<Input required type="date" value={form.donation_date} onChange={(e) => setForm({ ...form, donation_date: e.target.value })} /></label>
+          <label>{t("notesLabel")}<Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+        </FormModal>
       )}
       {donorLoadError && <ErrorState message={donorLoadError} />}
       {!isLoading && error && <ErrorState message={error} />}
@@ -584,7 +581,7 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
       {viewMode === "cards" ? (
         <CardsList>
           {isLoading && <LoadingState />}
-          {!isLoading && !error && visibleDonations.length === 0 && <p>{t("noDonationsYet")}</p>}
+          {!isLoading && !error && visibleDonations.length === 0 && <Typography>{t("noDonationsYet")}</Typography>}
           {!isLoading && !error && visibleDonations.map((d) => (
             <DataCard
               key={d.id}
@@ -613,36 +610,36 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
         </CardsList>
       ) : (
         <Box sx={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("donorCol")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("categoryCol")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("amountCol")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("dateCol")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("notesLabel")}</th>
-                <th style={{ textAlign: "left", padding: "12px", borderBottom: "2px solid #e0e6df" }}>{t("receiptCol")}</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table sx={{ width: "100%", borderCollapse: "collapse" }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("donorCol")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("categoryCol")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("amountCol")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("dateCol")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("notesLabel")}</TableCell>
+                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("receiptCol")}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {isLoading && (
-                <tr><td colSpan={6}><LoadingState /></td></tr>
+                <TableRow><TableCell colSpan={6}><LoadingState /></TableCell></TableRow>
               )}
               {!isLoading && !error && visibleDonations.length === 0 && (
-                <tr><td colSpan={6}><p>{t("noDonationsYet")}</p></td></tr>
+                <TableRow><TableCell colSpan={6}><Typography>{t("noDonationsYet")}</Typography></TableCell></TableRow>
               )}
               {!isLoading && !error && visibleDonations.map((d) => (
-                <tr key={d.id}>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>
-                    <Button className="secondaryAction" type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDonations")))}>
+                <TableRow key={d.id}>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>
+                    <SecondaryButton type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDonations")))}>
                       {d.donor_name ?? t("deletedPersonLabel")}
-                    </Button>
-                  </td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{d.category_name ?? t("unknownLabel")}</td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{d.currency} {d.amount}</td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{d.donation_date}<HijriTag date={d.donation_date} /></td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>{d.note ?? "—"}</td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #e0e6df" }}>
+                    </SecondaryButton>
+                  </TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{d.category_name ?? t("unknownLabel")}</TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{d.currency} {d.amount}</TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{d.donation_date}<HijriTag date={d.donation_date} /></TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{d.note ?? "—"}</TableCell>
+                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>
                     <ActionMenu items={[
                       { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadDonationReceipt(d.id) },
                       ...(canManage ? [{
@@ -658,11 +655,11 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
                         },
                       }] : []),
                     ]} ariaLabel={`${t("actionsCol")}: ${d.donor_name ?? t("deletedPersonLabel")}`} />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </Box>
       )}
       {profile && (
@@ -671,16 +668,16 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
             <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px" }}>
               <dt>{t("phoneCol")}</dt><dd>{profile.contact}</dd>
             </Box>
-            <h4>{t("completeDonationHistoryLabel")}</h4>
+            <Typography variant="h6">{t("completeDonationHistoryLabel")}</Typography>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {profile.donations.length === 0 && <p>{t("noDonationsYet")}</p>}
+              {profile.donations.length === 0 && <Typography>{t("noDonationsYet")}</Typography>}
               {profile.donations.map((donation) => (
                 <Paper key={donation.id} variant="outlined" sx={{ p: 1.5 }}>
                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>{donation.donation_date}</span>
+                    <Typography component="span">{donation.donation_date}</Typography>
                     <strong>{donation.currency} {donation.amount}</strong>
                   </Box>
-                  <small>{donation.category_name ?? t("unknownLabel")} · {donation.note ?? "—"}</small>
+                  <Typography component="small" variant="caption">{donation.category_name ?? t("unknownLabel")} · {donation.note ?? "—"}</Typography>
                 </Paper>
               ))}
             </Box>
@@ -723,7 +720,7 @@ function SummaryTab() {
           { key: "summary-to", type: "date", label: t("toLabel"), value: range.date_to, onChange: (value) => setRange({ ...range, date_to: value }) },
         ]}
       >
-        <Button className="secondaryAction" type="button" onClick={load}>{t("refreshBtn")}</Button>
+        <SecondaryButton type="button" onClick={load}>{t("refreshBtn")}</SecondaryButton>
       </FilterBar>
       {isLoading && <LoadingState />}
       {!isLoading && error && <ErrorState message={error} />}
@@ -737,7 +734,7 @@ function SummaryTab() {
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 2 }}>
             {Object.entries(summary.by_category).map(([name, amount]) => (
               <Paper key={name} variant="outlined" sx={{ p: 1.5, display: "flex", justifyContent: "space-between" }}>
-                <span>{name}</span>
+                <Typography component="span">{name}</Typography>
                 <strong>{amount}</strong>
               </Paper>
             ))}

@@ -1,5 +1,9 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
 import { Download, Edit2, FolderPlus, Plus, Trash2, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -116,15 +120,15 @@ export function ResourcesView() {
   }, [classFilter]);
 
   return (
-    <PageSection className="resourcesPanel">
+    <PageSection>
       <PageHeader
         title={t("resources")}
         notice={t("descResources")}
         actions={canManage && (
-          <div className="resourceHeaderActions">
-            <Button className="secondaryAction" type="button" onClick={() => setShowCategoryForm(true)}><FolderPlus size={16} /> {t("addCategoryBtn")}</Button>
-            <Button className="primaryAction" type="button" onClick={() => setShowResourceForm(true)}><Plus size={16} /> {t("addResourceBtn")}</Button>
-          </div>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Button type="button" onClick={() => setShowCategoryForm(true)}><FolderPlus size={16} /> {t("addCategoryBtn")}</Button>
+            <Button type="button" onClick={() => setShowResourceForm(true)}><Plus size={16} /> {t("addResourceBtn")}</Button>
+          </Box>
         )}
       />
 
@@ -156,7 +160,7 @@ export function ResourcesView() {
             </FormStack>
           </FormModal>}
 
-      <InlineFilter className="pwaFilterStack resourcesFilter" filters={[
+      <InlineFilter filters={[
         {
           key: "resource-category", type: "select", label: t("categoryCol"), value: categoryFilter,
           placeholder: t("allCategories"), onChange: setCategoryFilter,
@@ -176,7 +180,6 @@ export function ResourcesView() {
       ]}>
         {canManage && (
           <CheckboxField
-            className="resourceMineToggle"
             checked={mineOnly}
             onChange={(e) => setMineOnly(e.target.checked)}
             label={t("myUploadsOnlyLabel")}
@@ -244,8 +247,8 @@ export function ResourcesView() {
               <AudiencePicker value={audience} onChange={setAudience} />
             </FormStack>
           </FormModal>}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      {notice && <p className="notice">{notice}</p>}
+      {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+      {notice && <Alert severity="success" sx={{ mt: 1 }}>{notice}</Alert>}
 
       <DataTable<ResourceItem>
         columns={[

@@ -1,7 +1,9 @@
-import { Button } from "./ui/Button";
+import { Button, PrimaryButton, SecondaryButton } from "./ui/Button";
 import { Input, Select, CheckboxField } from "./ui/Field";
 import { Modal } from "./ui/Modal";
 import Paper from "@mui/material/Paper";
+import Box from "@mui/material/Box";
+import { styled } from "@mui/material/styles";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type AcademicSession, type AcademicClass, academicsApi } from "../lib/endpoints";
@@ -12,6 +14,14 @@ interface RolloverWizardProps {
   onClose: () => void;
   onSuccess: () => void;
 }
+
+const StyledFieldset = styled("fieldset")(({ theme }) => ({
+  padding: theme.spacing(1.5),
+  marginBottom: theme.spacing(1.5),
+  borderRadius: theme.shape.borderRadius,
+  border: `1px solid ${theme.palette.divider}`,
+  backgroundColor: theme.palette.background.default,
+}));
 
 export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: RolloverWizardProps) {
   const { t } = useTranslation();
@@ -58,85 +68,91 @@ export function RolloverWizard({ sourceSession, classes, onClose, onSuccess }: R
 
   return (
     <Modal title={t("rolloverHeading", { name: sourceSession.name })} onClose={onClose} maxWidth={600}>
-        {error && <div style={{ color: "var(--error)", padding: "8px", backgroundColor: "var(--error-light)", borderRadius: "4px" }}>{error}</div>}
+        {error && (
+          <Box sx={{ color: "error.main", padding: "8px", backgroundColor: "error.light", borderRadius: 1 }}>
+            {error}
+          </Box>
+        )}
 
         {step === 1 && (
-          <form onSubmit={handleNext} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <p style={{ margin: 0, color: "var(--muted)" }}>{t("rolloverStep1Hint")}</p>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              {t("newSessionNameLabel")}
-              <Input className="inputField" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("academicSessionExample")} />
-            </label>
-            <div className="formGridTwo">
-              <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                {t("gregorianStartLabel")}
-                <Input className="inputField" type="date" required value={form.gregorian_start} onChange={(e) => setForm({ ...form, gregorian_start: e.target.value })} />
-              </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                {t("gregorianEndLabel")}
-                <Input className="inputField" type="date" required value={form.gregorian_end} onChange={(e) => setForm({ ...form, gregorian_end: e.target.value })} />
-              </label>
-            </div>
-            <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              {t("hijriSpanLabel")}
-              <Input className="inputField" required value={form.hijri_span} onChange={(e) => setForm({ ...form, hijri_span: e.target.value })} placeholder="1448-1449" />
-            </label>
-            <Paper component="fieldset" variant="outlined" className="sectionPicker">
-              <legend>{t("rolloverCopyLegend")}</legend>
-              <CheckboxField
-                checked={form.copy_timetable}
-                onChange={(e) => setForm({ ...form, copy_timetable: e.target.checked })}
-                label={t("copyTimetableLabel")}
-              />
-              <CheckboxField
-                checked={form.copy_holidays}
-                onChange={(e) => setForm({ ...form, copy_holidays: e.target.checked })}
-                label={t("copyHolidaysLabel")}
-              />
-              {form.copy_holidays && (
+          <form onSubmit={handleNext}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <Box component="p" sx={{ margin: 0, color: "text.secondary" }}>{t("rolloverStep1Hint")}</Box>
+              <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                {t("newSessionNameLabel")}
+                <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("academicSessionExample")} />
+              </Box>
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+                <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                  {t("gregorianStartLabel")}
+                  <Input type="date" required value={form.gregorian_start} onChange={(e) => setForm({ ...form, gregorian_start: e.target.value })} />
+                </Box>
+                <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                  {t("gregorianEndLabel")}
+                  <Input type="date" required value={form.gregorian_end} onChange={(e) => setForm({ ...form, gregorian_end: e.target.value })} />
+                </Box>
+              </Box>
+              <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                {t("hijriSpanLabel")}
+                <Input required value={form.hijri_span} onChange={(e) => setForm({ ...form, hijri_span: e.target.value })} placeholder="1448-1449" />
+              </Box>
+              <StyledFieldset>
+                <legend>{t("rolloverCopyLegend")}</legend>
                 <CheckboxField
-                  checked={form.shift_holiday_dates}
-                  onChange={(e) => setForm({ ...form, shift_holiday_dates: e.target.checked })}
-                  label={t("shiftHolidayDatesLabel")}
+                  checked={form.copy_timetable}
+                  onChange={(e) => setForm({ ...form, copy_timetable: e.target.checked })}
+                  label={t("copyTimetableLabel")}
                 />
-              )}
-            </Paper>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "16px" }}>
-              <Button type="button" className="secondaryAction" onClick={onClose}>{t("cancelBtn")}</Button>
-              <Button type="submit" className="primaryAction">{t("nextBtn")}</Button>
-            </div>
+                <CheckboxField
+                  checked={form.copy_holidays}
+                  onChange={(e) => setForm({ ...form, copy_holidays: e.target.checked })}
+                  label={t("copyHolidaysLabel")}
+                />
+                {form.copy_holidays && (
+                  <CheckboxField
+                    checked={form.shift_holiday_dates}
+                    onChange={(e) => setForm({ ...form, shift_holiday_dates: e.target.checked })}
+                    label={t("shiftHolidayDatesLabel")}
+                  />
+                )}
+              </StyledFieldset>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, marginTop: 2 }}>
+                <SecondaryButton type="button" onClick={onClose}>{t("cancelBtn")}</SecondaryButton>
+                <PrimaryButton type="submit">{t("nextBtn")}</PrimaryButton>
+              </Box>
+            </Box>
           </form>
         )}
 
         {step === 2 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <p style={{ margin: 0, color: "var(--muted)" }}>{t("rolloverStep2Hint")}</p>
-            <div className="dataTable rolloverMappingTable">
-              <div className="dataRow header">
-                <span>{t("currentClassCol", { name: sourceSession.name })}</span>
-                <span>{t("nextClassCol", { name: form.name })}</span>
-              </div>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box component="p" sx={{ margin: 0, color: "text.secondary" }}>{t("rolloverStep2Hint")}</Box>
+            <Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, padding: "10px 0", borderBottom: "2px solid", borderColor: "divider", fontWeight: 700, fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "text.secondary" }}>
+                <Box sx={{ flex: 1, minWidth: 80 }}>{t("currentClassCol", { name: sourceSession.name })}</Box>
+                <Box sx={{ flex: 1, minWidth: 80 }}>{t("nextClassCol", { name: form.name })}</Box>
+              </Box>
               {classes.map(c => (
-                <div className="dataRow" key={c.id}>
-                  <span data-label={t("currentClassCol", { name: sourceSession.name })}>{c.name}</span>
-                  <div data-label={t("nextClassCol", { name: form.name })}>
-                  <Select className="inputField" value={mappings[c.id] || ""} onChange={(e) => setMappings({ ...mappings, [c.id]: e.target.value })}>
-                    <option value="">{t("graduateOption")}</option>
-                    {classes.map(targetClass => (
-                      <option key={targetClass.id} value={targetClass.id}>{targetClass.name}</option>
-                    ))}
-                  </Select>
-                  </div>
-                </div>
+                <Box key={c.id} sx={{ display: "flex", alignItems: "center", gap: 1.5, padding: "10px 0", borderBottom: "1px solid", borderColor: "divider", fontSize: "0.85rem" }}>
+                  <Box component="span" data-label={t("currentClassCol", { name: sourceSession.name })} sx={{ flex: 1, minWidth: 80 }}>{c.name}</Box>
+                  <Box data-label={t("nextClassCol", { name: form.name })} sx={{ flex: 1, minWidth: 80 }}>
+                    <Select value={mappings[c.id] || ""} onChange={(e) => setMappings({ ...mappings, [c.id]: e.target.value })}>
+                      <option value="">{t("graduateOption")}</option>
+                      {classes.map(targetClass => (
+                        <option key={targetClass.id} value={targetClass.id}>{targetClass.name}</option>
+                      ))}
+                    </Select>
+                  </Box>
+                </Box>
               ))}
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "16px" }}>
-              <Button type="button" className="secondaryAction" onClick={() => setStep(1)} disabled={loading}>{t("backBtn")}</Button>
-              <Button type="button" className="primaryAction" onClick={handleSubmit} disabled={loading}>
+            </Box>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, marginTop: 2 }}>
+              <SecondaryButton type="button" onClick={() => setStep(1)} disabled={loading}>{t("backBtn")}</SecondaryButton>
+              <PrimaryButton type="button" onClick={handleSubmit} disabled={loading}>
                 {loading ? t("processingLabel") : t("completeRolloverBtn")}
-              </Button>
-            </div>
-          </div>
+              </PrimaryButton>
+            </Box>
+          </Box>
         )}
     </Modal>
   );

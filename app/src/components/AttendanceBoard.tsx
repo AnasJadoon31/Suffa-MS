@@ -1,4 +1,4 @@
-import { Button } from "./ui/Button";
+import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
 import {
   ArrowLeft,
   BookOpen,
@@ -13,9 +13,10 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButton";
-import { styled } from "@mui/material/styles";
+import { styled, useTheme } from "@mui/material/styles";
 
 import type { AttendanceStatus } from "../data/mockData";
 import { AttendanceCalendar, monthRange, toDateKey, type ClassDayStats, type HolidayMarkers, type StudentDayStatus } from "./AttendanceCalendar";
@@ -178,8 +179,7 @@ function TeacherAttendancePanel() {
         searchPlaceholder={t("searchTeacherPlaceholder")}
       >
         {(teacherSearch || selectedTeacherId) && (
-          <Button
-            className="secondaryAction"
+          <SecondaryButton
             type="button"
             onClick={() => {
               setTeacherSearch("");
@@ -187,13 +187,13 @@ function TeacherAttendancePanel() {
             }}
           >
             {t("clearBtn")}
-          </Button>
+          </SecondaryButton>
         )}
       </FilterBar>
-      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Typography color="error.main">{error}</Typography>}
 
       <RosterList>
-        {logs.length === 0 && <p>{t("noTeacherAttendanceLogs")}</p>}
+        {logs.length === 0 && <Typography>{t("noTeacherAttendanceLogs")}</Typography>}
         {logs.map((entry) => (
           <DataCard
             key={entry.id}
@@ -262,7 +262,7 @@ function AttendanceHistoryCards({
 
   return (
     <RosterList>
-      {entries.length === 0 && <p>{t("noAttendanceHistory")}</p>}
+      {entries.length === 0 && <Typography>{t("noAttendanceHistory")}</Typography>}
       {entries.map((entry) => (
         <DataCard
           key={entry.id}
@@ -674,35 +674,36 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setHasUnsavedMarks(false);
   }
 
+  const theme = useTheme();
   return (
     <section>
-      <header style={{ marginBottom: 16 }}>
-        <div>
-          <span style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#0b4f49" }}>{headerEyebrow}</span>
-          <h2 style={{ margin: "4px 0" }}>{headerTitle}</h2>
+      <Box sx={{ mb: 2 }}>
+        <Box>
+          <Typography variant="caption" sx={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: theme.palette.teal.dark }}>{headerEyebrow}</Typography>
+          <Typography variant="h5" sx={{ my: 0.5 }}>{headerTitle}</Typography>
           {selectedClass?.course_names.length ? (
-            <p style={{ color: "#5f6d67", margin: 0 }}>{selectedClass.course_names.join(", ")}</p>
+            <Typography color="text.secondary">{selectedClass.course_names.join(", ")}</Typography>
           ) : null}
-        </div>
+        </Box>
         {selectedClassId && (
-          <div style={{ marginTop: 8 }}>
-            <Button className="secondaryAction" type="button" onClick={() => void returnToClasses()}>
+          <Box sx={{ mt: 1 }}>
+            <SecondaryButton type="button" onClick={() => void returnToClasses()}>
               <ArrowLeft size={17} />
               {t("classesHeading")}
-            </Button>
-          </div>
+            </SecondaryButton>
+          </Box>
         )}
-      </header>
+      </Box>
 
-      {error && <p style={{ color: "var(--rose)" }}>{error}</p>}
-      {saveMessage && <p>{saveMessage}</p>}
+      {error && <Typography color="error.main">{error}</Typography>}
+      {saveMessage && <Typography>{saveMessage}</Typography>}
 
       {lockedEntries.length > 0 && (
-        <div style={{ padding: 12, backgroundColor: "#fdf3e2", borderRadius: 12, marginBottom: 16 }}>
-          <p>
+        <Paper sx={{ p: 1.5, backgroundColor: "warning.light", borderRadius: 3, mb: 2 }} variant="outlined">
+          <Typography>
             {lockedEntries.length} entr{lockedEntries.length === 1 ? "y" : "ies"} rejected - attendance day is locked
             or covered by approved leave.
-          </p>
+          </Typography>
           {canOverride ? (
             <ul>
               {lockedEntries.map((entry) => (
@@ -715,36 +716,61 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               ))}
             </ul>
           ) : (
-            <p>{t("askPrincipalOverride")}</p>
+            <Typography>{t("askPrincipalOverride")}</Typography>
           )}
-        </div>
+        </Paper>
       )}
 
       {canManageTeacherAttendance && (
         <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-          <Button
-            className={attendanceMode === "students" ? "primaryAction" : "secondaryAction"}
-            type="button"
-            onClick={async () => {
-              if (!(await confirmDiscardUnsavedMarks())) return;
-              setAttendanceMode("students");
-              setSearchParams({});
-            }}
-          >
-            {t("studentAttendanceHeading")}
-          </Button>
-          <Button
-            className={attendanceMode === "teachers" ? "primaryAction" : "secondaryAction"}
-            type="button"
-            onClick={async () => {
-              if (!(await confirmDiscardUnsavedMarks())) return;
-              setAttendanceMode("teachers");
-              clearAttendanceSelection();
-              setSearchParams({ mode: "teachers" });
-            }}
-          >
-            {t("teacherAttendanceHeading")}
-          </Button>
+          {attendanceMode === "students" ? (
+            <PrimaryButton
+              type="button"
+              onClick={async () => {
+                if (!(await confirmDiscardUnsavedMarks())) return;
+                setAttendanceMode("students");
+                setSearchParams({});
+              }}
+            >
+              {t("studentAttendanceHeading")}
+            </PrimaryButton>
+          ) : (
+            <SecondaryButton
+              type="button"
+              onClick={async () => {
+                if (!(await confirmDiscardUnsavedMarks())) return;
+                setAttendanceMode("students");
+                setSearchParams({});
+              }}
+            >
+              {t("studentAttendanceHeading")}
+            </SecondaryButton>
+          )}
+          {attendanceMode === "teachers" ? (
+            <PrimaryButton
+              type="button"
+              onClick={async () => {
+                if (!(await confirmDiscardUnsavedMarks())) return;
+                setAttendanceMode("teachers");
+                clearAttendanceSelection();
+                setSearchParams({ mode: "teachers" });
+              }}
+            >
+              {t("teacherAttendanceHeading")}
+            </PrimaryButton>
+          ) : (
+            <SecondaryButton
+              type="button"
+              onClick={async () => {
+                if (!(await confirmDiscardUnsavedMarks())) return;
+                setAttendanceMode("teachers");
+                clearAttendanceSelection();
+                setSearchParams({ mode: "teachers" });
+              }}
+            >
+              {t("teacherAttendanceHeading")}
+            </SecondaryButton>
+          )}
         </Box>
       )}
 
@@ -754,22 +780,22 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         <ClassGrid>
           {classes.flatMap((item) => item.sections.map((section) => (
             <ClassCard key={section.id} variant="outlined" onClick={() => void selectClass(item.id, section.id)}>
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 12, backgroundColor: "#e0e6df" }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 3, backgroundColor: "divider" }}>
                 <BookOpen size={18} />
-              </span>
+              </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <strong>{item.name} / {section.name}</strong>
-                <small style={{ display: "block", color: "#5f6d67" }}>{item.course_names.join(", ") || t("noCoursesAssigned")}</small>
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.8rem", color: "#5f6d67" }}>
+                <Typography component="small" variant="caption" sx={{ display: "block", color: "text.secondary" }}>{item.course_names.join(", ") || t("noCoursesAssigned")}</Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, fontSize: "0.8rem", color: "text.secondary" }}>
                   <UsersRound size={15} />
                   {t("studentCount", { count: section.student_count })}
-                </span>
+                </Box>
               </Box>
               <ChevronRight size={18} />
             </ClassCard>
           )))}
-          {!isLoadingClasses && classes.every((item) => item.sections.length === 0) && <p>{t("noAttendanceClasses")}</p>}
-          {isLoadingClasses && <p>{t("loadingLabel")}</p>}
+          {!isLoadingClasses && classes.every((item) => item.sections.length === 0) && <Typography>{t("noAttendanceClasses")}</Typography>}
+          {isLoadingClasses && <Typography>{t("loadingLabel")}</Typography>}
         </ClassGrid>
       )}
 
@@ -811,30 +837,54 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
             ]}
           />
           <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-            <Button
-              className={activeTab === "calendar" ? "primaryAction" : "secondaryAction"}
-              type="button"
-              onClick={async () => {
-                if (!(await confirmDiscardUnsavedMarks())) return;
-                setActiveTab("calendar");
-                setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "calendar" });
-              }}
-            >
-              {t("calendarTab")}
-            </Button>
-            <Button
-              className={activeTab === "studentHistory" ? "primaryAction" : "secondaryAction"}
-              type="button"
-              onClick={async () => {
-                if (!(await confirmDiscardUnsavedMarks())) return;
-                setActiveTab("studentHistory");
-                setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
-              }}
-            >
-              {t("studentAttendanceHistory")}
-            </Button>
+            {activeTab === "calendar" ? (
+              <PrimaryButton
+                type="button"
+                onClick={async () => {
+                  if (!(await confirmDiscardUnsavedMarks())) return;
+                  setActiveTab("calendar");
+                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "calendar" });
+                }}
+              >
+                {t("calendarTab")}
+              </PrimaryButton>
+            ) : (
+              <SecondaryButton
+                type="button"
+                onClick={async () => {
+                  if (!(await confirmDiscardUnsavedMarks())) return;
+                  setActiveTab("calendar");
+                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "calendar" });
+                }}
+              >
+                {t("calendarTab")}
+              </SecondaryButton>
+            )}
+            {activeTab === "studentHistory" ? (
+              <PrimaryButton
+                type="button"
+                onClick={async () => {
+                  if (!(await confirmDiscardUnsavedMarks())) return;
+                  setActiveTab("studentHistory");
+                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
+                }}
+              >
+                {t("studentAttendanceHistory")}
+              </PrimaryButton>
+            ) : (
+              <SecondaryButton
+                type="button"
+                onClick={async () => {
+                  if (!(await confirmDiscardUnsavedMarks())) return;
+                  setActiveTab("studentHistory");
+                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
+                }}
+              >
+                {t("studentAttendanceHistory")}
+              </SecondaryButton>
+            )}
           </Box>
-          {!selectedCourseId || !selectedSlotId ? <p>{t("chooseCoursePeriodPrompt")}</p> : null}
+          {!selectedCourseId || !selectedSlotId ? <Typography>{t("chooseCoursePeriodPrompt")}</Typography> : null}
         </>
       )}
 
@@ -855,8 +905,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
           />
 
           <section>
-            {isLoadingClassHistory && <p>{t("loadingLabel")}</p>}
-            {!isLoadingClassHistory && !selectedDate && <p>{t("selectDayPrompt")}</p>}
+            {isLoadingClassHistory && <Typography>{t("loadingLabel")}</Typography>}
+            {!isLoadingClassHistory && !selectedDate && <Typography>{t("selectDayPrompt")}</Typography>}
             {!isLoadingClassHistory && selectedDate && (
               <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mb: 1 }}>
                 <strong>{selectedDate}</strong>
@@ -866,7 +916,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
             {!isLoadingClassHistory && selectedDate && showMarkForm && (
               <RosterList>
-                {isLoadingRoster && <p>{t("loadingLabel")}</p>}
+                {isLoadingRoster && <Typography>{t("loadingLabel")}</Typography>}
                 {!isLoadingRoster && roster?.students.map((student) => {
                   const isApprovedLeaveLocked = approvedLeaveStudentIds.has(student.id);
                   const status = isApprovedLeaveLocked ? "leave" : marked[student.id];
@@ -902,32 +952,30 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                     />
                   );
                 })}
-                {!isLoadingRoster && roster?.students.length === 0 && <p>{t("noActiveStudentsToMark")}</p>}
+                {!isLoadingRoster && roster?.students.length === 0 && <Typography>{t("noActiveStudentsToMark")}</Typography>}
 
                 <SaveBar>
-                  <span>{t("outbox")}</span>
+                  <Typography component="span">{t("outbox")}</Typography>
                   <strong>{entries.length}</strong>
-                  <span>{t("markedStudents")}</span>
+                  <Typography component="span">{t("markedStudents")}</Typography>
                   <strong>{markedCount}</strong>
-                  <small>{t("outboxHelp")}</small>
-                  <Button
-                    className="primaryAction"
+                  <Typography component="small" variant="caption">{t("outboxHelp")}</Typography>
+                  <PrimaryButton
                     type="button"
                     onClick={() => saveAttendance()}
                     disabled={readOnly || !sessionId || !hasUnsavedMarks || markedCount === 0 || isSavingAttendance}
                   >
                     <Save size={18} />
                     {t("saveAttendance")}
-                  </Button>
-                  <Button
-                    className="secondaryAction"
+                  </PrimaryButton>
+                  <SecondaryButton
                     type="button"
                     onClick={() => sync()}
                     disabled={readOnly || isSyncing || entries.length === 0}
                   >
                     <CloudUpload size={18} />
                     {t("syncNow")}
-                  </Button>
+                  </SecondaryButton>
                 </SaveBar>
               </RosterList>
             )}
@@ -936,10 +984,10 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               <>
                 <AttendanceHistoryCards entries={selectedDayEntries} includeStudent />
                 {isSelectedToday && (
-                  <Button className="secondaryAction" type="button" onClick={startEditingToday}>
+                  <SecondaryButton type="button" onClick={startEditingToday}>
                     <Pencil size={16} />
                     {t("editAttendance")}
-                  </Button>
+                  </SecondaryButton>
                 )}
               </>
             )}
@@ -973,7 +1021,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 />
               ))}
             </RosterList>
-            {filteredStudents.length === 0 && <p>{t("noStudentsFound")}</p>}
+            {filteredStudents.length === 0 && <Typography>{t("noStudentsFound")}</Typography>}
           </Box>
 
           <Box>
@@ -990,8 +1038,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               holidayMarkers={holidayMarkers}
             />
             <section>
-              {isLoadingStudentHistory && <p>{t("loadingLabel")}</p>}
-              {!isLoadingStudentHistory && !studentSelectedDate && <p>{t("selectDayPrompt")}</p>}
+              {isLoadingStudentHistory && <Typography>{t("loadingLabel")}</Typography>}
+              {!isLoadingStudentHistory && !studentSelectedDate && <Typography>{t("selectDayPrompt")}</Typography>}
               {!isLoadingStudentHistory && studentSelectedDate && (
                 <>
                   <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mb: 1 }}>

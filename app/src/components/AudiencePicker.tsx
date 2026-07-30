@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
+import { styled } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 
 import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Course, type Scope, type Section } from "../lib/endpoints";
@@ -8,6 +9,32 @@ import { useAuth } from "../lib/AuthContext";
 import { Select, CheckboxField } from "./ui/Field";
 
 type Mode = "all" | "teachers" | "students" | "classes" | "sections" | "courses" | "users";
+
+const PickerWrapper = styled(Box)({
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+});
+
+const SectionPicker = styled(Paper)({
+  padding: 12,
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+});
+
+const FieldLabel = styled("label")({
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  fontSize: "0.875rem",
+});
+
+const HintText = styled("p")(({ theme }) => ({
+  margin: "0 0 6px",
+  color: theme.palette.text.secondary,
+  fontSize: "0.875rem",
+}));
 
 /**
  * Shared "who sees this" control for resources/forms/announcements —
@@ -92,8 +119,8 @@ export function AudiencePicker({
   };
 
   return (
-    <Box className="audiencePicker">
-      <label>
+    <PickerWrapper>
+      <FieldLabel>
         {t("audienceLabel")}
         <Select value={mode} onChange={(e) => setMode2(e.target.value as Mode)}>
           {user?.role !== "teacher" && <option value="all">{t("audienceEveryone")}</option>}
@@ -104,9 +131,9 @@ export function AudiencePicker({
           <option value="courses">{t("audienceCourses")}</option>
           {user?.role !== "teacher" && <option value="users">{t("audienceUsers")}</option>}
         </Select>
-      </label>
+      </FieldLabel>
       {mode === "classes" && (
-        <Paper variant="outlined" className="sectionPicker">
+        <SectionPicker variant="outlined">
           {classes.map((c) => (
             <CheckboxField
               key={c.id}
@@ -115,10 +142,10 @@ export function AudiencePicker({
               label={c.name}
             />
           ))}
-        </Paper>
+        </SectionPicker>
       )}
       {mode === "sections" && (
-        <Paper variant="outlined" className="sectionPicker">
+        <SectionPicker variant="outlined">
           {classes.flatMap((c) =>
             (sections[c.id] ?? []).map((s) => (
               <CheckboxField
@@ -129,11 +156,11 @@ export function AudiencePicker({
               />
             ))
           )}
-        </Paper>
+        </SectionPicker>
       )}
       {mode === "courses" && (
-        <Paper variant="outlined" className="sectionPicker">
-          <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectCoursesHint")}</p>
+        <SectionPicker variant="outlined">
+          <HintText>{t("selectCoursesHint")}</HintText>
           {courses.map((co) => (
             <CheckboxField
               key={co.id}
@@ -142,21 +169,21 @@ export function AudiencePicker({
               label={co.name}
             />
           ))}
-        </Paper>
+        </SectionPicker>
       )}
       {mode === "users" && (
-        <Paper variant="outlined" className="sectionPicker">
-          <p className="notice" style={{ margin: "0 0 6px" }}>{t("selectUsersHint")}</p>
+        <SectionPicker variant="outlined">
+          <HintText>{t("selectUsersHint")}</HintText>
           {people.map((p) => (
             <CheckboxField
               key={p.user_id}
               checked={(value.users ?? []).includes(p.user_id)}
               onChange={() => toggleId("users", p.user_id)}
-              label={<>{p.name} <small style={{ color: "var(--muted)" }}>({p.role === "teacher" ? t("teachers") : t("students")})</small></>}
+              label={<>{p.name} <small>({p.role === "teacher" ? t("teachers") : t("students")})</small></>}
             />
           ))}
-        </Paper>
+        </SectionPicker>
       )}
-    </Box>
+    </PickerWrapper>
   );
 }

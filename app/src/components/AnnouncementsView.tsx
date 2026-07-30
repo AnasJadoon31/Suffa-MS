@@ -1,4 +1,4 @@
-import { Button } from "./ui/Button";
+import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Megaphone, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -14,7 +14,54 @@ import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Chip from "@mui/material/Chip";
+import Alert from "@mui/material/Alert";
+import { styled } from "@mui/material/styles";
 
+const AnnouncementCard = styled(Paper)(({ theme }) => ({
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: 12,
+  marginBottom: theme.spacing(1.5),
+  padding: theme.spacing(2),
+  cursor: "pointer",
+  transition: "background-color 0.15s ease",
+  "&:hover": {
+    backgroundColor: theme.palette.action.hover,
+  },
+}));
+
+const AnnouncementHeader = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 1,
+}));
+
+const AnnouncementBody = styled(Box)(({ theme }) => ({
+  marginTop: "1rem",
+  marginLeft: 24,
+}));
+
+const AnnouncementMeta = styled(Box)(({ theme }) => ({
+  marginTop: "1rem",
+  color: theme.palette.text.secondary,
+  fontSize: "0.85rem",
+}));
+
+const AnnouncementActions = styled(Box)(({ theme }) => ({
+  display: "flex",
+  gap: 0.5,
+  marginTop: "0.5rem",
+}));
+
+const Badge = styled(Chip)(({ theme }) => ({
+  backgroundColor: theme.palette.mode === "dark" ? theme.palette.saffron.light : theme.palette.saffron.light,
+  color: theme.palette.saffron.contrastText,
+  fontWeight: 600,
+  fontSize: "0.75rem",
+}));
 
 function toScope(audience: string): Scope {
   if (audience === "students") return { all: false, classes: [], roles: ["student"] };
@@ -133,63 +180,63 @@ export function AnnouncementsView() {
   };
 
   return (
-    <PageSection className="announcementsPanel">
+    <PageSection>
       <PageHeader
         title={t("announcementsHeading")}
         notice={t("announcementsSubtitle")}
-        actions={canPost ? <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("postAnnouncementBtn")}</Button> : null}
+        actions={canPost ? <PrimaryButton type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("postAnnouncementBtn")}</PrimaryButton> : null}
       />
 
       {canPost && showCreate && (
         <FormModal
-                title={t("postAnnouncementBtn")} onClose={() => setShowCreate(false)}
-                onSubmit={handleCreate}
-                submitLabel={t("postAnnouncementBtn")}
-                submitIcon={<Plus size={16} />}
-              >
-                <FormStack>
-                  <FormField label={t("titleLabel")}>
-                    <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-                  </FormField>
-                  <FormRow>
-                    <FormField label={t("targetAudienceLabel")}>
-                      <Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
-                        <option value="all">{t("audienceEveryone")}</option>
-                        <option value="teachers">{t("teachers")}</option>
-                        <option value="students">{t("students")}</option>
-                      </Select>
-                    </FormField>
-                    <FormField label={t("announcementCategoryLabel")}>
-                      <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("announcementCategoryPlaceholder") ?? ""} list="announcement-categories" />
-                    </FormField>
-                  </FormRow>
-                  <FormField label={t("attachmentLinkLabel")}>
-                    <Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder={t("optionalPlaceholder")} />
-                  </FormField>
-                  <FormRow>
-                    <FormField label={t("publishAtLabel")}>
-                      <Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} />
-                    </FormField>
-                    <FormField label={t("expiresAtLabel")}>
-                      <Input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} />
-                    </FormField>
-                  </FormRow>
-                  <FormField label={t("bodyLabel")}>
-                    <RichTextEditor
-                      value={form.body}
-                      onChange={(html) => setForm({ ...form, body: html })}
-                      placeholder={t("announcementContentPlaceholder")}
-                    />
-                  </FormField>
-                </FormStack>
-              </FormModal>
+          title={t("postAnnouncementBtn")} onClose={() => setShowCreate(false)}
+          onSubmit={handleCreate}
+          submitLabel={t("postAnnouncementBtn")}
+          submitIcon={<Plus size={16} />}
+        >
+          <FormStack>
+            <FormField label={t("titleLabel")}>
+              <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            </FormField>
+            <FormRow>
+              <FormField label={t("targetAudienceLabel")}>
+                <Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
+                  <option value="all">{t("audienceEveryone")}</option>
+                  <option value="teachers">{t("teachers")}</option>
+                  <option value="students">{t("students")}</option>
+                </Select>
+              </FormField>
+              <FormField label={t("announcementCategoryLabel")}>
+                <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t("announcementCategoryPlaceholder") ?? ""} list="announcement-categories" />
+              </FormField>
+            </FormRow>
+            <FormField label={t("attachmentLinkLabel")}>
+              <Input value={form.attachment_link} onChange={(e) => setForm({ ...form, attachment_link: e.target.value })} placeholder={t("optionalPlaceholder")} />
+            </FormField>
+            <FormRow>
+              <FormField label={t("publishAtLabel")}>
+                <Input type="datetime-local" value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })} />
+              </FormField>
+              <FormField label={t("expiresAtLabel")}>
+                <Input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} />
+              </FormField>
+            </FormRow>
+            <FormField label={t("bodyLabel")}>
+              <RichTextEditor
+                value={form.body}
+                onChange={(html) => setForm({ ...form, body: html })}
+                placeholder={t("announcementContentPlaceholder")}
+              />
+            </FormField>
+          </FormStack>
+        </FormModal>
       )}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Alert severity="error" sx={{ mb: 1 }}><Typography>{error}</Typography></Alert>}
       <datalist id="announcement-categories">
         {knownCategories.map((c) => <option key={c} value={c} />)}
       </datalist>
 
-      <InlineFilter className="pwaFilterStack" filters={[
+      <InlineFilter filters={[
         ...(canPost ? [{ key: "audience", type: "tab" as const, value: tab, options: [
           { value: "all", label: t("audienceEveryone") },
           { value: "teachers", label: t("teachers") },
@@ -201,75 +248,76 @@ export function AnnouncementsView() {
         { key: "date-to", type: "input", inputType: "date", label: t("toLabel"), value: dates.date_to, onChange: (value) => setDates({ ...dates, date_to: value }) },
       ]} />
 
-      <div className="roster">
+      <Box>
         {isLoading && <LoadingState />}
         {!isLoading && loadError && <ErrorState message={loadError} />}
-        {!isLoading && !loadError && announcements.length === 0 && <p className="emptyState">{t("noAnnouncementsListYet")}</p>}
+        {!isLoading && !loadError && announcements.length === 0 && <Typography color="text.secondary">{t("noAnnouncementsListYet")}</Typography>}
         {!isLoading && !loadError && announcements.map((a) => (
-          <div className="rosterRow" key={a.id} style={{ alignItems: "flex-start", cursor: "pointer", transition: "background-color 0.15s ease" }} onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}>
-            <div style={{ flex: 1, padding: "0.5rem 0" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {expandedId === a.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <strong><Megaphone size={14} /> {a.title}</strong>
-                {a.category && <span className="badge">{a.category}</span>}
-              </div>
+          <AnnouncementCard key={a.id} onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Box sx={{ flex: 1 }}>
+                <AnnouncementHeader>
+                  {expandedId === a.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  <strong><Megaphone size={14} /> {a.title}</strong>
+                  {a.category && <Badge size="small" label={a.category} />}
+                </AnnouncementHeader>
+                
+                {expandedId === a.id ? (
+                  <AnnouncementBody>
+                    <div dangerouslySetInnerHTML={{ __html: a.body }} />
+                    {a.attachment_link && (
+                      <Box sx={{ mt: 1 }}>
+                        <Box component="a" href={a.attachment_link} target="_blank" rel="noreferrer" sx={{ fontWeight: 500 }}>{t("viewAttachmentLink")}</Box>
+                      </Box>
+                    )}
+                    <AnnouncementMeta>
+                      {t("announcementAudienceLine", { audience: t(audienceLabelKey[fromScope(a.audience_scope)]) })}
+                    </AnnouncementMeta>
+                  </AnnouncementBody>
+                ) : (
+                  <Box sx={{ ml: 3, color: "text.secondary", fontSize: "0.9rem", mt: 0.5 }}>
+                    {a.body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 100)}...
+                  </Box>
+                )}
+              </Box>
               
-              {expandedId === a.id ? (
-                <div style={{ marginTop: "1rem", marginLeft: "24px" }}>
-                  <div dangerouslySetInnerHTML={{ __html: a.body }} className="richTextContent" />
-                  {a.attachment_link && (
-                    <div style={{ marginTop: "1rem" }}>
-                      <a href={a.attachment_link} target="_blank" rel="noreferrer" style={{ fontWeight: 500, color: "var(--brand)" }}>{t("viewAttachmentLink")}</a>
-                    </div>
-                  )}
-                  <div style={{ marginTop: "1rem", color: "var(--slate-500)", fontSize: "0.85rem" }}>
-                    {t("announcementAudienceLine", { audience: t(audienceLabelKey[fromScope(a.audience_scope)]) })}
-                  </div>
-                </div>
-              ) : (
-                <div style={{ marginLeft: "24px", color: "var(--slate-500)", fontSize: "0.9rem", marginTop: "4px" }}>
-                  {a.body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 100)}...
-                </div>
-              )}
-            </div>
-            
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem", padding: "0.5rem 0" }}>
-              <small style={{ color: "var(--slate-500)" }}>{new Date(a.created_at).toLocaleString()}</small>
-              {canPost && expandedId === a.id && (
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }} onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    type="button"
-                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px 8px", cursor: "pointer" }}
-                    onClick={() => {
-                      setEditId(a.id);
-                      setEditForm({
-                        title: a.title,
-                        body: a.body,
-                        category: a.category || "",
-                        attachment_link: a.attachment_link || "",
-                        audience: fromScope(a.audience_scope),
-                        publish_at: a.publish_at ? new Date(a.publish_at).toISOString().slice(0, 16) : "",
-                        expires_at: a.expires_at ? new Date(a.expires_at).toISOString().slice(0, 16) : "",
-                      });
-                    }}
-                    title={t("editBtn")}
-                  >
-                    <Pencil size={14} />
-                  </Button>
-                  <Button
-                    type="button"
-                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px 8px", cursor: "pointer", color: "var(--rose)" }}
-                    onClick={() => handleDelete(a.id)}
-                    title={t("deleteBtn")}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
+              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
+                <Typography variant="caption" color="text.secondary">{new Date(a.created_at).toLocaleString()}</Typography>
+                {canPost && expandedId === a.id && (
+                  <AnnouncementActions onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setEditId(a.id);
+                        setEditForm({
+                          title: a.title,
+                          body: a.body,
+                          category: a.category || "",
+                          attachment_link: a.attachment_link || "",
+                          audience: fromScope(a.audience_scope),
+                          publish_at: a.publish_at ? new Date(a.publish_at).toISOString().slice(0, 16) : "",
+                          expires_at: a.expires_at ? new Date(a.expires_at).toISOString().slice(0, 16) : "",
+                        });
+                      }}
+                      title={t("editBtn")}
+                    >
+                      <Pencil size={14} />
+                    </Button>
+                    <Button
+                      type="button"
+                      color="error"
+                      onClick={() => handleDelete(a.id)}
+                      title={t("deleteBtn")}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </AnnouncementActions>
+                )}
+              </Box>
+            </Box>
+          </AnnouncementCard>
         ))}
-      </div>
+      </Box>
 
       {editId && (
         <FormModal

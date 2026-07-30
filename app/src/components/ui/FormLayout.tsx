@@ -3,7 +3,7 @@ import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Paper from "@mui/material/Paper";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, styled } from "@mui/material/styles";
 
 /**
  * FormStack — vertical container for form fields with consistent spacing.
@@ -102,12 +102,12 @@ export function FormActions({ children }: Readonly<{ children: ReactNode }>) {
  */
 export function FormField({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <span style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--muted, #5f6d67)" }}>
+    <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+      <Box component="span" sx={{ fontSize: "0.875rem", fontWeight: 500, color: "text.secondary" }}>
         {label}
-      </span>
+      </Box>
       {children}
-    </label>
+    </Box>
   );
 }
 
@@ -127,3 +127,48 @@ export function FormCard({ children }: Readonly<{ children: ReactNode }>) {
     </Paper>
   );
 }
+
+/* ------------------------------------------------------------------ styled components */
+
+export const StyledFormStack = styled(Stack)(({ theme }) => ({
+  width: "100%",
+}));
+
+export const StyledFormSection = styled(Box)(({ theme }) => ({
+  marginBottom: theme.spacing(3),
+}));
+
+export const StyledFormRow = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: theme.spacing(2),
+  [theme.breakpoints.up("sm")]: {
+    gridTemplateColumns: "1fr 1fr",
+  },
+}));
+
+export const StyledFormActions = styled(Box)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "row",
+  justifyContent: "flex-end",
+  gap: theme.spacing(1.5),
+  marginTop: theme.spacing(3),
+  paddingTop: theme.spacing(2),
+  borderTop: `1px solid ${theme.palette.divider}`,
+  [theme.breakpoints.down("sm")]: {
+    flexDirection: "column",
+    position: "sticky",
+    bottom: 0,
+    backgroundColor: theme.palette.background.paper,
+    marginX: -2,
+    paddingX: 2,
+    paddingBottom: 2,
+    zIndex: 1,
+  },
+}));
+
+export const StyledFormField = styled(Box)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(0.75),
+}));

@@ -1,5 +1,9 @@
 import { Button } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
 import { FileDown, LayoutGrid, List, Plus, Trash2, Upload, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -82,38 +86,38 @@ export function TimetableView({ mode = "grid", onModeChange }: Readonly<{ mode?:
     <PageSection>
       <PageHeader title={t("timetable")} notice={t("descTimetable")} />
 
-      <div className="formActions" style={{ marginBottom: 16 }}>
-        <Button className={viewMode === "grid" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("grid")}>
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+        <Button type="button" onClick={() => onModeChange?.("grid")}>
           <LayoutGrid size={16} /> {t("weeklyGridTab")}
         </Button>
         {!isTeacher && (
-          <Button className={viewMode === "list" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("list")}>
+          <Button type="button" onClick={() => onModeChange?.("list")}>
             <List size={16} /> {t("listTab")}
           </Button>
         )}
         {!isTeacher && (
-          <Button className={viewMode === "teachers" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("teachers")}>
+          <Button type="button" onClick={() => onModeChange?.("teachers")}>
             <Users size={16} /> {t("byTeacherTab")}
           </Button>
         )}
         {canManage && (
-          <Button className={viewMode === "import" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onModeChange?.("import")}>
+          <Button type="button" onClick={() => onModeChange?.("import")}>
             <Upload size={16} /> {t("importTab")}
           </Button>
         )}
         {canManage && (
-          <Button className="secondaryAction" type="button" onClick={() => operationsApi.exportTimetablePdf()}>
+          <Button type="button" onClick={() => operationsApi.exportTimetablePdf()}>
             <FileDown size={16} /> {t("exportTimetablePdfBtn")}
           </Button>
         )}
-      </div>
+      </Box>
 
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
 
       {!isLoading && !loadError && (
         <>
-          {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+          {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
 
           {viewMode === "grid" && (
             <GridView slots={visibleSlots} classes={classes} sections={sections} lockToOwn={isTeacher} />
@@ -172,81 +176,90 @@ function GridView({
   );
 
   return (
-    <section className="timetableGridSection">
-      <InlineFilter className="pwaFilterStack" filters={[
+    <Box component="section" sx={{ mb: 2 }}>
+      <InlineFilter filters={[
         { key: "class", type: "select", value: classId, placeholder: t("chooseClassEllipsis"), options: pickableClasses.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => { setClassId(value); setSectionId(""); } },
         { key: "section", type: "select", value: sectionId, placeholder: t("allSections"), disabled: !classId, options: pickableSections.map((s) => ({ value: s.id, label: s.name })), onChange: setSectionId },
       ]} />
 
       {!classId || !sectionId ? (
-        <p className="emptyState">{t("pickClassSectionPrompt")}</p>
+        <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("pickClassSectionPrompt")}</Typography>
       ) : gridPeriods.length === 0 ? (
-        <p className="emptyState">{t("noSlotsForSection")}</p>
+        <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noSlotsForSection")}</Typography>
       ) : (
         <>
-          <div className="timetableGrid" style={{ gridTemplateColumns: `auto repeat(${DAY_KEYS.length}, 1fr)` }}>
-            <div className="timetableGridCell timetableGridCorner" />
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: `auto repeat(${DAY_KEYS.length}, 1fr)`,
+              gap: 1,
+              overflowX: "auto",
+            }}
+          >
+            <Box sx={{ p: 1, fontWeight: 700 }} />
             {DAY_KEYS.map((day) => (
-              <div className="timetableGridCell timetableGridHeader" key={day}>{t(day)}</div>
+              <Box key={day} sx={{ p: 1, fontWeight: 700, textAlign: "center", borderBottom: 2, borderColor: "divider" }}>
+                {t(day)}
+              </Box>
             ))}
             {gridPeriods.map((period) => {
               const timeForPeriod = gridSlots.find((s) => s.period === period);
               return (
                 <Fragment key={period}>
-                  <div className="timetableGridCell timetableGridHeader">
+                  <Box sx={{ p: 1, fontWeight: 700, borderBottom: 1, borderColor: "divider" }}>
                     <strong>{t("periodLabel", { period })}</strong>
-                    {timeForPeriod && <small>{timeForPeriod.start_time}–{timeForPeriod.end_time}</small>}
-                  </div>
+                    {timeForPeriod && <Typography component="span" sx={{ display: "block", fontSize: "0.75rem", color: "text.secondary" }}>{timeForPeriod.start_time}–{timeForPeriod.end_time}</Typography>}
+                  </Box>
                   {DAY_KEYS.map((_, dayIndex) => {
                     const slot = gridSlots.find((s) => s.day_of_week === dayIndex && s.period === period);
                     return (
-                      <div className="timetableGridCell" key={`${period}-${dayIndex}`}>
+                      <Box key={`${period}-${dayIndex}`} sx={{ p: 1, borderBottom: 1, borderColor: "divider" }}>
                         {slot ? (
                           <>
                             <strong>{slot.course_name ?? "—"}</strong>
-                            <small>{slot.teacher_name ?? "—"}</small>
+                            <Typography component="span" sx={{ display: "block", fontSize: "0.75rem", color: "text.secondary" }}>{slot.teacher_name ?? "—"}</Typography>
                           </>
                         ) : (
-                          <span className="timetableGridEmpty">—</span>
+                          <Typography component="span" sx={{ color: "text.disabled" }}>—</Typography>
                         )}
-                      </div>
+                      </Box>
                     );
                   })}
                 </Fragment>
               );
             })}
-          </div>
+          </Box>
 
-          <div className="mobileTimetableCards">
+          <Box sx={{ display: { xs: "block", md: "none" }, mt: 2 }}>
             {gridPeriods.map((period) => {
               const timeForPeriod = gridSlots.find((s) => s.period === period);
               return (
-                <section className="mobileTimetablePeriod" key={period}>
+                <Paper key={period} variant="outlined" sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 2, mb: 1 }}>
                   <header>
                     <strong>{t("periodLabel", { period })}</strong>
-                    {timeForPeriod && <small>{timeForPeriod.start_time}–{timeForPeriod.end_time}</small>}
+                    {timeForPeriod && <Typography component="span" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>{timeForPeriod.start_time}–{timeForPeriod.end_time}</Typography>}
                   </header>
-                  <div className="mobileTimetableDayList">
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}>
                     {DAY_KEYS.map((day, dayIndex) => {
                       const slot = gridSlots.find((s) => s.day_of_week === dayIndex && s.period === period);
                       return (
-                        <article className="mobileTimetableDay" key={`${period}-${dayIndex}`}>
+                        <Paper key={`${period}-${dayIndex}`} variant="outlined" sx={{ border: 1, borderColor: "divider", borderRadius: 1, p: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <span>{t(day)}</span>
-                          <div>
+                          <Box>
                             <strong>{slot?.course_name ?? "—"}</strong>
-                            <small>{slot?.teacher_name ?? "—"}</small>
-                          </div>
-                        </article>
+                            <Typography component="span" sx={{ display: "block", fontSize: "0.75rem", color: "text.secondary" }}>{slot?.teacher_name ?? "—"}</Typography>
+                          </Box>
+                        </Paper>
                       );
                     })}
-                  </div>
-                </section>
+                  </Box>
+                </Paper>
               );
             })}
-          </div>
+          </Box>
         </>
       )}
-    </section>
+    </Box>
   );
 }
 
@@ -295,7 +308,7 @@ function ListView({
 
   return (
     <>
-      {canManage && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addSlotBtn")}</Button>}
+      {canManage && <Button type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("addSlotBtn")}</Button>}
       {canManage && showCreate && (
         <FormModal
                 title={t("addSlotBtn")} onClose={() => setShowCreate(false)}
@@ -371,7 +384,7 @@ function ListView({
               </FormModal>
       )}
 
-      <InlineFilter className="pwaFilterStack" filters={[
+      <InlineFilter filters={[
         { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value, section_id: "" }) },
         { key: "section", type: "select", value: filters.section_id, placeholder: t("allSections"), disabled: !filters.class_id, options: (sections[filters.class_id] ?? []).map((s) => ({ value: s.id, label: s.name })), onChange: (value) => setFilters({ ...filters, section_id: value }) },
         { key: "course", type: "select", value: filters.course_id, placeholder: t("allCourses"), options: allCourses.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, course_id: value }) },
@@ -390,7 +403,6 @@ function ListView({
           { header: t("actionsCol"), render: (s) => (
             canManage ? (
               <Button
-                className="tableAction"
                 type="button"
                 aria-label={t("deleteSlotConfirm")}
                 title={t("deleteSlotConfirm")}
@@ -438,13 +450,13 @@ function ByTeacherView({ slots }: Readonly<{ slots: TimetableSlot[] }>) {
     return [...grouped.values()].sort((a, b) => a.teacher.localeCompare(b.teacher));
   }, [slots]);
 
-  if (byTeacher.length === 0) return <p className="emptyState">{t("noSlotsYet")}</p>;
+  if (byTeacher.length === 0) return <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noSlotsYet")}</Typography>;
 
   return (
-    <div className="teacherAssignments">
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       {byTeacher.map((entry) => (
-        <PageSection key={entry.teacher} style={{ marginBottom: 12 }}>
-          <h3>{entry.teacher}</h3>
+        <PageSection key={entry.teacher} sx={{ marginBottom: 12 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>{entry.teacher}</Typography>
           <ul>
             {[...entry.pairs.values()]
               .sort((a, b) => `${a.klass}${a.section}`.localeCompare(`${b.klass}${b.section}`))
@@ -456,7 +468,7 @@ function ByTeacherView({ slots }: Readonly<{ slots: TimetableSlot[] }>) {
           </ul>
         </PageSection>
       ))}
-    </div>
+    </Box>
   );
 }
 
@@ -497,36 +509,39 @@ function ImportView({ onDone }: Readonly<{ onDone: () => void }>) {
   const allOk = result !== null && result.results.every((row) => row.ok);
 
   return (
-    <div>
-      <p className="notice">{t("importHint")}</p>
-      <pre className="importExample">Class 1, Alif, Nazra, TCH-0001, 0, 08:00, 08:40</pre>
+    <Box>
+      <Typography sx={{ color: "text.secondary", fontSize: "0.875rem", mb: 1 }}>{t("importHint")}</Typography>
+      <Box component="pre" sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 2, fontSize: "0.8rem", overflowX: "auto" }}>Class 1, Alif, Nazra, TCH-0001, 0, 08:00, 08:40</Box>
       <Textarea
-        className="importTextarea"
         rows={8}
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder={t("importPlaceholder")}
       />
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      <div className="formActions">
-        <Button className="secondaryAction" type="button" onClick={() => run(true)}>{t("dryRunBtn")}</Button>
-        <Button className="primaryAction" type="button" disabled={!allOk} onClick={() => run(false)}>
+      {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
+        <Button type="button" onClick={() => run(true)}>{t("dryRunBtn")}</Button>
+        <Button type="button" disabled={!allOk} onClick={() => run(false)}>
           <Upload size={16} /> {t("importCommitBtn")}
         </Button>
-      </div>
+      </Box>
       {result && (
-        <div className="dataTable" style={{ marginTop: 12 }}>
-          <div className="dataRow header"><span>{t("rowCol")}</span><span>{t("statusCol")}</span><span>{t("errorCol")}</span></div>
+        <Box sx={{ mt: 1.5 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
+            <span>{t("rowCol")}</span>
+            <span>{t("statusCol")}</span>
+            <span>{t("errorCol")}</span>
+          </Box>
           {result.results.map((row) => (
-            <div className="dataRow" key={row.row}>
-              <span data-label={t("rowCol")}>{row.row}</span>
-              <span data-label={t("statusCol")}>{row.ok ? "✓" : "✗"}</span>
-              <span data-label={t("errorCol")}>{row.error ?? ""}</span>
-            </div>
+            <Box key={row.row} sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, py: 1, borderBottom: 1, borderColor: "divider" }}>
+              <span>{row.row}</span>
+              <span>{row.ok ? "✓" : "✗"}</span>
+              <span>{row.error ?? ""}</span>
+            </Box>
           ))}
-          {result.created > 0 && <p className="notice">{t("importCreated", { count: result.created })}</p>}
-        </div>
+          {result.created > 0 && <Typography sx={{ color: "text.secondary", fontSize: "0.875rem", mt: 1 }}>{t("importCreated", { count: result.created })}</Typography>}
+        </Box>
       )}
-    </div>
+    </Box>
   );
 }

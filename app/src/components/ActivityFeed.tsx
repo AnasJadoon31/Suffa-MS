@@ -1,4 +1,4 @@
-import { styled } from "@mui/material/styles";
+import { styled, useTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
@@ -33,14 +33,17 @@ const EVENT_ICONS: Record<ActivityEventType, LucideIcon> = {
   timetable: CalendarCheck,
 };
 
-const EVENT_COLORS: Record<ActivityEventType, string> = {
-  attendance: "#0f766e",
-  enrollment: "#3f7f4c",
-  payment: "#c77d1a",
-  announcement: "#0f766e",
-  form: "#c77d1a",
-  timetable: "#3f7f4c",
-};
+function getEventColor(type: ActivityEventType, mode: "light" | "dark"): string {
+  const colors: Record<ActivityEventType, { light: string; dark: string }> = {
+    attendance: { light: "#0f766e", dark: "#7bc5bb" },
+    enrollment: { light: "#3f7f4c", dark: "#9bc7a9" },
+    payment: { light: "#c77d1a", dark: "#efb45f" },
+    announcement: { light: "#0f766e", dark: "#7bc5bb" },
+    form: { light: "#c77d1a", dark: "#efb45f" },
+    timetable: { light: "#3f7f4c", dark: "#9bc7a9" },
+  };
+  return colors[type]?.[mode] ?? "#0f766e";
+}
 
 function relativeTime(isoTimestamp: string, now: Date = new Date()): string {
   const then = new Date(isoTimestamp).getTime();
@@ -139,6 +142,8 @@ export type ActivityFeedProps = Readonly<{
 
 export function ActivityFeed({ events = [] }: ActivityFeedProps) {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const mode = theme.palette.mode;
 
   if (events.length === 0) {
     return (
@@ -166,7 +171,7 @@ export function ActivityFeed({ events = [] }: ActivityFeedProps) {
       <Timeline>
         {events.map((event) => {
           const Icon = EVENT_ICONS[event.type];
-          const color = EVENT_COLORS[event.type];
+          const color = getEventColor(event.type, mode);
           return (
             <TimelineItem key={event.id}>
               <IconDot color={color}>

@@ -8,7 +8,6 @@ import { AuthProvider } from "./lib/AuthContext";
 import { ThemeProvider } from "./lib/ThemeContext";
 import { ensurePwaRegistration } from "./lib/pwaRegistration";
 import "./i18n";
-import "./styles.css";
 
 import { DialogProvider } from "./lib/DialogContext";
 import { SnackbarProvider } from "./components/ui/Snackbar";

@@ -1,8 +1,25 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
 import { academicsApi, type AcademicSession } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Select } from "./ui/Field";
+
+const ReadOnlyBanner = styled("div")(({ theme }) => ({
+  padding: theme.spacing(1, 2),
+  backgroundColor: theme.palette.warning.light,
+  color: theme.palette.warning.dark,
+  fontSize: "0.875rem",
+  textAlign: "center",
+  borderBottom: `1px solid ${theme.palette.divider}`,
+}));
+
+const StyledSelect = styled(Select)(({ theme }) => ({
+  fontSize: "0.85rem",
+  minHeight: 44,
+  width: "auto",
+}));
 
 export function useSessionReadOnly(): boolean {
   const { user } = useAuth();
@@ -44,19 +61,17 @@ export function SessionSwitcher() {
   }
 
   return (
-    <Select
-      className="inputField sessionSwitcherSelect"
+    <StyledSelect
       value={selectedId}
       onChange={handleChange}
       disabled={saving}
-      style={{ fontSize: "0.85rem", minHeight: "44px", width: "auto" }}
     >
       {sessions.map((s) => (
         <option key={s.id} value={s.id}>
           {s.name} {s.is_active ? t("sessionActiveSuffix") : ""}
         </option>
       ))}
-    </Select>
+    </StyledSelect>
   );
 }
 
@@ -77,8 +92,8 @@ export function SessionReadOnlyBanner() {
   if (!selected || selected.is_active) return null;
 
   return (
-    <div className="sessionReadOnlyBanner" role="status">
+    <ReadOnlyBanner role="status">
       {t("sessionViewOnlyBanner", { name: selected.name })}
-    </div>
+    </ReadOnlyBanner>
   );
 }

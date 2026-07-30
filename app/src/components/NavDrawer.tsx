@@ -76,6 +76,25 @@ const NavLinkWrapper = styled(NavLink)({
   },
 });
 
+const BrandLogo = styled("span")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 32,
+  height: 32,
+  borderRadius: 8,
+  backgroundColor: theme.palette.teal?.main ?? theme.palette.primary.main,
+  color: theme.palette.teal?.contrastText ?? theme.palette.primary.contrastText,
+  fontSize: "1rem",
+  fontWeight: 700,
+}));
+
+const BrandInfo = styled("div")({
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+});
+
 export type NavDrawerProps = Readonly<{
   open: boolean;
   onClose: () => void;
@@ -109,27 +128,14 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
       aria-label={t("primaryNavigationLabel")}
     >
       <DrawerHeader>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              backgroundColor: "var(--mui-palette-teal-main, #0f766e)",
-              color: "#fff",
-              fontSize: "1rem",
-              fontWeight: 700,
-            }}
-          >
+        <BrandInfo>
+          <BrandLogo>
             {madrasa?.name?.[0]?.toUpperCase() ?? "م"}
-          </span>
+          </BrandLogo>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
             {madrasa?.name || t("appName")}
           </Typography>
-        </div>
+        </BrandInfo>
         <IconButton size="small" onClick={onClose} aria-label="Close menu">
           <X size={18} />
         </IconButton>

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import InputAdornment from "@mui/material/InputAdornment";
 import TextField from "@mui/material/TextField";
+import { styled } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 
@@ -25,6 +26,61 @@ interface SelectedPerson {
 
 const audienceRoleForPerson = (role: SelectedPerson["role"]) => role === "guardian" ? "parent" : role;
 const audienceRoleForMode = (mode: RoleMode) => mode === "guardians" ? "parent" : mode.slice(0, -1);
+
+const PickerWrapper = styled(Box)({
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+});
+
+const Stage = styled(Box)({
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+});
+
+const FieldLabel = styled("label")({
+  fontSize: "0.875rem",
+  fontWeight: 500,
+});
+
+const PeopleMultiSelect = styled(Box)({
+  position: "relative",
+});
+
+const SelectedChips = styled("div")({
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 4,
+  marginTop: 8,
+});
+
+const PeopleMultiSelectMenu = styled(Box)({
+  position: "fixed",
+  zIndex: 1300,
+  backgroundColor: "background.paper",
+  borderRadius: 8,
+  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+  padding: 8,
+});
+
+const PeopleMultiSelectOption = styled("button")({
+  display: "grid",
+  gridTemplateColumns: "24px minmax(0, 1fr)",
+  gap: 8,
+  alignItems: "center",
+  width: "100%",
+  border: 0,
+  borderRadius: 4,
+  background: "transparent",
+  color: "inherit",
+  cursor: "pointer",
+  padding: "8px",
+  textAlign: "left",
+  fontFamily: "inherit",
+  fontSize: "inherit",
+  "&:hover": { backgroundColor: "rgba(14, 93, 83, 0.12)" },
+});
 
 /**
  * ISS3-027: Staged audience picker
@@ -51,7 +107,7 @@ export function StagedAudiencePicker({
   const [narrowMode, setNarrowMode] = useState<NarrowMode>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isPeopleDropdownOpen, setIsPeopleDropdownOpen] = useState(false);
-  const [peopleDropdownStyle, setPeopleDropdownStyle] = useState<CSSProperties | undefined>();
+  const [peopleDropdownStyle, setPeopleDropdownStyle] = useState<React.CSSProperties | undefined>();
   const pickerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -340,20 +396,20 @@ export function StagedAudiencePicker({
   };
 
   return (
-    <Box className="stagedAudiencePicker">
+    <PickerWrapper>
       {/* Stage 1: Role Selection */}
-      <Box className="stage">
-        <label htmlFor={roleSelectId.current}>{t("targetAudienceLabel")}</label>
+      <Stage>
+        <FieldLabel htmlFor={roleSelectId.current}>{t("targetAudienceLabel")}</FieldLabel>
         <Select id={roleSelectId.current} value={roleMode} onChange={(e) => handleRoleChange(e.target.value as RoleMode)}>
           <option value="teachers">{t("teachers")}</option>
           <option value="students">{t("students")}</option>
           <option value="guardians">{t("guardians")}</option>
         </Select>
-      </Box>
+      </Stage>
 
       {/* Stage 2: Narrow by Class/Section */}
-      <Box className="stage">
-        <label htmlFor={narrowSelectId.current}>{t("narrowByLabel", "Narrow by")}</label>
+      <Stage>
+        <FieldLabel htmlFor={narrowSelectId.current}>{t("narrowByLabel", "Narrow by")}</FieldLabel>
         <Select id={narrowSelectId.current} value={narrowMode} onChange={(e) => handleNarrowChange(e.target.value as NarrowMode)}>
           <option value="all">{t("allLabel", "All")}</option>
           <option value="classes">{t("classesLabel", "Classes")}</option>
@@ -371,16 +427,15 @@ export function StagedAudiencePicker({
             {(sections[selectedClassId] ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
         )}
-      </Box>
+      </Stage>
 
       {/* Stage 3: Person Selection */}
-      <Box className="stage">
-        <label>{t("selectPersonsLabel", "Select persons")}</label>
-        <Box className="peopleMultiSelect" ref={pickerRef}>
+      <Stage>
+        <FieldLabel>{t("selectPersonsLabel", "Select persons")}</FieldLabel>
+        <PeopleMultiSelect ref={pickerRef}>
           <Button
             ref={triggerRef}
             type="button"
-            className="peopleMultiSelectTrigger"
             aria-label={`${t("selectPersonsLabel", "Select persons")}: ${selectedSummary}`}
             aria-haspopup="listbox"
             aria-expanded={isPeopleDropdownOpen}
@@ -388,23 +443,23 @@ export function StagedAudiencePicker({
             onClick={() => setIsPeopleDropdownOpen((open) => !open)}
             onKeyDown={handlePeoplePickerKeyDown}
           >
-            <span className="peopleMultiSelectSummary">{selectedSummary}</span>
+            <span>{selectedSummary}</span>
             <ChevronDown size={16} aria-hidden="true" />
           </Button>
 
           {selectedPersons.length > 0 && (
-            <div className="selectedChips" aria-label={t("selectedPeopleCount", { count: selectedPersons.length, defaultValue: "Selected people" })}>
+            <SelectedChips aria-label={t("selectedPeopleCount", { count: selectedPersons.length, defaultValue: "Selected people" })}>
               {selectedPersons.map((p) => (
-                <Button key={personKey(p)} className="chip" type="button" aria-label={p.name} onClick={() => removePerson(personKey(p))}>
+                <Button key={personKey(p)} type="button" aria-label={p.name} onClick={() => removePerson(personKey(p))}>
                   {p.name}
                   <X size={13} />
                 </Button>
               ))}
-            </div>
+            </SelectedChips>
           )}
 
           {isPeopleDropdownOpen && (
-            <Box className="peopleMultiSelectMenu" style={peopleDropdownStyle} sx={{ minHeight: 180 }}>
+            <PeopleMultiSelectMenu style={peopleDropdownStyle} sx={{ minHeight: 180 }}>
               <TextField
                 inputRef={searchInputRef}
                 fullWidth
@@ -448,49 +503,34 @@ export function StagedAudiencePicker({
                   const key = personKey(person);
                   const selected = selectedPersons.some((p) => personKey(p) === personKey(person));
                   return (
-                    <Box
-                      component="button"
+                    <PeopleMultiSelectOption
                       type="button"
                       key={key}
                       id={`${listboxId.current}-${person.id}`}
                       role="option"
                       aria-selected={selected}
-                      className="peopleMultiSelectOption"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => togglePerson(person)}
                       sx={{
-                        display: "grid",
-                        gridTemplateColumns: "24px minmax(0, 1fr)",
-                        gap: 1,
-                        alignItems: "center",
-                        width: "100%",
-                        border: 0,
-                        borderRadius: 1,
                         background: index === activeOptionIndex ? "rgba(14, 93, 83, 0.1)" : "transparent",
-                        color: "inherit",
-                        cursor: "pointer",
-                        px: 1,
-                        py: 1,
-                        textAlign: "left",
-                        "&:hover": { background: "rgba(14, 93, 83, 0.12)" },
                       }}
                     >
-                      <span className="peopleMultiSelectCheck">{selected && <Check size={14} />}</span>
-                      <span className="peopleMultiSelectPerson">
+                      <span>{selected && <Check size={14} />}</span>
+                      <span>
                         <strong>{person.name}</strong>
                         <small>{t(person.role)}</small>
                       </span>
-                    </Box>
+                    </PeopleMultiSelectOption>
                   );
                 })}
                 {!isLoading && filteredPersons.length === 0 && (
                   <Box sx={{ px: 1, py: 2, color: "text.secondary" }}>{t("noResults", "No results")}</Box>
                 )}
               </Box>
-            </Box>
+            </PeopleMultiSelectMenu>
           )}
-        </Box>
-      </Box>
-    </Box>
+        </PeopleMultiSelect>
+      </Stage>
+    </PickerWrapper>
   );
 }

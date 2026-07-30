@@ -2,6 +2,10 @@ import { Button } from "./ui/Button";
 import { FileDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
 
 import { useAuth } from "../lib/AuthContext";
 import { academicsApi, operationsApi, type AcademicClass, type AcademicSession, type Section, type TimetableSlot, reportingApi } from "../lib/endpoints";
@@ -24,15 +28,15 @@ function ReportCard({
   return (
     <PageSection>
       <PageHeader title={title} />
-      <InlineFilter className="reportCardFilter" filters={filters}>
-        <div className="formActions">
-          <Button className="secondaryAction" type="button" disabled={disabled} onClick={() => onDownload("csv")}>
+      <InlineFilter filters={filters}>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <Button type="button" disabled={disabled} onClick={() => onDownload("csv")}>
             <FileDown size={16} /> CSV
           </Button>
-          <Button className="secondaryAction" type="button" disabled={disabled} onClick={() => onDownload("pdf")}>
+          <Button type="button" disabled={disabled} onClick={() => onDownload("pdf")}>
             <FileDown size={16} /> PDF
           </Button>
-        </div>
+        </Box>
       </InlineFilter>
     </PageSection>
   );
@@ -180,7 +184,7 @@ export function ReportsView() {
         />
       )}
 
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
     </PageSection>
   );
 }

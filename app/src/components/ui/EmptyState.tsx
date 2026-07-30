@@ -4,28 +4,6 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { Inbox } from "lucide-react";
 
-const EmptyStateContainer = styled(Box)(({ theme }) => ({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  textAlign: "center",
-  padding: theme.spacing(6, 3),
-  minHeight: 280,
-}));
-
-const EmptyStateIcon = styled(Box)(({ theme }) => ({
-  width: 72,
-  height: 72,
-  borderRadius: "50%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: theme.palette.mode === "dark" ? "#1a2925" : "#f2f4ef",
-  color: theme.palette.text.secondary,
-  marginBottom: theme.spacing(2),
-}));
-
 export function EmptyState({
   icon,
   title,
@@ -40,15 +18,47 @@ export function EmptyState({
   return (
     <EmptyStateContainer>
       <EmptyStateIcon>{icon ?? <Inbox size={32} />}</EmptyStateIcon>
-      <Typography variant="h6" sx={{ mb: 0.5, fontWeight: 600 }}>
-        {title}
-      </Typography>
+      <EmptyStateTitle>{title}</EmptyStateTitle>
       {message && (
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 320, mb: 2 }}>
-          {message}
-        </Typography>
+        <EmptyStateMessage>{message}</EmptyStateMessage>
       )}
       {action}
     </EmptyStateContainer>
   );
 }
+
+/* ------------------------------------------------------------------ styled components */
+
+export const EmptyStateContainer = styled(Box)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  padding: theme.spacing(6, 3),
+  minHeight: 280,
+}));
+
+export const EmptyStateIcon = styled(Box)(({ theme }) => ({
+  width: 72,
+  height: 72,
+  borderRadius: "50%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: theme.palette.mode === "dark" ? theme.palette.background.paper : theme.palette.background.default,
+  color: theme.palette.text.secondary,
+  marginBottom: theme.spacing(2),
+}));
+
+export const EmptyStateTitle = styled(Typography)(({ theme }) => ({
+  marginBottom: theme.spacing(0.5),
+  fontWeight: 600,
+  color: theme.palette.text.primary,
+}));
+
+export const EmptyStateMessage = styled(Typography)(({ theme }) => ({
+  maxWidth: 320,
+  marginBottom: theme.spacing(2),
+  color: theme.palette.text.secondary,
+}));

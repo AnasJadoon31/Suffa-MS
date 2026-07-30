@@ -1,4 +1,8 @@
 import { Button } from "./ui/Button";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
 import { KeyRound, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -77,19 +81,15 @@ export function ProfileView() {
     <>
       <PageSection>
         <PageHeader title={t("myProfile")} icon={<UserIcon size={18} />} notice={t("descProfile")} />
-        <div className="dataTable">
-          <div className="dataRow">
-            <span>{t("usernameLabel")}</span>
-            <span>{user.username}</span>
-          </div>
-          <div className="dataRow">
-            <span>{t("roleLabel")}</span>
-            <span><RoleBadge role={user.role} /></span>
-          </div>
-        </div>
-        <Button className="primaryAction" type="button" onClick={() => setProfileModal("language")}>{t("preferredLanguageLabel")}</Button>
+        <Box sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 1, mb: 2 }}>
+          <Typography sx={{ fontWeight: 700 }}>{t("usernameLabel")}</Typography>
+          <Typography>{user.username}</Typography>
+          <Typography sx={{ fontWeight: 700 }}>{t("roleLabel")}</Typography>
+          <Typography><RoleBadge role={user.role} /></Typography>
+        </Box>
+        <Button type="button" onClick={() => setProfileModal("language")}>{t("preferredLanguageLabel")}</Button>
         {profileModal === "language" && <Modal title={t("preferredLanguageLabel")} onClose={() => setProfileModal(null)}>
-          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <Box sx={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 2 }}>
             <label>
               {t("preferredLanguageLabel")}
               <Select
@@ -101,15 +101,15 @@ export function ProfileView() {
                 <option value="ur">اردو</option>
               </Select>
             </label>
-          </div>
+          </Box>
         </Modal>}
-        {languageNotice && <p className="notice">{languageNotice}</p>}
-        {languageError && <p className="notice" style={{ color: "var(--rose)" }}>{languageError}</p>}
+        {languageNotice && <Alert severity="success" sx={{ mt: 1 }}>{languageNotice}</Alert>}
+        {languageError && <Alert severity="error" sx={{ mt: 1 }}>{languageError}</Alert>}
       </PageSection>
 
       <PageSection>
         <PageHeader title={t("changePasswordHeading")} icon={<KeyRound size={18} />} />
-        <Button className="primaryAction" type="button" onClick={() => setProfileModal("password")}>{t("changePasswordBtn")}</Button>
+        <Button type="button" onClick={() => setProfileModal("password")}>{t("changePasswordBtn")}</Button>
         {profileModal === "password" && <FormModal
                 title={t("changePasswordHeading")} onClose={() => setProfileModal(null)}
                 onSubmit={(e) => void changePassword(e)}
@@ -151,8 +151,8 @@ export function ProfileView() {
                           />
                         </label>
               </FormModal>}
-        {passwordNotice && <p className="notice">{passwordNotice}</p>}
-        {passwordError && <p className="notice" style={{ color: "var(--rose)" }}>{passwordError}</p>}
+        {passwordNotice && <Alert severity="success" sx={{ mt: 1 }}>{passwordNotice}</Alert>}
+        {passwordError && <Alert severity="error" sx={{ mt: 1 }}>{passwordError}</Alert>}
       </PageSection>
     </>
   );

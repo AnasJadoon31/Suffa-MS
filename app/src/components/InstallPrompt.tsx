@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { styled } from "@mui/material/styles";
+import { styled, useTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
@@ -34,6 +34,19 @@ const Banner = styled(Box)(({ theme }) => ({
     borderRadius: 16,
     border: `1px solid ${theme.palette.divider}`,
   },
+}));
+
+const InstructionsBox = styled(Box)(({ theme }) => ({
+  position: "absolute",
+  bottom: "100%",
+  left: 0,
+  right: 0,
+  marginBottom: 8,
+  padding: theme.spacing(2),
+  backgroundColor: theme.palette.background.paper,
+  borderRadius: 8,
+  border: `1px solid ${theme.palette.divider}`,
+  boxShadow: "0 -4px 16px rgba(0,0,0,0.08)",
 }));
 
 function isIOSSafari(): boolean {
@@ -75,6 +88,7 @@ function startTimeTracking(): () => void {
 
 export function InstallPrompt() {
   const { t } = useTranslation();
+  const theme = useTheme();
   const [visible, setVisible] = useState(false);
   const [iosInstructions, setIosInstructions] = useState(false);
 
@@ -101,7 +115,7 @@ export function InstallPrompt() {
 
   return (
     <Banner>
-      <Download size={24} color="#0f766e" />
+      <Download size={24} color={theme.palette.teal.main} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
           {t("installApp", "Install Suffa-MS")}
@@ -123,21 +137,7 @@ export function InstallPrompt() {
         <X size={16} />
       </IconButton>
       {iosInstructions && (
-        <Box
-          sx={{
-            position: "absolute",
-            bottom: "100%",
-            left: 0,
-            right: 0,
-            mb: 1,
-            p: 2,
-            backgroundColor: "background.paper",
-            borderRadius: 2,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: "0 -4px 16px rgba(0,0,0,0.08)",
-          }}
-        >
+        <InstructionsBox>
           <Typography variant="caption" color="text.secondary">
             {t("iosInstallSteps", "Tap the Share button, then 'Add to Home Screen'")}
           </Typography>
@@ -145,7 +145,7 @@ export function InstallPrompt() {
             <Share size={16} />
             <PlusSquare size={16} />
           </Box>
-        </Box>
+        </InstructionsBox>
       )}
     </Banner>
   );

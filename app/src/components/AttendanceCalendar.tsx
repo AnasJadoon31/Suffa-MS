@@ -1,4 +1,4 @@
-import { Button } from "./ui/Button";
+import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -66,34 +66,32 @@ export function AttendanceCalendar({
   ];
 
   return (
-    <Paper variant="outlined" className="attendanceCalendar">
-      <Box className="attendanceCalendarNav">
-        <Button
-          className="secondaryAction"
+    <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", p: 1.5 }}>
+        <SecondaryButton
           type="button"
           onClick={() => onMonthChange(addMonths(month, -1))}
           aria-label={t("previousMonth")}
         >
           <ChevronLeft size={17} />
-        </Button>
+        </SecondaryButton>
         <strong>{monthFormatter.format(month)}</strong>
-        <Button
-          className="secondaryAction"
+        <SecondaryButton
           type="button"
           onClick={() => onMonthChange(addMonths(month, 1))}
           aria-label={t("nextMonth")}
         >
           <ChevronRight size={17} />
-        </Button>
+        </SecondaryButton>
       </Box>
-      <Box className="attendanceCalendarWeekdays">
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.5, px: 1.5, pb: 0.5 }}>
         {weekdayLabels.map((label) => (
-          <span key={label}>{label}</span>
+          <Box key={label} sx={{ textAlign: "center", fontSize: "0.75rem", fontWeight: 600, color: "text.secondary" }}>{label}</Box>
         ))}
       </Box>
-      <Box className="attendanceCalendarGrid">
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.5, px: 1.5, pb: 1.5 }}>
         {cells.map((cell, index) => {
-          if (!cell) return <span className="attendanceCalendarDay blank" key={`blank-${index}`} />;
+          if (!cell) return <span key={`blank-${index}`} />;
 
           const isFuture = cell.key > todayKey;
           const isToday = cell.key === todayKey;
@@ -101,36 +99,33 @@ export function AttendanceCalendar({
           const stats = mode === "class" ? classDayStats[cell.key] : undefined;
           const status = mode === "student" ? studentDayStatus[cell.key] : undefined;
           const holidayName = holidayMarkers[cell.key];
-          const classNames = [
-            "attendanceCalendarDay",
-            isFuture && "future",
-            isToday && "today",
-            isSelected && "selected",
-            holidayName && "holiday",
-            status ? status : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
 
           return (
-            <Button
-              className={classNames}
+            <SecondaryButton
               type="button"
               key={cell.key}
               disabled={isFuture}
               onClick={() => onSelectDate(cell.key)}
               title={holidayName}
+              sx={{
+                minHeight: 48,
+                flexDirection: "column",
+                gap: 0.25,
+                backgroundColor: isSelected ? "primary.main" : isToday ? "action.hover" : "transparent",
+                color: isSelected ? "primary.contrastText" : "text.primary",
+                "&:hover": { backgroundColor: isSelected ? "primary.dark" : "action.hover" },
+              }}
             >
-              <span className="attendanceCalendarDayNumber">{cell.day}</span>
+              <span>{cell.day}</span>
               {holidayName && (
-                <span className="attendanceCalendarDayHoliday">{t("holidayLabel")}</span>
+                <Box component="span" sx={{ fontSize: "0.6rem", color: "warning.main" }}>{t("holidayLabel")}</Box>
               )}
               {mode === "class" && stats && !holidayName && (
-                <span className="attendanceCalendarDayStat">
+                <Box component="span" sx={{ fontSize: "0.6rem" }}>
                   {stats.present}/{stats.total}
-                </span>
+                </Box>
               )}
-            </Button>
+            </SecondaryButton>
           );
         })}
       </Box>

@@ -1,5 +1,9 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
 import { Building2, Copy, Plus, ToggleLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -53,19 +57,23 @@ export function PlatformView() {
   };
 
   return (
-    <div className="platformRoot">
-      <Workspace style={{ padding: 24 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      <Workspace sx={{ p: 3 }}>
         <Topbar>
-          <div className="topbarContext">
-            <h1><Building2 size={20} /> {t("platformTitle")}</h1>
-            <p className="viewDescription">{t("platformSubtitle", { username: user?.username })}</p>
-          </div>
-          <Button className="secondaryAction" type="button" onClick={logout}>{t("logout")}</Button>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h5" sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 700 }}>
+              <Building2 size={20} /> {t("platformTitle")}
+            </Typography>
+            <Typography sx={{ color: "text.secondary", fontSize: "0.875rem" }}>
+              {t("platformSubtitle", { username: user?.username })}
+            </Typography>
+          </Box>
+          <Button type="button" onClick={logout}>{t("logout")}</Button>
         </Topbar>
 
-        <PageSection style={{ marginTop: 16 }}>
-          <h3>{t("onboardHeading")}</h3>
-          <Button className="primaryAction" type="button" onClick={() => setShowOnboard(true)}><Plus size={16} /> {t("onboardBtn")}</Button>
+        <PageSection sx={{ marginTop: 16 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>{t("onboardHeading")}</Typography>
+          <Button type="button" onClick={() => setShowOnboard(true)}><Plus size={16} /> {t("onboardBtn")}</Button>
           {showOnboard && <FormModal
                     title={t("onboardHeading")} onClose={() => setShowOnboard(false)}
                     onSubmit={async (e) => {
@@ -92,27 +100,27 @@ export function PlatformView() {
 
                   <label>{t("principalUsernameLabel")}<Input required minLength={3} value={form.principal_username} onChange={(e) => setForm({ ...form, principal_username: e.target.value })} /></label>
                   </FormModal>}
-          {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-          {notice && <p className="notice">{notice}</p>}
+          {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+          {notice && <Alert severity="success" sx={{ mt: 1 }}>{notice}</Alert>}
           {principalSetupUrl && (
-            <div className="credentialDeliveryActions" role="status" aria-label={t("credentialsReadyLabel")}>
-              <span>{t("credentialsReadyLabel")}</span>
-              <Button className="secondaryAction" type="button" onClick={() => void navigator.clipboard.writeText(principalSetupUrl)}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }} role="status" aria-label={t("credentialsReadyLabel")}>
+              <Typography>{t("credentialsReadyLabel")}</Typography>
+              <Button type="button" onClick={() => void navigator.clipboard.writeText(principalSetupUrl)}>
                 <Copy size={15} /> {t("copyLinkBtn")}
               </Button>
-            </div>
+            </Box>
           )}
         </PageSection>
 
-        <PageSection style={{ marginTop: 16 }}>
-          <h3>{t("madarisHeading")}</h3>
+        <PageSection sx={{ marginTop: 16 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>{t("madarisHeading")}</Typography>
           <DataTable<PlatformMadrasa>
             columns={[
               { header: t("nameLabel"), render: (m) => m.name },
               { header: t("slugLabel"), render: (m) => m.slug },
               { header: t("createdCol"), render: (m) => new Date(m.created_at).toLocaleDateString() },
               { header: t("actionsCol"), render: (m) => (
-                <Button className="tableAction" type="button" onClick={() => openMadrasa(m)}>
+                <Button type="button" onClick={() => openMadrasa(m)}>
                   <ToggleLeft size={14} /> {t("featuresBtn")}
                 </Button>
               )},
@@ -126,22 +134,22 @@ export function PlatformView() {
         </PageSection>
 
         {selected && (
-          <PageSection style={{ marginTop: 16 }}>
-            <h3>{t("featuresHeading", { name: selected.name })}</h3>
-            <p className="notice">{t("featuresHint")}</p>
-            <div className="delegateList">
+          <PageSection sx={{ marginTop: 16 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>{t("featuresHeading", { name: selected.name })}</Typography>
+            <Typography sx={{ color: "text.secondary", fontSize: "0.875rem", mb: 1 }}>{t("featuresHint")}</Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {features.map((flag) => (
                 <CheckboxField
                   key={flag.key}
                   checked={flag.enabled}
                   onChange={() => void toggleFeature(flag)}
-                  label={<>{flag.label} <small className="notice">({flag.key})</small></>}
+                  label={<>{flag.label} <Typography component="span" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>({flag.key})</Typography></>}
                 />
               ))}
-            </div>
+            </Box>
           </PageSection>
         )}
       </Workspace>
-    </div>
+    </Box>
   );
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import InputAdornment from "@mui/material/InputAdornment";
 import TextField from "@mui/material/TextField";
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
 import { useTranslation } from "react-i18next";
 
 const MUITextField = TextField as any;
@@ -167,9 +169,9 @@ export function PhoneInput({
   };
 
   return (
-    <div className="phoneInput">
+    <PhoneInputWrapper>
       {label && <label htmlFor={id}>{label}</label>}
-      <div className="phoneInputWrapper muiPhoneInputWrapper">
+      <PhoneInputFieldWrapper>
         <MUITextField
           id={id}
           type="tel"
@@ -179,7 +181,7 @@ export function PhoneInput({
           placeholder={placeholder || t("phonePlaceholder", "3001234567")}
           disabled={disabled}
           required={required}
-          className={`phoneInputField${error && touched ? " invalid" : ""}`}
+          error={!!error && touched}
           dir="ltr"
           aria-invalid={!!error && touched}
           aria-describedby={error && touched ? `${id}-error` : undefined}
@@ -187,7 +189,7 @@ export function PhoneInput({
           fullWidth
           slotProps={{
             input: {
-              startAdornment: <InputAdornment position="start">+92</InputAdornment>,
+              startAdornment: <PhonePrefix position="start">+92</PhonePrefix>,
             },
             htmlInput: {
               inputMode: "tel",
@@ -196,17 +198,38 @@ export function PhoneInput({
             },
           }}
         />
-      </div>
+      </PhoneInputFieldWrapper>
       {error && touched && (
-        <p id={`${id}-error`} className="phoneInputError" role="alert">
+        <Box id={`${id}-error`} role="alert" sx={{ color: "error.main", fontSize: "0.75rem", mt: 0.5 }}>
           {error}
-        </p>
+        </Box>
       )}
       {value && (
-        <p className="phoneInputFormatted">
+        <Box sx={{ color: "text.secondary", fontSize: "0.75rem", mt: 0.5 }}>
           {formatPhoneDisplay(value)}
-        </p>
+        </Box>
       )}
-    </div>
+    </PhoneInputWrapper>
   );
 }
+
+/* ------------------------------------------------------------------ styled components */
+
+export const PhoneInputWrapper = styled(Box)({
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+});
+
+export const PhonePrefix = styled(InputAdornment)(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  fontWeight: 500,
+  backgroundColor: theme.palette.action.hover,
+  borderRight: `1px solid ${theme.palette.divider}`,
+  paddingRight: theme.spacing(1),
+  marginRight: 0,
+}));
+
+export const PhoneInputFieldWrapper = styled(Box)({
+  width: "100%",
+});

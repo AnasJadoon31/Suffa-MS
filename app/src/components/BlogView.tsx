@@ -1,5 +1,10 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
+import Chip from "@mui/material/Chip";
 import { CheckCircle2, Newspaper, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -63,7 +68,7 @@ export function BlogView() {
         notice={t("descBlog")}
       />
 
-      {canManage && !editing && <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("saveDraftBtn")}</Button>}
+      {canManage && !editing && <Button type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("saveDraftBtn")}</Button>}
       {canManage && !editing && showCreate && (
         <FormModal
                 title={t("saveDraftBtn")} onClose={() => setShowCreate(false)}
@@ -85,14 +90,16 @@ export function BlogView() {
               >
                 <label>{t("titleLabel")}<Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
 
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <span style={{ color: "var(--muted)", fontWeight: 650, fontSize: "0.86rem" }}>{t("bodyLabel")}</span>
+              <Box sx={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 0.75 }}>
+                          <Typography component="span" sx={{ color: "text.secondary", fontWeight: 650, fontSize: "0.86rem" }}>
+                            {t("bodyLabel")}
+                          </Typography>
                           <RichTextEditor
                             value={form.body}
                             onChange={(body) => setForm((current) => ({ ...current, body }))}
                             placeholder={t("writePostPlaceholder")}
                           />
-                        </div>
+                        </Box>
               </FormModal>
       )}
 
@@ -112,29 +119,31 @@ export function BlogView() {
                         }}
                 submitLabel={t("saveBtn")}
               >
-                <h3 style={{ gridColumn: "1 / -1" }}>{t("editPostHeading", { title: editing.title })}</h3>
+                <Typography variant="h6" sx={{ gridColumn: "1 / -1" }}>{t("editPostHeading", { title: editing.title })}</Typography>
 
               <label>{t("titleLabel")}<Input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></label>
 
-              <div style={{ gridColumn: "1 / -1" }}>
+              <Box sx={{ gridColumn: "1 / -1" }}>
                           <RichTextEditor value={editForm.body} onChange={(body) => setEditForm((cur) => ({ ...cur, body }))} />
-                        </div>
+                        </Box>
               </FormModal>
       )}
 
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
 
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
-      <div className="blogGrid">
-        {!isLoading && !loadError && posts.length === 0 && <p className="emptyState">{t("noPostsYet")}</p>}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }, gap: 2 }}>
+        {!isLoading && !loadError && posts.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noPostsYet")}</Typography>}
         {!isLoading && !loadError && posts.map((p) => (
           <BlogCard key={p.id}>
             <header>
               <h3>{p.title}</h3>
-              <span className={p.published ? "badge badgePublished" : "badge badgeDraft"}>
-                {p.published ? t("publishedLabel") : t("draftLabel")}
-              </span>
+              <Chip
+                label={p.published ? t("publishedLabel") : t("draftLabel")}
+                size="small"
+                color={p.published ? "success" : "default"}
+              />
             </header>
             <p>{stripHtml(p.body).slice(0, 220)}{stripHtml(p.body).length > 220 ? "…" : ""}</p>
             <small>{new Date(p.created_at).toLocaleDateString()}</small>
@@ -167,7 +176,7 @@ export function BlogView() {
             )}
           </BlogCard>
         ))}
-      </div>
+      </Box>
     </PageSection>
   );
 }

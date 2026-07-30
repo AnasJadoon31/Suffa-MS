@@ -1,5 +1,9 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
 import { Edit2, Eye, FileText, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -178,22 +182,24 @@ export function FormsView() {
   const canEditForm = (form: FormDef) => !readOnly && (canManageAll || form.created_by_id === user?.id);
 
   return (
-    <PageSection className="formsPanel">
+    <PageSection>
       <PageHeader
         title={t("forms")}
         icon={<FileText size={18} />}
         notice={t("descForms")}
       />
 
-      <div className="tabs" role="tablist" aria-label={t("forms")}>
-        <Button className={activeTab === "forms" ? "primaryAction" : "secondaryAction"} type="button" role="tab" aria-selected={activeTab === "forms"} onClick={() => setActiveTab("forms")}>{t("formsTabLabel")}</Button>
-        {canViewResponses && <Button className={activeTab === "responses" ? "primaryAction" : "secondaryAction"} type="button" role="tab" aria-selected={activeTab === "responses"} onClick={() => setActiveTab("responses")}>{t("responsesTabLabel")}</Button>}
-      </div>
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }} role="tablist" aria-label={t("forms")}>
+        <Button type="button" role="tab" aria-selected={activeTab === "forms"} onClick={() => setActiveTab("forms")}>{t("formsTabLabel")}</Button>
+        {canViewResponses && <Button type="button" role="tab" aria-selected={activeTab === "responses"} onClick={() => setActiveTab("responses")}>{t("responsesTabLabel")}</Button>}
+      </Box>
 
       {activeTab === "forms" && (<>
-      {canCreate && <div className="formActions formsCreateActions">
-        <Button className="primaryAction" type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createFormBtn")}</Button>
-      </div>}
+      {canCreate && (
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+          <Button type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createFormBtn")}</Button>
+        </Box>
+      )}
 
       {canCreate && showCreate && <FormModal
             title={t("createFormBtn")} onClose={() => setShowCreate(false)} maxWidth={800}
@@ -247,12 +253,12 @@ export function FormsView() {
 
           <FormFieldsEditor fields={fields} onChange={setFields} />
           </FormModal>}
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
       <datalist id="form-categories">
         {knownCategories.map((c) => <option key={c} value={c} />)}
       </datalist>
 
-      <InlineFilter className="pwaFilterStack" filters={[
+      <InlineFilter filters={[
         {
           key: "category", type: "select", value: categoryFilter,
           ariaLabel: t("categoryFilterLabel"), placeholder: t("allCategories"),
@@ -300,7 +306,7 @@ export function FormsView() {
           }}
           emptyLabel={t("noMatchingPeople")}
         />
-        {formFilters.user_id && <Button className="secondaryAction" type="button" onClick={() => { setFormPersonSearch(""); setFormFilters({ ...formFilters, user_id: "" }); }}>{t("cancelBtn")}</Button>}
+        {formFilters.user_id && <Button type="button" onClick={() => { setFormPersonSearch(""); setFormFilters({ ...formFilters, user_id: "" }); }}>{t("cancelBtn")}</Button>}
       </InlineFilter>
 
       <DataTable<FormDef>
@@ -315,23 +321,23 @@ export function FormsView() {
                 label: t("editBtn"),
                 icon: <Edit2 size={14} />,
                 onClick: () => {
-                      setEditing(f);
-                      setEditAudience(f.visibility_scope);
-                      setEditError("");
+                  setEditing(f);
+                  setEditAudience(f.visibility_scope);
+                  setEditError("");
                 },
               }, {
                 label: t("deleteBtn"),
                 icon: <Trash2 size={14} />,
                 destructive: true,
                 onClick: async () => {
-                      if (!(await confirm(t("deleteFormConfirm") ?? ""))) return;
-                      try {
-                        await operationsApi.deleteForm(f.id);
-                        if (selected?.id === f.id) setSelected(null);
-                        await load();
-                      } catch (err: any) {
-                        await alert(err.response?.data?.detail ?? t("failedDeleteForm"));
-                      }
+                  if (!(await confirm(t("deleteFormConfirm") ?? ""))) return;
+                  try {
+                    await operationsApi.deleteForm(f.id);
+                    if (selected?.id === f.id) setSelected(null);
+                    await load();
+                  } catch (err: any) {
+                    await alert(err.response?.data?.detail ?? t("failedDeleteForm"));
+                  }
                 },
               }] : []),
             ]} ariaLabel={`${t("actionsCol")}: ${f.title}`} />
@@ -364,11 +370,11 @@ export function FormsView() {
             }
           }}
         >
-          {notice && <p className="notice">{notice}</p>}
+          {notice && <Alert severity="success" sx={{ mb: 1 }}>{notice}</Alert>}
           {user?.role === "parent" && (
             <label>{t("wardLabel")}<Select required value={selectedWardId} onChange={(event) => setSelectedWardId(event.target.value)}>{wards.map((ward) => <option key={ward.id} value={ward.id}>{ward.name}</option>)}</Select></label>
           )}
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {selected.fields_definition.map((f) => (
               f.type === "phone"
                 ? <PhoneInput key={f.key} id={`form-${f.key}`} label={f.label} required={f.required} value={answers[f.key] ?? ""} onChange={(value) => setAnswers({ ...answers, [f.key]: value })} />
@@ -384,7 +390,7 @@ export function FormsView() {
                 />
               </label>
             ))}
-          </div>
+          </Box>
         </FormModal>
       )}
 
@@ -429,7 +435,7 @@ export function FormsView() {
 
       {activeTab === "responses" && canViewResponses && (
         <>
-          <InlineFilter className="pwaFilterStack" filters={[
+          <InlineFilter filters={[
             { key: "response-form", type: "select", value: responseFilters.form_id, placeholder: t("allFormsLabel"), options: forms.map((form) => ({ value: form.id, label: form.title })), onChange: (value) => setResponseFilters({ ...responseFilters, form_id: value }) },
             { key: "response-role", type: "select", value: responseFilters.respondent_role, placeholder: t("allRolesLabel"), options: [{ value: "student", label: t("students") }, { value: "teacher", label: t("teachers") }, { value: "parent", label: t("guardians") }], onChange: (value) => setResponseFilters({ ...responseFilters, respondent_role: value }) },
             { key: "response-class", type: "select", value: responseFilters.class_id, placeholder: t("allClasses"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: (value) => setResponseFilters({ ...responseFilters, class_id: value, section_id: "" }) },
@@ -471,7 +477,7 @@ export function FormsView() {
               emptyLabel={t("noStudentsYet")}
             />
             {(responseFilters.respondent_user_id || responseFilters.student_id) && (
-              <Button className="secondaryAction" type="button" onClick={() => {
+              <Button type="button" onClick={() => {
                 setResponsePersonSearch("");
                 setResponseStudentSearch("");
                 setResponseFilters({ ...responseFilters, respondent_user_id: "", student_id: "" });
@@ -494,16 +500,24 @@ export function FormsView() {
       )}
       {selectedResponse && (
         <Modal title={t("responseDetailsHeading")} onClose={() => setSelectedResponse(null)}>
-          <dl className="responseDetails">
-            <dt>{t("respondentLabel")}</dt><dd>{selectedResponse.submitted_by_name ?? t("deletedPersonLabel")}</dd>
-            <dt>{t("wardLabel")}</dt><dd>{selectedResponse.ward_name ?? selectedResponse.student_name ?? "—"}</dd>
-            <dt>{t("submittedCol")}</dt><dd>{new Date(selectedResponse.created_at).toLocaleString()}</dd>
+          <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 1 }}>
+            <Typography component="dt" sx={{ fontWeight: 700 }}>{t("respondentLabel")}</Typography>
+            <Typography component="dd">{selectedResponse.submitted_by_name ?? t("deletedPersonLabel")}</Typography>
+            <Typography component="dt" sx={{ fontWeight: 700 }}>{t("wardLabel")}</Typography>
+            <Typography component="dd">{selectedResponse.ward_name ?? selectedResponse.student_name ?? "—"}</Typography>
+            <Typography component="dt" sx={{ fontWeight: 700 }}>{t("submittedCol")}</Typography>
+            <Typography component="dd">{new Date(selectedResponse.created_at).toLocaleString()}</Typography>
             {(forms.find((form) => form.id === selectedResponse.form_id)?.fields_definition ?? []).map((field) => {
               const value = selectedResponse.response_data[field.key];
               const display = Array.isArray(value) ? value.join(", ") : value && typeof value === "object" ? JSON.stringify(value) : String(value ?? "—");
-              return <div key={field.key} className="responseDetailRow"><dt>{field.label}</dt><dd>{display}</dd></div>;
+              return (
+                <Box key={field.key} sx={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "auto 1fr", gap: 1 }}>
+                  <Typography component="dt" sx={{ fontWeight: 700 }}>{field.label}</Typography>
+                  <Typography component="dd">{display}</Typography>
+                </Box>
+              );
             })}
-          </dl>
+          </Box>
         </Modal>
       )}
     </PageSection>

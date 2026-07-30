@@ -1,8 +1,16 @@
-import { Button } from "./ui/Button";
+import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import Alert from "@mui/material/Alert";
 import { BookOpen, ClipboardList, FileDown, Pencil, Plus, Send, Trash2, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -40,6 +48,147 @@ import { PageSection, PageHeader } from "./ui/Layout";
 import { ActionMenu } from "./ui/ActionMenu";
 import { InlineFilter } from "./ui/InlineFilter";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
+import { styled } from "@mui/material/styles";
+
+const FormActions = styled(Box)(({ theme }) => ({
+  display: "flex",
+  gap: theme.spacing(1),
+  marginBottom: theme.spacing(2),
+  flexWrap: "wrap",
+}));
+
+const SectionPicker = styled(Paper)(({ theme }) => ({
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: 12,
+  padding: theme.spacing(2),
+  gridColumn: "1 / -1",
+}));
+
+const GradingSetupLayout = styled(Box)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(2),
+}));
+
+const GradingPlanHeader = styled(Box)(({ theme }) => ({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: theme.spacing(2),
+  flexWrap: "wrap",
+}));
+
+const WeightTotal = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "valid",
+})<{ valid?: boolean }>(({ theme, valid }) => ({
+  padding: theme.spacing(0.5, 1.5),
+  borderRadius: 8,
+  fontWeight: 600,
+  backgroundColor: valid ? theme.palette.leaf.light : theme.palette.rose.light,
+  color: valid ? theme.palette.leaf.contrastText : theme.palette.rose.contrastText,
+}));
+
+const GradingBuilderSection = styled("section")(({ theme }) => ({
+  marginBottom: theme.spacing(2),
+}));
+
+const SectionTitleRow = styled(Box)(({ theme }) => ({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: theme.spacing(1),
+}));
+
+const GradingRow = styled(Box)(({ theme }) => ({
+  display: "flex",
+  gap: theme.spacing(2),
+  alignItems: "flex-end",
+  marginBottom: theme.spacing(1),
+  flexWrap: "wrap",
+}));
+
+const GradingBandRow = styled(Box)(({ theme }) => ({
+  display: "flex",
+  gap: theme.spacing(2),
+  alignItems: "flex-end",
+  marginBottom: theme.spacing(1),
+  flexWrap: "wrap",
+}));
+
+const GradingPreview = styled(Typography)(({ theme }) => ({
+  marginTop: theme.spacing(1),
+  fontStyle: "italic",
+  color: theme.palette.text.secondary,
+}));
+
+const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: 16,
+  marginBottom: theme.spacing(2),
+}));
+
+const HeaderTableRow = styled(TableRow)(({ theme }) => ({
+  "& th": {
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    fontSize: "0.75rem",
+    color: theme.palette.teal.main,
+    borderBottom: `2px solid ${theme.palette.divider}`,
+    padding: theme.spacing(1.5, 2),
+  },
+}));
+
+const DataTableRow = styled(TableRow)(({ theme }) => ({
+  "& td": {
+    padding: theme.spacing(1.5, 2),
+    borderColor: theme.palette.divider,
+  },
+  "&:hover": {
+    backgroundColor: theme.palette.action.hover,
+  },
+}));
+
+const MobileCard = styled(Paper)(({ theme }) => ({
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: 12,
+  padding: theme.spacing(2),
+  marginBottom: theme.spacing(1.5),
+}));
+
+const MobileCardHeader = styled(Box)(({ theme }) => ({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: theme.spacing(1),
+}));
+
+const MobileFields = styled(Box)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(1),
+}));
+
+const MobileMetric = styled(Box)(({ theme }) => ({
+  display: "flex",
+  justifyContent: "space-between",
+  padding: theme.spacing(0.5, 0),
+}));
+
+const MobileActions = styled(Box)(({ theme }) => ({
+  display: "flex",
+  gap: theme.spacing(1),
+  marginTop: theme.spacing(1),
+  paddingTop: theme.spacing(1),
+  borderTop: `1px solid ${theme.palette.divider}`,
+}));
+
+const TeacherSummary = styled(Box)(({ theme }) => ({
+  marginTop: theme.spacing(2),
+  padding: theme.spacing(1.5),
+  borderRadius: 8,
+  border: `1px solid ${theme.palette.divider}`,
+}));
 
 export type AssessmentTab = "assignments" | "grading" | "results" | "setup";
 
@@ -81,8 +230,6 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
             setStudents([]);
           }
         } else {
-          // Submission payloads already include student_name. Avoid an
-          // optional directory request that a scoped teacher cannot access.
           setStudents([]);
         }
         if (hasPermission("assignments.manage_all")) {
@@ -104,20 +251,52 @@ export function AssessmentsView({ tab = "assignments", onTabChange }: Readonly<{
   return (
     <PageSection>
       <PageHeader title={t("assessmentsTitle")} notice={t("assessmentsSubtitle")} />
-      <div className="formActions" style={{ marginBottom: 16 }}>
-        {(isTeacher || hasPermission("assignments.create")) && <Button className={tab === "assignments" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("assignments")}>
-          <ClipboardList size={16} /> {t("assignmentsTab")}
-        </Button>}
-        {(isTeacher || hasPermission("assessments.marks.enter")) && <Button className={tab === "grading" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("grading")}>
-          <BookOpen size={16} /> {t("gradingTab")}
-        </Button>}
-        {(hasPermission("grading.schemes.manage") || hasPermission("assessments.exam_types.manage")) && <Button className={tab === "setup" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("setup")}>
-          <BookOpen size={16} /> {t("gradingSetupBtn")}
-        </Button>}
-        {(isTeacher || hasPermission("assessments.marks.enter")) && <Button className={tab === "results" ? "primaryAction" : "secondaryAction"} type="button" onClick={() => onTabChange?.("results")}>
-          <Send size={16} /> {t("resultsTab")}
-        </Button>}
-      </div>
+      <FormActions>
+        {(isTeacher || hasPermission("assignments.create")) && (
+          tab === "assignments" ? (
+            <PrimaryButton type="button" onClick={() => onTabChange?.("assignments")}>
+              <ClipboardList size={16} /> {t("assignmentsTab")}
+            </PrimaryButton>
+          ) : (
+            <SecondaryButton type="button" onClick={() => onTabChange?.("assignments")}>
+              <ClipboardList size={16} /> {t("assignmentsTab")}
+            </SecondaryButton>
+          )
+        )}
+        {(isTeacher || hasPermission("assessments.marks.enter")) && (
+          tab === "grading" ? (
+            <PrimaryButton type="button" onClick={() => onTabChange?.("grading")}>
+              <BookOpen size={16} /> {t("gradingTab")}
+            </PrimaryButton>
+          ) : (
+            <SecondaryButton type="button" onClick={() => onTabChange?.("grading")}>
+              <BookOpen size={16} /> {t("gradingTab")}
+            </SecondaryButton>
+          )
+        )}
+        {(hasPermission("grading.schemes.manage") || hasPermission("assessments.exam_types.manage")) && (
+          tab === "setup" ? (
+            <PrimaryButton type="button" onClick={() => onTabChange?.("setup")}>
+              <BookOpen size={16} /> {t("gradingSetupBtn")}
+            </PrimaryButton>
+          ) : (
+            <SecondaryButton type="button" onClick={() => onTabChange?.("setup")}>
+              <BookOpen size={16} /> {t("gradingSetupBtn")}
+            </SecondaryButton>
+          )
+        )}
+        {(isTeacher || hasPermission("assessments.marks.enter")) && (
+          tab === "results" ? (
+            <PrimaryButton type="button" onClick={() => onTabChange?.("results")}>
+              <Send size={16} /> {t("resultsTab")}
+            </PrimaryButton>
+          ) : (
+            <SecondaryButton type="button" onClick={() => onTabChange?.("results")}>
+              <Send size={16} /> {t("resultsTab")}
+            </SecondaryButton>
+          )
+        )}
+      </FormActions>
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
       {!isLoading && !loadError && tab === "assignments" && (
@@ -168,7 +347,6 @@ function AssignmentsTab({
   const { confirm } = useDialog();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filters, setFilters] = useState(() => {
-    // Deep link from the dashboard's "open class list" button (§C).
     const pending = consumePendingClassNav();
     return {
       class_id: pending?.classId ?? "",
@@ -235,7 +413,7 @@ function AssignmentsTab({
 
   return (
     <>
-      <InlineFilter className="pwaFilterStack" filters={[
+      <InlineFilter filters={[
         { key: "class", type: "select", value: filters.class_id, placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => updateFilters({ ...filters, class_id: value, section_id: "" }) },
         { key: "section", type: "select", value: filters.section_id, placeholder: t("allSections"), disabled: !filters.class_id, options: filterSections.map((s) => ({ value: s.id, label: s.name })), onChange: (value) => updateFilters({ ...filters, section_id: value }) },
         { key: "course", type: "select", value: filters.course_id, placeholder: t("allCourses"), options: courses.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => updateFilters({ ...filters, course_id: value }) },
@@ -249,9 +427,9 @@ function AssignmentsTab({
         ], onChange: (value) => updateFilters({ ...filters, sort: value }) },
       ]}>
         {canCreate && (
-          <Button className="primaryAction" type="button" onClick={() => setShowCreate((v) => !v)}>
+          <PrimaryButton type="button" onClick={() => setShowCreate((v) => !v)}>
             <Plus size={16} /> {t("createAssignmentBtn")}
-          </Button>
+          </PrimaryButton>
         )}
       </InlineFilter>
 
@@ -269,17 +447,16 @@ function AssignmentsTab({
         />
       )}
 
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Alert severity="error" sx={{ mb: 1 }}><Typography>{error}</Typography></Alert>}
       <DataTable<Assignment>
-        className="assignmentsTable"
         columns={[
-          { header: t("titleCol"), className: "colTitle", render: (a) => a.title },
-          { header: t("categoryCol"), className: "colCategory", render: (a) => a.category ?? "—" },
-          { header: t("classSectionCol"), className: "colClassSection", render: (a) => `${a.class_name ?? "—"}${a.section_name ? ` / ${a.section_name}` : ""}` },
-          { header: t("courseCol"), className: "colCourse", render: (a) => a.course_name ?? "—" },
-          { header: t("teacherCol"), className: "colTeacher", render: (a) => a.teacher_name ?? "—" },
-          { header: t("dueCol"), className: "colDue", render: (a) => new Date(a.due_date).toLocaleDateString() },
-          { header: t("actionsCol"), className: "colActions", render: (a) => (
+          { header: t("titleCol"), render: (a) => a.title },
+          { header: t("categoryCol"), render: (a) => a.category ?? "—" },
+          { header: t("classSectionCol"), render: (a) => `${a.class_name ?? "—"}${a.section_name ? ` / ${a.section_name}` : ""}` },
+          { header: t("courseCol"), render: (a) => a.course_name ?? "—" },
+          { header: t("teacherCol"), render: (a) => a.teacher_name ?? "—" },
+          { header: t("dueCol"), render: (a) => new Date(a.due_date).toLocaleDateString() },
+          { header: t("actionsCol"), render: (a) => (
             <ActionMenu items={[
               ...(a.attachment_key ? [{
                 label: t("downloadBtn"),
@@ -299,14 +476,14 @@ function AssignmentsTab({
                 icon: <Trash2 size={14} />,
                 destructive: true,
                 onClick: async () => {
-                      const wholeBatch = a.batch_id !== null && (await confirm(t("deleteBatchConfirm")));
-                      if (a.batch_id === null && !(await confirm(t("deleteConfirm")))) return;
-                      try {
-                        await assessmentsApi.deleteAssignment(a.id, wholeBatch);
-                        await load();
-                      } catch (err: any) {
-                        setError(err.response?.data?.detail ?? t("failedDelete"));
-                      }
+                  const wholeBatch = a.batch_id !== null && (await confirm(t("deleteBatchConfirm")));
+                  if (a.batch_id === null && !(await confirm(t("deleteConfirm")))) return;
+                  try {
+                    await assessmentsApi.deleteAssignment(a.id, wholeBatch);
+                    await load();
+                  } catch (err: any) {
+                    setError(err.response?.data?.detail ?? t("failedDelete"));
+                  }
                 },
               }] : []),
             ]} ariaLabel={`${t("actionsCol")}: ${a.title}`} />
@@ -316,7 +493,7 @@ function AssignmentsTab({
         keyExtractor={(a) => a.id}
         renderBeforeRow={(a, index, arr) => (
           filters.sort === "teacher" && (index === 0 || arr[index - 1].teacher_name !== a.teacher_name) ? (
-            <div className="dataRow sectionRow"><strong>{a.teacher_name ?? t("unassignedLabel")}</strong></div>
+            <Box sx={{ p: 1, bgcolor: "action.hover", fontWeight: 600 }}><strong>{a.teacher_name ?? t("unassignedLabel")}</strong></Box>
           ) : null
         )}
         emptyMessage={t("noAssignmentsYet")}
@@ -335,20 +512,34 @@ function AssignmentsTab({
       )}
 
       {selected && (
-        <PageSection style={{ marginTop: 16 }}>
-          <h3>{t("submissionsHeading", { title: selected.title })}</h3>
-          <div className="dataTable">
-            <div className="dataRow header"><span>{t("studentCol")}</span><span>{t("submittedCol")}</span><span>{t("lateCol")}</span><span>{t("markCol")}</span><span>{t("actionsCol")}</span></div>
-            {submissions.length === 0 && <p className="emptyState">{t("noSubmissionsYet")}</p>}
-            {submissions.map((s) => (
-              <SubmissionRow
-                key={s.id}
-                submission={s}
-                studentName={s.student_name ?? students.find((st) => st.id === s.student_id)?.name ?? t("unknownPersonLabel")}
-                onGraded={() => void openSubmissions(selected)}
-              />
-            ))}
-          </div>
+        <PageSection sx={{ marginTop: 16 }}>
+          <Typography variant="h6">{t("submissionsHeading", { title: selected.title })}</Typography>
+          <StyledTableContainer>
+            <Table size="small">
+              <TableHead>
+                <HeaderTableRow>
+                  <TableCell>{t("studentCol")}</TableCell>
+                  <TableCell>{t("submittedCol")}</TableCell>
+                  <TableCell>{t("lateCol")}</TableCell>
+                  <TableCell>{t("markCol")}</TableCell>
+                  <TableCell>{t("actionsCol")}</TableCell>
+                </HeaderTableRow>
+              </TableHead>
+              <TableBody>
+                {submissions.length === 0 && (
+                  <DataTableRow><TableCell colSpan={5}><Typography color="text.secondary">{t("noSubmissionsYet")}</Typography></TableCell></DataTableRow>
+                )}
+                {submissions.map((s) => (
+                  <SubmissionRow
+                    key={s.id}
+                    submission={s}
+                    studentName={s.student_name ?? students.find((st) => st.id === s.student_id)?.name ?? t("unknownPersonLabel")}
+                    onGraded={() => void openSubmissions(selected)}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </StyledTableContainer>
         </PageSection>
       )}
     </>
@@ -446,7 +637,7 @@ function AssignmentCreateForm({
             label={t("publishAllClassesLabel")}
           />
         )}
-        {allClasses && <small className="notice">{t("publishAllClassesHint")}</small>}
+        {allClasses && <Alert severity="info" sx={{ mb: 1 }}><Typography>{t("publishAllClassesHint")}</Typography></Alert>}
         {!allClasses && (
           <FormField label={t("classLabel")}>
             <Select required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })}>
@@ -462,9 +653,9 @@ function AssignmentCreateForm({
           </Select>
         </FormField>
         {!allClasses && sections.length > 0 && (
-          <Paper component="fieldset" variant="outlined" className="sectionPicker">
+          <SectionPicker>
             <legend>{t("sectionsLegend")}</legend>
-            <small className="notice">{t("sectionsHint")}</small>
+            <Alert severity="info" sx={{ mb: 1 }}><Typography>{t("sectionsHint")}</Typography></Alert>
             {sections.map((s) => (
               <CheckboxField
                 key={s.id}
@@ -473,7 +664,7 @@ function AssignmentCreateForm({
                 label={s.name}
               />
             ))}
-          </Paper>
+          </SectionPicker>
         )}
         <FormField label={t("titleLabel")}>
           <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -593,37 +784,39 @@ function SubmissionRow({
   const [mark, setMark] = useState(submission.mark?.toString() ?? "");
   const [feedback, setFeedback] = useState(submission.feedback ?? "");
   return (
-    <div className="dataRow">
-      <span data-label={t("studentCol")}>{studentName}</span>
-      <span data-label={t("submittedCol")}>{new Date(submission.submitted_at).toLocaleString()}</span>
-      <span data-label={t("lateCol")}>{submission.is_late ? t("lateLabel") : t("onTimeLabel")}</span>
-      <span className="submissionGradeField" data-label={t("markCol")}>
-        <Input placeholder={t("markCol")} value={mark} onChange={(e) => setMark(e.target.value)} />
-        <Textarea className="input" placeholder={t("feedbackLabel", "Feedback")} rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
-      </span>
-      <span className="submissionActions" data-label={t("actionsCol")}>
-        <Button
-          className="tableAction"
-          type="button"
-          onClick={async () => {
-            const { url } = await filesApi.presignDownload(submission.file_key);
-            window.open(url, "_blank", "noreferrer");
-          }}
-        >
-          <FileDown size={14} /> {t("downloadBtn")}
-        </Button>
-        <Button
-          className="tableAction"
-          type="button"
-          onClick={async () => {
-            await assessmentsApi.gradeSubmission(submission.id, { mark: Number(mark), feedback: feedback || undefined });
-            onGraded();
-          }}
-        >
-          {t("saveBtn")}
-        </Button>
-      </span>
-    </div>
+    <DataTableRow>
+      <TableCell>{studentName}</TableCell>
+      <TableCell>{new Date(submission.submitted_at).toLocaleString()}</TableCell>
+      <TableCell>{submission.is_late ? t("lateLabel") : t("onTimeLabel")}</TableCell>
+      <TableCell>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+          <Input placeholder={t("markCol")} value={mark} onChange={(e) => setMark(e.target.value)} />
+          <Textarea placeholder={t("feedbackLabel", "Feedback")} rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+        </Box>
+      </TableCell>
+      <TableCell>
+        <Box sx={{ display: "flex", gap: 0.5 }}>
+          <TableAction
+            type="button"
+            onClick={async () => {
+              const { url } = await filesApi.presignDownload(submission.file_key);
+              window.open(url, "_blank", "noreferrer");
+            }}
+          >
+            <FileDown size={14} /> {t("downloadBtn")}
+          </TableAction>
+          <TableAction
+            type="button"
+            onClick={async () => {
+              await assessmentsApi.gradeSubmission(submission.id, { mark: Number(mark), feedback: feedback || undefined });
+              onGraded();
+            }}
+          >
+            {t("saveBtn")}
+          </TableAction>
+        </Box>
+      </TableCell>
+    </DataTableRow>
   );
 }
 
@@ -669,112 +862,123 @@ function GradingTab({
 
   return (
     <>
-      <InlineFilter className="pwaFilterStack" filters={[
+      <InlineFilter filters={[
         { key: "class", type: "select", value: classId, placeholder: t("chooseClassEllipsis"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: setClassId },
         ...(matrix && section ? [{ key: "course", type: "select" as const, value: courseId, options: section.courses.map((c) => ({ value: c.course_id, label: c.course_name })), onChange: setCourseId }] : []),
       ]} />
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Alert severity="error" sx={{ mb: 1 }}><Typography>{error}</Typography></Alert>}
 
       {matrix && (
-        <div className="formActions" style={{ marginBottom: 8 }}>
+        <FormActions>
           {matrix.sections.map((s) => (
-            <Button
-              key={s.section_id}
-              type="button"
-              className={s.section_id === sectionId ? "primaryAction" : "secondaryAction"}
-              onClick={() => setSectionId(s.section_id)}
-            >
-              {s.section_name}
-            </Button>
+            s.section_id === sectionId ? (
+              <PrimaryButton
+                key={s.section_id}
+                type="button"
+                onClick={() => setSectionId(s.section_id)}
+              >
+                {s.section_name}
+              </PrimaryButton>
+            ) : (
+              <SecondaryButton
+                key={s.section_id}
+                type="button"
+                onClick={() => setSectionId(s.section_id)}
+              >
+                {s.section_name}
+              </SecondaryButton>
+            )
           ))}
-        </div>
+        </FormActions>
       )}
 
       {section && course && (
         <>
-          <p className="notice">
-            {t("gradingContext", {
-              course: course.course_name,
-              section: section.section_name,
-              teacher: course.teacher_name ?? "—",
-            })}
-          </p>
+          <Alert severity="info" sx={{ mb: 1 }}>
+            <Typography>
+              {t("gradingContext", {
+                course: course.course_name,
+                section: section.section_name,
+                teacher: course.teacher_name ?? "—",
+              })}
+            </Typography>
+          </Alert>
           {course.exam_types.length === 0 ? (
-            <p className="emptyState">{t("noExamTypesForCourse")}</p>
+            <Typography color="text.secondary">{t("noExamTypesForCourse")}</Typography>
           ) : renderCards ? (
-            <div className="assessmentMobileList" role="list" aria-label={t("gradingTab")}>
+            <Box role="list" aria-label={t("gradingTab")}>
               {section.students.map((student) => {
                 const cell = student.courses.find((c) => c.course_id === course.course_id);
                 return (
-                  <article className="assessmentMobileCard" role="listitem" key={student.student_id}>
-                    <header>
+                  <MobileCard role="listitem" key={student.student_id}>
+                    <MobileCardHeader>
                       <strong>{student.name}</strong>
-                      <span>{student.admission_number}</span>
-                    </header>
-                    <div className="assessmentMobileFields">
+                      <Typography component="span">{student.admission_number}</Typography>
+                    </MobileCardHeader>
+                    <MobileFields>
                       {course.exam_types.map((et) => (
-                        <label key={et.id} className="assessmentMarkField">
-                          <span>{et.name} <small>({et.weightage})</small></span>
+                        <Box key={et.id} sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                          <Typography component="span">{et.name} <small>({et.weightage})</small></Typography>
                           <MarkCell
                             examTypeId={et.id}
                             studentId={student.student_id}
                             initial={cell?.marks.find((m) => m.exam_type_id === et.id)?.score ?? null}
                             onSaved={() => void load(classId)}
                           />
-                        </label>
+                        </Box>
                       ))}
-                      <div className="assessmentMobileMetric">
-                        <span>{t("scoreCol")}</span>
+                      <MobileMetric>
+                        <Typography component="span">{t("scoreCol")}</Typography>
                         <strong>{cell?.raw_score ?? "—"}</strong>
-                      </div>
-                      <div className="assessmentMobileMetric">
-                        <span>{t("bandCol")}</span>
+                      </MobileMetric>
+                      <MobileMetric>
+                        <Typography component="span">{t("bandCol")}</Typography>
                         <strong>{cell?.band ?? "—"}</strong>
-                      </div>
-                    </div>
-                  </article>
+                      </MobileMetric>
+                    </MobileFields>
+                  </MobileCard>
                 );
               })}
-            </div>
+            </Box>
           ) : (
-            <div className="sheetWrap desktopOnlySheet">
-              <table className="sheet">
-                <thead>
-                  <tr>
-                    <th>{t("studentCol")}</th>
-                    <th>{t("admissionNoCol")}</th>
+            <StyledTableContainer>
+              <Table size="small">
+                <TableHead>
+                  <HeaderTableRow>
+                    <TableCell>{t("studentCol")}</TableCell>
+                    <TableCell>{t("admissionNoCol")}</TableCell>
                     {course.exam_types.map((et) => (
-                      <th key={et.id}>{et.name} <small>({et.weightage})</small></th>
+                      <TableCell key={et.id}>{et.name} <small>({et.weightage})</small></TableCell>
                     ))}
-                    <th>{t("scoreCol")}</th>
-                    <th>{t("bandCol")}</th>
-                  </tr>
-                </thead>
-                <tbody>
+                    <TableCell>{t("scoreCol")}</TableCell>
+                    <TableCell>{t("bandCol")}</TableCell>
+                  </HeaderTableRow>
+                </TableHead>
+                <TableBody>
                   {section.students.map((student) => {
                     const cell = student.courses.find((c) => c.course_id === course.course_id);
                     return (
-                      <tr key={student.student_id}>
-                        <td data-label={t("studentCol")}>{student.name}</td>
-                        <td data-label={t("admissionNoCol")}>{student.admission_number}</td>
+                      <DataTableRow key={student.student_id}>
+                        <TableCell>{student.name}</TableCell>
+                        <TableCell>{student.admission_number}</TableCell>
                         {course.exam_types.map((et) => (
-                          <td key={et.id} data-label={`${et.name} (${et.weightage})`}>
+                          <TableCell key={et.id}>
                             <MarkCell
                               examTypeId={et.id}
                               studentId={student.student_id}
                               initial={cell?.marks.find((m) => m.exam_type_id === et.id)?.score ?? null}
                               onSaved={() => void load(classId)}
                             />
-                          </td>
+                          </TableCell>
                         ))}
-                        <td data-label={t("scoreCol")}>{cell?.raw_score ?? "—"}</td>
-                        <td data-label={t("bandCol")}>{cell?.band ?? "—"}</td>
-                      </tr>
+                        <TableCell>{cell?.raw_score ?? "—"}</TableCell>
+                        <TableCell>{cell?.band ?? "—"}</TableCell>
+                      </DataTableRow>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+              </Table>
+            </StyledTableContainer>
           )}
         </>
       )}
@@ -806,10 +1010,8 @@ function MarkCell({
   };
 
   return (
-    <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+    <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
       <Input
-        className="markInput"
-        style={{ width: "4rem" }}
         value={value}
         disabled={saving}
         onChange={(e) => setValue(e.target.value)}
@@ -821,11 +1023,11 @@ function MarkCell({
         }}
       />
       {value !== (initial?.toString() ?? "") && (
-        <Button className="iconBtn" onClick={() => save()} disabled={saving} type="button" aria-label={t("saveBtn")} title={t("saveBtn")}>
+        <IconButton onClick={() => save()} disabled={saving} type="button" aria-label={t("saveBtn")} title={t("saveBtn")}>
           <Save size={14} />
-        </Button>
+        </IconButton>
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -879,284 +1081,84 @@ function GradingPlanSetup({
   const canSave = canCreateScheme && canCreateExamType && !!courseId && !!name.trim() && components.length > 0 && Math.abs(totalWeight - 100) < 0.01 && bands.length > 0;
   const previewBand = bands.find((item) => 75 >= Number(item.min_score) && 75 <= Number(item.max_score))?.label ?? "—";
 
-  return <div className="gradingSetupLayout">
-    <PageSection className="gradingPlanCard">
-      <div className="gradingPlanHeader"><div><h3>{t("gradingPlanHeading")}</h3><p className="notice">{t("gradingPlanHint")}</p></div><div className={`weightTotal ${Math.abs(totalWeight - 100) < 0.01 ? "valid" : "invalid"}`}>{t("totalWeightLabel")}: {totalWeight}%</div></div>
-      <InlineFilter className="pwaFilterStack" filters={[
-        { key: "course", type: "select", label: t("courseLabel"), value: courseId, placeholder: t("selectEllipsis"), options: courses.map((item) => ({ value: item.id, label: item.name })), onChange: setCourseId },
-        { key: "class", type: "select", label: t("classOverrideLabel"), value: classId, placeholder: t("courseDefaultOption"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: setClassId, disabled: !courseId },
-      ]} />
-      {isLoading ? <LoadingState /> : <>
-        <label className="gradingPlanName">{t("schemeNameLabel")}<Input value={name} onChange={(event) => setName(event.target.value)} /></label>
-        <section className="gradingBuilderSection">
-          <div className="sectionTitleRow"><div><h4>{t("gradeComponentsHeading")}</h4><p>{t("gradeComponentsHint")}</p></div><Button className="secondaryAction" type="button" onClick={() => setComponents([...components, { name: "", weightage: "" }])}><Plus size={14} /> {t("addComponentBtn")}</Button></div>
-          <div className="gradingRows">
-            {components.map((component, index) => <div className="gradingRow" key={component.id ?? index}><label>{t("componentNameLabel")}<Input required value={component.name} onChange={(event) => setComponents(components.map((item, i) => i === index ? { ...item, name: event.target.value } : item))} /></label><label>{t("weightageLabel")}<Input required type="number" min="0.01" max="100" step="0.01" value={component.weightage} onChange={(event) => setComponents(components.map((item, i) => i === index ? { ...item, weightage: event.target.value } : item))} /></label><Button className="iconBtn danger" type="button" aria-label={t("removeComponentBtn")} onClick={() => setComponents(components.filter((_, i) => i !== index))}><Trash2 size={14} /></Button></div>)}
-            <div className="gradingRow assignmentPoolRow"><label>{t("assignmentPoolLabel")}<Input value={t("assignmentsCol")} disabled /></label><label>{t("weightageLabel")}<Input type="number" min="0" max="100" step="0.01" value={assignmentWeight} onChange={(event) => setAssignmentWeight(event.target.value)} /></label></div>
-          </div>
-        </section>
-        <section className="gradingBuilderSection">
-          <div className="sectionTitleRow"><div><h4>{t("gradeBandsHeading")}</h4><p>{t("gradeBandsHint")}</p></div><Button className="secondaryAction" type="button" onClick={() => setBands([...bands, { label: "", min_score: "", max_score: "" }])}><Plus size={14} /> {t("addBandBtn")}</Button></div>
-          <div className="gradingRows">{bands.map((band, index) => <div className="gradingBandRow" key={index}><label>{t("bandCol")}<Input value={band.label} onChange={(event) => setBands(bands.map((item, i) => i === index ? { ...item, label: event.target.value } : item))} /></label><label>{t("minimumLabel")}<Input type="number" min="0" max="100" step="0.01" value={band.min_score} onChange={(event) => setBands(bands.map((item, i) => i === index ? { ...item, min_score: event.target.value } : item))} /></label><label>{t("maximumLabel")}<Input type="number" min="0" max="100" step="0.01" value={band.max_score} onChange={(event) => setBands(bands.map((item, i) => i === index ? { ...item, max_score: event.target.value } : item))} /></label><Button className="iconBtn danger" type="button" aria-label={t("removeBandBtn")} onClick={() => setBands(bands.filter((_, i) => i !== index))}><Trash2 size={14} /></Button></div>)}</div>
-          <p className="gradingPreview">{t("gradingPreviewLabel", { score: 75, band: previewBand })}</p>
-        </section>
-        {error && <p className="notice errorText">{error}</p>}{notice && <p className="notice">{notice}</p>}
-        <div className="formActions"><Button className="primaryAction" type="button" disabled={!canSave} isLoading={isLoading} onClick={async () => { setError(""); setNotice(""); setIsLoading(true); try { await assessmentsApi.saveGradingPlan({ course_id: courseId, class_id: classId || null, name: name.trim(), assignment_weightage: Number(assignmentWeight || 0), components: components.map((item) => ({ id: item.id, name: item.name.trim(), weightage: Number(item.weightage) })), bands: bands.map((item) => ({ label: item.label.trim(), min_score: Number(item.min_score), max_score: Number(item.max_score) })) }); setNotice(t("gradingPlanSaved")); } catch (err: any) { setError(err.response?.data?.detail ?? t("failedSaveGradingPlan")); } finally { setIsLoading(false); } }}><Save size={16} /> {t("saveGradingPlanBtn")}</Button></div>
-      </>}
-    </PageSection>
-    {canCreateScheme && <PageSection className="assignmentPolicyCard"><h3>{t("assignmentPolicyHeading")}</h3><p className="notice">{t("assignmentPolicyHint")}</p><label>{t("classLabel")}<Select value={limitClassId} onChange={(event) => { setLimitClassId(event.target.value); setAssignmentLimit(String(classes.find((item) => item.id === event.target.value)?.assignment_limit ?? "")); }}><option value="">{t("chooseClassEllipsis")}</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label><label>{t("assignmentLimitLabel")}<Input type="number" min="1" value={assignmentLimit} onChange={(event) => setAssignmentLimit(event.target.value)} /></label><Button className="secondaryAction" type="button" disabled={!limitClassId} onClick={async () => { await academicsApi.updateClass(limitClassId, { assignment_limit: assignmentLimit ? Number(assignmentLimit) : null }); setNotice(t("assignmentPolicySaved")); }}><Save size={16} /> {t("saveBtn")}</Button></PageSection>}
-  </div>;
-}
-
-function GradingSetup({
-  courses,
-  classes,
-  canCreateScheme,
-  canCreateExamType,
-}: Readonly<{ courses: Course[]; classes: AcademicClass[]; canCreateScheme: boolean; canCreateExamType: boolean }>) {
-  const { t } = useTranslation();
-  const { confirm } = useDialog();
-  type EditableBand = { label: string; min_score: string; max_score: string };
-  const defaultBands: EditableBand[] = [];
-  const [schemes, setSchemes] = useState<GradingScheme[]>([]);
-  const [examTypes, setExamTypes] = useState<ExamType[]>([]);
-  const [schemeForm, setSchemeForm] = useState({ name: "", bands: defaultBands, include_assignments: false });
-  const [examForm, setExamForm] = useState({ course_id: "", class_id: "", name: "", weightage: "", grading_scheme_id: "" });
-  const [editingScheme, setEditingScheme] = useState<GradingScheme | null>(null);
-  const [editingExam, setEditingExam] = useState<ExamType | null>(null);
-  const [showSchemeForm, setShowSchemeForm] = useState(false);
-  const [showExamForm, setShowExamForm] = useState(false);
-  const [error, setError] = useState("");
-  const [limitClassId, setLimitClassId] = useState("");
-  const [assignmentLimit, setAssignmentLimit] = useState("");
-  const [classLimits, setClassLimits] = useState<Record<string, number | null>>({});
-
-  const load = async () => {
-    setSchemes(await assessmentsApi.listGradingSchemes());
-    setExamTypes(await assessmentsApi.listExamTypes());
-  };
-  useEffect(() => {
-    void load();
-  }, []);
-  useEffect(() => {
-    setClassLimits(Object.fromEntries(classes.map((item) => [item.id, item.assignment_limit ?? null])));
-  }, [classes]);
-
   return (
-    <PageSection style={{ marginBottom: 16 }}>
-      <h3>{t("setupGradingSchemeTitle")}</h3>
-      <div className="formActions" style={{ marginBottom: 12 }}>
-        {canCreateScheme && <Button className="primaryAction" type="button" onClick={() => {
-          setEditingScheme(null);
-          setSchemeForm({ name: "", bands: defaultBands, include_assignments: false });
-          setShowSchemeForm(true);
-        }}><Plus size={16} /> {t("addSchemeBtn")}</Button>}
-        {canCreateExamType && <Button className="primaryAction" type="button" onClick={() => {
-          setEditingExam(null);
-          setExamForm({ course_id: "", class_id: "", name: "", weightage: "", grading_scheme_id: "" });
-          setShowExamForm(true);
-        }}><Plus size={16} /> {t("addExamTypeBtn")}</Button>}
-      </div>
+    <GradingSetupLayout>
+      <PageSection>
+        <GradingPlanHeader>
+          <Box>
+            <Typography variant="h6">{t("gradingPlanHeading")}</Typography>
+            <Alert severity="info" sx={{ mt: 0.5 }}><Typography>{t("gradingPlanHint")}</Typography></Alert>
+          </Box>
+          <WeightTotal valid={Math.abs(totalWeight - 100) < 0.01}>{t("totalWeightLabel")}: {totalWeight}%</WeightTotal>
+        </GradingPlanHeader>
+        <InlineFilter filters={[
+          { key: "course", type: "select", label: t("courseLabel"), value: courseId, placeholder: t("selectEllipsis"), options: courses.map((item) => ({ value: item.id, label: item.name })), onChange: setCourseId },
+          { key: "class", type: "select", label: t("classOverrideLabel"), value: classId, placeholder: t("courseDefaultOption"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: setClassId, disabled: !courseId },
+        ]} />
+        {isLoading ? <LoadingState /> : <>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mb: 1 }}>
+            <Typography component="span" sx={{ fontWeight: 600 }}>{t("schemeNameLabel")}</Typography>
+            <Input value={name} onChange={(event) => setName(event.target.value)} />
+          </Box>
+          <GradingBuilderSection>
+            <SectionTitleRow>
+              <Box>
+                <Typography variant="subtitle2">{t("gradeComponentsHeading")}</Typography>
+                <Typography>{t("gradeComponentsHint")}</Typography>
+              </Box>
+              <SecondaryButton type="button" onClick={() => setComponents([...components, { name: "", weightage: "" }])}><Plus size={14} /> {t("addComponentBtn")}</SecondaryButton>
+            </SectionTitleRow>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {components.map((component, index) => (
+                <GradingRow key={component.id ?? index}>
+                  <label>{t("componentNameLabel")}<Input required value={component.name} onChange={(event) => setComponents(components.map((item, i) => i === index ? { ...item, name: event.target.value } : item))} /></label>
+                  <label>{t("weightageLabel")}<Input required type="number" min="0.01" max="100" step="0.01" value={component.weightage} onChange={(event) => setComponents(components.map((item, i) => i === index ? { ...item, weightage: event.target.value } : item))} /></label>
+                  <IconButton color="error" type="button" aria-label={t("removeComponentBtn")} onClick={() => setComponents(components.filter((_, i) => i !== index))}><Trash2 size={14} /></IconButton>
+                </GradingRow>
+              ))}
+              <GradingRow>
+                <label>{t("assignmentPoolLabel")}<Input value={t("assignmentsCol")} disabled /></label>
+                <label>{t("weightageLabel")}<Input type="number" min="0" max="100" step="0.01" value={assignmentWeight} onChange={(event) => setAssignmentWeight(event.target.value)} /></label>
+              </GradingRow>
+            </Box>
+          </GradingBuilderSection>
+          <GradingBuilderSection>
+            <SectionTitleRow>
+              <Box>
+                <Typography variant="subtitle2">{t("gradeBandsHeading")}</Typography>
+                <Typography>{t("gradeBandsHint")}</Typography>
+              </Box>
+              <SecondaryButton type="button" onClick={() => setBands([...bands, { label: "", min_score: "", max_score: "" }])}><Plus size={14} /> {t("addBandBtn")}</SecondaryButton>
+            </SectionTitleRow>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {bands.map((band, index) => (
+                <GradingBandRow key={index}>
+                  <label>{t("bandCol")}<Input value={band.label} onChange={(event) => setBands(bands.map((item, i) => i === index ? { ...item, label: event.target.value } : item))} /></label>
+                  <label>{t("minimumLabel")}<Input type="number" min="0" max="100" step="0.01" value={band.min_score} onChange={(event) => setBands(bands.map((item, i) => i === index ? { ...item, min_score: event.target.value } : item))} /></label>
+                  <label>{t("maximumLabel")}<Input type="number" min="0" max="100" step="0.01" value={band.max_score} onChange={(event) => setBands(bands.map((item, i) => i === index ? { ...item, max_score: event.target.value } : item))} /></label>
+                  <IconButton color="error" type="button" aria-label={t("removeBandBtn")} onClick={() => setBands(bands.filter((_, i) => i !== index))}><Trash2 size={14} /></IconButton>
+                </GradingBandRow>
+              ))}
+            </Box>
+            <GradingPreview>{t("gradingPreviewLabel", { score: 75, band: previewBand })}</GradingPreview>
+          </GradingBuilderSection>
+          {error && <Alert severity="error" sx={{ mb: 1 }}><Typography>{error}</Typography></Alert>}
+          {notice && <Alert severity="success" sx={{ mb: 1 }}><Typography>{notice}</Typography></Alert>}
+          <FormActions>
+            <PrimaryButton type="button" disabled={!canSave} loading={isLoading} onClick={async () => { setError(""); setNotice(""); setIsLoading(true); try { await assessmentsApi.saveGradingPlan({ course_id: courseId, class_id: classId || null, name: name.trim(), assignment_weightage: Number(assignmentWeight || 0), components: components.map((item) => ({ id: item.id, name: item.name.trim(), weightage: Number(item.weightage) })), bands: bands.map((item) => ({ label: item.label.trim(), min_score: Number(item.min_score), max_score: Number(item.max_score) })) }); setNotice(t("gradingPlanSaved")); } catch (err: any) { setError(err.response?.data?.detail ?? t("failedSaveGradingPlan")); } finally { setIsLoading(false); } }}><Save size={16} /> {t("saveGradingPlanBtn")}</PrimaryButton>
+          </FormActions>
+        </>}
+      </PageSection>
       {canCreateScheme && (
-        <div className="formActions" style={{ marginBottom: 12 }}>
-          <Select value={limitClassId} onChange={(event) => {
-            const classId = event.target.value;
-            setLimitClassId(classId);
-            setAssignmentLimit(String(classLimits[classId] ?? ""));
-          }}>
-            <option value="">{t("chooseClassEllipsis")}</option>
-            {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </Select>
-          <Input
-            type="number"
-            min="1"
-            value={assignmentLimit}
-            onChange={(event) => setAssignmentLimit(event.target.value)}
-            placeholder={t("assignmentLimitExample")}
-            aria-label={t("assignmentLimitLabel")}
-          />
-          <Button
-            className="secondaryAction"
-            type="button"
-            disabled={!limitClassId}
-            onClick={async () => {
-              await academicsApi.updateClass(limitClassId, {
-                assignment_limit: assignmentLimit ? Number(assignmentLimit) : null,
-              });
-              setClassLimits((current) => ({
-                ...current,
-                [limitClassId]: assignmentLimit ? Number(assignmentLimit) : null,
-              }));
-            }}
-          >
-            <Save size={16} /> {t("saveBtn")}
-          </Button>
-          <small className="notice">{t("assignmentLimitLabel")}</small>
-        </div>
+        <PageSection>
+          <Typography variant="h6">{t("assignmentPolicyHeading")}</Typography>
+          <Alert severity="info" sx={{ mb: 1 }}><Typography>{t("assignmentPolicyHint")}</Typography></Alert>
+          <label>{t("classLabel")}<Select value={limitClassId} onChange={(event) => { setLimitClassId(event.target.value); setAssignmentLimit(String(classes.find((item) => item.id === event.target.value)?.assignment_limit ?? "")); }}><option value="">{t("chooseClassEllipsis")}</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+          <label>{t("assignmentLimitLabel")}<Input type="number" min="1" value={assignmentLimit} onChange={(event) => setAssignmentLimit(event.target.value)} /></label>
+          <SecondaryButton type="button" disabled={!limitClassId} onClick={async () => { await academicsApi.updateClass(limitClassId, { assignment_limit: assignmentLimit ? Number(assignmentLimit) : null }); setNotice(t("assignmentPolicySaved")); }}><Save size={16} /> {t("saveBtn")}</SecondaryButton>
+        </PageSection>
       )}
-      {showSchemeForm && <FormModal
-            title={editingScheme ? t("editBtn") : t("addSchemeBtn")} onClose={() => setShowSchemeForm(false)}
-            onSubmit={async (e) => {
-                    e.preventDefault();
-                    setError("");
-                    try {
-                      const payload = {
-                        name: schemeForm.name,
-                        bands: schemeForm.bands.map((band) => ({
-                          label: band.label,
-                          min_score: Number(band.min_score),
-                          max_score: Number(band.max_score),
-                        })),
-                        include_assignments: schemeForm.include_assignments,
-                      };
-                      if (editingScheme) await assessmentsApi.updateGradingScheme(editingScheme.id, payload);
-                      else await assessmentsApi.createGradingScheme(payload);
-                      setSchemeForm({ name: "", bands: defaultBands, include_assignments: false });
-                      setEditingScheme(null);
-                      setShowSchemeForm(false);
-                      await load();
-                    } catch (err: any) {
-                      setError(err.response?.data?.detail ?? t("failedCreateScheme"));
-                    }
-                  }}
-            submitLabel={editingScheme ? t("saveBtn") : t("addSchemeBtn")}
-            submitIcon={editingScheme ? <Pencil size={16} /> : <Plus size={16} />}
-            submitDisabled={schemeForm.bands.length === 0}
-          >
-            <label>{t("schemeNameLabel")}<Input required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} /></label>
-            <CheckboxField
-              checked={schemeForm.include_assignments}
-              onChange={(e) => setSchemeForm({ ...schemeForm, include_assignments: e.target.checked })}
-              label={t("includeAssignmentsInResultsLabel")}
-            />
-
-          <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
-                    <strong>{t("bandsLabel")}</strong>
-                    {schemeForm.bands.map((band, index) => <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", margin: 0 }} key={index}>
-                      <label>{t("nameLabel")}<Input required value={band.label} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /></label>
-                      <label>{t("minimumLabel")}<Input required type="number" value={band.min_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, min_score: event.target.value } : item) })} /></label>
-                      <label>{t("maximumLabel")}<Input required type="number" value={band.max_score} onChange={(event) => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.map((item, itemIndex) => itemIndex === index ? { ...item, max_score: event.target.value } : item) })} /></label>
-                      <Button className="tableAction" type="button" aria-label={t("removeBandBtn")} title={t("removeBandBtn")} onClick={() => setSchemeForm({ ...schemeForm, bands: schemeForm.bands.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={14} /></Button>
-                    </div>)}
-                    <Button className="secondaryAction" type="button" onClick={() => setSchemeForm({ ...schemeForm, bands: [...schemeForm.bands, { label: "", min_score: "", max_score: "" }] })}><Plus size={14} /> {t("addFieldBtn")}</Button>
-                  </div>
-          </FormModal>}
-      <DataTable<GradingScheme>
-        columns={[
-          { header: t("schemeCol"), render: (s) => s.name },
-          { header: t("bandsCol"), render: (s) => s.bands.map((b) => `${b.label} (${b.min_score}-${b.max_score})`).join(", ") },
-          { header: t("assignmentsCol"), render: (s) => s.include_assignments ? t("includedLabel") : t("excludedLabel") },
-          { header: t("actionsCol"), render: (s) => (
-            <ActionMenu items={canCreateScheme ? [{
-              label: t("editBtn"),
-              icon: <Pencil size={15} />,
-              onClick: () => {
-                setEditingScheme(s);
-                setSchemeForm({ name: s.name, bands: s.bands.map((band) => ({ label: band.label, min_score: String(band.min_score), max_score: String(band.max_score) })), include_assignments: s.include_assignments });
-                setShowSchemeForm(true);
-              },
-            }, {
-              label: t("deleteBtn"),
-              icon: <Trash2 size={15} />,
-              destructive: true,
-              onClick: async () => {
-                if (!(await confirm(t("deleteRecordConfirm")))) return;
-                try { await assessmentsApi.deleteGradingScheme(s.id); await load(); }
-                catch (err: any) { setError(err.response?.data?.detail ?? t("genericError")); }
-              },
-            }] : []} ariaLabel={`${t("actionsCol")}: ${s.name}`} />
-          )},
-        ]}
-        data={schemes}
-        keyExtractor={(s) => s.id}
-      />
-
-      {showExamForm && <FormModal
-            title={editingExam ? t("editBtn") : t("addExamTypeBtn")} onClose={() => setShowExamForm(false)}
-            onSubmit={async (e) => {
-                    e.preventDefault();
-                    setError("");
-                    try {
-                      const payload = {
-                        course_id: examForm.course_id,
-                        class_id: examForm.class_id || undefined,
-                        name: examForm.name,
-                        weightage: Number(examForm.weightage),
-                        grading_scheme_id: examForm.grading_scheme_id,
-                      };
-                      if (editingExam) await assessmentsApi.updateExamType(editingExam.id, payload);
-                      else await assessmentsApi.createExamType(payload);
-                      setExamForm({ course_id: "", class_id: "", name: "", weightage: "", grading_scheme_id: "" });
-                      setEditingExam(null);
-                      setShowExamForm(false);
-                      await load();
-                    } catch (err: any) {
-                      setError(err.response?.data?.detail ?? t("failedCreateExamType"));
-                    }
-                  }}
-            submitLabel={editingExam ? t("saveBtn") : t("addExamTypeBtn")}
-            submitIcon={editingExam ? <Pencil size={16} /> : <Plus size={16} />}
-          >
-            <label>
-                    {t("courseLabel")}
-                    <Select required value={examForm.course_id} onChange={(e) => setExamForm({ ...examForm, course_id: e.target.value })}>
-                      <option value="">{t("selectEllipsis")}</option>
-                      {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </Select>
-                  </label>
-
-            <label>
-                    {t("classLabel")} <small>({t("optionalLabel", "Optional")})</small>
-                    <Select value={examForm.class_id} onChange={(e) => setExamForm({ ...examForm, class_id: e.target.value })}>
-                      <option value="">{t("allClassesLabel", "All Classes")}</option>
-                      {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </Select>
-                  </label>
-
-          <label>{t("examNameLabel")}<Input required value={examForm.name} onChange={(e) => setExamForm({ ...examForm, name: e.target.value })} placeholder={t("examExample")} /></label>
-
-          <label>{t("weightageLabel")}<Input required type="number" value={examForm.weightage} onChange={(e) => setExamForm({ ...examForm, weightage: e.target.value })} placeholder="40" /></label>
-
-          <label>
-                    {t("gradingSchemeLabel")}
-                    <Select required value={examForm.grading_scheme_id} onChange={(e) => setExamForm({ ...examForm, grading_scheme_id: e.target.value })}>
-                      <option value="">{t("selectEllipsis")}</option>
-                      {schemes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </Select>
-                  </label>
-          </FormModal>}
-      <DataTable<ExamType>
-        columns={[
-          { header: t("courseCol"), render: (et) => courses.find((c) => c.id === et.course_id)?.name ?? "—" },
-          { header: t("classCol"), render: (et) => et.class_id ? (classes.find((c) => c.id === et.class_id)?.name ?? "—") : t("allClassesLabel", "All Classes") },
-          { header: t("examCol"), render: (et) => et.name },
-          { header: t("weightageCol"), render: (et) => `${et.weightage}%` },
-          { header: t("actionsCol"), render: (et) => (
-            <ActionMenu items={canCreateExamType ? [{
-              label: t("editBtn"),
-              icon: <Pencil size={15} />,
-              onClick: () => {
-                setEditingExam(et);
-                setExamForm({ course_id: et.course_id, class_id: et.class_id || "", name: et.name, weightage: String(et.weightage), grading_scheme_id: et.grading_scheme_id });
-                setShowExamForm(true);
-              },
-            }, {
-              label: t("deleteBtn"),
-              icon: <Trash2 size={15} />,
-              destructive: true,
-              onClick: async () => {
-                if (!(await confirm(t("deleteRecordConfirm")))) return;
-                try { await assessmentsApi.deleteExamType(et.id); await load(); }
-                catch (err: any) { setError(err.response?.data?.detail ?? t("genericError")); }
-              },
-            }] : []} ariaLabel={`${t("actionsCol")}: ${et.name}`} />
-          )},
-        ]}
-        data={examTypes}
-        keyExtractor={(et) => et.id}
-      />
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-    </PageSection>
+    </GradingSetupLayout>
   );
 }
 
@@ -1230,24 +1232,24 @@ function ResultsTab({
 
   return (
     <>
-      <InlineFilter className="pwaFilterStack" filters={[
+      <InlineFilter filters={[
         { key: "class", type: "select", value: classId, placeholder: t("chooseClassEllipsis"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: setClassId },
       ]}>
         {matrix && (
           <>
-            <Button className="secondaryAction" type="button" onClick={() => assessmentsApi.exportResults({ class_id: classId }, "csv")}>
+            <SecondaryButton type="button" onClick={() => assessmentsApi.exportResults({ class_id: classId }, "csv")}>
               <FileDown size={16} /> CSV
-            </Button>
-            <Button className="secondaryAction" type="button" onClick={() => assessmentsApi.exportResults({ class_id: classId }, "pdf")}>
+            </SecondaryButton>
+            <SecondaryButton type="button" onClick={() => assessmentsApi.exportResults({ class_id: classId }, "pdf")}>
               <FileDown size={16} /> PDF
-            </Button>
+            </SecondaryButton>
           </>
         )}
       </InlineFilter>
 
       {matrix && uniqueCourses.length > 0 && (
-        <div className="formActions" style={{ marginBottom: 8, flexWrap: "wrap" }}>
-          <small className="notice">{t("toggleColumnsHint")}</small>
+        <FormActions>
+          <Alert severity="info" sx={{ flex: 1 }}><Typography>{t("toggleColumnsHint")}</Typography></Alert>
           {uniqueCourses.map((c) => (
             <CheckboxField
               key={c.course_id}
@@ -1256,131 +1258,131 @@ function ResultsTab({
               label={c.course_name}
             />
           ))}
-        </div>
+        </FormActions>
       )}
 
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
-      {notice && <p className="notice">{notice}</p>}
+      {error && <Alert severity="error" sx={{ mb: 1 }}><Typography>{error}</Typography></Alert>}
+      {notice && <Alert severity="success" sx={{ mb: 1 }}><Typography>{notice}</Typography></Alert>}
 
       {matrix?.sections.map((section) => {
         const visibleCourses = section.courses.filter((c) => !hiddenCourses.has(c.course_id));
         return (
-          <PageSection key={section.section_id} style={{ marginTop: 16 }}>
+          <PageSection key={section.section_id} sx={{ marginTop: 16 }}>
             <PageHeader title={`${section.class_name} / ${section.section_name}`}>
               {canPublish && (
-                <Button className="primaryAction" type="button" onClick={() => publishSection(section)}>
+                <PrimaryButton type="button" onClick={() => publishSection(section)}>
                   <Send size={16} /> {t("publishSectionBtn")}
-                </Button>
+                </PrimaryButton>
               )}
             </PageHeader>
             {renderCards ? (
-              <div className="assessmentMobileList" role="list" aria-label={`${section.class_name} / ${section.section_name}`}>
-                {section.students.length === 0 && <p className="emptyState">{t("noStudentsInSection")}</p>}
+              <Box role="list" aria-label={`${section.class_name} / ${section.section_name}`}>
+                {section.students.length === 0 && <Typography color="text.secondary">{t("noStudentsInSection")}</Typography>}
                 {section.students.map((student) => (
-                  <article className="assessmentMobileCard" role="listitem" key={student.student_id}>
-                    <header>
+                  <MobileCard role="listitem" key={student.student_id}>
+                    <MobileCardHeader>
                       <strong>{student.name}</strong>
-                      <span>{student.admission_number}</span>
-                    </header>
-                    <div className="assessmentMobileFields">
+                      <Typography component="span">{student.admission_number}</Typography>
+                    </MobileCardHeader>
+                    <MobileFields>
                       {visibleCourses.map((c) => {
                         const cell = student.courses.find((x) => x.course_id === c.course_id);
                         return (
-                          <div className="assessmentMobileMetric" key={c.course_id}>
-                            <span>{c.course_name}</span>
+                          <MobileMetric key={c.course_id}>
+                            <Typography component="span">{c.course_name}</Typography>
                             <strong>
                               {cell?.raw_score !== null && cell?.raw_score !== undefined
                                 ? `${cell.raw_score}${cell.band ? ` (${cell.band})` : ""}`
                                 : "—"}
                             </strong>
-                          </div>
+                          </MobileMetric>
                         );
                       })}
-                      <div className="assessmentMobileMetric assessmentMobileTotal">
-                        <span>{t("overallLabel")}</span>
+                      <MobileMetric>
+                        <Typography component="span">{t("overallLabel")}</Typography>
                         <strong>{student.overall_score ?? "—"}</strong>
-                      </div>
-                    </div>
-                    <div className="assessmentMobileActions" aria-label={t("actionsCol")}>
-                      <Button
-                        className="tableAction"
+                      </MobileMetric>
+                    </MobileFields>
+                    <MobileActions aria-label={t("actionsCol")}>
+                      <TableAction
                         type="button"
                         aria-label={t("downloadResultCardBtn")}
                         title={t("downloadResultCardBtn")}
                         onClick={() => assessmentsApi.downloadResultCard(student.student_id, matrix.session_id)}
                       >
                         <FileDown size={14} />
-                      </Button>
+                      </TableAction>
                       {canMessage && (
-                        <Button className="tableAction" type="button" aria-label={t("sendToParentsBtn")} title={t("sendToParentsBtn")} onClick={() => sendReport(student.student_id)}>
+                        <TableAction type="button" aria-label={t("sendToParentsBtn")} title={t("sendToParentsBtn")} onClick={() => sendReport(student.student_id)}>
                           <Send size={14} />
-                        </Button>
+                        </TableAction>
                       )}
-                    </div>
-                  </article>
+                    </MobileActions>
+                  </MobileCard>
                 ))}
-              </div>
+              </Box>
             ) : (
-              <div className="sheetWrap desktopOnlySheet">
-                <table className="sheet">
-                  <thead>
-                    <tr>
-                      <th>{t("studentCol")}</th>
-                      <th>{t("admissionNoCol")}</th>
-                      {visibleCourses.map((c) => <th key={c.course_id}>{c.course_name}</th>)}
-                      <th>{t("overallLabel")}</th>
-                      <th>{t("actionsCol")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <StyledTableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <HeaderTableRow>
+                      <TableCell>{t("studentCol")}</TableCell>
+                      <TableCell>{t("admissionNoCol")}</TableCell>
+                      {visibleCourses.map((c) => <TableCell key={c.course_id}>{c.course_name}</TableCell>)}
+                      <TableCell>{t("overallLabel")}</TableCell>
+                      <TableCell>{t("actionsCol")}</TableCell>
+                    </HeaderTableRow>
+                  </TableHead>
+                  <TableBody>
                     {section.students.length === 0 && (
-                      <tr><td className="sheetEmpty" colSpan={visibleCourses.length + 4}>{t("noStudentsInSection")}</td></tr>
+                      <DataTableRow><TableCell colSpan={visibleCourses.length + 4}><Typography color="text.secondary">{t("noStudentsInSection")}</Typography></TableCell></DataTableRow>
                     )}
                     {section.students.map((student) => (
-                      <tr key={student.student_id}>
-                        <td data-label={t("studentCol")}>{student.name}</td>
-                        <td data-label={t("admissionNoCol")}>{student.admission_number}</td>
+                      <DataTableRow key={student.student_id}>
+                        <TableCell>{student.name}</TableCell>
+                        <TableCell>{student.admission_number}</TableCell>
                         {visibleCourses.map((c) => {
                           const cell = student.courses.find((x) => x.course_id === c.course_id);
                           return (
-                            <td key={c.course_id} data-label={c.course_name}>
+                            <TableCell key={c.course_id}>
                               {cell?.raw_score !== null && cell?.raw_score !== undefined
                                 ? `${cell.raw_score}${cell.band ? ` (${cell.band})` : ""}`
                                 : "—"}
-                            </td>
+                            </TableCell>
                           );
                         })}
-                        <td data-label={t("overallLabel")}><strong>{student.overall_score ?? "—"}</strong></td>
-                        <td data-label={t("actionsCol")}>
-                          <Button
-                            className="tableAction"
-                            type="button"
-                            aria-label={t("downloadResultCardBtn")}
-                            title={t("downloadResultCardBtn")}
-                            onClick={() => assessmentsApi.downloadResultCard(student.student_id, matrix.session_id)}
-                          >
-                            <FileDown size={14} />
-                          </Button>
-                          {canMessage && (
-                            <Button className="tableAction" type="button" aria-label={t("sendToParentsBtn")} title={t("sendToParentsBtn")} onClick={() => sendReport(student.student_id)}>
-                              <Send size={14} />
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
+                        <TableCell><strong>{student.overall_score ?? "—"}</strong></TableCell>
+                        <TableCell>
+                          <Box sx={{ display: "flex", gap: 0.5 }}>
+                            <TableAction
+                              type="button"
+                              aria-label={t("downloadResultCardBtn")}
+                              title={t("downloadResultCardBtn")}
+                              onClick={() => assessmentsApi.downloadResultCard(student.student_id, matrix.session_id)}
+                            >
+                              <FileDown size={14} />
+                            </TableAction>
+                            {canMessage && (
+                              <TableAction type="button" aria-label={t("sendToParentsBtn")} title={t("sendToParentsBtn")} onClick={() => sendReport(student.student_id)}>
+                                <Send size={14} />
+                              </TableAction>
+                            )}
+                          </Box>
+                        </TableCell>
+                      </DataTableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </StyledTableContainer>
             )}
-            <div className="teacherSummary">
+            <TeacherSummary>
               <strong>{t("courseTeachersHeading")}</strong>
               <ul>
                 {section.courses.map((c) => (
                   <li key={c.course_id}>{c.course_name} — {c.teacher_name ?? "—"}</li>
                 ))}
               </ul>
-            </div>
+            </TeacherSummary>
           </PageSection>
         );
       })}

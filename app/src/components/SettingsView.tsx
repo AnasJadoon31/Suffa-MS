@@ -1,5 +1,10 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
+import Chip from "@mui/material/Chip";
 import { Check, Copy, MessageCircle, Pencil, RefreshCw, Settings as SettingsIcon, Upload, Wifi, WifiOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -178,45 +183,53 @@ export function SettingsView() {
   return (
     <PageSection>
       <PageHeader title={t("settingsTitle")} icon={<SettingsIcon size={18} />} notice={t("settingsSubtitle")} />
-      {error && <p className="notice" style={{ color: "var(--rose)" }}>{error}</p>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {canManage && (
-        <PageSection className="whatsappConnectionCard">
-          <div className="whatsappConnectionHeader">
-            <div>
-              <h3><MessageCircle size={18} /> {t("whatsappConnectionTitle")}</h3>
-              <p className="notice">{t("whatsappConnectionDescription")}</p>
-            </div>
-            <span className={`whatsappConnectionState ${whatsAppStatus?.connected ? "connected" : "disconnected"}`}>
-              {whatsAppStatus?.connected ? <Wifi size={15} /> : (whatsAppLoading ? <RefreshCw size={15} /> : <WifiOff size={15} />)}
-              {whatsAppStateLabel}
-            </span>
-          </div>
-          {pairingError && <p className="notice" style={{ color: "var(--rose)" }}>{pairingError}</p>}
-          <div className="whatsappConnectionActions">
+        <Paper variant="outlined" sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 2.5, mb: 2.5 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 2 }}>
+            <Box>
+              <Typography variant="h6" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <MessageCircle size={18} /> {t("whatsappConnectionTitle")}
+              </Typography>
+              <Typography sx={{ color: "text.secondary", fontSize: "0.875rem", mt: 0.5 }}>
+                {t("whatsappConnectionDescription")}
+              </Typography>
+            </Box>
+            <Chip
+              icon={whatsAppStatus?.connected ? <Wifi size={15} /> : (whatsAppLoading ? <RefreshCw size={15} /> : <WifiOff size={15} />)}
+              label={whatsAppStateLabel}
+              color={whatsAppStatus?.connected ? "success" : "default"}
+              size="small"
+            />
+          </Box>
+          {pairingError && <Alert severity="error" sx={{ mt: 1 }}>{pairingError}</Alert>}
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
             <Button type="button" onClick={() => { setPairingOpen(true); setPairingMethod("phone"); setPairingCode(""); setQrCode(""); setPairingError(""); setReplacePairingPending(false); }} disabled={whatsAppLoading || !whatsAppStatus || whatsAppStatus.connected}>
               <MessageCircle size={15} /> {t("connectWhatsAppBtn")}
             </Button>
-            <Button className="secondaryAction" type="button" onClick={() => void loadWhatsAppStatus()} disabled={whatsAppLoading}>
+            <Button type="button" onClick={() => void loadWhatsAppStatus()} disabled={whatsAppLoading}>
               <RefreshCw size={15} /> {t("refreshStatusBtn")}
             </Button>
-          </div>
-        </PageSection>
+          </Box>
+        </Paper>
       )}
 
       {pairingOpen && (
         <Modal title={t("connectWhatsAppTitle")} onClose={() => { setPairingOpen(false); setPairingCode(""); setQrCode(""); }}>
           {!pairingCode && !qrCode ? (
-            <form className="whatsappPairingForm" onSubmit={pairingMethod === "phone" ? requestPairingCode : (event) => { event.preventDefault(); void generateQrCode(false); }}>
-              <div className="whatsappMethodSwitch" role="tablist" aria-label={t("whatsappPairingMethodLabel")}>
-                <Button className={pairingMethod === "phone" ? "primaryAction" : "secondaryAction"} type="button" role="tab" aria-selected={pairingMethod === "phone"} onClick={() => { setPairingMethod("phone"); setReplacePairingPending(false); setPairingError(""); }}>
+            <form onSubmit={pairingMethod === "phone" ? requestPairingCode : (event) => { event.preventDefault(); void generateQrCode(false); }}>
+              <Box sx={{ display: "flex", gap: 1, mb: 2 }} role="tablist" aria-label={t("whatsappPairingMethodLabel")}>
+                <Button type="button" role="tab" aria-selected={pairingMethod === "phone"} onClick={() => { setPairingMethod("phone"); setReplacePairingPending(false); setPairingError(""); }}>
                   {t("whatsappPhonePairingTab")}
                 </Button>
-                <Button className={pairingMethod === "qr" ? "primaryAction" : "secondaryAction"} type="button" role="tab" aria-selected={pairingMethod === "qr"} onClick={() => { setPairingMethod("qr"); setReplacePairingPending(false); setPairingError(""); }}>
+                <Button type="button" role="tab" aria-selected={pairingMethod === "qr"} onClick={() => { setPairingMethod("qr"); setReplacePairingPending(false); setPairingError(""); }}>
                   {t("whatsappQrPairingTab")}
                 </Button>
-              </div>
-              <p className="notice">{pairingMethod === "phone" ? t("whatsappPhoneHelp") : t("whatsappQrHelp")}</p>
+              </Box>
+              <Typography sx={{ color: "text.secondary", fontSize: "0.875rem", mb: 1 }}>
+                {pairingMethod === "phone" ? t("whatsappPhoneHelp") : t("whatsappQrHelp")}
+              </Typography>
               {pairingMethod === "phone" ? (
                 <PhoneInput
                   id="whatsapp-pairing-phone"
@@ -227,57 +240,78 @@ export function SettingsView() {
                   onChange={setPairingPhone}
                 />
               ) : null}
-              {pairingError && <p className="notice" style={{ color: "var(--rose)" }}>{pairingError}</p>}
+              {pairingError && <Alert severity="error" sx={{ mt: 1 }}>{pairingError}</Alert>}
               {replacePairingPending ? (
-                <div className="whatsappPairingWarning" role="alert">
-                  <p>{t("whatsappReplacePairingWarning")}</p>
-                  <div className="whatsappConnectionActions">
+                <Alert severity="warning" sx={{ mt: 1 }}>
+                  <Typography>{t("whatsappReplacePairingWarning")}</Typography>
+                  <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
                     <Button type="button" onClick={() => void (pairingMethod === "phone" ? generatePairingCode(true) : generateQrCode(true))} disabled={whatsAppLoading}>{t("replacePairingBtn")}</Button>
-                    <Button className="secondaryAction" type="button" onClick={() => setReplacePairingPending(false)}>{t("cancelBtn")}</Button>
-                  </div>
-                </div>
+                    <Button type="button" onClick={() => setReplacePairingPending(false)}>{t("cancelBtn")}</Button>
+                  </Box>
+                </Alert>
               ) : (
                 <Button type="submit" disabled={whatsAppLoading || (pairingMethod === "phone" && !pairingPhone)}>{whatsAppLoading ? t("generatingCodeLabel") : pairingMethod === "phone" ? t("generatePairingCodeBtn") : t("generateQrCodeBtn")}</Button>
               )}
             </form>
           ) : whatsAppStatus?.connected ? (
-            <div className="whatsappPairingSuccess"><Wifi size={30} /><h3>{t("whatsappConnectedTitle")}</h3><p className="notice">{t("whatsappConnectedDescription")}</p></div>
+            <Box sx={{ textAlign: "center", py: 2 }}>
+              <Wifi size={30} />
+              <Typography variant="h6">{t("whatsappConnectedTitle")}</Typography>
+              <Typography sx={{ color: "text.secondary", fontSize: "0.875rem" }}>{t("whatsappConnectedDescription")}</Typography>
+            </Box>
           ) : qrCode ? (
-            <div className="whatsappPairingCode">
-              <p>{t("whatsappQrInstructions")}</p>
-              <img className="whatsappQrImage" src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`} alt={t("whatsappQrAlt")} />
-              <p className="notice">{t("whatsappWaitingForConnection")}</p>
-            </div>
+            <Box sx={{ textAlign: "center" }}>
+              <Typography>{t("whatsappQrInstructions")}</Typography>
+              <Box component="img" sx={{ margin: "16px auto", display: "block" }} src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`} alt={t("whatsappQrAlt")} />
+              <Typography sx={{ color: "text.secondary", fontSize: "0.875rem" }}>{t("whatsappWaitingForConnection")}</Typography>
+            </Box>
           ) : (
-            <div className="whatsappPairingCode">
-              <p>{t("whatsappPairingInstructions")}</p>
-              <div className="pairingCodeValue" aria-label={t("whatsappPairingCodeLabel")}>{pairingCode}</div>
-              <Button className="secondaryAction" type="button" onClick={() => void navigator.clipboard.writeText(pairingCode.replace("-", ""))}><Copy size={15} /> {t("copyCodeBtn")}</Button>
-              <p className="notice">{t("whatsappWaitingForConnection")}</p>
-            </div>
+            <Box sx={{ textAlign: "center" }}>
+              <Typography>{t("whatsappPairingInstructions")}</Typography>
+              <Box
+                sx={{
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  py: 2,
+                  px: 3,
+                  bgcolor: "action.hover",
+                  borderRadius: 2,
+                  display: "inline-block",
+                  my: 1,
+                }}
+                aria-label={t("whatsappPairingCodeLabel")}
+              >
+                {pairingCode}
+              </Box>
+              <Button type="button" onClick={() => void navigator.clipboard.writeText(pairingCode.replace("-", ""))}><Copy size={15} /> {t("copyCodeBtn")}</Button>
+              <Typography sx={{ color: "text.secondary", fontSize: "0.875rem", mt: 1 }}>{t("whatsappWaitingForConnection")}</Typography>
+            </Box>
           )}
         </Modal>
       )}
 
       {isLoading && <LoadingState />}
       {!isLoading && loadError && <ErrorState message={loadError} />}
-      {!isLoading && !loadError && categories.length === 0 && <p className="emptyState">{t("noSettingsYet")}</p>}
+      {!isLoading && !loadError && categories.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noSettingsYet")}</Typography>}
       {!isLoading && !loadError && categories.map(([category, items]) => (
-        <PageSection key={category} style={{ marginBottom: 16 }}>
-          <h3 className="settingsCategory">{t(`settingsCategory_${category}`, { defaultValue: category })}</h3>
-          <div className="settingsList">
+        <PageSection key={category} sx={{ marginBottom: 16 }}>
+          <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>{t(`settingsCategory_${category}`, { defaultValue: category })}</Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {items.map((item) => (
-              <div className="settingsRow" key={item.key}>
-                <span className="settingsLabel">{item.label}</span>
-                <span className="notice">{item.type === "file" ? (draftValue(item) ? t("fileUploadedLabel") : "—") : draftValue(item)}</span>
-                {canManage && <Button className="tableAction" type="button" onClick={() => setEditingKey(item.key)}><Pencil size={14} /> {t("editBtn")}</Button>}
-                {savedKey === item.key && <Check size={16} className="savedTick" />}
+              <Box key={item.key} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap", py: 1, borderBottom: 1, borderColor: "divider" }}>
+                <Typography sx={{ fontWeight: 600, minWidth: 120 }}>{item.label}</Typography>
+                <Typography sx={{ color: "text.secondary", flex: 1 }}>
+                  {item.type === "file" ? (draftValue(item) ? t("fileUploadedLabel") : "—") : draftValue(item)}
+                </Typography>
+                {canManage && <Button type="button" onClick={() => setEditingKey(item.key)}><Pencil size={14} /> {t("editBtn")}</Button>}
+                {savedKey === item.key && <Check size={16} />}
                 {editingKey === item.key && (
                   item.type === "file" ? (
                     <Modal title={item.label} onClose={() => setEditingKey(null)}>
-                      <label className="secondaryAction">
-                        <Upload size={16} /> {t("chooseLogoBtn")}
-                        <Input className="visuallyHidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => {
+                      <label>
+                        <Button type="button"><Upload size={16} /> {t("chooseLogoBtn")}</Button>
+                        <Input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => {
                           const file = event.target.files?.[0];
                           if (file) void uploadFile(item, file).then(() => setEditingKey(null));
                           event.target.value = "";
@@ -299,9 +333,9 @@ export function SettingsView() {
                     </FormModal>
                   )
                 )}
-              </div>
+              </Box>
             ))}
-          </div>
+          </Box>
         </PageSection>
       ))}
     </PageSection>

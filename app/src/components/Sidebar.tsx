@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router";
 import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -132,6 +133,15 @@ const NavLinkWrapper = styled(NavLink)({
   },
 });
 
+const ProfileInfo = styled("div")({
+  flex: 1,
+  overflow: "hidden",
+});
+
+const BrandInfo = styled("div")({
+  overflow: "hidden",
+});
+
 export type SidebarProps = Readonly<{
   onNavigate?: () => void;
 }>;
@@ -195,17 +205,17 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       <BrandArea>
         <BrandLogo>{madrasa?.name?.[0]?.toUpperCase() ?? "م"}</BrandLogo>
         {!collapsed && (
-          <div style={{ overflow: "hidden" }}>
+          <BrandInfo>
             <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
               {(i18n.language === "ur" ? madrasa?.name_ur : madrasa?.name_en) || madrasa?.name || t("appName")}
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap>
               {t("appName")}
             </Typography>
-          </div>
+          </BrandInfo>
         )}
         <CollapseButton size="small" onClick={() => setCollapsed((v) => !v)} sx={{ display: collapsed ? "none" : "inline-flex" }}>
-          <ChevronRight size={14} style={{ transform: "rotate(180deg)" }} />
+          <Box component={ChevronRight} size={14} sx={{ transform: "rotate(180deg)" }} />
         </CollapseButton>
       </BrandArea>
 
@@ -304,12 +314,12 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           </Avatar>
           {!collapsed && (
             <>
-              <div style={{ flex: 1, overflow: "hidden" }}>
+              <ProfileInfo>
                 <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
                   {user.username}
                 </Typography>
                 <RoleBadge role={user.role} />
-              </div>
+              </ProfileInfo>
               <IconButton size="small" onClick={logout} aria-label={t("logout")} title={t("logout")}>
                 <LogOut size={16} />
               </IconButton>

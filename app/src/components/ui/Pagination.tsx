@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { styled } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import type { PageResult } from "../../lib/api";
 import { Button } from "./Button";
@@ -43,12 +44,11 @@ export function PaginationControls({
   return (
     <Box
       component="nav"
-      className="pagination"
       aria-label={t("paginationLabel")}
-      sx={{ display: "flex", gap: 1.25, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}
+      sx={{ display: "flex", gap: 1.25, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", py: 1.5 }}
     >
       <Button
-        className="secondaryAction"
+        variant="outlined"
         type="button"
         disabled={page === 0}
         onClick={() => onChange({ ...state, page: page - 1 })}
@@ -57,7 +57,7 @@ export function PaginationControls({
       </Button>
       <Typography variant="body2" color="text.secondary">{t("pageOfLabel", { page: page + 1, pages, total })}</Typography>
       <Button
-        className="secondaryAction"
+        variant="outlined"
         type="button"
         disabled={page + 1 >= pages}
         onClick={() => onChange({ ...state, page: page + 1 })}
@@ -67,3 +67,14 @@ export function PaginationControls({
     </Box>
   );
 }
+
+/* ------------------------------------------------------------------ styled components */
+
+export const PaginationContainer = styled(Box)(({ theme }) => ({
+  display: "flex",
+  gap: theme.spacing(1.25),
+  alignItems: "center",
+  justifyContent: "flex-end",
+  flexWrap: "wrap",
+  padding: theme.spacing(1.5, 0),
+}));

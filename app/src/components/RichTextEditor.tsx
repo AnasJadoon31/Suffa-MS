@@ -2,6 +2,7 @@ import { Button } from "./ui/Button";
 import { useEffect, useRef } from "react";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
+import { styled } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { Select } from "./ui/Field";
 import {
@@ -27,6 +28,25 @@ const FONT_OPTIONS = [
   { labelKey: "sansSerifFontLabel", value: "Arial" },
   { labelKey: "urduFontLabel", value: "Noto Nastaliq Urdu" },
 ];
+
+const EditorToolbar = styled(Box)({
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 4,
+  padding: 8,
+  borderBottom: "1px solid",
+  borderColor: "divider",
+});
+
+const EditorArea = styled(Box)({
+  minHeight: 120,
+  padding: 12,
+  outline: "none",
+  "&:empty::before": {
+    content: "attr(data-placeholder)",
+    color: "text.secondary",
+  },
+});
 
 export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
   const { t } = useTranslation();
@@ -57,8 +77,8 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   };
 
   return (
-    <Paper variant="outlined" className="richTextEditor">
-      <Box className="richTextToolbar" role="toolbar" aria-label={t("textFormattingLabel")}>
+    <Paper variant="outlined">
+      <EditorToolbar role="toolbar" aria-label={t("textFormattingLabel")}>
         <Button type="button" title={t("boldLabel")} onMouseDown={(e) => { e.preventDefault(); exec("bold"); }}><Bold size={14} /></Button>
         <Button type="button" title={t("italicLabel")} onMouseDown={(e) => { e.preventDefault(); exec("italic"); }}><Italic size={14} /></Button>
         <Button type="button" title={t("underlineLabel")} onMouseDown={(e) => { e.preventDefault(); exec("underline"); }}><Underline size={14} /></Button>
@@ -77,10 +97,9 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         >
           {FONT_OPTIONS.map((f) => <option key={f.labelKey} value={f.value}>{t(f.labelKey)}</option>)}
         </Select>
-      </Box>
-      <Box
+      </EditorToolbar>
+      <EditorArea
         ref={editorRef}
-        className="richTextArea"
         contentEditable
         data-placeholder={placeholder}
         onInput={emit}

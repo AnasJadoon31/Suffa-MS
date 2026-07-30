@@ -1,5 +1,8 @@
 import { Button } from "./ui/Button";
 import Paper from "@mui/material/Paper";
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -9,6 +12,62 @@ import { Input, Select, CheckboxField } from "./ui/Field";
 const FIELD_TYPES = ["text", "textarea", "phone", "radio", "checkbox_group", "dropdown", "label"];
 const OPTION_FIELD_TYPES = new Set(["radio", "checkbox_group", "dropdown"]);
 type EditableFieldType = FormFieldDefinition["type"];
+
+const EditorWrapper = styled(Paper)({
+  padding: 16,
+});
+
+const FormFieldsHeader = styled("div")({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  marginBottom: 16,
+});
+
+const FormFieldsList = styled("div")({
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+});
+
+const FormFieldCard = styled(Paper)({
+  padding: 16,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  position: "relative",
+});
+
+const FieldLabel = styled("label")({
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  fontSize: "0.875rem",
+});
+
+const FormFieldOptions = styled("fieldset")({
+  border: "none",
+  padding: 0,
+  margin: 0,
+});
+
+const FormFieldOptionRow = styled("div")({
+  display: "flex",
+  gap: 4,
+  alignItems: "center",
+  marginBottom: 4,
+});
+
+const Legend = styled("legend")({
+  fontSize: "0.875rem",
+  fontWeight: 500,
+  marginBottom: 8,
+});
+
+const EmptyState = styled(Typography)({
+  textAlign: "center",
+  padding: 16,
+});
 
 export const emptyFormField = (): FormFieldDefinition => ({
   key: "",
@@ -61,28 +120,28 @@ export function FormFieldsEditor({
   };
 
   return (
-    <Paper component="section" variant="outlined" className="formFieldsEditor" aria-label={t("formFieldsHeading")}>
-      <div className="formFieldsHeader">
+    <EditorWrapper variant="outlined" aria-label={t("formFieldsHeading")}>
+      <FormFieldsHeader>
         <div>
-          <h4>{t("formFieldsHeading")}</h4>
-          <p>{t("formFieldsHint")}</p>
+          <Typography variant="h6" component="h4">{t("formFieldsHeading")}</Typography>
+          <Typography variant="body2" color="text.secondary">{t("formFieldsHint")}</Typography>
         </div>
-        <Button className="secondaryAction" type="button" onClick={() => onChange([...fields, emptyFormField()])}>
+        <Button type="button" onClick={() => onChange([...fields, emptyFormField()])}>
           <Plus size={16} /> {t("addFieldBtn")}
         </Button>
-      </div>
+      </FormFieldsHeader>
 
-      {fields.length === 0 && <p className="emptyState compactEmptyState">{t("noCustomFieldsYet")}</p>}
-      <div className="formFieldsList">
+      {fields.length === 0 && <EmptyState variant="body2" color="text.secondary">{t("noCustomFieldsYet")}</EmptyState>}
+      <FormFieldsList>
         {fields.map((field, index) => (
-          <Paper key={index} variant="outlined" className="formFieldCard">
-            <span className="formFieldNumber">{index + 1}</span>
-            {field.built_in && <span className="formFieldBuiltInBadge">{t("builtInFieldLabel", "Built-in")}</span>}
-            <label>
+          <FormFieldCard key={index} variant="outlined">
+            <span>{index + 1}</span>
+            {field.built_in && <span>{t("builtInFieldLabel", "Built-in")}</span>}
+            <FieldLabel>
               {t("fieldLabelLabel")}
               <Input required value={field.label} disabled={field.built_in} onChange={(event) => updateField(index, { label: event.target.value })} />
-            </label>
-            <label>
+            </FieldLabel>
+            <FieldLabel>
               {t("fieldTypeLabel")}
               <Select disabled={field.built_in} value={field.type} onChange={(event) => {
                 const type = event.target.value as EditableFieldType;
@@ -90,12 +149,12 @@ export function FormFieldsEditor({
               }}>
                 {FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
               </Select>
-            </label>
+            </FieldLabel>
             {OPTION_FIELD_TYPES.has(field.type) && (
-              <fieldset className="formFieldOptions">
-                <legend>{t("fieldOptionsLabel")}</legend>
+              <FormFieldOptions>
+                <Legend>{t("fieldOptionsLabel")}</Legend>
                 {field.options.map((option, optionIndex) => (
-                  <div className="formFieldOptionRow" key={optionIndex}>
+                  <FormFieldOptionRow key={optionIndex}>
                     <Input
                       required
                       aria-label={t("optionNumberLabel", { number: optionIndex + 1 })}
@@ -104,45 +163,42 @@ export function FormFieldsEditor({
                         options: field.options.map((item, itemIndex) => itemIndex === optionIndex ? event.target.value : item),
                       })}
                     />
-                    <Button className="iconBtn" type="button" disabled={optionIndex === 0} aria-label={t("moveOptionUp")}
+                    <Button type="button" disabled={optionIndex === 0} aria-label={t("moveOptionUp")}
                       onClick={() => {
                         const options = [...field.options];
                         [options[optionIndex - 1], options[optionIndex]] = [options[optionIndex], options[optionIndex - 1]];
                         updateField(index, { options });
                       }}><ArrowUp size={14} /></Button>
-                    <Button className="iconBtn" type="button" disabled={optionIndex === field.options.length - 1} aria-label={t("moveOptionDown")}
+                    <Button type="button" disabled={optionIndex === field.options.length - 1} aria-label={t("moveOptionDown")}
                       onClick={() => {
                         const options = [...field.options];
                         [options[optionIndex], options[optionIndex + 1]] = [options[optionIndex + 1], options[optionIndex]];
                         updateField(index, { options });
                       }}><ArrowDown size={14} /></Button>
-                    <Button className="iconBtn danger" type="button" aria-label={t("removeOption")}
+                    <Button type="button" aria-label={t("removeOption")}
                       onClick={() => updateField(index, { options: field.options.filter((_, itemIndex) => itemIndex !== optionIndex) })}>
                       <Trash2 size={14} />
                     </Button>
-                  </div>
+                  </FormFieldOptionRow>
                 ))}
-                <Button className="secondaryAction" type="button" onClick={() => updateField(index, { options: [...field.options, ""] })}>
+                <Button type="button" onClick={() => updateField(index, { options: [...field.options, ""] })}>
                   <Plus size={14} /> {t("addOption")}
                 </Button>
-              </fieldset>
+              </FormFieldOptions>
             )}
             <CheckboxField
-              className="formFieldRequired"
               checked={field.required}
               onChange={(event) => updateField(index, { required: event.target.checked })}
               label={t("requiredLabel")}
             />
             {field.built_in && (
               <CheckboxField
-                className="formFieldEnabled"
                 checked={field.enabled !== false}
                 onChange={(event) => updateField(index, { enabled: event.target.checked })}
                 label={t("enabledLabel")}
               />
             )}
             <Button
-              className="iconBtn danger formFieldRemove"
               type="button"
               aria-label={t("removeFieldBtn")}
               disabled={field.built_in}
@@ -150,9 +206,9 @@ export function FormFieldsEditor({
             >
               <Trash2 size={15} />
             </Button>
-          </Paper>
+          </FormFieldCard>
         ))}
-      </div>
-    </Paper>
+      </FormFieldsList>
+    </EditorWrapper>
   );
 }

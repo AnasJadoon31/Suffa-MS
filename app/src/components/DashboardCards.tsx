@@ -1,4 +1,4 @@
-import { styled } from "@mui/material/styles";
+import { styled, useTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
@@ -122,6 +122,59 @@ const TrendRow = styled("div")({
   marginTop: 4,
 });
 
+const ChildTab = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: theme.spacing(1),
+  padding: "8px 14px",
+  borderRadius: 999,
+  cursor: "pointer",
+  fontWeight: 600,
+  fontSize: "0.85rem",
+  border: `1px solid ${theme.palette.divider}`,
+}));
+
+const ListItemRow = styled(Box)(({ theme }) => ({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "8px 0",
+  borderBottom: `1px solid ${theme.palette.divider}`,
+}));
+
+const ListItemRowWrap = styled(Box)(({ theme }) => ({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "8px 0",
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  flexWrap: "wrap",
+  gap: theme.spacing(1),
+}));
+
+const ListItemSimple = styled(Box)(({ theme }) => ({
+  padding: "8px 0",
+  borderBottom: `1px solid ${theme.palette.divider}`,
+}));
+
+const ErrorText = styled(Typography)(({ theme }) => ({
+  color: theme.palette.error.main,
+}));
+
+const FeedbackText = styled("span")(({ theme }) => ({
+  color: theme.palette.teal.main,
+  marginTop: 4,
+  display: "block",
+}));
+
+const SuccessText = styled(Typography)(({ theme }) => ({
+  color: theme.palette.leaf.main,
+}));
+
+const WarningText = styled(Typography)(({ theme }) => ({
+  color: theme.palette.gold.main,
+}));
+
 // ─── Metric Card ──────────────────────────────────────────────────────
 
 type MetricCardProps = Readonly<{
@@ -134,6 +187,7 @@ type MetricCardProps = Readonly<{
 }>;
 
 function MetricCard({ label, value, icon: Icon, iconColor, trend, trendDirection }: MetricCardProps) {
+  const theme = useTheme();
   return (
     <MetricCardPaper>
       <MetricIconWrapper color={iconColor}>
@@ -164,8 +218,8 @@ function MetricCard({ label, value, icon: Icon, iconColor, trend, trendDirection
       </Typography>
       {trend && (
         <TrendRow>
-          {trendDirection === "up" && <TrendingUp size={14} color="#3f7f4c" />}
-          {trendDirection === "down" && <TrendingDown size={14} color="#b94a48" />}
+          {trendDirection === "up" && <TrendingUp size={14} color={theme.palette.leaf.main} />}
+          {trendDirection === "down" && <TrendingDown size={14} color={theme.palette.rose.main} />}
           <Typography variant="caption" color="text.secondary">
             {trend}
           </Typography>
@@ -218,6 +272,7 @@ export function DashboardCards({ onNavigate }: DashboardCardsProps) {
 
 function ParentDashboardCards({ data, isDesktop }: Readonly<{ data: ParentDashboard; isDesktop: boolean }>) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const [selectedChildId, setSelectedChildId] = useState(data.children[0]?.id ?? "");
   const child = data.children.find((candidate) => candidate.id === selectedChildId) ?? data.children[0];
 
@@ -225,7 +280,7 @@ function ParentDashboardCards({ data, isDesktop }: Readonly<{ data: ParentDashbo
     return (
       <PageSection>
         <PageHeader title={t("myChildrenHeading")} />
-        <p>{t("noLinkedChildren")}</p>
+        <Typography>{t("noLinkedChildren")}</Typography>
       </PageSection>
     );
   }
@@ -267,9 +322,9 @@ function ParentDashboardCards({ data, isDesktop }: Readonly<{ data: ParentDashbo
               }}
             >
               <GraduationCap size={16} />
-              <span>
+              <Typography component="span">
                 <strong>{candidate.name}</strong>
-              </span>
+              </Typography>
             </Box>
           ))}
         </Box>
@@ -280,28 +335,28 @@ function ParentDashboardCards({ data, isDesktop }: Readonly<{ data: ParentDashbo
           label={t("classLabel")}
           value={child.current_class ?? "—"}
           icon={GraduationCap}
-          iconColor="#0f766e"
+          iconColor={theme.palette.teal.main}
           trend={`${t("admissionNumberCol")}: ${child.admission_number}`}
         />
         <MetricCard
           label={t("attendance")}
           value={`${attendanceCounts.present ?? 0} / ${Object.keys(statuses).length || "—"}`}
           icon={ClipboardCheck}
-          iconColor="#3f7f4c"
+          iconColor={theme.palette.leaf.main}
           trend={t("attendanceSummaryLine", { absent: attendanceCounts.absent ?? 0, leave: attendanceCounts.leave ?? 0 })}
         />
         <MetricCard
           label={t("overallScoreLabel")}
           value={child.latest_result?.overall_score ?? "—"}
           icon={TrendingUp}
-          iconColor="#c77d1a"
+          iconColor={theme.palette.gold.main}
           trend={child.latest_result ? t("publishedLabel") : t("notPublishedLabel")}
         />
         <MetricCard
           label={t("feesPaidLabel")}
           value={paymentTotals}
           icon={CircleDollarSign}
-          iconColor="#c77d1a"
+          iconColor={theme.palette.gold.main}
           trend={t("paymentCount", { count: child.payments.length })}
         />
       </MetricGridContainer>
@@ -318,82 +373,90 @@ function ParentDashboardCards({ data, isDesktop }: Readonly<{ data: ParentDashbo
 
           <PageSection>
             <PageHeader title={t("feeHistoryHeading")} />
-            {child.payments.length === 0 && <p>{t("noPaymentsYet")}</p>}
+            {child.payments.length === 0 && <Typography>{t("noPaymentsYet")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.payments.map((payment) => (
-                <Box key={payment.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-                  <span><strong>{payment.category}</strong><br /><small>{payment.note}</small></span>
-                  <span>{payment.payment_date}</span>
-                  <span><strong>{payment.amount.toLocaleString()} {payment.currency}</strong></span>
-                </Box>
+                <ListItemRow key={payment.id}>
+                  <Typography component="span">
+                    <strong>{payment.category}</strong>
+                    <br />
+                    <Typography component="small" variant="caption" color="text.secondary">{payment.note}</Typography>
+                  </Typography>
+                  <Typography component="span">{payment.payment_date}</Typography>
+                  <Typography component="span"><strong>{payment.amount.toLocaleString()} {payment.currency}</strong></Typography>
+                </ListItemRow>
               ))}
             </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("todaysTimetableHeading")} />
-            {child.today_timetable.length === 0 && <p>{t("noPeriodsToday")}</p>}
+            {child.today_timetable.length === 0 && <Typography>{t("noPeriodsToday")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.today_timetable.map((slot, index) => (
-                <Box key={`${slot.course_id}-${slot.period}-${index}`} sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-                  <span><strong>{t("periodLabel", { period: slot.period })}</strong></span>
-                  <span>{slot.start_time} – {slot.end_time}</span>
-                </Box>
+                <ListItemRow key={`${slot.course_id}-${slot.period}-${index}`}>
+                  <Typography component="span"><strong>{t("periodLabel", { period: slot.period })}</strong></Typography>
+                  <Typography component="span">{slot.start_time} – {slot.end_time}</Typography>
+                </ListItemRow>
               ))}
             </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("dueAssignmentsHeading")} />
-            {child.due_assignments.length === 0 && <p>{t("nothingDue")}</p>}
+            {child.due_assignments.length === 0 && <Typography>{t("nothingDue")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.due_assignments.map((assignment) => (
-                <Box key={assignment.id} sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-                  <span><strong>{assignment.title}</strong></span>
-                  <span>{assignment.due_date.slice(0, 10)}</span>
-                </Box>
+                <ListItemRow key={assignment.id}>
+                  <Typography component="span"><strong>{assignment.title}</strong></Typography>
+                  <Typography component="span">{assignment.due_date.slice(0, 10)}</Typography>
+                </ListItemRow>
               ))}
             </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("announcements")} />
-            {child.announcements.length === 0 && <p>{t("noAnnouncementsYet")}</p>}
+            {child.announcements.length === 0 && <Typography>{t("noAnnouncementsYet")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.announcements.map((announcement) => (
-                <Box key={announcement.id} sx={{ padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-                  <span><strong>{announcement.title}</strong><br /><small>{announcement.body}</small></span>
-                </Box>
+                <ListItemSimple key={announcement.id}>
+                  <Typography component="span">
+                    <strong>{announcement.title}</strong>
+                    <br />
+                    <Typography component="small" variant="caption" color="text.secondary">{announcement.body}</Typography>
+                  </Typography>
+                </ListItemSimple>
               ))}
             </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("forms")} notice={t("wardFormsHint", { name: child.name })} />
-            {child.forms.length === 0 && <p>{t("noFormsYet")}</p>}
+            {child.forms.length === 0 && <Typography>{t("noFormsYet")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.forms.map((form) => (
-                <Box key={form.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-                  <span>
+                <ListItemRow key={form.id}>
+                  <Typography component="span">
                     <strong>{form.title}</strong>
                     <br />
-                    <small>{form.description || form.category || t("forms")}</small>
-                  </span>
-                  <span>{form.open_until ? form.open_until.slice(0, 10) : t("openBtn")}</span>
+                    <Typography component="small" variant="caption" color="text.secondary">{form.description || form.category || t("forms")}</Typography>
+                  </Typography>
+                  <Typography component="span">{form.open_until ? form.open_until.slice(0, 10) : t("openBtn")}</Typography>
                   <Link to="/forms">{t("openBtn")}</Link>
-                </Box>
+                </ListItemRow>
               ))}
             </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("resources")} />
-            {child.resources.length === 0 && <p>{t("noResourcesShared")}</p>}
+            {child.resources.length === 0 && <Typography>{t("noResourcesShared")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {child.resources.map((resource) => (
-                <Box key={resource.id} sx={{ padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-                  <span><strong>{resource.title}</strong></span>
-                </Box>
+                <ListItemSimple key={resource.id}>
+                  <Typography component="span"><strong>{resource.title}</strong></Typography>
+                </ListItemSimple>
               ))}
             </Box>
           </PageSection>
@@ -409,14 +472,14 @@ function ParentResults({ child }: Readonly<{ child: ParentChildDashboard }>) {
   return (
     <PageSection>
       <PageHeader title={t("latestResultsHeading")} />
-      {results.length === 0 && <p>{t("noPublishedResults")}</p>}
+      {results.length === 0 && <Typography>{t("noPublishedResults")}</Typography>}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         {results.map((result) => (
-          <Box key={result.course_id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-            <span><strong>{result.course_name ?? t("courseLabel")}</strong></span>
-            <span>{result.raw_score == null ? "—" : `${result.raw_score}%`}</span>
-            <span>{result.band ?? "—"}</span>
-          </Box>
+          <ListItemRow key={result.course_id}>
+            <Typography component="span"><strong>{result.course_name ?? t("courseLabel")}</strong></Typography>
+            <Typography component="span">{result.raw_score == null ? "—" : `${result.raw_score}%`}</Typography>
+            <Typography component="span">{result.band ?? "—"}</Typography>
+          </ListItemRow>
         ))}
       </Box>
     </PageSection>
@@ -449,13 +512,13 @@ function StudentAttendancePanel({
       />
       {selectedDate && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
-          {selectedPeriods.length === 0 && <p>{t("noAttendanceHistory")}</p>}
+          {selectedPeriods.length === 0 && <Typography>{t("noAttendanceHistory")}</Typography>}
           {selectedPeriods.map((entry, index) => (
-            <Box key={entry.timetable_slot_id ?? `${entry.date}-legacy-${index}`} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-              <span><strong>{entry.legacy_general ? t("legacyGeneralAttendance") : entry.course_name}</strong></span>
-              <span>{entry.legacy_general ? "—" : t("periodLabel", { period: entry.period })}</span>
-              <span>{t(entry.status)}</span>
-            </Box>
+            <ListItemRow key={entry.timetable_slot_id ?? `${entry.date}-legacy-${index}`}>
+              <Typography component="span"><strong>{entry.legacy_general ? t("legacyGeneralAttendance") : entry.course_name}</strong></Typography>
+              <Typography component="span">{entry.legacy_general ? "—" : t("periodLabel", { period: entry.period })}</Typography>
+              <Typography component="span">{t(entry.status)}</Typography>
+            </ListItemRow>
           ))}
         </Box>
       )}
@@ -467,6 +530,7 @@ function StudentAttendancePanel({
 
 function PrincipalDashboardCards({ data, isDesktop }: Readonly<{ data: PrincipalDashboard; isDesktop: boolean }>) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const studentCount = data.counts.students ?? 0;
   const teacherCount = data.counts.teachers ?? 0;
   const markedAttendanceTotal = data.attendance.present + data.attendance.absent + data.attendance.leave;
@@ -485,7 +549,7 @@ function PrincipalDashboardCards({ data, isDesktop }: Readonly<{ data: Principal
       value: String(studentCount),
       detail: t("activeClassesCount", { count: data.counts.classes }),
       icon: GraduationCap,
-      color: "#0f766e",
+      color: theme.palette.teal.main,
       trendDirection: "up" as const,
     },
     {
@@ -493,7 +557,7 @@ function PrincipalDashboardCards({ data, isDesktop }: Readonly<{ data: Principal
       value: String(teacherCount),
       detail: t("activeTeacherProfiles"),
       icon: UserRoundCog,
-      color: "#3f7f4c",
+      color: theme.palette.leaf.main,
       trendDirection: "neutral" as const,
     },
     {
@@ -501,7 +565,7 @@ function PrincipalDashboardCards({ data, isDesktop }: Readonly<{ data: Principal
       value: `${data.attendance.present} / ${attendanceRosterTotal || "—"}`,
       detail: attendanceDetail,
       icon: ClipboardCheck,
-      color: "#0f766e",
+      color: theme.palette.teal.main,
       trendDirection: "up" as const,
     },
     {
@@ -509,7 +573,7 @@ function PrincipalDashboardCards({ data, isDesktop }: Readonly<{ data: Principal
       value: String(data.attendance.missing_sync_teachers),
       detail: t("teachersWithoutTodayMark"),
       icon: AlertTriangle,
-      color: "#c77d1a",
+      color: theme.palette.gold.main,
       trendDirection: data.attendance.missing_sync_teachers > 0 ? ("down" as const) : ("neutral" as const),
     },
     {
@@ -517,7 +581,7 @@ function PrincipalDashboardCards({ data, isDesktop }: Readonly<{ data: Principal
       value: `${data.finance.month_total.toLocaleString()} ${data.finance.currency}`,
       detail: t("contributionsAndDonations"),
       icon: CircleDollarSign,
-      color: "#c77d1a",
+      color: theme.palette.gold.main,
       trendDirection: "up" as const,
     },
   ];
@@ -564,6 +628,7 @@ function PrincipalDashboardCards({ data, isDesktop }: Readonly<{ data: Principal
 
 function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readonly<{ data: TeacherDashboard; onNavigate?: (view: import("../data/mockData").ViewId) => void; readOnly: boolean; isDesktop: boolean }>) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const [attendance, setAttendance] = useState(data.today_attendance);
   const [logs, setLogs] = useState<TeacherAttendanceLogEntry[]>([]);
   const [error, setError] = useState("");
@@ -608,14 +673,14 @@ function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readon
           label={t("myClassesHeading")}
           value={data.my_classes.length}
           icon={GraduationCap}
-          iconColor="#0f766e"
+          iconColor={theme.palette.teal.main}
           trend={data.my_classes.map((c) => `${c.class_name} · ${c.course_name}`).join(", ") || t("noAssignmentsYet")}
         />
         <MetricCard
           label={t("pendingSubmissionsHeading")}
           value={data.pending_submissions}
           icon={ClipboardCheck}
-          iconColor="#c77d1a"
+          iconColor={theme.palette.gold.main}
           trend={t("ungradedAcrossClasses")}
           trendDirection={data.pending_submissions > 0 ? "down" : "neutral"}
         />
@@ -623,39 +688,41 @@ function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readon
           label={t("todayAttendance")}
           value={attendance?.check_in ? formatTime(attendance.check_in) : t("notCheckedIn")}
           icon={LogIn}
-          iconColor="#3f7f4c"
+          iconColor={theme.palette.leaf.main}
           trend={t("checkedOutAt", { time: formatTime(attendance?.check_out) })}
         />
       </MetricGridContainer>
       <PageSection>
         <PageHeader title={t("myClassesHeading")} />
-        {data.my_classes.length === 0 && <p>{t("noCoursesAssigned")}</p>}
+        {data.my_classes.length === 0 && <Typography>{t("noCoursesAssigned")}</Typography>}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           {data.my_classes.map((entry, index) => (
             <Box key={index} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider", flexWrap: "wrap", gap: 1 }}>
-              <span>{entry.class_name}{entry.section_name ? ` / ${entry.section_name}` : ""}</span>
-              <span>{entry.course_name}</span>
+              <Typography component="span">{entry.class_name}{entry.section_name ? ` / ${entry.section_name}` : ""}</Typography>
+              <Typography component="span">{entry.course_name}</Typography>
               <Box sx={{ display: "flex", gap: 1 }}>
-                <button
+                <Box
+                  component="button"
                   type="button"
                   onClick={() => {
                     setPendingClassNav({ classId: entry.class_id, sectionId: entry.section_id, courseId: entry.course_id });
                     onNavigate?.("attendance");
                   }}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: "1px solid #e0e6df", background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
+                  sx={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: `1px solid ${theme.palette.divider}`, background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
                 >
                   <ExternalLink size={14} /> {t("openClassListBtn")}
-                </button>
-                <button
+                </Box>
+                <Box
+                  component="button"
                   type="button"
                   onClick={() => {
                     setPendingClassNav({ classId: entry.class_id, sectionId: entry.section_id, courseId: entry.course_id });
                     onNavigate?.("assessments");
                   }}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: "1px solid #e0e6df", background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
+                  sx={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: `1px solid ${theme.palette.divider}`, background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
                 >
                   <ExternalLink size={14} /> {t("assessments")}
-                </button>
+                </Box>
               </Box>
             </Box>
           ))}
@@ -664,39 +731,41 @@ function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readon
       <PageSection>
         <PageHeader title={t("timeInOutHeading")} />
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <button
+          <Box
+            component="button"
             type="button"
             disabled={readOnly || !!attendance?.check_in}
             onClick={() => checkIn()}
-            style={{
+            sx={{
               display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 999,
-              border: "none", backgroundColor: readOnly || attendance?.check_in ? "#e0e6df" : "#0f766e",
-              color: readOnly || attendance?.check_in ? "#9bb8b0" : "#fff", cursor: readOnly || attendance?.check_in ? "not-allowed" : "pointer",
+              border: "none", backgroundColor: readOnly || attendance?.check_in ? theme.palette.divider : theme.palette.teal.main,
+              color: readOnly || attendance?.check_in ? theme.palette.text.disabled : theme.palette.teal.contrastText, cursor: readOnly || attendance?.check_in ? "not-allowed" : "pointer",
               fontWeight: 600, fontSize: "0.875rem",
             }}
           >
             <LogIn size={16} /> {t("timeInLabel")}
-          </button>
-          <button
+          </Box>
+          <Box
+            component="button"
             type="button"
             disabled={readOnly || !attendance?.check_in || !!attendance?.check_out}
             onClick={() => checkOut()}
-            style={{
+            sx={{
               display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 999,
-              border: "1px solid #e0e6df", backgroundColor: readOnly || !attendance?.check_in || attendance?.check_out ? "transparent" : "#fff",
-              color: readOnly || !attendance?.check_in || attendance?.check_out ? "#9bb8b0" : "#16211d",
+              border: `1px solid ${theme.palette.divider}`, backgroundColor: readOnly || !attendance?.check_in || attendance?.check_out ? "transparent" : theme.palette.background.paper,
+              color: readOnly || !attendance?.check_in || attendance?.check_out ? theme.palette.text.disabled : theme.palette.text.primary,
               cursor: readOnly || !attendance?.check_in || attendance?.check_out ? "not-allowed" : "pointer",
               fontWeight: 600, fontSize: "0.875rem",
             }}
           >
             <LogOut size={16} /> {t("timeOutLabel")}
-          </button>
+          </Box>
         </Box>
-        {error && <p style={{ color: "#b94a48" }}>{error}</p>}
+        {error && <ErrorText sx={{ mt: 1 }}>{error}</ErrorText>}
       </PageSection>
       <PageSection>
         <PageHeader title={t("todaysTimetableHeading")} />
-        {data.today_timetable.length === 0 && <p>{t("noPeriodsToday")}</p>}
+        {data.today_timetable.length === 0 && <Typography>{t("noPeriodsToday")}</Typography>}
         <ul>
           {data.today_timetable.map((slot, i) => (
             <li key={i}>{slot.start_time} – {slot.end_time} ({t("periodLabel", { period: slot.period })})</li>
@@ -707,19 +776,19 @@ function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readon
         <PageHeader title={t("myAttendanceLogHeading")} />
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontWeight: 700, fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: 2, borderColor: "divider" }}>
-            <span>{t("dateCol")}</span>
-            <span>{t("statusCol")}</span>
-            <span>{t("timeInLabel")}</span>
-            <span>{t("timeOutLabel")}</span>
+            <Typography component="span">{t("dateCol")}</Typography>
+            <Typography component="span">{t("statusCol")}</Typography>
+            <Typography component="span">{t("timeInLabel")}</Typography>
+            <Typography component="span">{t("timeOutLabel")}</Typography>
           </Box>
-          {logs.length === 0 && <p>{t("noTeacherAttendanceLogs")}</p>}
+          {logs.length === 0 && <Typography>{t("noTeacherAttendanceLogs")}</Typography>}
           {logs.slice(0, 10).map((entry) => (
-            <Box key={entry.id} sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-              <span>{entry.attendance_date}</span>
-              <span>{t(entry.status)}</span>
-              <span>{formatTime(entry.check_in)}</span>
-              <span>{formatTime(entry.check_out)}</span>
-            </Box>
+            <ListItemRow key={entry.id}>
+              <Typography component="span">{entry.attendance_date}</Typography>
+              <Typography component="span">{t(entry.status)}</Typography>
+              <Typography component="span">{formatTime(entry.check_in)}</Typography>
+              <Typography component="span">{formatTime(entry.check_out)}</Typography>
+            </ListItemRow>
           ))}
         </Box>
       </PageSection>
@@ -731,6 +800,7 @@ function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readon
 
 function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assignment: StudentDashboard["due_assignments"][number]; onSubmitted: () => void; readOnly: boolean }>) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(assignment.submitted ?? false);
@@ -755,61 +825,64 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
 
   return (
     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: 1, borderColor: "divider", flexWrap: "wrap", gap: 1 }}>
-      <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <Typography component="span" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
         <strong>{assignment.title}</strong>
-        <span>Due {assignment.due_date.slice(0, 10)}</span>
+        <Typography component="span">Due {assignment.due_date.slice(0, 10)}</Typography>
         {assignment.feedback && (
-          <span style={{ color: "#0f766e", marginTop: 4 }}>
+          <FeedbackText>
             <strong>{t("remarksLabel", "Remarks")}:</strong> {assignment.feedback}
-          </span>
+          </FeedbackText>
         )}
-      </span>
-      <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      </Typography>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
         {submitted ? (
-          <span style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-            <span>{t("submittedLabel")}</span>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, alignItems: "flex-end" }}>
+            <Typography component="span">{t("submittedLabel")}</Typography>
             {assignment.mark !== undefined && assignment.mark !== null && assignment.max_marks && (
-              <span>{assignment.mark} / {assignment.max_marks}</span>
+              <Typography component="span">{assignment.mark} / {assignment.max_marks}</Typography>
             )}
             {submittedFileKey && (
-              <button
+              <Box
+                component="button"
                 type="button"
                 onClick={async () => {
                   const { url } = await filesApi.presignDownload(submittedFileKey);
                   window.open(url, "_blank", "noreferrer");
                 }}
-                style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: "1px solid #e0e6df", background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
+                sx={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: `1px solid ${theme.palette.divider}`, background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
               >
                 <FileDown size={14} /> {t("downloadBtn")}
-              </button>
+              </Box>
             )}
-          </span>
+          </Box>
         ) : (
           <>
             <Input type="file" disabled={readOnly} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            <button
+            <Box
+              component="button"
               type="button"
               disabled={readOnly || !file}
               onClick={() => submit()}
-              style={{
+              sx={{
                 display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 999,
-                border: "none", backgroundColor: readOnly || !file ? "#e0e6df" : "#0f766e",
-                color: readOnly || !file ? "#9bb8b0" : "#fff", cursor: readOnly || !file ? "not-allowed" : "pointer",
+                border: "none", backgroundColor: readOnly || !file ? theme.palette.divider : theme.palette.teal.main,
+                color: readOnly || !file ? theme.palette.text.disabled : theme.palette.teal.contrastText, cursor: readOnly || !file ? "not-allowed" : "pointer",
                 fontWeight: 600, fontSize: "0.875rem",
               }}
             >
               {t("submitBtn")}
-            </button>
+            </Box>
           </>
         )}
-      </span>
-      {error && <span style={{ color: "#b94a48", width: "100%" }}>{error}</span>}
+      </Box>
+      {error && <ErrorText sx={{ width: "100%" }}>{error}</ErrorText>}
     </Box>
   );
 }
 
 function StudentDashboardCards({ data, readOnly, isDesktop }: Readonly<{ data: StudentDashboard; readOnly: boolean; isDesktop: boolean }>) {
   const { t } = useTranslation();
+  const theme = useTheme();
 
   const statuses = (data.my_attendance ?? {}) as StudentDayStatus;
   const counts = Object.values(statuses).reduce(
@@ -824,14 +897,14 @@ function StudentDashboardCards({ data, readOnly, isDesktop }: Readonly<{ data: S
           label={t("overallScoreLabel")}
           value={data.latest_result?.overall_score ?? "—"}
           icon={TrendingUp}
-          iconColor="#c77d1a"
+          iconColor={theme.palette.gold.main}
           trend={data.latest_result?.published ? t("publishedLabel") : t("notPublishedLabel")}
         />
         <MetricCard
           label={t("dueAssignmentsHeading")}
           value={data.due_assignments.length}
           icon={ClipboardCheck}
-          iconColor="#0f766e"
+          iconColor={theme.palette.teal.main}
           trend={t("notSubmittedLabel")}
           trendDirection={data.due_assignments.length > 0 ? "down" : "neutral"}
         />
@@ -839,7 +912,7 @@ function StudentDashboardCards({ data, readOnly, isDesktop }: Readonly<{ data: S
           label={t("attendance")}
           value={`${counts.present ?? 0} / ${Object.keys(statuses).length || "—"}`}
           icon={CalendarDays}
-          iconColor="#3f7f4c"
+          iconColor={theme.palette.leaf.main}
           trend={t("attendanceSummaryLine", { absent: counts.absent ?? 0, leave: counts.leave ?? 0 })}
         />
       </MetricGridContainer>
@@ -854,20 +927,20 @@ function StudentDashboardCards({ data, readOnly, isDesktop }: Readonly<{ data: S
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <PageSection>
             <PageHeader title={t("todaysTimetableHeading")} />
-            {data.today_timetable.length === 0 && <p>{t("noPeriodsToday")}</p>}
+            {data.today_timetable.length === 0 && <Typography>{t("noPeriodsToday")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {data.today_timetable.map((slot, i) => (
-                <Box key={i} sx={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-                  <span><strong>{t("periodLabel", { period: slot.period })}</strong></span>
-                  <span>{slot.start_time} – {slot.end_time}</span>
-                </Box>
+                <ListItemRow key={i}>
+                  <Typography component="span"><strong>{t("periodLabel", { period: slot.period })}</strong></Typography>
+                  <Typography component="span">{slot.start_time} – {slot.end_time}</Typography>
+                </ListItemRow>
               ))}
             </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("dueAssignmentsHeading")} />
-            {data.due_assignments.length === 0 && <p>{t("nothingDue")}</p>}
+            {data.due_assignments.length === 0 && <Typography>{t("nothingDue")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {data.due_assignments.map((a) => (
                 <DueAssignmentRow key={a.id} assignment={a} readOnly={readOnly} onSubmitted={() => { /* refreshes next load */ }} />
@@ -877,24 +950,24 @@ function StudentDashboardCards({ data, readOnly, isDesktop }: Readonly<{ data: S
 
           <PageSection>
             <PageHeader title={t("announcements")} />
-            {data.announcements.length === 0 && <p>{t("noAnnouncementsYet")}</p>}
+            {data.announcements.length === 0 && <Typography>{t("noAnnouncementsYet")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {data.announcements.map((a) => (
-                <Box key={a.id} sx={{ padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-                  <span>{a.title}</span>
-                </Box>
+                <ListItemSimple key={a.id}>
+                  <Typography component="span">{a.title}</Typography>
+                </ListItemSimple>
               ))}
             </Box>
           </PageSection>
 
           <PageSection>
             <PageHeader title={t("resources")} />
-            {data.resources.length === 0 && <p>{t("noResourcesShared")}</p>}
+            {data.resources.length === 0 && <Typography>{t("noResourcesShared")}</Typography>}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {data.resources.map((r) => (
-                <Box key={r.id} sx={{ padding: "8px 0", borderBottom: 1, borderColor: "divider" }}>
-                  <span>{r.title}</span>
-                </Box>
+                <ListItemSimple key={r.id}>
+                  <Typography component="span">{r.title}</Typography>
+                </ListItemSimple>
               ))}
             </Box>
           </PageSection>

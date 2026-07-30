@@ -1,4 +1,9 @@
 import { Button } from "./ui/Button";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
+import Chip from "@mui/material/Chip";
 import { FileDown, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -97,41 +102,45 @@ export function MyAssessmentsView() {
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
       {!loading && !error && result?.published && (
-        <div className="notice">
+        <Alert severity="info" sx={{ mt: 1 }}>
           {t("overallScoreLabel")}: <strong>{result.overall_score ?? "—"}</strong>
-          <div className="resultSummaryList">
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
             {result.course_results.map((courseResult) => (
-              <span key={courseResult.course_id} className="badge">
-                {assignments.find((assignment) => assignment.course_id === courseResult.course_id)?.course_name ?? t("courseLabel")}: {courseResult.raw_score ?? "—"}{courseResult.band ? ` · ${courseResult.band}` : ""}
-              </span>
+              <Chip
+                key={courseResult.course_id}
+                label={`${assignments.find((assignment) => assignment.course_id === courseResult.course_id)?.course_name ?? t("courseLabel")}: ${courseResult.raw_score ?? "—"}${courseResult.band ? ` · ${courseResult.band}` : ""}`}
+                size="small"
+              />
             ))}
-          </div>
-          <Button className="tableAction" type="button" onClick={() => assessmentsApi.downloadMyResultCard(sessionId)}>
+          </Box>
+          <Button type="button" onClick={() => assessmentsApi.downloadMyResultCard(sessionId)}>
             <FileDown size={14} /> {t("downloadResultCardBtn")}
           </Button>
-        </div>
+        </Alert>
       )}
-      {!loading && assignments.length === 0 && <p className="emptyState">{t("nothingDue")}</p>}
-      <div className="dataTable assessmentTable">
-        <div className="dataRow header assessmentStudentRow">
-          <span>{t("assignmentLabel")}</span><span>{t("dueDateLabel")}</span>
-          <span>{t("instructionsLabel")}</span><span>{t("submissionActionsLabel")}</span>
-        </div>
+      {!loading && assignments.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("nothingDue")}</Typography>}
+      <Box sx={{ mt: 2 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
+          <span>{t("assignmentLabel")}</span>
+          <span>{t("dueDateLabel")}</span>
+          <span>{t("instructionsLabel")}</span>
+          <span>{t("submissionActionsLabel")}</span>
+        </Box>
         {assignments.map((assignment) => (
-          <div className="dataRow assessmentStudentRow" key={assignment.id}>
-            <span data-label={t("assignmentLabel")}><strong>{assignment.title}</strong><small>{assignment.course_name ?? "—"}</small></span>
-            <span data-label={t("dueDateLabel")}>{new Date(assignment.due_date).toLocaleString()}</span>
-            <span data-label={t("instructionsLabel")}>{assignment.instructions || "—"}</span>
-            <span data-label={t("submissionActionsLabel")}>
+          <Box key={assignment.id} sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, py: 1, borderBottom: 1, borderColor: "divider", alignItems: "center" }}>
+            <span><strong>{assignment.title}</strong><br /><small>{assignment.course_name ?? "—"}</small></span>
+            <span>{new Date(assignment.due_date).toLocaleString()}</span>
+            <span>{assignment.instructions || "—"}</span>
+            <span>
               {(assignment.submission_file_key || submitted.has(assignment.id)) ? (
-                <span className="submissionSummary">
-                  <span>{t("submittedLabel")}</span>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                  <Typography component="span">{t("submittedLabel")}</Typography>
                   {assignment.submission_mark != null && (
-                    <span className="badge success">{assignment.submission_mark}{assignment.max_marks ? ` / ${assignment.max_marks}` : ""}</span>
+                    <Chip label={`${assignment.submission_mark}${assignment.max_marks ? ` / ${assignment.max_marks}` : ""}`} size="small" color="success" />
                   )}
-                  {assignment.submission_feedback && <span>{t("remarksLabel")}: {assignment.submission_feedback}</span>}
+                  {assignment.submission_feedback && <Typography component="span">{t("remarksLabel")}: {assignment.submission_feedback}</Typography>}
                   {assignment.submission_file_key && (
-                    <Button className="tableAction" type="button" onClick={async () => {
+                    <Button type="button" onClick={async () => {
                       const { url } = await filesApi.presignDownload(assignment.submission_file_key!);
                       window.open(url, "_blank", "noreferrer");
                     }}>
@@ -141,27 +150,27 @@ export function MyAssessmentsView() {
                   {!readOnly && new Date() <= new Date(assignment.due_date) && (
                     <>
                       <Input aria-label={t("replacementFileLabel")} type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
-                      <Button className="tableAction" type="button" disabled={!files[assignment.id]} onClick={() => submit(assignment)}>
+                      <Button type="button" disabled={!files[assignment.id]} onClick={() => submit(assignment)}>
                         <Upload size={14} /> {t("replaceSubmissionBtn")}
                       </Button>
-                      <Button className="tableAction dangerAction" type="button" onClick={() => removeSubmission(assignment)}>
+                      <Button type="button" onClick={() => removeSubmission(assignment)}>
                         <Trash2 size={14} /> {t("removeSubmissionBtn")}
                       </Button>
                     </>
                   )}
-                </span>
+                </Box>
               ) : (
                 <>
                   <Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} disabled={readOnly} onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
-                  <Button className="tableAction" type="button" disabled={readOnly || !files[assignment.id]} onClick={() => submit(assignment)}>
+                  <Button type="button" disabled={readOnly || !files[assignment.id]} onClick={() => submit(assignment)}>
                     <Upload size={14} /> {t("submitBtn")}
                   </Button>
                 </>
               )}
             </span>
-          </div>
+          </Box>
         ))}
-      </div>
+      </Box>
     </PageSection>
   );
 }

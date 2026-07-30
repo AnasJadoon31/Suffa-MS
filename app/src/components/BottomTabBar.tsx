@@ -63,6 +63,10 @@ const NavLinkWrapper = styled(NavLink)({
   },
 });
 
+const IconWrapper = styled("span")({
+  position: "relative",
+});
+
 export type BottomTabBarProps = Readonly<{
   onMoreClick?: () => void;
 }>;
@@ -116,10 +120,10 @@ export function BottomTabBar({ onMoreClick }: BottomTabBarProps) {
               value={item.id}
               label={t(navItem.labelKey)}
               icon={
-                <span style={{ position: "relative" }}>
+                <IconWrapper>
                   <Indicator />
                   <Icon size={20} />
-                </span>
+                </IconWrapper>
               }
             />
           </NavLinkWrapper>

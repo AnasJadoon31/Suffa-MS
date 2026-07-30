@@ -1,4 +1,8 @@
 import { Button } from "./ui/Button";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Chip from "@mui/material/Chip";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -57,22 +61,29 @@ function MyTeacherAttendance() {
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
       {!loading && !readOnly && (
-        <div className="formActions">
-          <Button className="primaryAction" type="button" disabled={Boolean(today?.check_in)} onClick={() => check("in")}>{t("timeInLabel")}</Button>
-          <Button className="secondaryAction" type="button" disabled={!today?.check_in || Boolean(today.check_out)} onClick={() => check("out")}>{t("timeOutLabel")}</Button>
-        </div>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+          <Button type="button" disabled={Boolean(today?.check_in)} onClick={() => check("in")}>{t("timeInLabel")}</Button>
+          <Button type="button" disabled={!today?.check_in || Boolean(today.check_out)} onClick={() => check("out")}>{t("timeOutLabel")}</Button>
+        </Box>
       )}
       {!loading && (
-        <div className="dataTable" style={{ marginTop: 16 }}>
-          <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("statusCol")}</span><span>{t("timeInLabel")}</span><span>{t("timeOutLabel")}</span></div>
-          {entries.length === 0 && <p className="emptyState">{t("noAttendanceHistory")}</p>}
+        <Box sx={{ mt: 2 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
+            <span>{t("dateCol")}</span>
+            <span>{t("statusCol")}</span>
+            <span>{t("timeInLabel")}</span>
+            <span>{t("timeOutLabel")}</span>
+          </Box>
+          {entries.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noAttendanceHistory")}</Typography>}
           {entries.map((entry) => (
-            <div className="dataRow" key={entry.id}>
-              <span data-label={t("dateCol")}>{entry.attendance_date}</span><span data-label={t("statusCol")}>{t(entry.status)}</span>
-              <span data-label={t("timeInLabel")}>{entry.check_in?.slice(0, 5) ?? "—"}</span><span data-label={t("timeOutLabel")}>{entry.check_out?.slice(0, 5) ?? "—"}</span>
-            </div>
+            <Box key={entry.id} sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, py: 1, borderBottom: 1, borderColor: "divider" }}>
+              <span>{entry.attendance_date}</span>
+              <span>{t(entry.status)}</span>
+              <span>{entry.check_in?.slice(0, 5) ?? "—"}</span>
+              <span>{entry.check_out?.slice(0, 5) ?? "—"}</span>
+            </Box>
           ))}
-        </div>
+        </Box>
       )}
     </PageSection>
   );
@@ -118,20 +129,31 @@ function MyStudentAttendance() {
             mode="student"
             studentDayStatus={statuses}
           />
-          <div className="dataTable" style={{ marginTop: 16 }}>
-            <div className="dataRow header"><span>{t("dateCol")}</span><span>{t("courseAndPeriodLabel")}</span><span>{t("statusCol")}</span><span>{t("markedByCol")}</span></div>
-            {selectedDate && selectedEntries.length === 0 && <p className="emptyState">{t("noAttendanceHistory")}</p>}
+          <Box sx={{ mt: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
+              <span>{t("dateCol")}</span>
+              <span>{t("courseAndPeriodLabel")}</span>
+              <span>{t("statusCol")}</span>
+              <span>{t("markedByCol")}</span>
+            </Box>
+            {selectedDate && selectedEntries.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noAttendanceHistory")}</Typography>}
             {selectedEntries.map((entry) => (
-              <div className="dataRow" key={entry.id}>
-                <span data-label={t("dateCol")}>{entry.attendance_date}</span>
-                <span data-label={t("courseAndPeriodLabel")}>{entry.legacy_general
+              <Box key={entry.id} sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, py: 1, borderBottom: 1, borderColor: "divider" }}>
+                <span>{entry.attendance_date}</span>
+                <span>{entry.legacy_general
                   ? t("legacyGeneralAttendance")
                   : `${entry.course?.name ?? "—"} · ${t("periodLabel", { period: entry.timetable_slot?.period })}`}</span>
-                <span data-label={t("statusCol")} className={`statusPill ${entry.status}`}>{t(entry.status)}</span>
-                <span data-label={t("markedByCol")}>{entry.marked_by.display_name}</span>
-              </div>
+                <span>
+                  <Chip
+                    label={t(entry.status)}
+                    size="small"
+                    color={entry.status === "present" ? "success" : entry.status === "absent" ? "error" : "default"}
+                  />
+                </span>
+                <span>{entry.marked_by.display_name}</span>
+              </Box>
             ))}
-          </div>
+          </Box>
         </>
       )}
     </PageSection>
