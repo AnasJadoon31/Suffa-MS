@@ -11,6 +11,8 @@ import { api } from "../lib/api";
 import { Input } from "./ui/Field";
 import { Button } from "./ui/Button";
 
+const iconStyle = { color: "var(--muted, #5f6d67)" } as const;
+
 export function LoginScreen() {
   const { t } = useTranslation();
   const { login } = useAuth();
@@ -114,51 +116,45 @@ export function LoginScreen() {
                 <label htmlFor="login-tenant" style={{ display: "block", marginBottom: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                   {t("madrasaIdLabel")}
                 </label>
-                <Box sx={{ position: "relative" }}>
-                  <Building2 size={18} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted, #5f6d67)" }} />
-                  <Input
-                    id="login-tenant"
-                    type="text"
-                    value={tenant}
-                    onChange={(e) => setTenant(e.target.value)}
-                    placeholder="suffa"
-                    required
-                  />
-                </Box>
+                <Input
+                  id="login-tenant"
+                  type="text"
+                  value={tenant}
+                  onChange={(e) => setTenant(e.target.value)}
+                  placeholder="suffa"
+                  required
+                  startAdornment={<Building2 size={18} style={iconStyle} />}
+                />
               </Box>
 
               <Box>
                 <label htmlFor="login-username" style={{ display: "block", marginBottom: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                   {t("usernameLabel")}
                 </label>
-                <Box sx={{ position: "relative" }}>
-                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted, #5f6d67)", fontWeight: 600 }}>@</span>
-                  <Input
-                    id="login-username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder={t("usernamePlaceholder")}
-                    required
-                  />
-                </Box>
+                <Input
+                  id="login-username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={t("usernamePlaceholder")}
+                  required
+                  startAdornment={<span style={{ color: "var(--muted, #5f6d67)", fontWeight: 600 }}>@</span>}
+                />
               </Box>
 
               <Box>
                 <label htmlFor="login-password" style={{ display: "block", marginBottom: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                   {t("passwordLabel")}
                 </label>
-                <Box sx={{ position: "relative" }}>
-                  <KeyRound size={18} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted, #5f6d67)" }} />
-                  <Input
-                    id="login-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={t("passwordPlaceholder")}
-                    required
-                  />
-                </Box>
+                <Input
+                  id="login-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t("passwordPlaceholder")}
+                  required
+                  startAdornment={<KeyRound size={18} style={iconStyle} />}
+                />
               </Box>
 
               <Button type="submit" isLoading={isLoading} style={{ marginTop: 8 }}>
@@ -227,51 +223,45 @@ export function LoginScreen() {
                 <label htmlFor="login-tenant" style={{ display: "block", marginBottom: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                   {t("madrasaIdLabel")}
                 </label>
-                <Box sx={{ position: "relative" }}>
-                  <Building2 size={18} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted, #5f6d67)" }} />
-                  <Input
-                    id="login-tenant"
-                    type="text"
-                    value={tenant}
-                    onChange={(e) => setTenant(e.target.value)}
-                    placeholder="suffa"
-                    required
-                  />
-                </Box>
+                <Input
+                  id="login-tenant"
+                  type="text"
+                  value={tenant}
+                  onChange={(e) => setTenant(e.target.value)}
+                  placeholder="suffa"
+                  required
+                  startAdornment={<Building2 size={18} style={iconStyle} />}
+                />
               </Box>
 
               <Box>
                 <label htmlFor="login-username" style={{ display: "block", marginBottom: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                   {t("usernameLabel")}
                 </label>
-                <Box sx={{ position: "relative" }}>
-                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted, #5f6d67)", fontWeight: 600 }}>@</span>
-                  <Input
-                    id="login-username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder={t("usernamePlaceholder")}
-                    required
-                  />
-                </Box>
+                <Input
+                  id="login-username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={t("usernamePlaceholder")}
+                  required
+                  startAdornment={<span style={{ color: "var(--muted, #5f6d67)", fontWeight: 600 }}>@</span>}
+                />
               </Box>
 
               <Box>
                 <label htmlFor="login-password" style={{ display: "block", marginBottom: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                   {t("passwordLabel")}
                 </label>
-                <Box sx={{ position: "relative" }}>
-                  <KeyRound size={18} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted, #5f6d67)" }} />
-                  <Input
-                    id="login-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={t("passwordPlaceholder")}
-                    required
-                  />
-                </Box>
+                <Input
+                  id="login-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t("passwordPlaceholder")}
+                  required
+                  startAdornment={<KeyRound size={18} style={iconStyle} />}
+                />
               </Box>
 
               <Button type="submit" isLoading={isLoading} style={{ marginTop: 8 }}>

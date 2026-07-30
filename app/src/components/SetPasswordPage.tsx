@@ -61,15 +61,11 @@ export function SetPasswordPage() {
                 {error && <div className="login-error">{error}</div>}
                 <div className="form-group">
                   <label>{t("newPasswordLabel")}</label>
-                  <div className="input-with-icon">
-                    <Input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-                  </div>
+                  <Input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
                 </div>
                 <div className="form-group">
                   <label>{t("confirmPasswordLabel")}</label>
-                  <div className="input-with-icon">
-                    <Input type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-                  </div>
+                  <Input type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 </div>
                 <Button type="submit" className="login-button">{t("setPasswordBtn")}</Button>
               </form>

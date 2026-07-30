@@ -1,6 +1,7 @@
 import React from "react";
 import MuiCheckbox from "@mui/material/Checkbox";
 import FormControl from "@mui/material/FormControl";
+import InputAdornment from "@mui/material/InputAdornment";
 import NativeSelect from "@mui/material/NativeSelect";
 import MuiRadio from "@mui/material/Radio";
 import TextField from "@mui/material/TextField";
@@ -11,8 +12,11 @@ const MUIFormControl = FormControl as any;
 const MUINativeSelect = NativeSelect as any;
 const MUIRadio = MuiRadio as any;
 
-type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
-export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, onClick, size: _nativeSize, color: _nativeColor, ...props }, ref) => {
+type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
+  startAdornment?: React.ReactNode;
+  endAdornment?: React.ReactNode;
+};
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, onClick, startAdornment, endAdornment, size: _nativeSize, color: _nativeColor, ...props }, ref) => {
   const { ["aria-label"]: ariaLabel, ["aria-describedby"]: ariaDescribedBy, ["aria-invalid"]: ariaInvalid, ...textFieldProps } = props;
   return (
     <MUITextField
@@ -35,6 +39,10 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className
         },
       }}
       {...textFieldProps}
+      InputProps={{
+        startAdornment: startAdornment ? <InputAdornment position="start">{startAdornment}</InputAdornment> : undefined,
+        endAdornment: endAdornment ? <InputAdornment position="end">{endAdornment}</InputAdornment> : undefined,
+      }}
       slotProps={{
         htmlInput: {
           "aria-label": ariaLabel,
