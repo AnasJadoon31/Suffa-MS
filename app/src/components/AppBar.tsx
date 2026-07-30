@@ -52,7 +52,7 @@ const DateChipStyled = styled(Chip)(({ theme }) => ({
   backgroundColor: theme.palette.background.default,
   "& .MuiChip-icon": {
     fontSize: 14,
-    marginLeft: 6,
+    marginInlineStart: 6,
     color: theme.palette.text.secondary,
   },
   [theme.breakpoints.down(400)]: {
@@ -62,7 +62,7 @@ const DateChipStyled = styled(Chip)(({ theme }) => ({
       display: "none",
     },
     "& .MuiChip-icon": {
-      marginLeft: 0,
+      marginInlineStart: 0,
     },
   },
 }));

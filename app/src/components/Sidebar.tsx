@@ -58,11 +58,14 @@ const BrandLogo = styled("span")(({ theme }) => ({
 const NavItemButton = styled(ListItemButton, {
   shouldForwardProp: (prop) => prop !== "isActive",
 })<{ isActive: boolean }>(({ theme, isActive }) => ({
+  display: "flex",
+  alignItems: "center",
   borderRadius: 10,
-  marginInline: 6,
+  marginInline: 0,
   marginBottom: 2,
   paddingInline: 10,
   minHeight: 40,
+  width: "100%",
   "&::before": {
     content: '""',
     position: "absolute",
@@ -307,24 +310,29 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               bgcolor: "teal.main",
               color: "teal.contrastText",
               cursor: "pointer",
+              flexShrink: 0,
             }}
             onClick={() => {}}
           >
             {initialsOf(user.username)}
           </Avatar>
           {!collapsed && (
-            <>
-              <ProfileInfo>
-                <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                  {user.username}
-                </Typography>
-                <RoleBadge role={user.role} />
-              </ProfileInfo>
-              <IconButton size="small" onClick={logout} aria-label={t("logout")} title={t("logout")}>
-                <LogOut size={16} />
-              </IconButton>
-            </>
+            <ProfileInfo>
+              <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                {user.username}
+              </Typography>
+              <RoleBadge role={user.role} />
+            </ProfileInfo>
           )}
+          <IconButton
+            size="small"
+            onClick={logout}
+            aria-label={t("logout")}
+            title={t("logout")}
+            sx={{ flexShrink: 0 }}
+          >
+            <LogOut size={16} />
+          </IconButton>
         </ProfileArea>
       )}
     </StyledDrawer>

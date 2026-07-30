@@ -5,11 +5,16 @@ import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import Alert from "@mui/material/Alert";
 import Chip from "@mui/material/Chip";
-import { Check, Copy, MessageCircle, Pencil, RefreshCw, Settings as SettingsIcon, Upload, Wifi, WifiOff } from "lucide-react";
+import FormControl from "@mui/material/FormControl";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import { Check, Copy, MessageCircle, Moon, Pencil, RefreshCw, Settings as SettingsIcon, Sun, Upload, Wifi, WifiOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { filesApi, messagingApi, operationsApi, type TypedSetting, type WhatsAppConnectionStatus } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
+import { useThemeMode } from "../lib/ThemeContext";
 import { Input, Select } from "./ui/Field";
 import { PhoneInput } from "./ui/PhoneInput";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
@@ -23,6 +28,7 @@ export function SettingsView() {
   const { hasPermission, refreshProfile } = useAuth();
   const readOnly = useSessionReadOnly();
   const canManage = !readOnly && hasPermission("settings.manage");
+  const { mode: themeMode, setDarkMode } = useThemeMode();
   const [settings, setSettings] = useState<TypedSetting[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savedKey, setSavedKey] = useState("");
@@ -184,6 +190,28 @@ export function SettingsView() {
     <PageSection>
       <PageHeader title={t("settingsTitle")} icon={<SettingsIcon size={18} />} notice={t("settingsSubtitle")} />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      <Paper variant="outlined" sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 2.5, mb: 2.5 }}>
+        <Typography variant="h6" sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+          <Sun size={18} /> {t("themeTitle", { defaultValue: "Theme" })}
+        </Typography>
+        <Typography sx={{ color: "text.secondary", fontSize: "0.875rem", mb: 2 }}>
+          {t("themeDescription", { defaultValue: "Choose your preferred theme. System will follow your OS setting." })}
+        </Typography>
+        <FormControl component="fieldset">
+          <RadioGroup
+            row
+            aria-label={t("themeTitle", { defaultValue: "Theme" })}
+            name="theme-mode"
+            value={themeMode}
+            onChange={(event) => setDarkMode(event.target.value as "light" | "dark" | "system")}
+          >
+            <FormControlLabel value="light" control={<Radio size="small" />} label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><Sun size={15} /> {t("themeLight", { defaultValue: "Light" })}</Box>} />
+            <FormControlLabel value="dark" control={<Radio size="small" />} label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><Moon size={15} /> {t("themeDark", { defaultValue: "Dark" })}</Box>} />
+            <FormControlLabel value="system" control={<Radio size="small" />} label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><SettingsIcon size={15} /> {t("themeSystem", { defaultValue: "System" })}</Box>} />
+          </RadioGroup>
+        </FormControl>
+      </Paper>
 
       {canManage && (
         <Paper variant="outlined" sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 2.5, mb: 2.5 }}>
