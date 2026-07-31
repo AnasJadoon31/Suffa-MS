@@ -10,11 +10,13 @@ import { useTheme, styled } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { Button } from "./Button";
 
-export function Modal({ title, onClose, maxWidth, actions, children }: Readonly<{ title: string | ReactNode; onClose: () => void; maxWidth?: number | string; actions?: ReactNode; children: ReactNode }>) {
+export function Modal({ title, onClose, maxWidth, actions, children }: Readonly<{ title: string | ReactNode; onClose: () => void; maxWidth?: number | string | Record<string, number | string>; actions?: ReactNode; children: ReactNode }>) {
   const { t } = useTranslation();
   const titleId = useId();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  const resolvedMaxWidth = maxWidth ?? { xs: "90vw", sm: 600, md: 800, lg: 1000 };
 
   return (
     <Dialog
@@ -27,7 +29,7 @@ export function Modal({ title, onClose, maxWidth, actions, children }: Readonly<
         paper: {
           sx: {
             width: "100%",
-            maxWidth: maxWidth ?? 720,
+            maxWidth: resolvedMaxWidth,
             margin: isMobile ? 0 : 16,
             borderRadius: isMobile ? "20px 20px 0 0" : 20,
             ...(isMobile && { marginBottom: 0, maxHeight: "calc(100% - 48px)" }),
@@ -82,7 +84,7 @@ export function FormModal({
   submitIcon?: ReactNode;
   submitDisabled?: boolean;
   error?: string | null;
-  maxWidth?: number | string;
+  maxWidth?: number | string | Record<string, number | string>;
   children: ReactNode;
 }>) {
   const { t } = useTranslation();

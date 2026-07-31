@@ -7,6 +7,7 @@ import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { styled } from "@mui/material/styles";
 import { LoadingState, ErrorState } from "./AsyncState";
@@ -47,13 +48,13 @@ export interface DataTableProps<T> {
 
 /* ------------------------------------------------------------------ styled components */
 
-export const StyledTable = styled(Table)(({ theme }) => ({
+const StyledTable = styled(Table)(({ theme }) => ({
   borderCollapse: "separate",
   borderSpacing: 0,
   width: "100%",
 }));
 
-export const StyledTableRow = styled(TableRow)(({ theme }) => ({
+const StyledTableRow = styled(TableRow)(({ theme }) => ({
   "&:hover": {
     backgroundColor: theme.palette.action.hover,
   },
@@ -62,12 +63,12 @@ export const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
 }));
 
-export const StyledTableCell = styled(TableCell)(({ theme }) => ({
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
   padding: theme.spacing(1.5, 2),
   borderColor: theme.palette.divider,
 }));
 
-export const StyledTableHeader = styled(TableCell)(({ theme }) => ({
+const StyledTableHeader = styled(TableCell)(({ theme }) => ({
   fontWeight: 700,
   textTransform: "uppercase",
   letterSpacing: "0.08em",
@@ -78,7 +79,7 @@ export const StyledTableHeader = styled(TableCell)(({ theme }) => ({
   padding: theme.spacing(1.5, 2),
 }));
 
-export const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
+const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
   width: "100%",
   overflowX: "auto",
   overflowY: "visible",
@@ -88,11 +89,53 @@ export const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
   border: `1px solid ${theme.palette.divider}`,
 }));
 
+const CardGrid = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+  gap: theme.spacing(2),
+}));
+
+const StyledCard = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderRadius: 16,
+  border: `1px solid ${theme.palette.divider}`,
+  transition: "box-shadow 0.2s ease, transform 0.15s ease",
+  "&:hover": {
+    boxShadow: theme.shadows[4],
+    transform: "translateY(-1px)",
+  },
+}));
+
+const CardField = styled(Box)(() => ({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "8px 0",
+  borderBottom: "1px solid",
+  borderColor: "divider",
+  "&:last-child": {
+    borderBottom: "none",
+  },
+}));
+
+const FieldLabel = styled(Typography)(({ theme }) => ({
+  fontSize: "0.75rem",
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  color: theme.palette.text.secondary,
+}));
+
+const FieldValue = styled(Typography)(() => ({
+  fontSize: "0.875rem",
+  fontWeight: 500,
+}));
+
 /* ------------------------------------------------------------------ component */
 
 /**
- * Generic data-table primitive that replaces the repeated
- * `<div className="dataTable"> … header … loading … empty … rows` boilerplate.
+ * Generic data-table primitive that renders as a table on desktop
+ * and as cards on mobile.
  */
 export function DataTable<T>({
   columns,
@@ -105,39 +148,32 @@ export function DataTable<T>({
   renderBeforeRow,
 }: Readonly<DataTableProps<T>>) {
   const showData = !isLoading && !error;
-  const renderCards = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   return (
-    <TableContainer
-      component={Paper}
-      variant="outlined"
-      className={className}
-      sx={{
-        width: "100%",
-        overflowX: "auto",
-        overflowY: "visible",
-        borderColor: "divider",
-        boxShadow: "none",
-        borderRadius: 2,
-      }}
-    >
-      {isLoading && (
-        <Box sx={{ p: 3 }}>
-          <LoadingState />
-        </Box>
-      )}
-      {!isLoading && error && (
-        <Box sx={{ p: 3 }}>
-          <ErrorState message={error} />
-        </Box>
-      )}
+    <Box className={className}>
+      {isLoading && <LoadingState />}
+      {!isLoading && error && <ErrorState message={error} />}
       {showData && data.length === 0 && emptyMessage && (
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: 3, textAlign: "center" }}>
           {emptyMessage}
         </Box>
       )}
-      {showData && data.length > 0 && !renderCards && (
-        <Table size="small" stickyHeader aria-label="data table" sx={{ minWidth: 720 }}>
+      {showData && data.length > 0 && !isMobile && (
+        <TableContainer
+          component={Paper}
+          variant="outlined"
+          sx={{
+            width: '100%',
+            overflowX: 'auto',
+            overflowY: 'visible',
+            borderColor: 'divider',
+            boxShadow: 'none',
+            borderRadius: 16,
+            border: '1px solid',
+          }}
+        >
+          <StyledTable size="small" stickyHeader aria-label="data table">
             <TableHead>
               <TableRow>
                 {columns.map((col, i) => (
@@ -159,12 +195,13 @@ export function DataTable<T>({
                 />
               ))}
             </TableBody>
-          </Table>
+          </StyledTable>
+        </TableContainer>
       )}
-      {showData && data.length > 0 && renderCards && (
-        <Box role="list" aria-label="data cards">
+      {showData && data.length > 0 && isMobile && (
+        <CardGrid role="list" aria-label="data cards">
           {data.map((item, index) => (
-            <MobileDataCard
+            <DataCard
               key={keyExtractor(item)}
               item={item}
               index={index}
@@ -173,13 +210,13 @@ export function DataTable<T>({
               renderBeforeRow={renderBeforeRow}
             />
           ))}
-        </Box>
+        </CardGrid>
       )}
-    </TableContainer>
+    </Box>
   );
 }
 
-/* ---- internal row wrapper (keeps Fragment key logic clean) ---- */
+/* ---- internal row wrapper ---- */
 
 function DataRow<T>({
   item,
@@ -212,7 +249,7 @@ function DataRow<T>({
   );
 }
 
-function MobileDataCard<T>({
+function DataCard<T>({
   item,
   index,
   data,
@@ -228,15 +265,18 @@ function MobileDataCard<T>({
   const before = renderBeforeRow?.(item, index, data);
   return (
     <>
-      {before && <div>{before}</div>}
-      <dl role="listitem">
-        {columns.map((col, i) => (
-          <div key={i}>
-            <dt>{col.header}</dt>
-            <dd>{col.render(item, index)}</dd>
-          </div>
-        ))}
-      </dl>
+      {before && <Box sx={{ gridColumn: "1 / -1" }}>{before}</Box>}
+      <StyledCard role="listitem" variant="outlined">
+        {columns.map((col, i) => {
+          const label = typeof col.header === "string" ? col.header : undefined;
+          return (
+            <CardField key={i}>
+              {label && <FieldLabel>{label}</FieldLabel>}
+              <FieldValue>{col.render(item, index)}</FieldValue>
+            </CardField>
+          );
+        })}
+      </StyledCard>
     </>
   );
 }

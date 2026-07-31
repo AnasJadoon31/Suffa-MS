@@ -464,11 +464,14 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     if (!selectedCourseId || timetableSlots.length === 0) return;
     const todayDayOfWeek = new Date().getDay();
     const todaysSlots = timetableSlots.filter((slot) => slot.course_id === selectedCourseId && slot.day_of_week === todayDayOfWeek);
-    if (todaysSlots.length === 1 && !selectedSlotId) {
+    if (todaysSlots.length === 1) {
       setSelectedSlotId(todaysSlots[0].id);
       setSearchParams((prev) => ({ ...prev, slot: todaysSlots[0].id }));
+    } else if (todaysSlots.length === 0) {
+      setSelectedSlotId('');
+      setSearchParams((prev) => ({ ...prev, slot: '' }));
     }
-  }, [selectedCourseId, timetableSlots, selectedSlotId, setSearchParams]);
+  }, [selectedCourseId, timetableSlots, setSearchParams]);
 
   useEffect(() => {
     if (!selectedClassId || !selectedSectionId || !selectedCourseId) {
