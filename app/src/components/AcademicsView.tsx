@@ -1,6 +1,6 @@
 import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Plus, Edit2, Trash2, X } from "lucide-react";
+import { CheckCircle2, Plus, Edit2, Trash2, X, BookOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
 import axios from "axios";
@@ -34,6 +34,21 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import { styled } from "@mui/material/styles";
 
+const ProgramGrid = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+  gap: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+}));
+
+const ProgramCard = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderRadius: 16,
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(1),
+}));
+
 const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
   border: `1px solid ${theme.palette.divider}`,
   borderRadius: 16,
@@ -65,6 +80,11 @@ const DataTableRow = styled(TableRow)(({ theme }) => ({
 const TabButton = styled(Button, {
   shouldForwardProp: (prop) => prop !== "active",
 })<{ active?: boolean }>(({ theme, active }) => ({
+  minHeight: 48,
+  px: 3,
+  borderRadius: 12,
+  fontWeight: 600,
+  fontSize: "0.9rem",
   ...(active && {
     backgroundColor: theme.palette.primary.main,
     color: theme.palette.primary.contrastText,
@@ -271,54 +291,48 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               </FormField>
                             </FormStack>
                           </FormModal>}
-              <StyledTableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <HeaderTableRow>
-                      <TableCell>{t("nameLabel")}</TableCell>
-                      <TableCell>{t("actionsCol")}</TableCell>
-                    </HeaderTableRow>
-                  </TableHead>
-                  <TableBody>
-                    {programs.length === 0 && (
-                      <DataTableRow><TableCell colSpan={2}><Typography color="text.secondary">{t("noProgramsYet")}</Typography></TableCell></DataTableRow>
+              <ProgramGrid>
+                {programs.length === 0 && (
+                  <Typography color="text.secondary">{t("noProgramsYet")}</Typography>
+                )}
+                {programs.map((p) => (
+                  <ProgramCard key={p.id} variant="outlined">
+                    {editingProgram?.id === p.id && (
+                      <FormModal
+                        title={t("editBtn")}
+                        onClose={() => setEditingProgram(null)}
+                        submitLabel={t("saveBtn")}
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          try {
+                            await academicsApi.updateProgram(p.id, { name: editingProgram.name });
+                            setEditingProgram(null);
+                            await refreshAll();
+                          } catch (err) { handleError(err); }
+                        }}
+                      >
+                        <label>
+                          {t("nameLabel")}
+                          <Input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
+                        </label>
+                      </FormModal>
                     )}
-                    {programs.map((p) => (
-                      <DataTableRow key={p.id}>
-                        {editingProgram?.id === p.id && (
-                          <FormModal
-                            title={t("editBtn")}
-                            onClose={() => setEditingProgram(null)}
-                            submitLabel={t("saveBtn")}
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-                              try {
-                                await academicsApi.updateProgram(p.id, { name: editingProgram.name });
-                                setEditingProgram(null);
-                                await refreshAll();
-                              } catch (err) { handleError(err); }
-                            }}
-                          >
-                            <label>
-                              {t("nameLabel")}
-                              <Input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
-                            </label>
-                          </FormModal>
-                        )}
-                        <TableCell>{p.name}</TableCell>
-                        <TableCell>
-                          <Box sx={{ display: "flex", gap: 0.5 }}>
-                            <ActionMenu ariaLabel={`${t("actionsCol")}: ${p.name}`} items={[
-                              { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingProgram(p) },
-                              { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `program:${p.id}`, onClick: () => handleDelete(`program:${p.id}`, p.name, () => academicsApi.deleteProgram(p.id)) },
-                            ]} />
-                          </Box>
-                        </TableCell>
-                      </DataTableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </StyledTableContainer>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 3, backgroundColor: "divider" }}>
+                        <BookOpen size={18} />
+                      </Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, flex: 1 }}>{p.name}</Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary">
+                      {t("classesCountLabel", { count: classes.filter((c) => c.program_id === p.id).length })}
+                    </Typography>
+                    <ActionMenu ariaLabel={`${t("actionsCol")}: ${p.name}`} items={[
+                      { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingProgram(p) },
+                      { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `program:${p.id}`, onClick: () => handleDelete(`program:${p.id}`, p.name, () => academicsApi.deleteProgram(p.id)) },
+                    ]} />
+                  </ProgramCard>
+                ))}
+              </ProgramGrid>
             </>
           )}
 

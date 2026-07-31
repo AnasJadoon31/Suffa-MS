@@ -12,13 +12,14 @@ import { useAuth } from "../lib/AuthContext";
 import { HijriTag } from "./HijriTag";
 import { Input, Select, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
-import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
+import { DataCard } from "./ui/DataCard";
+import { styled } from "@mui/material/styles";
 
 type HolidayForm = {
   name: string;
@@ -29,6 +30,13 @@ type HolidayForm = {
 };
 
 const EMPTY_FORM: HolidayForm = { name: "", category: "", start_date: "", end_date: "", class_ids: [] };
+
+const HolidayGrid = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+  gap: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+}));
 
 export function HolidaysView() {
   const { t } = useTranslation();
@@ -208,64 +216,57 @@ export function HolidaysView() {
 
       {!isLoading && error && <ErrorState message={error} />}
 
-      <DataTable<Holiday>
-        columns={[
-          { header: t("nameLabel"), render: (holiday) => editingId === holiday.id ? (
-            <Input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-          ) : holiday.name },
-          { header: t("categoryCol"), render: (holiday) => editingId === holiday.id ? (
-            <Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} />
-          ) : holiday.category ?? "—" },
-          { header: t("startLabel"), render: (holiday) => editingId === holiday.id ? (
-            <Input required type="date" value={editForm.start_date} onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })} />
-          ) : (
-            <>
-              {holiday.start_date}
-              <HijriTag date={holiday.start_date} />
-            </>
-          ) },
-          { header: t("endLabel"), render: (holiday) => editingId === holiday.id ? (
-            <Input required type="date" value={editForm.end_date} onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })} />
-          ) : (
-            <>
-              {holiday.end_date}
-              <HijriTag date={holiday.end_date} />
-            </>
-          ) },
-          { header: t("appliesToCol"), render: (holiday) => classNames(holiday.class_ids) },
-          ...(canManage ? [{ header: t("actionsCol"), render: (holiday: Holiday) => editingId === holiday.id ? (
-            <>
-              <Button type="button" onClick={() => saveHoliday(holiday.id)}>
-                <Save size={14} /> {t("saveBtn")}
-              </Button>
-              <Button type="button" onClick={cancelEditing}>
-                <X size={14} /> {t("cancelBtn")}
-              </Button>
-            </>
-          ) : (
-            <ActionMenu
-              ariaLabel={`${t("actionsCol")}: ${holiday.name}`}
-              items={[
-                {
-                  label: t("editBtn"),
-                  icon: <Pencil size={14} />,
-                  onClick: () => startEditing(holiday),
-                },
-                {
-                  label: t("deleteBtn"),
-                  icon: <Trash2 size={14} />,
-                  destructive: true,
-                  onClick: () => deleteHoliday(holiday),
-                },
+      {isLoading && <LoadingState />}
+      {!isLoading && holidays.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noHolidays")}</Typography>}
+
+      {!isLoading && holidays.length > 0 && (
+        <HolidayGrid>
+          {holidays.map((holiday) => (
+            <DataCard
+              key={holiday.id}
+              title={holiday.name}
+              subtitle={holiday.category ?? undefined}
+              fields={[
+                { label: t("startLabel"), value: holiday.start_date },
+                { label: t("endLabel"), value: holiday.end_date },
+                { label: t("appliesToCol"), value: classNames(holiday.class_ids) },
               ]}
+              actions={
+                canManage ? (
+                  editingId === holiday.id ? (
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Button type="button" onClick={() => saveHoliday(holiday.id)}>
+                        <Save size={14} /> {t("saveBtn")}
+                      </Button>
+                      <Button type="button" onClick={cancelEditing}>
+                        <X size={14} /> {t("cancelBtn")}
+                      </Button>
+                    </Box>
+                  ) : (
+                    <ActionMenu
+                      ariaLabel={`${t("actionsCol")}: ${holiday.name}`}
+                      items={[
+                        {
+                          label: t("editBtn"),
+                          icon: <Pencil size={14} />,
+                          onClick: () => startEditing(holiday),
+                        },
+                        {
+                          label: t("deleteBtn"),
+                          icon: <Trash2 size={14} />,
+                          destructive: true,
+                          onClick: () => deleteHoliday(holiday),
+                        },
+                      ]}
+                    />
+                  )
+                ) : undefined
+              }
             />
-          ) }] : []),
-        ]}
-        data={holidays}
-        keyExtractor={(h) => h.id}
-        isLoading={isLoading}
-        emptyMessage={t("noHolidays")}
-      />
+          ))}
+        </HolidayGrid>
+      )}
+
       {editingId && classes.length > 0 && (
         <PageSection sx={{ marginTop: 12 }}>
           <Typography component="span" sx={{ fontWeight: 700 }}>{t("appliesToCol")}</Typography>

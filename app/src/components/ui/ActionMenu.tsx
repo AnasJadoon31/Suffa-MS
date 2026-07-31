@@ -21,9 +21,10 @@ export interface ActionMenuProps {
   items: ActionMenuItem[];
   ariaLabel?: string;
   children?: ReactNode;
+  inlineThreshold?: number;
 }
 
-export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuProps>) {
+export function ActionMenu({ items, ariaLabel, children, inlineThreshold = 2 }: Readonly<ActionMenuProps>) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>();
@@ -72,6 +73,33 @@ export function ActionMenu({ items, ariaLabel, children }: Readonly<ActionMenuPr
       window.removeEventListener("scroll", handleReposition, true);
     };
   }, [isOpen, updateMenuPosition]);
+
+  if (items.length <= inlineThreshold) {
+    return (
+      <ActionMenuWrapper>
+        {items.map((item, index) => (
+          <IconButton
+            key={index}
+            type="button"
+            aria-label={item.label}
+            disabled={item.disabled}
+            onClick={() => void item.onClick()}
+            sx={{
+              width: 44,
+              height: 44,
+              color: item.destructive ? "error.main" : "text.secondary",
+              "&:hover": {
+                backgroundColor: item.destructive ? "error.light" : "action.hover",
+                color: item.destructive ? "error.dark" : "text.primary",
+              },
+            }}
+          >
+            {item.icon ?? <MoreVertical size={16} />}
+          </IconButton>
+        ))}
+      </ActionMenuWrapper>
+    );
+  }
 
   return (
     <ActionMenuWrapper>

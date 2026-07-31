@@ -46,11 +46,11 @@ const GroupHeader = styled(ListItem)(({ theme }) => ({
 const NavItemButton = styled(ListItemButton, {
   shouldForwardProp: (prop) => prop !== "isActive",
 })<{ isActive: boolean }>(({ theme, isActive }) => ({
-  borderRadius: 10,
-  marginInline: 6,
-  marginBottom: 2,
-  paddingInline: 10,
-  minHeight: 40,
+  borderRadius: 0,
+  marginInline: 0,
+  marginBottom: 0,
+  paddingInline: 16,
+  minHeight: 48,
   width: "100%",
   ...(isActive && {
     backgroundColor: theme.palette.teal?.light
@@ -75,6 +75,7 @@ const NavLinkWrapper = styled(NavLink)({
   display: "block",
   textDecoration: "none",
   color: "inherit",
+  width: "100%",
   "&.active": {
     color: "inherit",
   },
@@ -148,7 +149,7 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
             {madrasa?.name || t("appName")}
           </Typography>
         </BrandInfo>
-        <IconButton size="small" onClick={onClose} aria-label="Close menu">
+        <IconButton sx={{ width: 44, height: 44 }} onClick={onClose} aria-label="Close menu">
           <X size={18} />
         </IconButton>
       </DrawerHeader>
@@ -231,7 +232,6 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
             </Typography>
             <RoleBadge role={user.role} />
             <IconButton
-              size="small"
               onClick={logout}
               aria-label={t("logout")}
               title={t("logout")}

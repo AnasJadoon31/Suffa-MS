@@ -34,7 +34,7 @@ export function PageSection({
   return (
     <Paper component="section" variant="outlined" sx={{
       borderRadius: 2,
-      p: 2.5,
+      p: { xs: 2, sm: 3 },
       mb: 2.5,
       ...(readOnly && { bgcolor: "action.hover" }),
       ...(isDetail && { borderLeft: 4, borderColor: "primary.main" }),

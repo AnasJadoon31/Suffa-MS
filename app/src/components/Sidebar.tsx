@@ -217,7 +217,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             </Typography>
           </BrandInfo>
         )}
-        <CollapseButton size="small" onClick={() => setCollapsed((v) => !v)} sx={{ display: collapsed ? "none" : "inline-flex" }}>
+        <CollapseButton onClick={() => setCollapsed((v) => !v)} sx={{ display: collapsed ? "none" : "inline-flex" }}>
           <Box component={ChevronRight} size={14} sx={{ transform: "rotate(180deg)" }} />
         </CollapseButton>
       </BrandArea>
@@ -325,7 +325,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             </ProfileInfo>
           )}
           <IconButton
-            size="small"
             onClick={logout}
             aria-label={t("logout")}
             title={t("logout")}

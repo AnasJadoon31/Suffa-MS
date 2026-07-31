@@ -72,13 +72,13 @@ const MobileSearchRow = styled(Box)(({ theme }) => ({
   },
 }));
 
-const CollapsiblePanel = styled(Box)(({ theme }) => ({
+const MobileFiltersRow = styled(Box)(({ theme }) => ({
   display: "flex",
-  flexDirection: "column",
   gap: "8px",
-  padding: "12px",
-  backgroundColor: theme.palette.background.default,
-  borderRadius: 12,
+  overflowX: "auto",
+  padding: "8px 0",
+  scrollbarWidth: "none",
+  "&::-webkit-scrollbar": { display: "none" },
 }));
 
 export function FilterBar({
@@ -97,7 +97,7 @@ export function FilterBar({
 
   return (
     <FilterContainer>
-      {/* Mobile: search + expand toggle */}
+      {/* Mobile: search + filters in horizontal scroll */}
       <MobileSearchRow>
         {onSearchChange && (
           <TextField
@@ -105,7 +105,7 @@ export function FilterBar({
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
-            sx={{ flex: 1 }}
+            sx={{ flex: 1, minWidth: 120 }}
             slotProps={{
               input: {
                 startAdornment: (
@@ -123,11 +123,6 @@ export function FilterBar({
               },
             }}
           />
-        )}
-        {fields.length > 0 && (
-          <IconButton onClick={() => setExpanded((v) => !v)}>
-            {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-          </IconButton>
         )}
       </MobileSearchRow>
 
@@ -208,13 +203,13 @@ export function FilterBar({
         {children}
       </DesktopFieldsRow>
 
-      {/* Mobile: collapsible filter panel */}
-      {!isDesktop && expanded && fields.length > 0 && (
-        <CollapsiblePanel>
+      {/* Mobile: horizontal scrollable filters */}
+      {!isDesktop && fields.length > 0 && (
+        <MobileFiltersRow>
           {fields.map((field) => {
             if (field.type === "select") {
               return (
-                <Box component="label" key={field.key} sx={{ display: "flex", flexDirection: "column", gap: 0.5, width: "100%" }}>
+                <Box component="label" key={field.key} sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 140 }}>
                   {field.label && <span>{field.label}</span>}
                   <Select
                     aria-label={field.ariaLabel ?? field.label ?? field.placeholder}
@@ -238,7 +233,7 @@ export function FilterBar({
                 placeholder={field.placeholder}
                 value={field.value}
                 onChange={(e) => field.onChange(e.target.value)}
-                fullWidth
+                sx={{ minWidth: field.type === "date" ? 160 : 140 }}
                 slotProps={{
                   htmlInput: field.type === "date" ? { shrink: true } : undefined,
                 }}
@@ -248,7 +243,7 @@ export function FilterBar({
           {hasFilters && onClearAll && (
             <Chip label="Clear filters" size="small" onClick={onClearAll} sx={{ alignSelf: "flex-start" }} />
           )}
-        </CollapsiblePanel>
+        </MobileFiltersRow>
       )}
     </FilterContainer>
   );

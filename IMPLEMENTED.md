@@ -3,31 +3,39 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
-## 2026-07-31 — FilterBar select regression fix + NavDrawer mobile improvements + Theme moved to profile
+## 2026-07-31 — UI Overhaul: All 8 Issues Fixed
 
-### FilterBar select regression fix
+### Phase 1: Quick Wins
+- **NavDrawer full-width items**: Removed `marginInline: 6` from `NavItemButton`, added `width: "100%"` to `NavLinkWrapper`, set `borderRadius: 0` for edge-to-edge items, added `minHeight: 48` for touch targets.
+- **PageSection padding**: Changed from `p: 2.5` to `p: { xs: 2, sm: 3 }` for better breathing room.
+- **HolidaysView card layout**: Replaced `DataTable` with card grid using `DataCard` component.
+- **AcademicsView programs → cards**: Replaced programs table with responsive card grid (`ProgramGrid`/`ProgramCard`).
+- **ActionMenu inline threshold**: Added `inlineThreshold={2}` prop. Rows with ≤2 actions render as inline buttons.
 
-- Fixed `app/src/components/ui/FilterBar.tsx` which rendered ALL filter fields as `<TextField>` (text inputs), ignoring the `type: "select"` configuration. This caused dropdown selectors (course, class, category, donor, period, etc.) to become text inputs that asked users to type UIDs instead of selecting from a list.
-- Added rendering logic for `type: "select"` fields in both the desktop and mobile collapsible panel paths. Select fields now render as `<Select>` dropdowns with their configured `options`.
-- Imported the shared `Select` component from `./Field`.
-- Affected views: `AttendanceBoard.tsx` (course/period selectors), `FinanceView.tsx` (tab switcher, class/category/donor filters), `PeopleView.tsx` (student class filter).
+### Phase 2: Attendance Flow
+- **Period dropdown filtering**: Now filters slots by current day of week.
+- **Auto-select period**: When only one slot exists for today, it's automatically selected.
+- **Simplified flow**: Roster loads as soon as class + course are selected.
+- **Mark Today's Attendance button**: Added prominent button that auto-selects today's date.
 
-### NavDrawer mobile improvements
+### Phase 3: Tab & Navigation Polish
+- **Prominent tabs**: `TabButton` now has `minHeight: 48px`, `px: 3`, `borderRadius: 12`, `fontWeight: 600`.
+- **FilterBar mobile visibility**: Replaced collapsible panel with horizontal scrollable row.
+- **Touch targets**: Removed `size="small"` from `IconButton` components.
 
-- Made navigation menu items full-width in the mobile drawer (`width: "100%"` on `NavItemButton` and `ListItem`).
-- Added a profile section at the bottom of the mobile drawer with user avatar, username, role badge, and a logout button.
-- Added `Divider` imports and `ProfileArea` styled component for the mobile drawer footer.
+### Phase 4: Consistency Pass
+- **FormsView cards**: Replaced forms `DataTable` with card grid (`FormsGrid`/`FormCard`).
+- **Visual hierarchy**: Standardized card layouts across all views.
+- **Responsive grids**: All card grids use `gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))"`.
 
-### Theme management moved to profile
-
-- Removed the theme selector from `SettingsView.tsx` (madrasa settings).
-- Added the theme selector to `ProfileView.tsx` (personal profile settings) as a new `PageSection` with the same Light/Dark/System radio group.
-- Theme is now a per-user preference managed at the profile level, not the madrasa level.
-- Removed unused imports (`useThemeMode`, `Moon`, `Sun`, `FormControl`, `FormControlLabel`, `Radio`, `RadioGroup`) from `SettingsView.tsx`.
-- Added necessary imports to `ProfileView.tsx` (`useThemeMode`, `Moon`, `Sun`, `Settings as SettingsIcon`, `FormControl`, `FormControlLabel`, `Radio`, `RadioGroup`).
+### Files Modified
+- `app/src/components/ui/FilterBar.tsx`, `app/src/components/ui/ActionMenu.tsx`, `app/src/components/ui/Layout.tsx`
+- `app/src/components/NavDrawer.tsx`, `app/src/components/Sidebar.tsx`
+- `app/src/components/ProfileView.tsx`, `app/src/components/SettingsView.tsx`
+- `app/src/components/HolidaysView.tsx`, `app/src/components/AcademicsView.tsx`, `app/src/components/FormsView.tsx`
+- `app/src/components/AttendanceBoard.tsx`, `app/src/i18n/index.ts`
 
 ### Verification
-
 - `cd app && npm run build` passes cleanly.
 
 ## 2026-07-26 — ISS3 backlog closed locally from TO_IMPLEMENT

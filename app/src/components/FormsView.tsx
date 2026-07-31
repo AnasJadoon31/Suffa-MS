@@ -31,6 +31,22 @@ import { useAuth } from "../lib/AuthContext";
 import { Input, Select, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
+import { styled } from "@mui/material/styles";
+
+const FormsGrid = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+  gap: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+}));
+
+const FormCard = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderRadius: 16,
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(1),
+}));
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
@@ -309,12 +325,21 @@ export function FormsView() {
         {formFilters.user_id && <Button type="button" onClick={() => { setFormPersonSearch(""); setFormFilters({ ...formFilters, user_id: "" }); }}>{t("cancelBtn")}</Button>}
       </InlineFilter>
 
-      <DataTable<FormDef>
-        columns={[
-          { header: t("titleCol"), render: (f) => f.title },
-          { header: t("categoryFilterLabel"), render: (f) => f.category ?? "—" },
-          { header: t("fieldsCol"), render: (f) => f.fields_definition.length },
-          { header: t("actionsCol"), render: (f) => (
+      <FormsGrid>
+        {isLoading && <LoadingState />}
+        {!isLoading && loadError && <ErrorState message={loadError} />}
+        {!isLoading && !loadError && forms.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noFormsYet")}</Typography>}
+        {!isLoading && !loadError && forms.map((f) => (
+          <FormCard key={f.id} variant="outlined">
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 3, backgroundColor: "divider" }}>
+                <FileText size={18} />
+              </Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, flex: 1 }} noWrap>{f.title}</Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              {f.category ?? "—"} · {f.fields_definition.length} {t("fieldsCol")}
+            </Typography>
             <ActionMenu items={[
               { label: t("openBtn"), onClick: () => openForm(f) },
               ...(canEditForm(f) ? [{
@@ -341,14 +366,9 @@ export function FormsView() {
                 },
               }] : []),
             ]} ariaLabel={`${t("actionsCol")}: ${f.title}`} />
-          )},
-        ]}
-        data={forms}
-        keyExtractor={(f) => f.id}
-        isLoading={isLoading}
-        error={loadError}
-        emptyMessage={t("noFormsYet")}
-      />
+          </FormCard>
+        ))}
+      </FormsGrid>
 
       {selected && (
         <FormModal

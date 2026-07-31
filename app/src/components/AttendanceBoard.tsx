@@ -459,8 +459,19 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     })();
   }, [selectedClassId, selectedSectionId, user?.role]);
 
+  // Auto-select period when only one slot exists for current day
   useEffect(() => {
-    if (!selectedClassId || !selectedSectionId || !selectedCourseId || !selectedSlotId) {
+    if (!selectedCourseId || timetableSlots.length === 0) return;
+    const todayDayOfWeek = new Date().getDay();
+    const todaysSlots = timetableSlots.filter((slot) => slot.course_id === selectedCourseId && slot.day_of_week === todayDayOfWeek);
+    if (todaysSlots.length === 1 && !selectedSlotId) {
+      setSelectedSlotId(todaysSlots[0].id);
+      setSearchParams((prev) => ({ ...prev, slot: todaysSlots[0].id }));
+    }
+  }, [selectedCourseId, timetableSlots, selectedSlotId, setSearchParams]);
+
+  useEffect(() => {
+    if (!selectedClassId || !selectedSectionId || !selectedCourseId) {
       setRoster(null);
       setSessionId(null);
       setMarked({});
@@ -815,7 +826,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                   setSelectedCourseId(value);
                   setSelectedSlotId("");
                   setRoster(null);
-                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: value, view: activeTab === "studentHistory" ? "history" : "calendar" });
+                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: value, slot: "", view: activeTab === "studentHistory" ? "history" : "calendar" });
                 },
               },
               {
@@ -824,10 +835,12 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 label: t("periodCol"),
                 value: selectedSlotId,
                 placeholder: t("selectPeriodPrompt"),
-                options: timetableSlots.filter((slot) => slot.course_id === selectedCourseId).map((slot) => ({
-                  value: slot.id,
-                  label: t("scheduledPeriodOption", { day: t(attendanceDayKeys[slot.day_of_week] ?? "dayMon"), period: slot.period, start: formatTime(slot.start_time), end: formatTime(slot.end_time) }),
-                })),
+                options: timetableSlots
+                  .filter((slot) => slot.course_id === selectedCourseId && slot.day_of_week === new Date().getDay())
+                  .map((slot) => ({
+                    value: slot.id,
+                    label: t("scheduledPeriodOption", { day: t(attendanceDayKeys[slot.day_of_week] ?? "dayMon"), period: slot.period, start: formatTime(slot.start_time), end: formatTime(slot.end_time) }),
+                  })),
                 onChange: async (value) => {
                   if (!(await confirmDiscardUnsavedMarks())) return;
                   setSelectedSlotId(value);
@@ -884,7 +897,19 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               </SecondaryButton>
             )}
           </Box>
-          {!selectedCourseId || !selectedSlotId ? <Typography>{t("chooseCoursePeriodPrompt")}</Typography> : null}
+          {!selectedCourseId ? <Typography>{t("chooseCoursePeriodPrompt")}</Typography> : null}
+          {selectedCourseId && selectedSlotId && (
+            <PrimaryButton
+              type="button"
+              onClick={() => {
+                setActiveTab("calendar");
+                setSelectedDate(toDateKey(new Date()));
+              }}
+              sx={{ mb: 2 }}
+            >
+              {t("markTodayAttendance", { defaultValue: "Mark Today's Attendance" })}
+            </PrimaryButton>
+          )}
         </>
       )}
 
@@ -995,7 +1020,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </>
       )}
 
-      {attendanceMode === "students" && selectedClassId && selectedCourseId && selectedSlotId && activeTab === "studentHistory" && (
+      {attendanceMode === "students" && selectedClassId && selectedCourseId && activeTab === "studentHistory" && (
         <Box sx={{ display: { md: "grid" }, gridTemplateColumns: "280px 1fr", gap: 2 }}>
           <Box>
             <Box sx={{ mb: 1 }}>
