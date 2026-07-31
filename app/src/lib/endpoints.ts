@@ -319,7 +319,11 @@ export const attendanceApi = {
   listClasses: () => getAllPages<AttendanceClassOption>("/api/v1/attendance/classes"),
   classRoster: (classId: string, sectionId?: string, courseId?: string, timetableSlotId?: string) =>
     api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`, {
-      params: { section_id: sectionId, course_id: courseId, timetable_slot_id: timetableSlotId },
+      params: {
+        section_id: sectionId || undefined,
+        course_id: courseId || undefined,
+        timetable_slot_id: timetableSlotId || undefined,
+      },
     }).then((r) => r.data),
   classHistory: (classId: string, range?: AttendanceDateRange) =>
     api
@@ -393,7 +397,7 @@ export interface SessionResult {
 
 export const assessmentsApi = {
   getGradingPlan: (courseId: string, classId?: string) =>
-    api.get<GradingPlan>("/api/v1/assessments/grading-plan", { params: { course_id: courseId, class_id: classId } }).then((r) => r.data),
+    api.get<GradingPlan>("/api/v1/assessments/grading-plan", { params: { course_id: courseId, class_id: classId || undefined } }).then((r) => r.data),
   saveGradingPlan: (payload: Omit<GradingPlan, "id">) =>
     api.put<GradingPlan>("/api/v1/assessments/grading-plan", payload).then((r) => r.data),
   listAssignments: (params?: {

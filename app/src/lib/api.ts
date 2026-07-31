@@ -71,9 +71,23 @@ export function setAcademicSessionId(id: string | null): void {
   academicSessionId = id;
 }
 
+// Strip empty-string query params so Pydantic UUID | None fields don't
+// receive "" (which fails UUID validation) instead of being omitted.
+function stripEmptyParams(config: import("axios").InternalAxiosRequestConfig): void {
+  if (!config.params) return;
+  for (const key of Object.keys(config.params)) {
+    const value = config.params[key];
+    if (value === "" || value === null || value === undefined) {
+      delete config.params[key];
+    }
+  }
+}
+
 // Request Interceptor
 api.interceptors.request.use(
   (config) => {
+    stripEmptyParams(config);
+
     const token = localStorage.getItem("mms_token");
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;

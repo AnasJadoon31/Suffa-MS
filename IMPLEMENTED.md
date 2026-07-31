@@ -3,6 +3,23 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+
+## 2026-07-31 — Fix UUID validation error for empty query params
+
+**Issue:** `timetable_slot_id: Input should be a valid UUID, invalid length: expected length 32 for simple format, found 0` — Pydantic rejected empty strings sent as UUID query parameters.
+
+**Root cause:** Frontend state initializes IDs as `""` (empty string). When passed to API endpoints, these empty strings were sent as query params (e.g., `?timetable_slot_id=`), which Pydantic's `UUID | None` validation rejects — it expects either a valid UUID or no parameter at all (null).
+
+**Fix:**
+- Added a global request interceptor in `app/src/lib/api.ts` that strips empty-string, null, and undefined query params before the request is sent. This prevents the issue from recurring in any endpoint.
+- Also fixed `classRoster` and `getGradingPlan` in `app/src/lib/endpoints.ts` to use `|| undefined` for defense-in-depth.
+
+**Files:**
+- `app/src/lib/api.ts` — `stripEmptyParams()` interceptor
+- `app/src/lib/endpoints.ts` — `classRoster` and `getGradingPlan` param cleanup
+
+**Verification:** `cd app && npm run build` passes cleanly.
+
 ## 2026-07-31 — UI Overhaul: All 8 Issues Fixed
 
 ### Phase 1: Quick Wins
