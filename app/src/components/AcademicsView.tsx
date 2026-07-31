@@ -22,6 +22,7 @@ import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
+import { DataCard } from "./ui/DataCard";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
@@ -39,14 +40,6 @@ const ProgramGrid = styled(Box)(({ theme }) => ({
   gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
   gap: theme.spacing(2),
   marginBottom: theme.spacing(2),
-}));
-
-const ProgramCard = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(2),
-  borderRadius: 16,
-  display: "flex",
-  flexDirection: "column",
-  gap: theme.spacing(1),
 }));
 
 const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
@@ -296,43 +289,40 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                   <Typography color="text.secondary">{t("noProgramsYet")}</Typography>
                 )}
                 {programs.map((p) => (
-                  <ProgramCard key={p.id} variant="outlined">
-                    {editingProgram?.id === p.id && (
-                      <FormModal
-                        title={t("editBtn")}
-                        onClose={() => setEditingProgram(null)}
-                        submitLabel={t("saveBtn")}
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          try {
-                            await academicsApi.updateProgram(p.id, { name: editingProgram.name });
-                            setEditingProgram(null);
-                            await refreshAll();
-                          } catch (err) { handleError(err); }
-                        }}
-                      >
-                        <label>
-                          {t("nameLabel")}
-                          <Input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
-                        </label>
-                      </FormModal>
-                    )}
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 3, backgroundColor: "divider" }}>
-                        <BookOpen size={18} />
-                      </Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, flex: 1 }}>{p.name}</Typography>
-                    </Box>
-                    <Typography variant="body2" color="text.secondary">
-                      {t("classesCountLabel", { count: classes.filter((c) => c.program_id === p.id).length })}
-                    </Typography>
-                    <ActionMenu ariaLabel={`${t("actionsCol")}: ${p.name}`} items={[
-                      { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingProgram(p) },
-                      { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `program:${p.id}`, onClick: () => handleDelete(`program:${p.id}`, p.name, () => academicsApi.deleteProgram(p.id)) },
-                    ]} />
-                  </ProgramCard>
+                  <DataCard
+                    key={p.id}
+                    title={p.name}
+                    subtitle={t("classesCountLabel", { count: classes.filter((c) => c.program_id === p.id).length })}
+                    avatar={<BookOpen size={18} />}
+                    actions={
+                      <ActionMenu ariaLabel={`${t("actionsCol")}: ${p.name}`} items={[
+                        { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingProgram(p) },
+                        { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `program:${p.id}`, onClick: () => handleDelete(`program:${p.id}`, p.name, () => academicsApi.deleteProgram(p.id)) },
+                      ]} />
+                    }
+                  />
                 ))}
               </ProgramGrid>
+              {editingProgram && (
+                <FormModal
+                  title={t("editBtn")}
+                  onClose={() => setEditingProgram(null)}
+                  submitLabel={t("saveBtn")}
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      await academicsApi.updateProgram(editingProgram.id, { name: editingProgram.name });
+                      setEditingProgram(null);
+                      await refreshAll();
+                    } catch (err) { handleError(err); }
+                  }}
+                >
+                  <label>
+                    {t("nameLabel")}
+                    <Input autoFocus value={editingProgram.name} onChange={e => setEditingProgram({ ...editingProgram, name: e.target.value })} />
+                  </label>
+                </FormModal>
+              )}
             </>
           )}
 

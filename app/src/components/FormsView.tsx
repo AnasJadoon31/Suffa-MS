@@ -30,23 +30,6 @@ import { SearchDropdown } from "./SearchDropdown";
 import { useAuth } from "../lib/AuthContext";
 import { Input, Select, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
-import { DataTable } from "./ui/DataTable";
-import { styled } from "@mui/material/styles";
-
-const FormsGrid = styled(Box)(({ theme }) => ({
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-  gap: theme.spacing(2),
-  marginBottom: theme.spacing(2),
-}));
-
-const FormCard = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(2),
-  borderRadius: 16,
-  display: "flex",
-  flexDirection: "column",
-  gap: theme.spacing(1),
-}));
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
@@ -55,6 +38,21 @@ import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
 import { PhoneInput } from "./ui/PhoneInput";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
+import { DataCard } from "./ui/DataCard";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import { styled } from "@mui/material/styles";
+
+const FormsGrid = styled(Box)(({ theme }) => ({
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+  gap: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+}));
 
 export function FormsView() {
   const { t } = useTranslation();
@@ -330,43 +328,43 @@ export function FormsView() {
         {!isLoading && loadError && <ErrorState message={loadError} />}
         {!isLoading && !loadError && forms.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("noFormsYet")}</Typography>}
         {!isLoading && !loadError && forms.map((f) => (
-          <FormCard key={f.id} variant="outlined">
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1 }}>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 3, backgroundColor: "divider" }}>
-                <FileText size={18} />
-              </Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, flex: 1 }} noWrap>{f.title}</Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {f.category ?? "—"} · {f.fields_definition.length} {t("fieldsCol")}
-            </Typography>
-            <ActionMenu items={[
-              { label: t("openBtn"), onClick: () => openForm(f) },
-              ...(canEditForm(f) ? [{
-                label: t("editBtn"),
-                icon: <Edit2 size={14} />,
-                onClick: () => {
-                  setEditing(f);
-                  setEditAudience(f.visibility_scope);
-                  setEditError("");
-                },
-              }, {
-                label: t("deleteBtn"),
-                icon: <Trash2 size={14} />,
-                destructive: true,
-                onClick: async () => {
-                  if (!(await confirm(t("deleteFormConfirm") ?? ""))) return;
-                  try {
-                    await operationsApi.deleteForm(f.id);
-                    if (selected?.id === f.id) setSelected(null);
-                    await load();
-                  } catch (err: any) {
-                    await alert(err.response?.data?.detail ?? t("failedDeleteForm"));
-                  }
-                },
-              }] : []),
-            ]} ariaLabel={`${t("actionsCol")}: ${f.title}`} />
-          </FormCard>
+          <DataCard
+            key={f.id}
+            title={f.title}
+            subtitle={f.category ?? undefined}
+            avatar={<FileText size={18} />}
+            fields={[
+              { label: t("fieldsCol"), value: f.fields_definition.length },
+            ]}
+            actions={
+              <ActionMenu items={[
+                { label: t("openBtn"), onClick: () => openForm(f) },
+                ...(canEditForm(f) ? [{
+                  label: t("editBtn"),
+                  icon: <Edit2 size={14} />,
+                  onClick: () => {
+                    setEditing(f);
+                    setEditAudience(f.visibility_scope);
+                    setEditError("");
+                  },
+                }, {
+                  label: t("deleteBtn"),
+                  icon: <Trash2 size={14} />,
+                  destructive: true,
+                  onClick: async () => {
+                    if (!(await confirm(t("deleteFormConfirm") ?? ""))) return;
+                    try {
+                      await operationsApi.deleteForm(f.id);
+                      if (selected?.id === f.id) setSelected(null);
+                      await load();
+                    } catch (err: any) {
+                      await alert(err.response?.data?.detail ?? t("failedDeleteForm"));
+                    }
+                  },
+                }] : []),
+              ]} ariaLabel={`${t("actionsCol")}: ${f.title}`} />
+            }
+          />
         ))}
       </FormsGrid>
 
@@ -504,18 +502,32 @@ export function FormsView() {
               }}>{t("cancelBtn")}</Button>
             )}
           </InlineFilter>
-          <DataTable<FormResponse>
-            columns={[
-              { header: t("formLabel"), render: (response) => forms.find((form) => form.id === response.form_id)?.title ?? "—" },
-              { header: t("respondentLabel"), render: (response) => response.submitted_by_name ?? t("deletedPersonLabel") },
-              { header: t("wardLabel"), render: (response) => response.ward_name ?? response.student_name ?? "—" },
-              { header: t("submittedCol"), render: (response) => new Date(response.created_at).toLocaleString() },
-              { header: t("actionsCol"), render: (response) => <ActionMenu items={[{ label: t("viewResponseBtn"), icon: <Eye size={14} />, onClick: () => setSelectedResponse(response) }]} /> },
-            ]}
-            data={responses}
-            keyExtractor={(response) => response.id}
-            emptyMessage={t("noResponsesYet")}
-          />
+          <Box sx={{ overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>{t("formLabel")}</TableCell>
+                  <TableCell>{t("respondentLabel")}</TableCell>
+                  <TableCell>{t("wardLabel")}</TableCell>
+                  <TableCell>{t("submittedCol")}</TableCell>
+                  <TableCell>{t("actionsCol")}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {responses.map((response) => (
+                  <TableRow key={response.id}>
+                    <TableCell>{forms.find((form) => form.id === response.form_id)?.title ?? "—"}</TableCell>
+                    <TableCell>{response.submitted_by_name ?? t("deletedPersonLabel")}</TableCell>
+                    <TableCell>{response.ward_name ?? response.student_name ?? "—"}</TableCell>
+                    <TableCell>{new Date(response.created_at).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <ActionMenu items={[{ label: t("viewResponseBtn"), icon: <Eye size={14} />, onClick: () => setSelectedResponse(response) }]} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
         </>
       )}
       {selectedResponse && (

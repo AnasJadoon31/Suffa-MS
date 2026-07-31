@@ -6,36 +6,55 @@ Running log of completed work (newest first). Design rationale lives in
 ## 2026-07-31 — UI Overhaul: All 8 Issues Fixed
 
 ### Phase 1: Quick Wins
+
 - **NavDrawer full-width items**: Removed `marginInline: 6` from `NavItemButton`, added `width: "100%"` to `NavLinkWrapper`, set `borderRadius: 0` for edge-to-edge items, added `minHeight: 48` for touch targets.
 - **PageSection padding**: Changed from `p: 2.5` to `p: { xs: 2, sm: 3 }` for better breathing room.
 - **HolidaysView card layout**: Replaced `DataTable` with card grid using `DataCard` component.
-- **AcademicsView programs → cards**: Replaced programs table with responsive card grid (`ProgramGrid`/`ProgramCard`).
+- **AcademicsView programs → cards**: Replaced programs table with responsive card grid using `DataCard`.
 - **ActionMenu inline threshold**: Added `inlineThreshold={2}` prop. Rows with ≤2 actions render as inline buttons.
 
 ### Phase 2: Attendance Flow
+
 - **Period dropdown filtering**: Now filters slots by current day of week.
 - **Auto-select period**: When only one slot exists for today, it's automatically selected.
 - **Simplified flow**: Roster loads as soon as class + course are selected.
 - **Mark Today's Attendance button**: Added prominent button that auto-selects today's date.
 
 ### Phase 3: Tab & Navigation Polish
+
 - **Prominent tabs**: `TabButton` now has `minHeight: 48px`, `px: 3`, `borderRadius: 12`, `fontWeight: 600`.
 - **FilterBar mobile visibility**: Replaced collapsible panel with horizontal scrollable row.
 - **Touch targets**: Removed `size="small"` from `IconButton` components.
 
 ### Phase 4: Consistency Pass
-- **FormsView cards**: Replaced forms `DataTable` with card grid (`FormsGrid`/`FormCard`).
-- **Visual hierarchy**: Standardized card layouts across all views.
+
+- **FormsView cards**: Replaced forms `DataTable` with card grid using `DataCard`.
+- **Visual hierarchy**: Standardized card layouts across all views using `DataCard` component.
 - **Responsive grids**: All card grids use `gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))"`.
 
+### Additional Fixes
+
+- **ContentArea margins**: Added responsive padding (`xs: 2, sm: 3, md: 4`) to main content area.
+- **Card consistency**: All cards now use the same `DataCard` component for consistent styling.
+
 ### Files Modified
-- `app/src/components/ui/FilterBar.tsx`, `app/src/components/ui/ActionMenu.tsx`, `app/src/components/ui/Layout.tsx`
-- `app/src/components/NavDrawer.tsx`, `app/src/components/Sidebar.tsx`
-- `app/src/components/ProfileView.tsx`, `app/src/components/SettingsView.tsx`
-- `app/src/components/HolidaysView.tsx`, `app/src/components/AcademicsView.tsx`, `app/src/components/FormsView.tsx`
-- `app/src/components/AttendanceBoard.tsx`, `app/src/i18n/index.ts`
+
+- `app/src/App.tsx` — ContentArea padding
+- `app/src/components/ui/FilterBar.tsx` — Select rendering + mobile horizontal scroll
+- `app/src/components/ui/ActionMenu.tsx` — Inline threshold prop
+- `app/src/components/ui/Layout.tsx` — Responsive padding
+- `app/src/components/NavDrawer.tsx` — Full-width items + touch targets
+- `app/src/components/Sidebar.tsx` — Touch targets
+- `app/src/components/ProfileView.tsx` — Theme section added
+- `app/src/components/SettingsView.tsx` — Theme section removed
+- `app/src/components/HolidaysView.tsx` — Card layout
+- `app/src/components/AcademicsView.tsx` — Programs card grid (using DataCard)
+- `app/src/components/FormsView.tsx` — Forms card grid (using DataCard)
+- `app/src/components/AttendanceBoard.tsx` — Period filtering + simplified flow
+- `app/src/i18n/index.ts` — New keys: `classesCountLabel`, `markTodayAttendance`
 
 ### Verification
+
 - `cd app && npm run build` passes cleanly.
 
 ## 2026-07-26 — ISS3 backlog closed locally from TO_IMPLEMENT

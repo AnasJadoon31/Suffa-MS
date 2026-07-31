@@ -14,7 +14,7 @@ export function Topbar({ children }: { children: ReactNode }) {
 
 export function Workspace({ children, sx }: { children: ReactNode; sx?: any }) {
   return (
-    <Box component="section" sx={{ flex: 1, p: { xs: 1.5, sm: 2.5 }, ...sx }}>
+    <Box component="section" sx={{ flex: 1, p: { xs: 2, sm: 3, md: 4 }, ...sx }}>
       {children}
     </Box>
   );

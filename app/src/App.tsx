@@ -129,14 +129,21 @@ const fadeIn = keyframes`
   to { opacity: 1; transform: translateY(0); }
 `;
 
-const ContentArea = styled("div")({
+const ContentArea = styled("div")(({ theme }) => ({
   flex: 1,
   overflow: "auto",
   animation: `${fadeIn} 0.2s ease-out`,
+  padding: theme.spacing(2),
+  [theme.breakpoints.up("sm")]: {
+    padding: theme.spacing(3),
+  },
+  [theme.breakpoints.up("md")]: {
+    padding: theme.spacing(4),
+  },
   "@media (prefers-reduced-motion: reduce)": {
     animation: "none",
   },
-});
+}));
 
 const SkipLink = styled("a")(({ theme }) => ({
   position: "absolute",
