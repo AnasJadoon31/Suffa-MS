@@ -3,13 +3,32 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
-## 2026-07-31 — FilterBar select regression fix
+## 2026-07-31 — FilterBar select regression fix + NavDrawer mobile improvements + Theme moved to profile
+
+### FilterBar select regression fix
 
 - Fixed `app/src/components/ui/FilterBar.tsx` which rendered ALL filter fields as `<TextField>` (text inputs), ignoring the `type: "select"` configuration. This caused dropdown selectors (course, class, category, donor, period, etc.) to become text inputs that asked users to type UIDs instead of selecting from a list.
 - Added rendering logic for `type: "select"` fields in both the desktop and mobile collapsible panel paths. Select fields now render as `<Select>` dropdowns with their configured `options`.
 - Imported the shared `Select` component from `./Field`.
 - Affected views: `AttendanceBoard.tsx` (course/period selectors), `FinanceView.tsx` (tab switcher, class/category/donor filters), `PeopleView.tsx` (student class filter).
-- Verified: `cd app && npm run build` passes cleanly.
+
+### NavDrawer mobile improvements
+
+- Made navigation menu items full-width in the mobile drawer (`width: "100%"` on `NavItemButton` and `ListItem`).
+- Added a profile section at the bottom of the mobile drawer with user avatar, username, role badge, and a logout button.
+- Added `Divider` imports and `ProfileArea` styled component for the mobile drawer footer.
+
+### Theme management moved to profile
+
+- Removed the theme selector from `SettingsView.tsx` (madrasa settings).
+- Added the theme selector to `ProfileView.tsx` (personal profile settings) as a new `PageSection` with the same Light/Dark/System radio group.
+- Theme is now a per-user preference managed at the profile level, not the madrasa level.
+- Removed unused imports (`useThemeMode`, `Moon`, `Sun`, `FormControl`, `FormControlLabel`, `Radio`, `RadioGroup`) from `SettingsView.tsx`.
+- Added necessary imports to `ProfileView.tsx` (`useThemeMode`, `Moon`, `Sun`, `Settings as SettingsIcon`, `FormControl`, `FormControlLabel`, `Radio`, `RadioGroup`).
+
+### Verification
+
+- `cd app && npm run build` passes cleanly.
 
 ## 2026-07-26 — ISS3 backlog closed locally from TO_IMPLEMENT
 
@@ -418,7 +437,7 @@ stable `PDF-*` ID in `TO_IMPLEMENT.md` and must now satisfy the V-Model gates.
 - Split Admissions into the requested People → Students in person flow and a
   separate Public forms destination, preserving enquiries and all gates.
 - Confirmed the timetable's existing `ByTeacherView` already provides the
-  requested “who teaches what where” organization. Formalized rollover's data
+  requested "who teaches what where" organization. Formalized rollover's data
   rule: timetable/date-shifted holidays are copied; tenant-wide evergreen
   resources/forms/announcements/grading/fee categories remain shared and must
   not be duplicated.
@@ -914,7 +933,7 @@ Migrations `e5a1c7d9b304`, `f1b6d8e3a742`, `a2c4e6b8d150`. 82 tests green
   enrollment); donations by category/date range.
 - **Public endpoints B12/B16** (`/api/v1/public`, token-keyed, rate-limited
   with honeypots): `POST /contact/{public_key}` (W3Forms-style;
-  `madaris.public_key`), `GET /blog/{public_key}` published feed, admission
+  `madrais.public_key`), `GET /blog/{public_key}` published feed, admission
   forms — admin CRUD `/operations/admission-forms` (per program, unique
   `public_token`), public `GET`/`POST /admission-forms/{token}` landing in
   the Registrations tab (`form_id` + `extra_data` on applications). Blog got
@@ -1167,7 +1186,7 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
 - Added a focused browser workflow covering create, edit, public rendering,
   submission, validation, and mobile modal rendering.
 
-# 2026-07-13 — Route-based portal isolation
+## 2026-07-13 — Route-based portal isolation
 
 - Replaced persisted in-app view state with real React Router URLs for every portal page.
 - Added centralized role, permission, and feature checks that render a 404 when an account opens an unauthorized route.
@@ -1177,7 +1196,7 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
 - Forced self-service attendance and leave queries to remain self-scoped even when the user also holds management permissions, and enforced enrollment/section scope on assignment detail and submission APIs.
 - Scoped offline reference data and attendance outbox rows by madrasa and user, and removed the shared service-worker API response cache to prevent cross-login data exposure.
 
-# 2026-07-17 — Responsive UI system, visual regression loop, and endpoint contract
+## 2026-07-17 — Responsive UI system, visual regression loop, and endpoint contract
 
 Completed a whole-PWA design-system and responsive verification pass using
 deterministic authenticated Playwright fixtures. The reusable audit harness at

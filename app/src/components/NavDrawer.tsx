@@ -11,9 +11,12 @@ import ListItemText from "@mui/material/ListItemText";
 import IconButton from "@mui/material/IconButton";
 import Typography from "@mui/material/Typography";
 import Collapse from "@mui/material/Collapse";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import Avatar from "@mui/material/Avatar";
+import Divider from "@mui/material/Divider";
+import { ChevronDown, ChevronRight, LogOut, X } from "lucide-react";
 import { isNavItemAccessible, navGroups, portalRoutes, resolveNavItemPath } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
+import { RoleBadge, initialsOf } from "./Sidebar";
 
 const StyledDrawer = styled(MuiDrawer)(({ theme }) => ({
   "& .MuiDrawer-paper": {
@@ -48,6 +51,7 @@ const NavItemButton = styled(ListItemButton, {
   marginBottom: 2,
   paddingInline: 10,
   minHeight: 40,
+  width: "100%",
   ...(isActive && {
     backgroundColor: theme.palette.teal?.light
       ? `${theme.palette.teal.light}22`
@@ -95,6 +99,14 @@ const BrandInfo = styled("div")({
   gap: 10,
 });
 
+const ProfileArea = styled("div")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "12px 16px",
+  borderTop: `1px solid ${theme.palette.divider}`,
+}));
+
 export type NavDrawerProps = Readonly<{
   open: boolean;
   onClose: () => void;
@@ -104,7 +116,7 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
   const { t } = useTranslation();
   const location = useLocation();
   const activeView = portalRoutes.find((route) => route.path === location.pathname)?.view;
-  const { hasPermission, hasFeature, user, madrasa } = useAuth();
+  const { hasPermission, hasFeature, user, madrasa, logout } = useAuth();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const toggleGroup = (labelKey: string) => {
@@ -173,7 +185,7 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
                   const path = resolveNavItemPath(item, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate);
 
                   return (
-                    <ListItem key={item.id} disablePadding sx={{ px: 0 }}>
+                    <ListItem key={item.id} disablePadding sx={{ px: 0, width: "100%" }}>
                       <NavLinkWrapper to={path} onClick={onClose}>
                         <NavItemButton isActive={isActive}>
                           <NavIcon>
@@ -196,6 +208,40 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
           );
         })}
       </List>
+
+      {user && (
+        <>
+          <Divider />
+          <ProfileArea>
+            <Avatar
+              sx={{
+                width: 32,
+                height: 32,
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                bgcolor: "teal.main",
+                color: "teal.contrastText",
+                flexShrink: 0,
+              }}
+            >
+              {initialsOf(user.username)}
+            </Avatar>
+            <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }} noWrap>
+              {user.username}
+            </Typography>
+            <RoleBadge role={user.role} />
+            <IconButton
+              size="small"
+              onClick={logout}
+              aria-label={t("logout")}
+              title={t("logout")}
+              sx={{ flexShrink: 0 }}
+            >
+              <LogOut size={16} />
+            </IconButton>
+          </ProfileArea>
+        </>
+      )}
     </StyledDrawer>
   );
 }

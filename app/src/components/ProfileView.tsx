@@ -3,11 +3,16 @@ import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import Alert from "@mui/material/Alert";
-import { KeyRound, User as UserIcon } from "lucide-react";
+import FormControl from "@mui/material/FormControl";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import { KeyRound, Moon, Settings as SettingsIcon, Sun, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../lib/AuthContext";
+import { useThemeMode } from "../lib/ThemeContext";
 import { authApi } from "../lib/endpoints";
 import { RoleBadge } from "./Sidebar";
 import { Input, Select } from "./ui/Field";
@@ -20,6 +25,7 @@ import { PageSection, PageHeader } from "./ui/Layout";
 export function ProfileView() {
   const { t, i18n } = useTranslation();
   const { user, updateProfile } = useAuth();
+  const { mode: themeMode, setDarkMode } = useThemeMode();
   const [language, setLanguage] = useState(user?.preferred_language ?? "en");
   const [languageNotice, setLanguageNotice] = useState("");
   const [languageError, setLanguageError] = useState("");
@@ -105,6 +111,26 @@ export function ProfileView() {
         </Modal>}
         {languageNotice && <Alert severity="success" sx={{ mt: 1 }}>{languageNotice}</Alert>}
         {languageError && <Alert severity="error" sx={{ mt: 1 }}>{languageError}</Alert>}
+      </PageSection>
+
+      <PageSection>
+        <PageHeader title={t("themeTitle", { defaultValue: "Theme" })} icon={<Sun size={18} />} />
+        <Typography sx={{ color: "text.secondary", fontSize: "0.875rem", mb: 2 }}>
+          {t("themeDescription", { defaultValue: "Choose your preferred theme. System will follow your OS setting." })}
+        </Typography>
+        <FormControl component="fieldset">
+          <RadioGroup
+            row
+            aria-label={t("themeTitle", { defaultValue: "Theme" })}
+            name="theme-mode"
+            value={themeMode}
+            onChange={(event) => setDarkMode(event.target.value as "light" | "dark" | "system")}
+          >
+            <FormControlLabel value="light" control={<Radio size="small" />} label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><Sun size={15} /> {t("themeLight", { defaultValue: "Light" })}</Box>} />
+            <FormControlLabel value="dark" control={<Radio size="small" />} label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><Moon size={15} /> {t("themeDark", { defaultValue: "Dark" })}</Box>} />
+            <FormControlLabel value="system" control={<Radio size="small" />} label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><SettingsIcon size={15} /> {t("themeSystem", { defaultValue: "System" })}</Box>} />
+          </RadioGroup>
+        </FormControl>
       </PageSection>
 
       <PageSection>
