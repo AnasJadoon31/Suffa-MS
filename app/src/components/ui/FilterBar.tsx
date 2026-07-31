@@ -7,6 +7,7 @@ import IconButton from "@mui/material/IconButton";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { styled } from "@mui/material/styles";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import { Select } from "./Field";
 
 export interface FilterChip {
   key: string;
@@ -167,21 +168,40 @@ export function FilterBar({
             }}
           />
         )}
-        {fields.map((field) => (
-          <TextField
-            key={field.key}
-            size="small"
-            type={field.type === "date" ? "date" : "text"}
-            label={field.label}
-            placeholder={field.placeholder}
-            value={field.value}
-            onChange={(e) => field.onChange(e.target.value)}
-            sx={{ width: field.type === "date" ? 160 : 140 }}
-            slotProps={{
-              htmlInput: field.type === "date" ? { shrink: true } : undefined,
-            }}
-          />
-        ))}
+        {fields.map((field) => {
+          if (field.type === "select") {
+            return (
+              <Box component="label" key={field.key} sx={{ display: "flex", flexDirection: "column", gap: 0.5, width: 140 }}>
+                {field.label && <span>{field.label}</span>}
+                <Select
+                  aria-label={field.ariaLabel ?? field.label ?? field.placeholder}
+                  value={field.value}
+                  onChange={(e) => field.onChange(e.target.value)}
+                >
+                  {field.placeholder && <option value="">{field.placeholder}</option>}
+                  {field.options?.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </Select>
+              </Box>
+            );
+          }
+          return (
+            <TextField
+              key={field.key}
+              size="small"
+              type={field.type === "date" ? "date" : "text"}
+              label={field.label}
+              placeholder={field.placeholder}
+              value={field.value}
+              onChange={(e) => field.onChange(e.target.value)}
+              sx={{ width: field.type === "date" ? 160 : 140 }}
+              slotProps={{
+                htmlInput: field.type === "date" ? { shrink: true } : undefined,
+              }}
+            />
+          );
+        })}
         {hasFilters && onClearAll && (
           <Chip label="Clear" size="small" onClick={onClearAll} />
         )}
@@ -191,21 +211,40 @@ export function FilterBar({
       {/* Mobile: collapsible filter panel */}
       {!isDesktop && expanded && fields.length > 0 && (
         <CollapsiblePanel>
-          {fields.map((field) => (
-            <TextField
-              key={field.key}
-              size="small"
-              type={field.type === "date" ? "date" : "text"}
-              label={field.label}
-              placeholder={field.placeholder}
-              value={field.value}
-              onChange={(e) => field.onChange(e.target.value)}
-              fullWidth
-              slotProps={{
-                htmlInput: field.type === "date" ? { shrink: true } : undefined,
-              }}
-            />
-          ))}
+          {fields.map((field) => {
+            if (field.type === "select") {
+              return (
+                <Box component="label" key={field.key} sx={{ display: "flex", flexDirection: "column", gap: 0.5, width: "100%" }}>
+                  {field.label && <span>{field.label}</span>}
+                  <Select
+                    aria-label={field.ariaLabel ?? field.label ?? field.placeholder}
+                    value={field.value}
+                    onChange={(e) => field.onChange(e.target.value)}
+                  >
+                    {field.placeholder && <option value="">{field.placeholder}</option>}
+                    {field.options?.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </Select>
+                </Box>
+              );
+            }
+            return (
+              <TextField
+                key={field.key}
+                size="small"
+                type={field.type === "date" ? "date" : "text"}
+                label={field.label}
+                placeholder={field.placeholder}
+                value={field.value}
+                onChange={(e) => field.onChange(e.target.value)}
+                fullWidth
+                slotProps={{
+                  htmlInput: field.type === "date" ? { shrink: true } : undefined,
+                }}
+              />
+            );
+          })}
           {hasFilters && onClearAll && (
             <Chip label="Clear filters" size="small" onClick={onClearAll} sx={{ alignSelf: "flex-start" }} />
           )}

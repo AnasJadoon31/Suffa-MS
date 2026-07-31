@@ -3,6 +3,14 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-07-31 — FilterBar select regression fix
+
+- Fixed `app/src/components/ui/FilterBar.tsx` which rendered ALL filter fields as `<TextField>` (text inputs), ignoring the `type: "select"` configuration. This caused dropdown selectors (course, class, category, donor, period, etc.) to become text inputs that asked users to type UIDs instead of selecting from a list.
+- Added rendering logic for `type: "select"` fields in both the desktop and mobile collapsible panel paths. Select fields now render as `<Select>` dropdowns with their configured `options`.
+- Imported the shared `Select` component from `./Field`.
+- Affected views: `AttendanceBoard.tsx` (course/period selectors), `FinanceView.tsx` (tab switcher, class/category/donor filters), `PeopleView.tsx` (student class filter).
+- Verified: `cd app && npm run build` passes cleanly.
+
 ## 2026-07-26 — ISS3 backlog closed locally from TO_IMPLEMENT
 
 Completed the remaining Issues 3 backlog rows in `TO_IMPLEMENT.md` and refreshed
@@ -266,7 +274,7 @@ Release evidence:
   passed.
 - `npm run test:live-seed` generated isolated PostgreSQL/Redis/MinIO fixtures
   and verified principal, teacher, and student result PDFs. `npm run
-  test:live-roles` passed the five-role language/viewport matrix and all named
+test:live-roles` passed the five-role language/viewport matrix and all named
   browser journeys without an HTTP error.
 - The deployed Compose services `backend`, `worker`, `app`, and `web` were up;
   backend `/readyz`, app health, and web health returned success. Named live
@@ -418,11 +426,13 @@ stable `PDF-*` ID in `TO_IMPLEMENT.md` and must now satisfy the V-Model gates.
 ## 2026-07-13 — Course-mapping layout (B7-e) + loading/error rollout (§E)
 
 ### Leave view i18n follow-up
+
 - Completed the deferred `LeaveView.tsx` localization pass: every heading,
   field, filter, status, reason, search label, error, and empty state now uses
   i18next with English and Urdu translations.
 
 ### Dedicated class↔course mapping layout (B7-e)
+
 - `AcademicsView.tsx`'s Classes tab previously crammed the course list into
   a third inline column next to sections, cramped for classes with several
   courses. Replaced with: a course-count badge + "Manage courses" button per
@@ -443,10 +453,12 @@ stable `PDF-*` ID in `TO_IMPLEMENT.md` and must now satisfy the V-Model gates.
   on slow load or a failed fetch).
 
 ### Loading/error state rollout (§E), remaining ~15 views
+
 Following the exact `isLoading`/`error`(or `loadError`) + `<LoadingState/>`/
 `<ErrorState message=.../>` idiom already established in `PeopleView.tsx`/
 `AssessmentsView.tsx` (from the first pass), rolled out to every remaining
 view identified in TO_IMPLEMENT.md §E as missing it:
+
 - **Priority-first**: `TimetableView.tsx` (slots/classes/teachers initial
   load — previously silently swallowed classes-fetch failures via
   `.catch(() => undefined)`), `FinanceView.tsx` (categories load +
@@ -487,6 +499,7 @@ of wrapping.
 
 Fixed in `backend/app/core/pdf.py::render_table_pdf` (shared by all three
 callers, no call-site changes needed):
+
 - Every cell now renders as a `Paragraph` so long text wraps within its
   column instead of forcing the table wider than the page.
 - Explicit `colWidths` always sum to the printable width (first column 16%,
@@ -498,7 +511,7 @@ callers, no call-site changes needed):
   across the full row width with a shaded background, instead of rendering
   as a mostly-empty data row.
 
-Confirms the existing behavior was already correct on the *data* side —
+Confirms the existing behavior was already correct on the _data_ side —
 one weekly grid per section, stacked for every class in the madrasa (or
 filtered to one via `class_id`) — the bug was purely rendering/layout.
 Regression test in `test_backend_sweep.py` asserts the exported PDF's
@@ -620,7 +633,7 @@ as `Assignment.category` — filterable, not a managed table), `category`
 filter param on `GET /operations/announcements`, filter dropdown + datalist
 autocomplete in `AnnouncementsView.tsx`.
 
-**B9 — Resources.** `resources.manage` is now a *scoped* permission
+**B9 — Resources.** `resources.manage` is now a _scoped_ permission
 (`core/permissions.py`): a teacher may create/manage resources for classes/
 sections/courses they actually teach (derived from `core/teaching_scope.py`,
 the same source of truth assessments/attendance already use), enforced by a
@@ -685,11 +698,11 @@ non-super-admins. Regression: `test_x_madrasa_header_cannot_spoof_tenant`.
 finance, messaging, platform, reporting, academics, and auth was read in full
 (via parallel sub-agents, findings consolidated and applied here). 7 real gaps
 found and fixed, all with regression tests in `backend/tests/test_authz_matrix.py`:
+
 - `finance/routes.py` `GET /salary/{teacher_id}` + `GET /salary/{teacher_id}/payments`
   — zero tenant scoping at all (missing the `madrasa` dependency entirely).
 - `attendance/routes.py` `GET /summary/{subject_type}/{subject_id}` — silently
-  returned a zeroed-out summary for a bad/cross-tenant `subject_id` instead of
-  404.
+  returned a zeroed-out summary for a bad/cross-tenant `subject_id` instead of 404.
 - `academics/routes.py` `POST /classes/{class_id}/sections` and
   `POST /classes/{class_id}/courses/assign` — path `class_id` never
   tenant-checked before writing the child row, letting a principal attach a
@@ -756,7 +769,7 @@ timetable teacher scoping). This pass closed the remaining genuine gaps:
   existing lookup-any-teacher screen (`AdminSalaryView`); every other teacher
   gets a new read-only `MySalaryView` (own record + payment history only).
   Required one minimal backend addition: `GET /api/v1/finance/salary/me`
-  (`backend/app/modules/finance/routes.py`, registered *before*
+  (`backend/app/modules/finance/routes.py`, registered _before_
   `GET /salary/{teacher_id}` to avoid "me" being swallowed as a UUID path
   param), `MySalaryRead` schema, 403 for non-teacher accounts. The `salary`
   nav item's `permission` gate was removed (kept `roles` + `feature`) so every
@@ -783,7 +796,7 @@ Suite: 87 backend tests green (83 + 4 new); frontend `tsc --noEmit` and
   class/section order), optional `class_id` filter; "Export PDF" button on the
   Timetable screen. Tested (83rd backend test).
 - **PWA re-enabled properly**: `vite-plugin-pwa` with `registerType:
-  autoUpdate` (replaces the old kill-switch service worker that was parked to
+autoUpdate` (replaces the old kill-switch service worker that was parked to
   fight stale bundles), manifest + placeholder icons, network-first runtime
   caching for API GETs (offline dashboards/timetables), iOS meta tags.
 - **Mobile**: sidebar becomes an off-canvas drawer (hamburger in the topbar,
@@ -814,10 +827,10 @@ Suite: 87 backend tests green (83 + 4 new); frontend `tsc --noEmit` and
 - **AcademicsView** (B7-d/j): Sections tab merged into Classes (sections +
   course mapping managed under the class list); Teacher Assignments tab
   removed — assignments live on the Timetable screen.
-- **AdmissionsView split** (B12): three tabs — *Registrations* (walk-in form +
-  applications with Walk-in/Public-form source column), *Public forms*
+- **AdmissionsView split** (B12): three tabs — _Registrations_ (walk-in form +
+  applications with Walk-in/Public-form source column), _Public forms_
   (create per-program admission form, copy shareable public link,
-  close/reopen), *Enquiries* (contact-form inbox). Review gate moved to
+  close/reopen), _Enquiries_ (contact-form inbox). Review gate moved to
   `admissions.manage`.
 
 ## 2026-07-12 — Frontend phase 2 (timetable, people, delegation, platform)
@@ -848,15 +861,15 @@ Suite: 87 backend tests green (83 + 4 new); frontend `tsc --noEmit` and
 ## 2026-07-12 — Frontend phase 1 (assessments + settings + filter UIs)
 
 - **AssessmentsView rebuilt** (B8 d–e):
-  - *Assignments*: filter bar (class/section/course/category/sort), create
+  - _Assignments_: filter bar (class/section/course/category/sort), create
     form with per-section multi-publish checkboxes + category, edit modal with
     "apply to every section copy", delete with whole-batch confirm, list shows
     names (class/section/course/teacher) — no UUIDs.
-  - *Grading*: course-wise — pick class → section tabs → course dropdown;
+  - _Grading_: course-wise — pick class → section tabs → course dropdown;
     spreadsheet of students × exam types with inline mark cells (save on
     blur/Enter), computed score + band columns; scheme/exam-type setup folded
     behind a "Grading setup" toggle.
-  - *Results*: class picker → per-section sheets with course column show/hide,
+  - _Results_: class picker → per-section sheets with course column show/hide,
     publish-section button, per-student result-card/WhatsApp actions, CSV/PDF
     export, and the course→teacher footer.
 - **SettingsView rebuilt** (§7): categorized typed controls from
@@ -925,6 +938,7 @@ Migrations `e5a1c7d9b304`, `f1b6d8e3a742`, `a2c4e6b8d150`. 82 tests green
 ## 2026-07-12 — Assessments redesign, backend (IMPLEMENT.md §5)
 
 ### Assignment model & CRUD
+
 - `assignments.section_id` (null = whole class), `category`, `batch_id`
   (migration `d8f4a6b2c953`).
 - Multi-section publish: `POST /assessments/assignments` takes `section_ids[]`
@@ -940,6 +954,7 @@ Migrations `e5a1c7d9b304`, `f1b6d8e3a742`, `a2c4e6b8d150`. 82 tests green
   class-wide rows + their own section's (previously any section's).
 
 ### Results matrix + export
+
 - `GET /assessments/results/matrix?section_id=|class_id=`: per section —
   courses (with exam types, weightage, and the teacher who teaches that
   course in that section, from §4 slots ∪ legacy assignments), students ×
@@ -957,6 +972,7 @@ results with column show/hide) still pending — tracked in TO_IMPLEMENT B8.
 ## 2026-07-12 — Scope engine (IMPLEMENT.md build-order step 2)
 
 ### Timetable as source of truth (§4)
+
 - `timetable_slots.session_id` (migration `c3d8e1f5a927`, backfilled from each
   madrasa's active session). Slot create now: requires the active session,
   validates section∈class and teacher∈tenant, rejects overlapping slots for
@@ -975,6 +991,7 @@ results with column show/hide) still pending — tracked in TO_IMPLEMENT B8.
   A timetable slot alone now grants assessment/attendance scope — tested.
 
 ### Unified audience targeting (§6)
+
 - Kept the JSONB scope column (decision change from IMPLEMENT.md §6's
   normalized tables — the shape was already there; the resolver is now the
   single implementation). Scope keys: `all`, `roles`, and any-of targeting
@@ -993,6 +1010,7 @@ Suite: 60 backend tests green.
 ## 2026-07-12 — Foundations phase (IMPLEMENT.md build-order step 1)
 
 ### Per-user academic-session context (§10a)
+
 - `users.selected_session_id` (nullable FK → academic_sessions, `SET NULL` on
   session delete). Migration `8e4f2b7c1d90`.
 - `PATCH /api/v1/auth/me`: set `preferred_language`, `selected_session_id`
@@ -1006,14 +1024,16 @@ Suite: 60 backend tests green.
   it) and reloads.
 
 ### Read-only archived sessions (§10b)
+
 - `require_active_session` dependency + `ensure_writable_session(session,
-  madrasa_id, session_id)` payload-level guard (404 wrong tenant / 403 not
+madrasa_id, session_id)` payload-level guard (404 wrong tenant / 403 not
   active). Applied to: student enroll, teacher-assignment create, results
   publish. Remaining mutating routes adopt it as their screens are reworked.
 - `SessionReadOnlyBanner` under the topbar when viewing a non-active session
   (en + ur strings).
 
 ### Permission catalogue + scoped grants (§3 backend)
+
 - New codes: `holidays.manage`, `leave.manage`, `admissions.manage`,
   `settings.manage` (routes regated off the old coarse `timetable.manage` /
   `students.provision` / `academics.manage`).
@@ -1021,10 +1041,11 @@ Suite: 60 backend tests green.
   grants can target one class/section. `user_has_permission` now requires an
   unscoped grant; `user_has_permission_scoped` accepts matching scoped ones.
 - `PUT /auth/permissions/grants` accepts `grants: [{code, scope_type?,
-  scope_id?}]` (legacy `permission_codes` still works); audited.
+scope_id?}]` (legacy `permission_codes` still works); audited.
 - `GET /auth/users/{id}/permissions` (principal or self).
 
 ### Super-admin tier + feature flags (§1)
+
 - `UserRole.super_admin`; `users.madrasa_id` nullable (platform scope).
   `madrasa_features` table (no row = enabled). Migration `b7e9f2a4c611`
   (adds enum value via `ALTER TYPE`).
@@ -1040,6 +1061,7 @@ Suite: 60 backend tests green.
   `feature` key is off (`hasFeature` in AuthContext).
 
 ### Authz matrix tests (§9.1 start)
+
 - `tests/test_authz_matrix.py`: student and teacher get 403 across privileged
   routes (people, finance, admissions, platform, academics, holidays,
   settings); non-principal cannot grant permissions; cross-tenant student
@@ -1049,6 +1071,7 @@ Suite: 60 backend tests green.
   one test) no longer clobber each other's `dependency_overrides`.
 
 ### Package fixes
+
 - SQLAlchemy 2.0.36 → 2.0.51 (2.0.36 crashes on Python 3.14:
   `typing.Union.__getitem__` TypeError at mapper configuration).
 
@@ -1143,6 +1166,7 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
   the public API. Duplicate keys and choice fields without options are rejected.
 - Added a focused browser workflow covering create, edit, public rendering,
   submission, validation, and mobile modal rendering.
+
 # 2026-07-13 — Route-based portal isolation
 
 - Replaced persisted in-app view state with real React Router URLs for every portal page.
@@ -1152,6 +1176,7 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
 - Added student-only attendance history and role-scoped timetable endpoints; the general timetable endpoint now requires management permission.
 - Forced self-service attendance and leave queries to remain self-scoped even when the user also holds management permissions, and enforced enrollment/section scope on assignment detail and submission APIs.
 - Scoped offline reference data and attendance outbox rows by madrasa and user, and removed the shared service-worker API response cache to prevent cross-login data exposure.
+
 # 2026-07-17 — Responsive UI system, visual regression loop, and endpoint contract
 
 Completed a whole-PWA design-system and responsive verification pass using
