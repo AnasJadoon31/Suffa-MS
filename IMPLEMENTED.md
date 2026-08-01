@@ -3,6 +3,18 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-02 — Coolify Backend Healthcheck Startup Fix
+
+**Issue:** Coolify deployment for `e185809` built all images successfully but failed during `docker compose up -d` while waiting on `backend` health. The backend healthcheck used `/readyz`, which performs a database query and can block Compose's `service_healthy` dependency during startup.
+
+**Fix:**
+- Changed the backend container healthcheck to call `/healthz`, which verifies that the API process is serving HTTP.
+- Kept `/readyz` unchanged for database readiness diagnostics and external health checks.
+
+**Files:** `docker-compose.yml`
+
+**Verification:** `docker compose config`; `cd app && npm run build`.
+
 ## 2026-08-02 — Deployment Checkout Cleanup
 
 **Issue:** Coolify failed during repository clone/checkout for commit `119a427` before Docker build started. The repository still tracked generated screenshots, visual-audit artifacts, dev PWA output, bundled `app/dist.tar.gz`, and local SQLite databases, increasing checkout weight and polluting deploy clones.

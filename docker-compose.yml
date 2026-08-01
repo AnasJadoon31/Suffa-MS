@@ -34,7 +34,11 @@ services:
       - "traefik.docker.network=coolify"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read()\""]
+      # Container health should prove the API process is serving HTTP.
+      # /readyz still checks the database and remains useful for diagnostics,
+      # but using it here makes `docker compose up -d` fail when Compose waits
+      # on service_healthy while the DB is briefly slow or externally managed.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).read()\""]
       interval: 30s
       timeout: 10s
       retries: 5
