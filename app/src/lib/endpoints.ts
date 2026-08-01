@@ -317,14 +317,17 @@ export interface TeacherAttendanceToday {
 
 export const attendanceApi = {
   listClasses: () => getAllPages<AttendanceClassOption>("/api/v1/attendance/classes"),
-  classRoster: (classId: string, sectionId?: string, courseId?: string, timetableSlotId?: string) =>
-    api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`, {
+  classRoster: (classId: string, sectionId?: string, courseId?: string, timetableSlotId?: string) => {
+    const course = courseId || undefined;
+    const slot = (course && timetableSlotId) || undefined;
+    return api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`, {
       params: {
         section_id: sectionId || undefined,
-        course_id: courseId || undefined,
-        timetable_slot_id: timetableSlotId || undefined,
+        course_id: course,
+        timetable_slot_id: slot,
       },
-    }).then((r) => r.data),
+    }).then((r) => r.data);
+  },
   classHistory: (classId: string, range?: AttendanceDateRange) =>
     api
       .get<ClassAttendanceHistory>(`/api/v1/attendance/classes/${classId}/history`, { params: range })

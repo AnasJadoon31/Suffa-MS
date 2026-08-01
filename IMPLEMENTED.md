@@ -20,6 +20,18 @@ Running log of completed work (newest first). Design rationale lives in
 
 **Verification:** `cd app && npm run build` passes cleanly.
 
+## 2026-08-01 — Fix "course_id and timetable_slot_id must be provided together" error
+
+**Issue:** After fixing the empty-string UUID issue, a new error appeared: `course_id and timetable_slot_id must be provided together`. The backend requires both params to be present or both absent, but the frontend was sending one without the other.
+
+**Fix:** Updated `classRoster` in `app/src/lib/endpoints.ts` to only include `timetable_slot_id` when `course_id` is also present, enforcing the backend's "both or neither" constraint at the call site.
+
+**Files:**
+- `app/src/lib/endpoints.ts` — `classRoster` course/slot coupling fix
+
+**Verification:** `cd app && npm run build` passes cleanly.
+
+
 ## 2026-07-31 — UI Overhaul: All 8 Issues Fixed
 
 ### Phase 1: Quick Wins
