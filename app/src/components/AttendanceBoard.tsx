@@ -462,7 +462,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   // Auto-select period when only one slot exists for current day
   useEffect(() => {
     if (!selectedCourseId || timetableSlots.length === 0) return;
-    const todayDayOfWeek = new Date().getDay();
+    const todayDayOfWeek = (new Date().getDay() + 6) % 7;
     const todaysSlots = timetableSlots.filter((slot) => slot.course_id === selectedCourseId && slot.day_of_week === todayDayOfWeek);
     if (todaysSlots.length === 1) {
       setSelectedSlotId(todaysSlots[0].id);
@@ -839,7 +839,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 value: selectedSlotId,
                 placeholder: t("selectPeriodPrompt"),
                 options: timetableSlots
-                  .filter((slot) => slot.course_id === selectedCourseId && slot.day_of_week === new Date().getDay())
+                  .filter((slot) => slot.course_id === selectedCourseId && slot.day_of_week === ((new Date().getDay() + 6) % 7))
                   .map((slot) => ({
                     value: slot.id,
                     label: t("scheduledPeriodOption", { day: t(attendanceDayKeys[slot.day_of_week] ?? "dayMon"), period: slot.period, start: formatTime(slot.start_time), end: formatTime(slot.end_time) }),

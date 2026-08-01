@@ -318,8 +318,8 @@ export interface TeacherAttendanceToday {
 export const attendanceApi = {
   listClasses: () => getAllPages<AttendanceClassOption>("/api/v1/attendance/classes"),
   classRoster: (classId: string, sectionId?: string, courseId?: string, timetableSlotId?: string) => {
-    const course = courseId || undefined;
-    const slot = (course && timetableSlotId) || undefined;
+    const course = (courseId && timetableSlotId) ? courseId : undefined;
+    const slot = (courseId && timetableSlotId) ? timetableSlotId : undefined;
     return api.get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`, {
       params: {
         section_id: sectionId || undefined,

@@ -4,6 +4,24 @@ Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
 
+## 2026-08-01 — Fix Attendance Class Roster Parameter Coupling & Day-of-Week Mismatch
+
+**Issue:** 
+1. `course_id and timetable_slot_id must be provided together` (HTTP 422 error on Attendance roster load) caused by `classRoster` sending `course_id` without `timetable_slot_id` when `selectedSlotId` was cleared/empty upon course selection.
+2. JavaScript `Date.getDay()` (0=Sunday..6=Saturday) was being compared directly against backend day-of-week convention (0=Monday..6=Sunday), causing period auto-selection and dropdown filtering to fail on most days, leaving `selectedSlotId` empty and triggering the 422 error.
+
+**Fix:**
+- Updated `classRoster` in `app/src/lib/endpoints.ts` to strictly enforce "both or neither" for `course_id` and `timetable_slot_id`.
+- Updated period auto-selection and period filtering in `app/src/components/AttendanceBoard.tsx` to correctly map JavaScript day-of-week (`(new Date().getDay() + 6) % 7`) to backend day-of-week convention (0=Monday).
+
+**Files:**
+- `app/src/lib/endpoints.ts` — `classRoster` parameter coupling fix
+- `app/src/components/AttendanceBoard.tsx` — day-of-week mapping fix
+
+**Verification:** `cd app && npm run build` and backend test suite passed cleanly.
+
+
+
 ## 2026-07-31 — Fix UUID validation error for empty query params
 
 **Issue:** `timetable_slot_id: Input should be a valid UUID, invalid length: expected length 32 for simple format, found 0` — Pydantic rejected empty strings sent as UUID query parameters.
