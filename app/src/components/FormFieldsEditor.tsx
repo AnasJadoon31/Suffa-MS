@@ -1,8 +1,8 @@
 import { Button } from "./ui/Button";
-import Paper from "@mui/material/Paper";
+import { Paper } from "./ui/Mui";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { Box } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 

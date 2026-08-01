@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import Box from "@mui/material/Box";
-import CircularProgress from "@mui/material/CircularProgress";
-import InputAdornment from "@mui/material/InputAdornment";
-import TextField from "@mui/material/TextField";
+import { Box, CircularProgress, InputAdornment } from "./ui/Mui";
 import { styled } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronDown, Search, X } from "lucide-react";
@@ -10,7 +7,7 @@ import { Check, ChevronDown, Search, X } from "lucide-react";
 import { academicsApi, operationsApi, peopleApi, type AcademicClass, type Scope, type Section } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Button } from "./ui/Button";
-import { Select } from "./ui/Field";
+import { SearchInput, Select } from "./ui/Field";
 
 type RoleMode = "teachers" | "students" | "guardians";
 type NarrowMode = "all" | "classes" | "sections" | "persons";
@@ -460,11 +457,9 @@ export function StagedAudiencePicker({
 
           {isPeopleDropdownOpen && (
             <PeopleMultiSelectMenu style={peopleDropdownStyle} sx={{ minHeight: 180 }}>
-              <TextField
-                inputRef={searchInputRef}
+              <SearchInput
+                ref={searchInputRef}
                 fullWidth
-                size="small"
-                type="search"
                 label={t("searchPlaceholder", "Search...")}
                 placeholder={t("searchPlaceholder", "Search...")}
                 value={searchQuery}

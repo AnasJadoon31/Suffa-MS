@@ -1,5 +1,5 @@
 import { styled, keyframes } from "@mui/material/styles";
-import Box from "@mui/material/Box";
+import { Box } from "./Mui";
 
 const shimmer = keyframes`
   0% { background-position: -200px 0; }

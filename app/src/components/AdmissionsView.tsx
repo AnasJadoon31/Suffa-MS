@@ -34,11 +34,11 @@ import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
 import { answerString, BUILT_IN_ADMISSION_KEYS, enabledAdmissionFields, mergeAdmissionBuiltIns } from "../lib/admissionBuiltIns";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
-import AlertTitle from "@mui/material/AlertTitle";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
+import { AlertTitle } from "./ui/Mui";
 import { styled } from "@mui/material/styles";
 
 const FormActions = styled(Box)(({ theme }) => ({
@@ -557,7 +557,7 @@ function AdmissionFormsTab({ programs, canMutate }: Readonly<{ programs: Program
 
       {canMutate && (
         <FormActions>
-          <PrimaryButton type="button" onClick={() => setShowTypeSelection(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</PrimaryButton>
+          <PrimaryButton className="admissionFormCreateAction" type="button" onClick={() => setShowTypeSelection(true)}><Plus size={16} /> {t("createAdmissionFormBtn")}</PrimaryButton>
         </FormActions>
       )}
       

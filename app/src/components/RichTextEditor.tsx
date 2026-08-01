@@ -1,7 +1,7 @@
 import { Button } from "./ui/Button";
 import { useEffect, useRef } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
 import { styled } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { Select } from "./ui/Field";

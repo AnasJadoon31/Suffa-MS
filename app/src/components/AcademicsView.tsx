@@ -1,6 +1,6 @@
-import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
+import { PrimaryButton, IconButton, TableAction } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Plus, Edit2, Trash2, X, BookOpen } from "lucide-react";
+import { CheckCircle2, Plus, Edit2, Trash2, BookOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
 import axios from "axios";
@@ -18,21 +18,15 @@ import { Input, Select, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
-import { PageSection, PageHeader } from "./ui/Layout";
+import { PageSection, PageHeader, ResponsiveTabs } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
 import { ActionMenu } from "./ui/ActionMenu";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 import { DataCard } from "./ui/DataCard";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Chip from "@mui/material/Chip";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
+import { DataTable, type Column } from "./ui/DataTable";
+import { Box } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Chip } from "./ui/Mui";
 import { styled } from "@mui/material/styles";
 
 const ProgramGrid = styled(Box)(({ theme }) => ({
@@ -40,51 +34,6 @@ const ProgramGrid = styled(Box)(({ theme }) => ({
   gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
   gap: theme.spacing(2),
   marginBottom: theme.spacing(2),
-}));
-
-const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
-  border: `1px solid ${theme.palette.divider}`,
-  borderRadius: 16,
-  marginBottom: theme.spacing(2),
-}));
-
-const HeaderTableRow = styled(TableRow)(({ theme }) => ({
-  "& th": {
-    fontWeight: 700,
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    fontSize: "0.75rem",
-    color: theme.palette.teal.main,
-    borderBottom: `2px solid ${theme.palette.divider}`,
-    padding: theme.spacing(1.5, 2),
-  },
-}));
-
-const DataTableRow = styled(TableRow)(({ theme }) => ({
-  "& td": {
-    padding: theme.spacing(1.5, 2),
-    borderColor: theme.palette.divider,
-  },
-  "&:hover": {
-    backgroundColor: theme.palette.action.hover,
-  },
-}));
-
-const TabButton = styled(Button, {
-  shouldForwardProp: (prop) => prop !== "active",
-})<{ active?: boolean }>(({ theme, active }) => ({
-  minHeight: 48,
-  px: 3,
-  borderRadius: 12,
-  fontWeight: 600,
-  fontSize: "0.9rem",
-  ...(active && {
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.primary.contrastText,
-    "&:hover": {
-      backgroundColor: theme.palette.primary.dark,
-    },
-  }),
 }));
 
 const Badge = styled(Chip)(({ theme }) => ({
@@ -223,41 +172,78 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const classColumns: Column<AcademicClass>[] = [
+    { header: t("nameLabel"), render: (c) => c.name },
+    { header: t("programLabel"), render: (c) => programs.find((p) => p.id === c.program_id)?.name ?? "—" },
+    { header: t("portalCol"), render: (c) => c.default_portal_enabled ? t("yesLabel") : t("noLabel") },
+    {
+      header: t("actionsCol"),
+      render: (c) => (
+        <ActionMenu ariaLabel={`${t("actionsCol")}: ${c.name}`} items={[
+          { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingClass(c) },
+          { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `class:${c.id}`, onClick: () => handleDelete(`class:${c.id}`, c.name, () => academicsApi.deleteClass(c.id)) },
+        ]} />
+      ),
+    },
+  ];
+
+  const courseColumns: Column<Course>[] = [
+    { header: t("nameLabel"), render: (course) => course.name },
+    {
+      header: t("actionsCol"),
+      render: (course) => (
+        <ActionMenu ariaLabel={`${t("actionsCol")}: ${course.name}`} items={[
+          { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingCourse(course) },
+          { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `course:${course.id}`, onClick: () => handleDelete(`course:${course.id}`, course.name, () => academicsApi.deleteCourse(course.id)) },
+        ]} />
+      ),
+    },
+  ];
+
+  const sessionColumns: Column<AcademicSession>[] = [
+    { header: t("nameLabel"), render: (session) => session.name },
+    { header: t("spanCol"), render: (session) => `${session.gregorian_start} → ${session.gregorian_end}` },
+    { header: t("activeCol"), render: (session) => session.is_active ? <CheckCircle2 size={16} /> : "—" },
+    {
+      header: t("actionsCol"),
+      render: (session) => (
+        <ActionMenu ariaLabel={`${t("actionsCol")}: ${session.name}`} items={[
+          ...(!session.is_active ? [{
+            label: t("activateBtn"),
+            onClick: async () => { await academicsApi.activateSession(session.id); await refreshAll(); },
+          }] : [{
+            label: t("yearEndRolloverBtn", { defaultValue: "Year-End Rollover" }),
+            onClick: () => setRolloverSourceSession(session),
+          }]),
+          { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingSession(session) },
+          ...(!session.is_active ? [{
+            label: t("deleteBtn"),
+            icon: <Trash2 size={14} />,
+            destructive: true,
+            disabled: pendingDeleteKey === `session:${session.id}`,
+            onClick: () => handleDelete(`session:${session.id}`, session.name, () => academicsApi.deleteSession(session.id)),
+          }] : []),
+        ]} />
+      ),
+    },
+  ];
+
   return (
     <PageSection readOnly={readOnly}>
       <PageHeader title={t("academicStructureTitle")} notice={t("academicStructureSubtitle")} />
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <TabButton
-            active={activeTab === "programs"}
-            type="button"
-            onClick={() => onTabChange?.("programs")}
-          >
-            {t("programsHeading")}
-          </TabButton>
-          <TabButton
-            active={activeTab === "classes"}
-            type="button"
-            onClick={() => onTabChange?.("classes")}
-          >
-            {t("classesHeading")}
-          </TabButton>
-          <TabButton
-            active={activeTab === "courses"}
-            type="button"
-            onClick={() => onTabChange?.("courses")}
-          >
-            {t("coursesHeading")}
-          </TabButton>
-          <TabButton
-            active={activeTab === "sessions"}
-            type="button"
-            onClick={() => onTabChange?.("sessions")}
-          >
-            {t("sessionsHeading")}
-          </TabButton>
-        </Box>
+        <ResponsiveTabs
+          value={activeTab}
+          ariaLabel={t("academicStructureTitle")}
+          options={[
+            { value: "programs", label: t("programsHeading") },
+            { value: "classes", label: t("classesHeading") },
+            { value: "courses", label: t("coursesHeading") },
+            { value: "sessions", label: t("sessionsHeading") },
+          ]}
+          onChange={(nextTab) => onTabChange?.(nextTab)}
+        />
 
         <Box>
           {isLoading && <LoadingState />}
@@ -370,74 +356,48 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                   { value: "program", label: t("sortByProgramLabel") },
                 ], onChange: (value) => setClassSortBy(value as "name" | "program") },
               ]} />
-              <StyledTableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <HeaderTableRow>
-                      <TableCell>{t("nameLabel")}</TableCell>
-                      <TableCell>{t("programLabel")}</TableCell>
-                      <TableCell>{t("portalCol")}</TableCell>
-                      <TableCell>{t("actionsCol")}</TableCell>
-                    </HeaderTableRow>
-                  </TableHead>
-                  <TableBody>
-                    {classesToShow.length === 0 && (
-                      <DataTableRow><TableCell colSpan={4}><Typography color="text.secondary">{t("noClassesYet")}</Typography></TableCell></DataTableRow>
-                    )}
-                    {classesToShow.map((c) => (
-                      <DataTableRow key={c.id}>
-                        {editingClass?.id === c.id && (
-                          <FormModal
-                            title={t("editBtn")}
-                            onClose={() => setEditingClass(null)}
-                            submitLabel={t("saveBtn")}
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-                              try {
-                                await academicsApi.updateClass(c.id, {
-                                  name: editingClass.name,
-                                  program_id: editingClass.program_id,
-                                  default_portal_enabled: editingClass.default_portal_enabled,
-                                });
-                                setEditingClass(null);
-                                await refreshAll();
-                              } catch (err) { handleError(err); }
-                            }}
-                          >
-                            <label>
-                              {t("nameLabel")}
-                              <Input autoFocus value={editingClass.name} onChange={e => setEditingClass({ ...editingClass, name: e.target.value })} />
-                            </label>
-                            <label>
-                              {t("programLabel")}
-                              <Select value={editingClass.program_id} onChange={e => setEditingClass({ ...editingClass, program_id: e.target.value })}>
-                                {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                              </Select>
-                            </label>
-                            <CheckboxField
-                              title={t("classPortalEnabledHint") ?? ""}
-                              checked={editingClass.default_portal_enabled}
-                              onChange={(e) => setEditingClass({ ...editingClass, default_portal_enabled: e.target.checked })}
-                              label={t("classPortalEnabledLabel")}
-                            />
-                          </FormModal>
-                        )}
-                        <TableCell>{c.name}</TableCell>
-                        <TableCell>{programs.find((p) => p.id === c.program_id)?.name ?? "—"}</TableCell>
-                        <TableCell>{c.default_portal_enabled ? t("yesLabel") : t("noLabel")}</TableCell>
-                        <TableCell>
-                          <Box sx={{ display: "flex", gap: 0.5 }}>
-                            <ActionMenu ariaLabel={`${t("actionsCol")}: ${c.name}`} items={[
-                              { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingClass(c) },
-                              { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `class:${c.id}`, onClick: () => handleDelete(`class:${c.id}`, c.name, () => academicsApi.deleteClass(c.id)) },
-                            ]} />
-                          </Box>
-                        </TableCell>
-                      </DataTableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </StyledTableContainer>
+              <DataTable
+                columns={classColumns}
+                data={classesToShow}
+                keyExtractor={(item) => item.id}
+                emptyMessage={t("noClassesYet")}
+              />
+              {editingClass && (
+                <FormModal
+                  title={t("editBtn")}
+                  onClose={() => setEditingClass(null)}
+                  submitLabel={t("saveBtn")}
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      await academicsApi.updateClass(editingClass.id, {
+                        name: editingClass.name,
+                        program_id: editingClass.program_id,
+                        default_portal_enabled: editingClass.default_portal_enabled,
+                      });
+                      setEditingClass(null);
+                      await refreshAll();
+                    } catch (err) { handleError(err); }
+                  }}
+                >
+                  <FormStack>
+                    <FormField label={t("nameLabel")}>
+                      <Input autoFocus value={editingClass.name} onChange={e => setEditingClass({ ...editingClass, name: e.target.value })} />
+                    </FormField>
+                    <FormField label={t("programLabel")}>
+                      <Select value={editingClass.program_id} onChange={e => setEditingClass({ ...editingClass, program_id: e.target.value })}>
+                        {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </Select>
+                    </FormField>
+                    <CheckboxField
+                      title={t("classPortalEnabledHint") ?? ""}
+                      checked={editingClass.default_portal_enabled}
+                      onChange={(e) => setEditingClass({ ...editingClass, default_portal_enabled: e.target.checked })}
+                      label={t("classPortalEnabledLabel")}
+                    />
+                  </FormStack>
+                </FormModal>
+              )}
             </>
           )}
 
@@ -463,54 +423,33 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               </FormField>
                             </FormStack>
                           </FormModal>}
-              <StyledTableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <HeaderTableRow>
-                      <TableCell>{t("nameLabel")}</TableCell>
-                      <TableCell>{t("actionsCol")}</TableCell>
-                    </HeaderTableRow>
-                  </TableHead>
-                  <TableBody>
-                    {allCourses.length === 0 && (
-                      <DataTableRow><TableCell colSpan={2}><Typography color="text.secondary">{t("noCoursesYet")}</Typography></TableCell></DataTableRow>
-                    )}
-                    {allCourses.map((c) => (
-                      <DataTableRow key={c.id}>
-                        {editingCourse?.id === c.id && (
-                          <FormModal
-                            title={t("editBtn")}
-                            onClose={() => setEditingCourse(null)}
-                            submitLabel={t("saveBtn")}
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-                              try {
-                                await academicsApi.updateCourse(c.id, { name: editingCourse.name });
-                                setEditingCourse(null);
-                                await refreshAll();
-                              } catch (err) { handleError(err); }
-                            }}
-                          >
-                            <label>
-                              {t("nameLabel")}
-                              <Input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
-                            </label>
-                          </FormModal>
-                        )}
-                        <TableCell>{c.name}</TableCell>
-                        <TableCell>
-                          <Box sx={{ display: "flex", gap: 0.5 }}>
-                            <ActionMenu ariaLabel={`${t("actionsCol")}: ${c.name}`} items={[
-                              { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingCourse(c) },
-                              { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `course:${c.id}`, onClick: () => handleDelete(`course:${c.id}`, c.name, () => academicsApi.deleteCourse(c.id)) },
-                            ]} />
-                          </Box>
-                        </TableCell>
-                      </DataTableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </StyledTableContainer>
+              <DataTable
+                columns={courseColumns}
+                data={allCourses}
+                keyExtractor={(item) => item.id}
+                emptyMessage={t("noCoursesYet")}
+              />
+              {editingCourse && (
+                <FormModal
+                  title={t("editBtn")}
+                  onClose={() => setEditingCourse(null)}
+                  submitLabel={t("saveBtn")}
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      await academicsApi.updateCourse(editingCourse.id, { name: editingCourse.name });
+                      setEditingCourse(null);
+                      await refreshAll();
+                    } catch (err) { handleError(err); }
+                  }}
+                >
+                  <FormStack>
+                    <FormField label={t("nameLabel")}>
+                      <Input autoFocus value={editingCourse.name} onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })} />
+                    </FormField>
+                  </FormStack>
+                </FormModal>
+              )}
             </>
           )}
 
@@ -547,74 +486,68 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                 { key: "mapping-search", type: "input", inputType: "search", ariaLabel: t("searchLabel"), placeholder: t("searchClassesPlaceholder"), value: courseMapSearch, onChange: setCourseMapSearch },
                 { key: "mapping-class", type: "select", ariaLabel: t("classLabel"), placeholder: t("filterByClassLabel"), value: courseMapFilterClass, options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: setCourseMapFilterClass },
               ]} />
-              <StyledTableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <HeaderTableRow>
-                      <TableCell>{t("classLabel")}</TableCell>
-                      <TableCell>{t("sectionsCol")}</TableCell>
-                      <TableCell>{t("coursesCol")}</TableCell>
-                    </HeaderTableRow>
-                  </TableHead>
-                  <TableBody>
-                    {classesForCourseMap.length === 0 && (
-                      <DataTableRow><TableCell colSpan={3}><Typography color="text.secondary">{t("noClassesYet")}</Typography></TableCell></DataTableRow>
-                    )}
-                    {classesForCourseMap.map((c) => (
-                      <DataTableRow key={c.id}>
-                        <TableCell sx={{ verticalAlign: "top" }}><strong>{c.name}</strong></TableCell>
-                        <TableCell>
-                          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                            {(sections[c.id] ?? []).map((s) => (
-                              <Box key={s.id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                {editingSection?.id === s.id && (
-                                  <FormModal
-                                    title={t("editBtn")}
-                                    onClose={() => setEditingSection(null)}
-                                    submitLabel={t("saveBtn")}
-                                    onSubmit={async (e) => {
-                                      e.preventDefault();
-                                      try {
-                                        await academicsApi.updateSection(c.id, s.id, { name: editingSection.name });
-                                        setEditingSection(null);
-                                        await refreshAll();
-                                      } catch (err) { handleError(err); }
-                                    }}
-                                  >
-                                    <label>
-                                      {t("nameLabel")}
-                                      <Input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} />
-                                    </label>
-                                  </FormModal>
-                                )}
-                                <Typography component="span">{s.name}</Typography>
-                                <Box sx={{ ml: "auto", display: "flex", gap: 0.5 }}>
-                                  <ActionMenu ariaLabel={`${t("actionsCol")}: ${s.name}`} items={[
-                                    { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingSection(s) },
-                                    { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `section:${s.id}`, onClick: () => handleDelete(`section:${s.id}`, `${c.name} / ${s.name}`, () => academicsApi.deleteSection(c.id, s.id)) },
-                                  ]} />
-                                </Box>
-                              </Box>
-                            ))}
-                            {!(sections[c.id]?.length > 0) && <Typography component="span">—</Typography>}
+              <DataTable<AcademicClass>
+                className="courseMappingTable"
+                columns={[
+                  { header: t("classLabel"), render: (c) => <strong>{c.name}</strong> },
+                  {
+                    header: t("sectionsCol"),
+                    render: (c) => (
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                        {(sections[c.id] ?? []).map((s) => (
+                          <Box key={s.id} sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+                            {editingSection?.id === s.id && (
+                              <FormModal
+                                title={t("editBtn")}
+                                onClose={() => setEditingSection(null)}
+                                submitLabel={t("saveBtn")}
+                                onSubmit={async (e) => {
+                                  e.preventDefault();
+                                  try {
+                                    await academicsApi.updateSection(c.id, s.id, { name: editingSection.name });
+                                    setEditingSection(null);
+                                    await refreshAll();
+                                  } catch (err) { handleError(err); }
+                                }}
+                              >
+                                <label>
+                                  {t("nameLabel")}
+                                  <Input autoFocus value={editingSection.name} onChange={e => setEditingSection({ ...editingSection, name: e.target.value })} />
+                                </label>
+                              </FormModal>
+                            )}
+                            <Typography component="span" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>{s.name}</Typography>
+                            <Box sx={{ ml: "auto", display: "flex", gap: 0.5, flexShrink: 0 }}>
+                              <ActionMenu ariaLabel={`${t("actionsCol")}: ${s.name}`} items={[
+                                { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingSection(s) },
+                                { label: t("deleteBtn"), icon: <Trash2 size={14} />, destructive: true, disabled: pendingDeleteKey === `section:${s.id}`, onClick: () => handleDelete(`section:${s.id}`, `${c.name} / ${s.name}`, () => academicsApi.deleteSection(c.id, s.id)) },
+                              ]} />
+                            </Box>
                           </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
-                            <Badge size="small" label={t("coursesCountLabel", { count: (courses[c.id] ?? []).length })} />
-                            <TableAction
-                              type="button"
-                              onClick={() => setCourseMapModalClassId(c.id)}
-                            >
-                              {t("manageCoursesBtn")}
-                            </TableAction>
-                          </Box>
-                        </TableCell>
-                      </DataTableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </StyledTableContainer>
+                        ))}
+                        {!(sections[c.id]?.length > 0) && <Typography component="span">-</Typography>}
+                      </Box>
+                    ),
+                  },
+                  {
+                    header: t("coursesCol"),
+                    render: (c) => (
+                      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
+                        <Badge size="small" label={t("coursesCountLabel", { count: (courses[c.id] ?? []).length })} />
+                        <TableAction
+                          type="button"
+                          onClick={() => setCourseMapModalClassId(c.id)}
+                        >
+                          {t("manageCoursesBtn")}
+                        </TableAction>
+                      </Box>
+                    ),
+                  },
+                ]}
+                data={classesForCourseMap}
+                keyExtractor={(c) => c.id}
+                emptyMessage={t("noClassesYet")}
+              />
             </>
           )}
 
@@ -651,86 +584,49 @@ export function AcademicsView({ tab = "programs", onTabChange }: Readonly<{ tab?
                               </FormField>
                             </FormStack>
                           </FormModal>}
-              <StyledTableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <HeaderTableRow>
-                      <TableCell>{t("nameLabel")}</TableCell>
-                      <TableCell>{t("spanCol")}</TableCell>
-                      <TableCell>{t("activeCol")}</TableCell>
-                      <TableCell>{t("actionsCol")}</TableCell>
-                    </HeaderTableRow>
-                  </TableHead>
-                  <TableBody>
-                    {sessions.length === 0 && (
-                      <DataTableRow><TableCell colSpan={4}><Typography color="text.secondary">{t("noSessionsYet")}</Typography></TableCell></DataTableRow>
-                    )}
-                    {sessions.map((s) => (
-                      <DataTableRow key={s.id}>
-                        {editingSession?.id === s.id && (
-                          <FormModal
-                            title={t("editBtn")}
-                            onClose={() => setEditingSession(null)}
-                            submitLabel={t("saveBtn")}
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-                              try {
-                                await academicsApi.updateSession(s.id, {
-                                  name: editingSession.name, gregorian_start: editingSession.gregorian_start,
-                                  gregorian_end: editingSession.gregorian_end, hijri_span: editingSession.hijri_span
-                                });
-                                setEditingSession(null);
-                                await refreshAll();
-                              } catch (err) { handleError(err); }
-                            }}
-                          >
-                            <label>
-                              {t("nameLabel")}
-                              <Input autoFocus value={editingSession.name} onChange={e => setEditingSession({ ...editingSession, name: e.target.value })} />
-                            </label>
-                            <label>
-                              {t("startDateCol")}
-                              <Input type="date" value={editingSession.gregorian_start} onChange={e => setEditingSession({ ...editingSession, gregorian_start: e.target.value })} />
-                            </label>
-                            <label>
-                              {t("endDateCol")}
-                              <Input type="date" value={editingSession.gregorian_end} onChange={e => setEditingSession({ ...editingSession, gregorian_end: e.target.value })} />
-                            </label>
-                            <label>
-                              {t("hijriSpanCol")}
-                              <Input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} />
-                            </label>
-                          </FormModal>
-                        )}
-                        <TableCell>{s.name}</TableCell>
-                        <TableCell>{s.gregorian_start} → {s.gregorian_end}</TableCell>
-                        <TableCell>{s.is_active ? <CheckCircle2 size={16} color={s.is_active ? "inherit" : "inherit"} /> : "—"}</TableCell>
-                        <TableCell>
-                          <Box sx={{ display: "flex", gap: 1 }}>
-                            <ActionMenu ariaLabel={`${t("actionsCol")}: ${s.name}`} items={[
-                              ...(!s.is_active ? [{
-                                label: t("activateBtn"),
-                                onClick: async () => { await academicsApi.activateSession(s.id); await refreshAll(); },
-                              }] : [{
-                                label: "Year-End Rollover",
-                                onClick: () => setRolloverSourceSession(s),
-                              }]),
-                              { label: t("editBtn"), icon: <Edit2 size={14} />, onClick: () => setEditingSession(s) },
-                              ...(!s.is_active ? [{
-                                label: t("deleteBtn"),
-                                icon: <Trash2 size={14} />,
-                                destructive: true,
-                                disabled: pendingDeleteKey === `session:${s.id}`,
-                                onClick: () => handleDelete(`session:${s.id}`, s.name, () => academicsApi.deleteSession(s.id)),
-                              }] : []),
-                            ]} />
-                          </Box>
-                        </TableCell>
-                      </DataTableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </StyledTableContainer>
+              <DataTable
+                columns={sessionColumns}
+                data={sessions}
+                keyExtractor={(item) => item.id}
+                emptyMessage={t("noSessionsYet")}
+              />
+              {editingSession && (
+                <FormModal
+                  title={t("editBtn")}
+                  onClose={() => setEditingSession(null)}
+                  submitLabel={t("saveBtn")}
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      await academicsApi.updateSession(editingSession.id, {
+                        name: editingSession.name,
+                        gregorian_start: editingSession.gregorian_start,
+                        gregorian_end: editingSession.gregorian_end,
+                        hijri_span: editingSession.hijri_span,
+                      });
+                      setEditingSession(null);
+                      await refreshAll();
+                    } catch (err) { handleError(err); }
+                  }}
+                >
+                  <FormStack>
+                    <FormField label={t("nameLabel")}>
+                      <Input autoFocus value={editingSession.name} onChange={e => setEditingSession({ ...editingSession, name: e.target.value })} />
+                    </FormField>
+                    <FormRow>
+                      <FormField label={t("startDateCol")}>
+                        <Input type="date" value={editingSession.gregorian_start} onChange={e => setEditingSession({ ...editingSession, gregorian_start: e.target.value })} />
+                      </FormField>
+                      <FormField label={t("endDateCol")}>
+                        <Input type="date" value={editingSession.gregorian_end} onChange={e => setEditingSession({ ...editingSession, gregorian_end: e.target.value })} />
+                      </FormField>
+                    </FormRow>
+                    <FormField label={t("hijriSpanCol")}>
+                      <Input value={editingSession.hijri_span} onChange={e => setEditingSession({ ...editingSession, hijri_span: e.target.value })} />
+                    </FormField>
+                  </FormStack>
+                </FormModal>
+              )}
             </>
           )}
 

@@ -1,9 +1,10 @@
 import { type ReactNode } from "react";
-import Box from "@mui/material/Box";
-import Stack from "@mui/material/Stack";
-import Paper from "@mui/material/Paper";
-import useMediaQuery from "@mui/material/useMediaQuery";
+import { Box } from "./Mui";
+import { Stack } from "./Mui";
+import { Paper } from "./Mui";
+import { useMediaQuery } from "./Mui";
 import { useTheme, styled } from "@mui/material/styles";
+import { PWA_COMPACT_BREAKPOINT, PWA_TOUCH_TARGET } from "./Layout";
 
 /**
  * FormStack — vertical container for form fields with consistent spacing.
@@ -49,7 +50,7 @@ export function FormSection({ title, children }: Readonly<{ title?: string; chil
  */
 export function FormRow({ children }: Readonly<{ children: ReactNode }>) {
   const theme = useTheme();
-  const isDesktop = useMediaQuery(theme.breakpoints.up("sm"));
+  const isDesktop = useMediaQuery(`(min-width:${PWA_COMPACT_BREAKPOINT}px)`);
 
   return (
     <Box
@@ -69,7 +70,7 @@ export function FormRow({ children }: Readonly<{ children: ReactNode }>) {
  */
 export function FormActions({ children }: Readonly<{ children: ReactNode }>) {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMobile = useMediaQuery(`(max-width:${PWA_COMPACT_BREAKPOINT - 1}px)`);
 
   return (
     <Box
@@ -87,9 +88,12 @@ export function FormActions({ children }: Readonly<{ children: ReactNode }>) {
           backgroundColor: "background.paper",
           marginX: -2,
           paddingX: 2,
-          paddingBottom: 2,
-          zIndex: 1,
-        }),
+              paddingBottom: 2,
+              zIndex: 1,
+            }),
+            "& .MuiButton-root": {
+              minHeight: PWA_TOUCH_TARGET,
+            },
       }}
     >
       {children}
@@ -120,7 +124,7 @@ export function FormCard({ children }: Readonly<{ children: ReactNode }>) {
       variant="outlined"
       sx={{
         padding: 2,
-        borderRadius: 2,
+        borderRadius: 1,
       }}
     >
       {children}
@@ -142,7 +146,7 @@ export const StyledFormRow = styled(Box)(({ theme }) => ({
   display: "grid",
   gridTemplateColumns: "1fr",
   gap: theme.spacing(2),
-  [theme.breakpoints.up("sm")]: {
+  [theme.breakpoints.up(PWA_COMPACT_BREAKPOINT)]: {
     gridTemplateColumns: "1fr 1fr",
   },
 }));
@@ -155,7 +159,7 @@ export const StyledFormActions = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(3),
   paddingTop: theme.spacing(2),
   borderTop: `1px solid ${theme.palette.divider}`,
-  [theme.breakpoints.down("sm")]: {
+  [`@media (max-width:${PWA_COMPACT_BREAKPOINT - 1}px)`]: {
     flexDirection: "column",
     position: "sticky",
     bottom: 0,

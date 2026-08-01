@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import Typography from "@mui/material/Typography";
-import useMediaQuery from "@mui/material/useMediaQuery";
+import { Box } from "./Mui";
+import { Paper } from "./Mui";
+import { Table } from "./Mui";
+import { TableBody } from "./Mui";
+import { TableCell } from "./Mui";
+import { TableContainer } from "./Mui";
+import { TableHead } from "./Mui";
+import { TableRow } from "./Mui";
+import { Typography } from "./Mui";
+import { useMediaQuery } from "./Mui";
 import { styled } from "@mui/material/styles";
 import { LoadingState, ErrorState } from "./AsyncState";
+import { PWA_COMPACT_BREAKPOINT } from "./Layout";
 
 /* ------------------------------------------------------------------ types */
 
@@ -64,8 +65,10 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
 }));
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
-  padding: theme.spacing(1.5, 2),
+  padding: theme.spacing(1.25, 1.5),
   borderColor: theme.palette.divider,
+  verticalAlign: "top",
+  overflowWrap: "anywhere",
 }));
 
 const StyledTableHeader = styled(TableCell)(({ theme }) => ({
@@ -76,7 +79,8 @@ const StyledTableHeader = styled(TableCell)(({ theme }) => ({
   color: theme.palette.teal.main,
   backgroundColor: "transparent",
   borderBottom: `2px solid ${theme.palette.divider}`,
-  padding: theme.spacing(1.5, 2),
+  padding: theme.spacing(1.25, 1.5),
+  whiteSpace: "nowrap",
 }));
 
 const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
@@ -85,20 +89,23 @@ const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
   overflowY: "visible",
   borderColor: theme.palette.divider,
   boxShadow: "none",
-  borderRadius: 16,
+  borderRadius: 8,
   border: `1px solid ${theme.palette.divider}`,
 }));
 
 const CardGrid = styled(Box)(({ theme }) => ({
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-  gap: theme.spacing(2),
+  gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))",
+  gap: theme.spacing(1.5),
 }));
 
 const StyledCard = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(2),
-  borderRadius: 16,
+  display: "flex",
+  flexDirection: "column",
+  padding: theme.spacing(1.5),
+  borderRadius: 8,
   border: `1px solid ${theme.palette.divider}`,
+  overflow: "hidden",
   transition: "box-shadow 0.2s ease, transform 0.15s ease",
   "&:hover": {
     boxShadow: theme.shadows[4],
@@ -109,7 +116,8 @@ const StyledCard = styled(Paper)(({ theme }) => ({
 const CardField = styled(Box)(() => ({
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "center",
+  alignItems: "flex-start",
+  gap: 12,
   padding: "8px 0",
   borderBottom: "1px solid",
   borderColor: "divider",
@@ -126,9 +134,12 @@ const FieldLabel = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.secondary,
 }));
 
-const FieldValue = styled(Typography)(() => ({
+const FieldValue = styled(Box)(() => ({
   fontSize: "0.875rem",
   fontWeight: 500,
+  minWidth: 0,
+  textAlign: "end",
+  overflowWrap: "anywhere",
 }));
 
 /* ------------------------------------------------------------------ component */
@@ -148,10 +159,10 @@ export function DataTable<T>({
   renderBeforeRow,
 }: Readonly<DataTableProps<T>>) {
   const showData = !isLoading && !error;
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const renderCards = useMediaQuery(`(max-width: ${PWA_COMPACT_BREAKPOINT - 1}px)`);
 
   return (
-    <Box className={className}>
+    <Box className={`tableResponsive${className ? ` ${className}` : ""}`} sx={{ minWidth: 0, width: "100%" }}>
       {isLoading && <LoadingState />}
       {!isLoading && error && <ErrorState message={error} />}
       {showData && data.length === 0 && emptyMessage && (
@@ -159,7 +170,7 @@ export function DataTable<T>({
           {emptyMessage}
         </Box>
       )}
-      {showData && data.length > 0 && !isMobile && (
+      {showData && data.length > 0 && !renderCards && (
         <TableContainer
           component={Paper}
           variant="outlined"
@@ -169,11 +180,12 @@ export function DataTable<T>({
             overflowY: 'visible',
             borderColor: 'divider',
             boxShadow: 'none',
-            borderRadius: 16,
+            borderRadius: 1,
             border: '1px solid',
           }}
+          className="desktopDataTable"
         >
-          <StyledTable size="small" stickyHeader aria-label="data table">
+          <StyledTable className="desktopDataTable" size="small" stickyHeader aria-label="data table">
             <TableHead>
               <TableRow>
                 {columns.map((col, i) => (
@@ -198,8 +210,8 @@ export function DataTable<T>({
           </StyledTable>
         </TableContainer>
       )}
-      {showData && data.length > 0 && isMobile && (
-        <CardGrid role="list" aria-label="data cards">
+      {showData && data.length > 0 && renderCards && (
+        <CardGrid role="list" aria-label="data cards" className="mobileDataCards">
           {data.map((item, index) => (
             <DataCard
               key={keyExtractor(item)}
@@ -239,7 +251,7 @@ function DataRow<T>({
           <TableCell colSpan={columns.length}>{before}</TableCell>
         </StyledTableRow>
       )}
-      <StyledTableRow>
+      <StyledTableRow className="dataRow">
         {columns.map((col, i) => {
           const label = typeof col.header === "string" ? col.header : undefined;
           return <StyledTableCell key={i} data-label={label} className={col.className}>{col.render(item, index)}</StyledTableCell>;
@@ -266,11 +278,11 @@ function DataCard<T>({
   return (
     <>
       {before && <Box sx={{ gridColumn: "1 / -1" }}>{before}</Box>}
-      <StyledCard role="listitem" variant="outlined">
+      <StyledCard role="listitem" variant="outlined" className="mobileDataCard dataRow">
         {columns.map((col, i) => {
           const label = typeof col.header === "string" ? col.header : undefined;
           return (
-            <CardField key={i}>
+            <CardField key={i} data-label={label}>
               {label && <FieldLabel>{label}</FieldLabel>}
               <FieldValue>{col.render(item, index)}</FieldValue>
             </CardField>

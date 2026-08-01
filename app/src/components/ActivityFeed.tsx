@@ -1,7 +1,7 @@
 import { styled, useTheme } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
 import {
   CalendarCheck,
   ClipboardCheck,

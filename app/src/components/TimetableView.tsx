@@ -1,9 +1,9 @@
 import { Button } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
 import { FileDown, LayoutGrid, List, Plus, Trash2, Upload, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";

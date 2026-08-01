@@ -1,12 +1,8 @@
 import { Button } from "./ui/Button";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
-import FormControl from "@mui/material/FormControl";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Radio from "@mui/material/Radio";
-import RadioGroup from "@mui/material/RadioGroup";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
 import { KeyRound, Moon, Settings as SettingsIcon, Sun, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -118,19 +114,28 @@ export function ProfileView() {
         <Typography sx={{ color: "text.secondary", fontSize: "0.875rem", mb: 2 }}>
           {t("themeDescription", { defaultValue: "Choose your preferred theme. System will follow your OS setting." })}
         </Typography>
-        <FormControl component="fieldset">
-          <RadioGroup
-            row
-            aria-label={t("themeTitle", { defaultValue: "Theme" })}
-            name="theme-mode"
-            value={themeMode}
-            onChange={(event) => setDarkMode(event.target.value as "light" | "dark" | "system")}
-          >
-            <FormControlLabel value="light" control={<Radio size="small" />} label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><Sun size={15} /> {t("themeLight", { defaultValue: "Light" })}</Box>} />
-            <FormControlLabel value="dark" control={<Radio size="small" />} label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><Moon size={15} /> {t("themeDark", { defaultValue: "Dark" })}</Box>} />
-            <FormControlLabel value="system" control={<Radio size="small" />} label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><SettingsIcon size={15} /> {t("themeSystem", { defaultValue: "System" })}</Box>} />
-          </RadioGroup>
-        </FormControl>
+        <Box role="radiogroup" aria-label={t("themeTitle", { defaultValue: "Theme" })} sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+          {[
+            { value: "light" as const, label: t("themeLight", { defaultValue: "Light" }), icon: <Sun size={15} /> },
+            { value: "dark" as const, label: t("themeDark", { defaultValue: "Dark" }), icon: <Moon size={15} /> },
+            { value: "system" as const, label: t("themeSystem", { defaultValue: "System" }), icon: <SettingsIcon size={15} /> },
+          ].map((option) => (
+            <Button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={themeMode === option.value}
+              variant={themeMode === option.value ? "contained" : "outlined"}
+              onClick={() => setDarkMode(option.value)}
+              sx={{ minHeight: 44 }}
+            >
+              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                {option.icon}
+                {option.label}
+              </Box>
+            </Button>
+          ))}
+        </Box>
       </PageSection>
 
       <PageSection>

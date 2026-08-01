@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import IconButton from "@mui/material/IconButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import MenuItem from "@mui/material/MenuItem";
-import MenuList from "@mui/material/MenuList";
+import { IconButton } from "./Mui";
+import { ListItemIcon } from "./Mui";
+import { MenuItem } from "./Mui";
+import { MenuList } from "./Mui";
 import { MoreVertical } from "lucide-react";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
+import { Box } from "./Mui";
+import { useMediaQuery } from "./Mui";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
+import { PWA_COMPACT_BREAKPOINT } from "./Layout";
 
 export interface ActionMenuItem {
   label: string;
@@ -24,8 +26,10 @@ export interface ActionMenuProps {
   inlineThreshold?: number;
 }
 
-export function ActionMenu({ items, ariaLabel, children, inlineThreshold = 2 }: Readonly<ActionMenuProps>) {
+export function ActionMenu({ items, ariaLabel, children, inlineThreshold = 1 }: Readonly<ActionMenuProps>) {
   const { t } = useTranslation();
+  const isCompact = useMediaQuery(`(max-width: ${PWA_COMPACT_BREAKPOINT - 1}px)`);
+  const effectiveInlineThreshold = isCompact ? 0 : inlineThreshold;
   const [isOpen, setIsOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -74,7 +78,7 @@ export function ActionMenu({ items, ariaLabel, children, inlineThreshold = 2 }: 
     };
   }, [isOpen, updateMenuPosition]);
 
-  if (items.length <= inlineThreshold) {
+  if (items.length <= effectiveInlineThreshold) {
     return (
       <ActionMenuWrapper>
         {items.map((item, index) => (
@@ -104,6 +108,7 @@ export function ActionMenu({ items, ariaLabel, children, inlineThreshold = 2 }: 
   return (
     <ActionMenuWrapper>
       <ActionMenuTrigger
+        className="actionMenuTrigger"
         ref={buttonRef}
         type="button"
         aria-label={ariaLabel ?? t("actionsCol")}
@@ -126,6 +131,7 @@ export function ActionMenu({ items, ariaLabel, children, inlineThreshold = 2 }: 
         {items.map((item, index) => (
           <ActionMenuItemStyled
             key={index}
+            className="actionMenuItem"
             destructive={item.destructive}
             disabled={item.disabled}
             onClick={() => {

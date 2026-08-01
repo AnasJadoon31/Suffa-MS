@@ -1,16 +1,16 @@
 import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import useMediaQuery from "@mui/material/useMediaQuery";
-import Alert from "@mui/material/Alert";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Table } from "./ui/Mui";
+import { TableBody } from "./ui/Mui";
+import { TableCell } from "./ui/Mui";
+import { TableContainer } from "./ui/Mui";
+import { TableHead } from "./ui/Mui";
+import { TableRow } from "./ui/Mui";
+import { useMediaQuery } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
 import { BookOpen, ClipboardList, FileDown, Pencil, Plus, Send, Trash2, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -38,13 +38,13 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import { consumePendingClassNav } from "../lib/pendingNav";
 import { DOCUMENT_UPLOAD_ACCEPT, getDocumentUploadContentType } from "../lib/filePolicy";
-import { Input, Select, CheckboxField, Textarea } from "./ui/Field";
+import { FileInput, Input, Select, CheckboxField, Textarea } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { DEFAULT_PAGE_SIZE, pageParams, PaginationControls, recoverEmptyPage, type PageState } from "./ui/Pagination";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { Modal, FormModal } from "./ui/Modal";
-import { PageSection, PageHeader } from "./ui/Layout";
+import { PageSection, PageHeader, PWA_COMPACT_BREAKPOINT } from "./ui/Layout";
 import { ActionMenu } from "./ui/ActionMenu";
 import { InlineFilter } from "./ui/InlineFilter";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
@@ -181,6 +181,10 @@ const MobileActions = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(1),
   paddingTop: theme.spacing(1),
   borderTop: `1px solid ${theme.palette.divider}`,
+  "& button": {
+    minWidth: 44,
+    minHeight: 44,
+  },
 }));
 
 const TeacherSummary = styled(Box)(({ theme }) => ({
@@ -514,32 +518,29 @@ function AssignmentsTab({
       {selected && (
         <PageSection sx={{ marginTop: 16 }}>
           <Typography variant="h6">{t("submissionsHeading", { title: selected.title })}</Typography>
-          <StyledTableContainer>
-            <Table size="small">
-              <TableHead>
-                <HeaderTableRow>
-                  <TableCell>{t("studentCol")}</TableCell>
-                  <TableCell>{t("submittedCol")}</TableCell>
-                  <TableCell>{t("lateCol")}</TableCell>
-                  <TableCell>{t("markCol")}</TableCell>
-                  <TableCell>{t("actionsCol")}</TableCell>
-                </HeaderTableRow>
-              </TableHead>
-              <TableBody>
-                {submissions.length === 0 && (
-                  <DataTableRow><TableCell colSpan={5}><Typography color="text.secondary">{t("noSubmissionsYet")}</Typography></TableCell></DataTableRow>
-                )}
-                {submissions.map((s) => (
-                  <SubmissionRow
-                    key={s.id}
-                    submission={s}
-                    studentName={s.student_name ?? students.find((st) => st.id === s.student_id)?.name ?? t("unknownPersonLabel")}
-                    onGraded={() => void openSubmissions(selected)}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </StyledTableContainer>
+          <DataTable<Submission>
+            columns={[
+              {
+                header: t("studentCol"),
+                render: (submission) => submission.student_name ?? students.find((st) => st.id === submission.student_id)?.name ?? t("unknownPersonLabel"),
+              },
+              {
+                header: t("submittedCol"),
+                render: (submission) => new Date(submission.submitted_at).toLocaleString(),
+              },
+              {
+                header: t("lateCol"),
+                render: (submission) => submission.is_late ? t("lateLabel") : t("onTimeLabel"),
+              },
+              {
+                header: t("markCol"),
+                render: (submission) => <SubmissionGradeFields submission={submission} onGraded={() => void openSubmissions(selected)} />,
+              },
+            ]}
+            data={submissions}
+            keyExtractor={(submission) => submission.id}
+            emptyMessage={t("noSubmissionsYet")}
+          />
         </PageSection>
       )}
     </>
@@ -688,7 +689,13 @@ function AssignmentCreateForm({
             <Input type="number" step="any" min="0" max="100" value={form.weightage} onChange={(e) => setForm({ ...form, weightage: e.target.value })} placeholder="e.g. 20" />
           </FormField>
           <FormField label={t("attachmentLabel")}>
-            <Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
+            <FileInput
+              buttonLabel={t("chooseFileBtn")}
+              emptyLabel={t("noFileSelectedLabel")}
+              selectedLabel={attachmentFile?.name}
+              accept={DOCUMENT_UPLOAD_ACCEPT}
+              onFileChange={setAttachmentFile}
+            />
           </FormField>
         </FormRow>
       </FormStack>
@@ -775,48 +782,46 @@ function AssignmentEditForm({
   );
 }
 
-function SubmissionRow({
+function SubmissionGradeFields({
   submission,
-  studentName,
   onGraded,
-}: Readonly<{ submission: Submission; studentName: string; onGraded: () => void }>) {
+}: Readonly<{ submission: Submission; onGraded: () => void }>) {
   const { t } = useTranslation();
   const [mark, setMark] = useState(submission.mark?.toString() ?? "");
   const [feedback, setFeedback] = useState(submission.feedback ?? "");
   return (
-    <DataTableRow>
-      <TableCell>{studentName}</TableCell>
-      <TableCell>{new Date(submission.submitted_at).toLocaleString()}</TableCell>
-      <TableCell>{submission.is_late ? t("lateLabel") : t("onTimeLabel")}</TableCell>
-      <TableCell>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-          <Input placeholder={t("markCol")} value={mark} onChange={(e) => setMark(e.target.value)} />
-          <Textarea placeholder={t("feedbackLabel", "Feedback")} rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
-        </Box>
-      </TableCell>
-      <TableCell>
-        <Box sx={{ display: "flex", gap: 0.5 }}>
-          <TableAction
-            type="button"
-            onClick={async () => {
-              const { url } = await filesApi.presignDownload(submission.file_key);
-              window.open(url, "_blank", "noreferrer");
-            }}
-          >
-            <FileDown size={14} /> {t("downloadBtn")}
-          </TableAction>
-          <TableAction
-            type="button"
-            onClick={async () => {
-              await assessmentsApi.gradeSubmission(submission.id, { mark: Number(mark), feedback: feedback || undefined });
-              onGraded();
-            }}
-          >
-            {t("saveBtn")}
-          </TableAction>
-        </Box>
-      </TableCell>
-    </DataTableRow>
+    <Box
+      className="submissionGradeField"
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+        "& input, & textarea, & button, & .MuiInputBase-root": { minWidth: 44, minHeight: 44 },
+      }}
+    >
+      <Input placeholder={t("markCol")} value={mark} onChange={(e) => setMark(e.target.value)} />
+      <Textarea placeholder={t("feedbackLabel", "Feedback")} rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", "& button": { minWidth: 44, minHeight: 44 } }}>
+        <TableAction
+          type="button"
+          onClick={async () => {
+            const { url } = await filesApi.presignDownload(submission.file_key);
+            window.open(url, "_blank", "noreferrer");
+          }}
+        >
+          <FileDown size={14} /> {t("downloadBtn")}
+        </TableAction>
+        <TableAction
+          type="button"
+          onClick={async () => {
+            await assessmentsApi.gradeSubmission(submission.id, { mark: Number(mark), feedback: feedback || undefined });
+            onGraded();
+          }}
+        >
+          {t("saveBtn")}
+        </TableAction>
+      </Box>
+    </Box>
   );
 }
 
@@ -831,7 +836,7 @@ function GradingTab({
   const [courseId, setCourseId] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [error, setError] = useState("");
-  const renderCards = useMediaQuery("(max-width: 768px)");
+  const renderCards = useMediaQuery(`(max-width: ${PWA_COMPACT_BREAKPOINT - 1}px)`);
 
   const load = async (targetClassId: string) => {
     setError("");
@@ -910,7 +915,7 @@ function GradingTab({
               {section.students.map((student) => {
                 const cell = student.courses.find((c) => c.course_id === course.course_id);
                 return (
-                  <MobileCard role="listitem" key={student.student_id}>
+                  <MobileCard className="assessmentMobileCard" role="listitem" key={student.student_id}>
                     <MobileCardHeader>
                       <strong>{student.name}</strong>
                       <Typography component="span">{student.admission_number}</Typography>
@@ -941,7 +946,7 @@ function GradingTab({
               })}
             </Box>
           ) : (
-            <StyledTableContainer>
+            <StyledTableContainer className="matrixResponsiveException">
               <Table size="small">
                 <TableHead>
                   <HeaderTableRow>
@@ -1082,7 +1087,7 @@ function GradingPlanSetup({
   const previewBand = bands.find((item) => 75 >= Number(item.min_score) && 75 <= Number(item.max_score))?.label ?? "—";
 
   return (
-    <GradingSetupLayout>
+    <GradingSetupLayout className="gradingSetupLayout">
       <PageSection>
         <GradingPlanHeader>
           <Box>
@@ -1096,7 +1101,7 @@ function GradingPlanSetup({
           { key: "class", type: "select", label: t("classOverrideLabel"), value: classId, placeholder: t("courseDefaultOption"), options: classes.map((item) => ({ value: item.id, label: item.name })), onChange: setClassId, disabled: !courseId },
         ]} />
         {isLoading ? <LoadingState /> : <>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mb: 1 }}>
+          <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5, mb: 1 }}>
             <Typography component="span" sx={{ fontWeight: 600 }}>{t("schemeNameLabel")}</Typography>
             <Input value={name} onChange={(event) => setName(event.target.value)} />
           </Box>
@@ -1175,7 +1180,7 @@ function ResultsTab({
   const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const renderCards = useMediaQuery("(max-width: 768px)");
+  const renderCards = useMediaQuery(`(max-width: ${PWA_COMPACT_BREAKPOINT - 1}px)`);
 
   const load = async (targetClassId: string) => {
     setError("");
@@ -1279,7 +1284,7 @@ function ResultsTab({
               <Box role="list" aria-label={`${section.class_name} / ${section.section_name}`}>
                 {section.students.length === 0 && <Typography color="text.secondary">{t("noStudentsInSection")}</Typography>}
                 {section.students.map((student) => (
-                  <MobileCard role="listitem" key={student.student_id}>
+                  <MobileCard className="assessmentMobileCard" role="listitem" key={student.student_id}>
                     <MobileCardHeader>
                       <strong>{student.name}</strong>
                       <Typography component="span">{student.admission_number}</Typography>
@@ -1322,7 +1327,7 @@ function ResultsTab({
                 ))}
               </Box>
             ) : (
-              <StyledTableContainer>
+              <StyledTableContainer className="matrixResponsiveException">
                 <Table size="small">
                   <TableHead>
                     <HeaderTableRow>

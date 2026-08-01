@@ -1,9 +1,9 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
 import { Download, Edit2, FolderPlus, Plus, Trash2, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -22,7 +22,7 @@ import { AudiencePicker } from "./AudiencePicker";
 import { useAuth } from "../lib/AuthContext";
 import { cachedFetch } from "../lib/offlineCache";
 import { DOCUMENT_UPLOAD_ACCEPT, getDocumentUploadContentType } from "../lib/filePolicy";
-import { Input, Select, CheckboxField } from "./ui/Field";
+import { FileInput, Input, Select, CheckboxField } from "./ui/Field";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { DataTable } from "./ui/DataTable";
 import { useSessionReadOnly } from "./SessionSwitcher";
@@ -120,14 +120,14 @@ export function ResourcesView() {
   }, [classFilter]);
 
   return (
-    <PageSection>
+    <PageSection className="resourcesPanel">
       <PageHeader
         title={t("resources")}
         notice={t("descResources")}
         actions={canManage && (
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <Button type="button" onClick={() => setShowCategoryForm(true)}><FolderPlus size={16} /> {t("addCategoryBtn")}</Button>
-            <Button type="button" onClick={() => setShowResourceForm(true)}><Plus size={16} /> {t("addResourceBtn")}</Button>
+          <Box className="resourceHeaderActions" sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Button className="secondaryAction" type="button" onClick={() => setShowCategoryForm(true)}><FolderPlus size={16} /> {t("addCategoryBtn")}</Button>
+            <Button className="primaryAction" type="button" onClick={() => setShowResourceForm(true)}><Plus size={16} /> {t("addResourceBtn")}</Button>
           </Box>
         )}
       />
@@ -160,32 +160,35 @@ export function ResourcesView() {
             </FormStack>
           </FormModal>}
 
-      <InlineFilter filters={[
-        {
-          key: "resource-category", type: "select", label: t("categoryCol"), value: categoryFilter,
-          placeholder: t("allCategories"), onChange: setCategoryFilter,
-          options: categories.map((category) => ({
-            value: category.id,
-            label: `${category.name}${category.is_mine && category.owner_id ? ` (${t("mineTagLabel")})` : ""}`,
-          })),
-        },
-        ...(canManageAll ? [{
-          key: "resource-class", type: "select" as const, label: t("browseByClassLabel"), value: classFilter,
-          placeholder: t("allClasses"), options: classes.map((academicClass) => ({ value: academicClass.id, label: academicClass.name })), onChange: setClassFilter,
-        }] : []),
-        ...(canManageAll && classFilter ? [{
-          key: "resource-section", type: "select" as const, label: t("browseBySectionLabel"), value: sectionFilter,
-          placeholder: t("allSections"), options: sections.map((section) => ({ value: section.id, label: section.name })), onChange: setSectionFilter,
-        }] : []),
-      ]}>
-        {canManage && (
+      <Box className="resourcesFilter">
+        <InlineFilter filters={[
+          {
+            key: "resource-category", type: "select", label: t("categoryCol"), value: categoryFilter,
+            placeholder: t("allCategories"), onChange: setCategoryFilter,
+            options: categories.map((category) => ({
+              value: category.id,
+              label: `${category.name}${category.is_mine && category.owner_id ? ` (${t("mineTagLabel")})` : ""}`,
+            })),
+          },
+          ...(canManageAll ? [{
+            key: "resource-class", type: "select" as const, label: t("browseByClassLabel"), value: classFilter,
+            placeholder: t("allClasses"), options: classes.map((academicClass) => ({ value: academicClass.id, label: academicClass.name })), onChange: setClassFilter,
+          }] : []),
+          ...(canManageAll && classFilter ? [{
+            key: "resource-section", type: "select" as const, label: t("browseBySectionLabel"), value: sectionFilter,
+            placeholder: t("allSections"), options: sections.map((section) => ({ value: section.id, label: section.name })), onChange: setSectionFilter,
+          }] : []),
+        ]}>
+          {canManage && (
           <CheckboxField
+            className="resourceMineToggle"
             checked={mineOnly}
-            onChange={(e) => setMineOnly(e.target.checked)}
-            label={t("myUploadsOnlyLabel")}
-          />
-        )}
-      </InlineFilter>
+              onChange={(e) => setMineOnly(e.target.checked)}
+              label={t("myUploadsOnlyLabel")}
+            />
+          )}
+        </InlineFilter>
+      </Box>
 
       {canManage && showResourceForm && <FormModal
             title={t("addResourceBtn")} onClose={() => setShowResourceForm(false)}
@@ -242,7 +245,13 @@ export function ResourcesView() {
                 <Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder={t("optionalPlaceholder")} />
               </FormField>
               <FormField label={t("fileLabel")}>
-                <Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                <FileInput
+                  buttonLabel={t("chooseFileBtn")}
+                  emptyLabel={t("noFileSelectedLabel")}
+                  selectedLabel={file?.name}
+                  accept={DOCUMENT_UPLOAD_ACCEPT}
+                  onFileChange={setFile}
+                />
               </FormField>
               <AudiencePicker value={audience} onChange={setAudience} />
             </FormStack>

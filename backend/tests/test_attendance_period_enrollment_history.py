@@ -1,5 +1,7 @@
 from datetime import UTC, date, datetime
 
+from sqlalchemy import select
+
 from app.modules.attendance.models import AttendanceStatus, StudentAttendance
 from app.modules.operations.models import Holiday, Leave
 
@@ -8,6 +10,100 @@ async def _seed_slot(client):
     response = await client.get("/api/v1/operations/timetable")
     assert response.status_code == 200, response.text
     return response.json()[0]
+
+
+async def test_roster_infers_single_current_day_period_from_course(client, seed):
+    today_day = datetime.now(UTC).date().weekday()
+    slot_response = await client.post(
+        "/api/v1/operations/timetable",
+        json={
+            "class_id": str(seed.class_a.id),
+            "section_id": str(seed.sections.a1.id),
+            "course_id": str(seed.course.id),
+            "teacher_id": str(seed.teacher.id),
+            "day_of_week": today_day,
+            "period": 8,
+            "start_time": "14:00",
+            "end_time": "14:40",
+        },
+    )
+    assert slot_response.status_code == 200, slot_response.text
+    slot = slot_response.json()
+
+    roster = await client.get(
+        f"/api/v1/attendance/classes/{seed.class_a.id}/roster",
+        params={
+            "section_id": str(seed.sections.a1.id),
+            "course_id": str(seed.course.id),
+        },
+    )
+    assert roster.status_code == 200, roster.text
+    assert roster.json()["course"] == {"id": str(seed.course.id), "name": "Nazra"}
+    assert roster.json()["timetable_slot"]["id"] == slot["id"]
+
+
+async def test_roster_requires_period_when_course_has_multiple_current_day_periods(client, seed):
+    today_day = datetime.now(UTC).date().weekday()
+    for period in (8, 9):
+        response = await client.post(
+            "/api/v1/operations/timetable",
+            json={
+                "class_id": str(seed.class_a.id),
+                "section_id": str(seed.sections.a1.id),
+                "course_id": str(seed.course.id),
+                "teacher_id": str(seed.teacher.id),
+                "day_of_week": today_day,
+                "period": period,
+                "start_time": f"{period + 6}:00",
+                "end_time": f"{period + 6}:40",
+            },
+        )
+        assert response.status_code == 200, response.text
+
+    roster = await client.get(
+        f"/api/v1/attendance/classes/{seed.class_a.id}/roster",
+        params={
+            "section_id": str(seed.sections.a1.id),
+            "course_id": str(seed.course.id),
+        },
+    )
+    assert roster.status_code == 409
+    assert roster.json()["detail"] == "Multiple timetable periods found for this course today; choose a period"
+
+
+async def test_sync_infers_single_period_from_course_and_attendance_date(client, seed, db_sessionmaker):
+    slot = await _seed_slot(client)
+    marked_at = datetime(2027, 1, 3, 9, 0, tzinfo=UTC)
+    sync = await client.post(
+        "/api/v1/attendance/sync",
+        json={
+            "entries": [
+                {
+                    "subject_type": "student",
+                    "subject_id": str(seed.students[0].id),
+                    "session_id": str(seed.old_session.id),
+                    "attendance_date": "2027-01-03",
+                    "status": "present",
+                    "captured_at": marked_at.isoformat(),
+                    "idempotency_key": "period-attendance-inferred-sync",
+                    "course_id": str(seed.course.id),
+                },
+            ]
+        },
+    )
+    assert sync.status_code == 200, sync.text
+    assert sync.json()["accepted"] == 1
+
+    async with db_sessionmaker() as db:
+        record = (
+            await db.execute(
+                select(StudentAttendance).where(
+                    StudentAttendance.idempotency_key == "period-attendance-inferred-sync"
+                )
+            )
+        ).scalar_one()
+    assert record.course_id == seed.course.id
+    assert str(record.timetable_slot_id) == slot["id"]
 
 
 async def test_period_attendance_round_trips_through_roster_sync_and_history(client, seed):

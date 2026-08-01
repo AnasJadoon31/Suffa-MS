@@ -31,7 +31,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ type =
       onClick={handleClick}
       variant={variant}
       color={color}
-      size="small"
+      size="medium"
       loading={loading}
       loadingIndicator={<CircularProgress size={16} color="inherit" />}
       sx={sx}
@@ -93,8 +93,8 @@ export const TableAction = styled(MuiButton)(({ theme }) => ({
   borderColor: theme.palette.divider,
   color: theme.palette.text.secondary,
   fontSize: "0.8rem",
-  padding: theme.spacing(0.5, 1.5),
-  minHeight: 32,
+  padding: theme.spacing(0.75, 1.5),
+  minHeight: 44,
   "&:hover": {
     borderColor: theme.palette.primary.main,
     color: theme.palette.primary.main,

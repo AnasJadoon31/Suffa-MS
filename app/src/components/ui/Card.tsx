@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
-import Paper from "@mui/material/Paper";
-import Box from "@mui/material/Box";
+import { Paper } from "./Mui";
+import { Box } from "./Mui";
 import { styled } from "@mui/material/styles";
 
 export function Card({

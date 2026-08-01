@@ -11,11 +11,11 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButton";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { ToggleButton } from "./ui/Mui";
+import { ToggleButtonGroup } from "./ui/Mui";
 import { styled, useTheme } from "@mui/material/styles";
 
 import type { AttendanceStatus } from "../data/mockData";
@@ -58,6 +58,15 @@ const attendanceOptions = ["present", "absent", "leave"] as const;
 const attendanceDayKeys = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
 type AttendanceTab = "calendar" | "studentHistory";
 type AttendanceMode = "students" | "teachers";
+type AttendanceRouteUpdate = {
+  mode?: AttendanceMode | null;
+  classId?: string | null;
+  sectionId?: string | null;
+  courseId?: string | null;
+  slotId?: string | null;
+  view?: AttendanceTab | null;
+  studentId?: string | null;
+};
 
 export type AttendanceBoardProps = Readonly<Record<string, never>>;
 
@@ -236,6 +245,13 @@ function buildStudentDayStatus(entries: AttendanceLogEntry[]): StudentDayStatus 
   return map;
 }
 
+function areAttendanceMarksEqual(left: Record<string, AttendanceStatus>, right: Record<string, AttendanceStatus>): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) => left[key] === right[key]);
+}
+
 function parseDateKey(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
@@ -297,6 +313,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [selectedCourseId, setSelectedCourseId] = useState<string>(() => searchParams.get("course") ?? "");
   const [selectedSlotId, setSelectedSlotId] = useState<string>(() => searchParams.get("slot") ?? "");
   const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>([]);
+  const [isLoadingTimetableSlots, setIsLoadingTimetableSlots] = useState(false);
   const [activeTab, setActiveTab] = useState<AttendanceTab>(() => searchParams.get("view") === "history" ? "studentHistory" : "calendar");
   const [roster, setRoster] = useState<AttendanceRoster | null>(null);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
@@ -307,14 +324,38 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [saveMessage, setSaveMessage] = useState("");
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const canOverride = !readOnly && hasPermission("attendance.edit_locked");
+  const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
+  const todayDayOfWeek = (new Date().getDay() + 6) % 7;
+  const selectedSectionCourseOptions = useMemo(() => {
+    if (!selectedClass) return [];
+    if (!selectedClassId || !selectedSectionId) return selectedClass.courses;
+    if (isLoadingTimetableSlots || timetableSlots.length === 0) return [];
+    const scheduledCourseIds = new Set(timetableSlots.map((slot) => slot.course_id));
+    return selectedClass.courses.filter((course) => scheduledCourseIds.has(course.id));
+  }, [isLoadingTimetableSlots, selectedClass, selectedClassId, selectedSectionId, timetableSlots]);
+  const shouldChooseCourse = selectedSectionCourseOptions.length > 1;
+  const todaysCourseSlots = useMemo(
+    () => timetableSlots.filter((slot) => slot.course_id === selectedCourseId && slot.day_of_week === todayDayOfWeek),
+    [selectedCourseId, timetableSlots, todayDayOfWeek],
+  );
+  const shouldChoosePeriod = todaysCourseSlots.length > 0;
+  const effectiveSlotId = selectedSlotId || roster?.timetable_slot?.id || "";
+  const canMarkSelectedCourseToday = Boolean(selectedCourseId && effectiveSlotId);
+  const attendanceSelectionPrompt = (() => {
+    if (!selectedCourseId && (isLoadingTimetableSlots || selectedSectionCourseOptions.length === 1)) return "";
+    if (!selectedCourseId && selectedSectionCourseOptions.length === 0) return t("courseNotScheduledTodayPrompt");
+    if (!selectedCourseId) return t("selectCoursePrompt");
+    if (shouldChoosePeriod && !selectedSlotId) return t("selectAttendancePeriodPrompt");
+    if (!isLoadingTimetableSlots && !isLoadingRoster && !canMarkSelectedCourseToday) return t("courseNotScheduledTodayPrompt");
+    return "";
+  })();
   const { entries, lockedKeys, isSyncing, queueAttendanceBatch, sync, overrideEntry } = useAttendanceOutbox(
     sessionId,
     selectedCourseId || null,
-    selectedSlotId || null,
+    effectiveSlotId || null,
   );
-  const canOverride = !readOnly && hasPermission("attendance.edit_locked");
   const lockedEntries = entries.filter((entry) => lockedKeys.includes(entry.idempotency_key));
-  const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
 
   // Calendar tab
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -330,6 +371,40 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const [selectedStudentId, setSelectedStudentId] = useState(() => searchParams.get("student") ?? "");
   const [studentHistory, setStudentHistory] = useState<StudentAttendanceHistory | null>(null);
   const [isLoadingStudentHistory, setIsLoadingStudentHistory] = useState(false);
+
+  const setAttendanceRoute = useCallback((updates: AttendanceRouteUpdate = {}) => {
+    const nextMode = updates.mode ?? attendanceMode;
+    const nextClassId = updates.classId !== undefined ? updates.classId : selectedClassId;
+    const nextSectionId = updates.sectionId !== undefined ? updates.sectionId : selectedSectionId;
+    const nextCourseId = updates.courseId !== undefined ? updates.courseId : selectedCourseId;
+    const nextSlotId = updates.slotId !== undefined ? updates.slotId : selectedSlotId;
+    const nextView = updates.view ?? activeTab;
+    const nextStudentId = updates.studentId !== undefined ? updates.studentId : selectedStudentId;
+    const params = new URLSearchParams();
+
+    if (nextMode === "teachers") {
+      params.set("mode", "teachers");
+    }
+    if (nextMode === "students") {
+      if (nextClassId) params.set("class", nextClassId);
+      if (nextSectionId) params.set("section", nextSectionId);
+      if (nextCourseId) params.set("course", nextCourseId);
+      if (nextSlotId) params.set("slot", nextSlotId);
+      if (nextClassId) params.set("view", nextView === "studentHistory" ? "history" : "calendar");
+      if (nextClassId && nextView === "studentHistory" && nextStudentId) params.set("student", nextStudentId);
+    }
+
+    setSearchParams(params);
+  }, [
+    activeTab,
+    attendanceMode,
+    selectedClassId,
+    selectedCourseId,
+    selectedSectionId,
+    selectedSlotId,
+    selectedStudentId,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     setAttendanceMode(searchParams.get("mode") === "teachers" ? "teachers" : "students");
@@ -398,7 +473,15 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
     setHasUnsavedMarks(false);
     setSaveMessage("");
     setMarked({});
-    setSearchParams({ class: classId, section: sectionId, view: "calendar" });
+    setAttendanceRoute({
+      mode: "students",
+      classId,
+      sectionId,
+      courseId: null,
+      slotId: null,
+      view: "calendar",
+      studentId: null,
+    });
   }
 
   async function returnToClasses(): Promise<void> {
@@ -444,9 +527,11 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   useEffect(() => {
     if (!selectedClassId || !selectedSectionId) {
       setTimetableSlots([]);
+      setIsLoadingTimetableSlots(false);
       return;
     }
     void (async () => {
+      setIsLoadingTimetableSlots(true);
       try {
         const slots = user?.role === "teacher"
           ? await operationsApi.listMyTimetable()
@@ -455,26 +540,51 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         setTimetableSlots(scoped);
       } catch {
         setTimetableSlots([]);
+      } finally {
+        setIsLoadingTimetableSlots(false);
       }
     })();
   }, [selectedClassId, selectedSectionId, user?.role]);
 
-  // Auto-select period when only one slot exists for current day
+  // A teacher with a single course for the selected class/section should land
+  // directly on attendance; only multiple course choices need a prompt.
   useEffect(() => {
-    if (!selectedCourseId || timetableSlots.length === 0) return;
-    const todayDayOfWeek = (new Date().getDay() + 6) % 7;
-    const todaysSlots = timetableSlots.filter((slot) => slot.course_id === selectedCourseId && slot.day_of_week === todayDayOfWeek);
-    if (todaysSlots.length === 1) {
-      setSelectedSlotId(todaysSlots[0].id);
-      setSearchParams((prev) => ({ ...prev, slot: todaysSlots[0].id }));
-    } else if (todaysSlots.length === 0) {
-      setSelectedSlotId('');
-      setSearchParams((prev) => ({ ...prev, slot: '' }));
+    if (!selectedClassId || !selectedSectionId || isLoadingTimetableSlots) return;
+    if (selectedSectionCourseOptions.length === 1) {
+      const onlyCourseId = selectedSectionCourseOptions[0].id;
+      if (selectedCourseId !== onlyCourseId) {
+        setSelectedCourseId(onlyCourseId);
+        setSelectedSlotId("");
+        setRoster(null);
+        setAttendanceRoute({ courseId: onlyCourseId, slotId: null });
+      }
+      return;
     }
-  }, [selectedCourseId, timetableSlots, setSearchParams]);
+    if (selectedCourseId && !selectedSectionCourseOptions.some((course) => course.id === selectedCourseId)) {
+      setSelectedCourseId("");
+      setSelectedSlotId("");
+      setRoster(null);
+      setAttendanceRoute({ courseId: null, slotId: null });
+    }
+  }, [isLoadingTimetableSlots, selectedClassId, selectedCourseId, selectedSectionCourseOptions, selectedSectionId, setAttendanceRoute]);
+
+  // Keep an explicit period only while the selected course is scheduled today.
+  useEffect(() => {
+    if (!selectedCourseId || todaysCourseSlots.length === 0) {
+      if (selectedSlotId) {
+        setSelectedSlotId("");
+        setAttendanceRoute({ slotId: null });
+      }
+      return;
+    }
+    if (selectedSlotId && !todaysCourseSlots.some((slot) => slot.id === selectedSlotId)) {
+      setSelectedSlotId("");
+      setAttendanceRoute({ slotId: null });
+    }
+  }, [selectedCourseId, selectedSlotId, setAttendanceRoute, todaysCourseSlots]);
 
   useEffect(() => {
-    if (!selectedClassId || !selectedSectionId || !selectedCourseId) {
+    if (!selectedClassId || !selectedSectionId || !selectedCourseId || isLoadingTimetableSlots || (shouldChoosePeriod && !selectedSlotId)) {
       setRoster(null);
       setSessionId(null);
       setMarked({});
@@ -489,7 +599,8 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       setHasUnsavedMarks(false);
       setSaveMessage("");
       try {
-        const { data } = await cachedFetch(`attendance-roster-${selectedClassId}-${selectedSectionId}-${selectedCourseId}-${selectedSlotId}`, () =>
+        const slotKey = selectedSlotId || "auto";
+        const { data } = await cachedFetch(`attendance-roster-${selectedClassId}-${selectedSectionId}-${selectedCourseId}-${slotKey}`, () =>
           attendanceApi.classRoster(selectedClassId, selectedSectionId, selectedCourseId, selectedSlotId),
         );
         setRoster(data);
@@ -502,7 +613,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         setIsLoadingRoster(false);
       }
     })();
-  }, [selectedClassId, selectedSectionId, selectedCourseId, selectedSlotId, t]);
+  }, [isLoadingTimetableSlots, selectedClassId, selectedSectionId, selectedCourseId, selectedSlotId, shouldChoosePeriod, t]);
 
   useEffect(() => {
     if (!hasUnsavedMarks) return;
@@ -535,9 +646,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   useEffect(() => {
     if (activeTab === "studentHistory" && !selectedStudentId && roster?.students.length) {
       setSelectedStudentId(roster.students[0].id);
-      setSearchParams({ class: selectedClassId ?? "", section: selectedSectionId ?? "", view: "history", student: roster.students[0].id });
+      setAttendanceRoute({ view: "studentHistory", studentId: roster.students[0].id });
     }
-  }, [activeTab, roster, selectedClassId, selectedSectionId, selectedStudentId, setSearchParams]);
+  }, [activeTab, roster, selectedStudentId, setAttendanceRoute]);
 
   useEffect(() => {
     if (!selectedClassId || !selectedSectionId || activeTab !== "studentHistory" || !selectedStudentId) return;
@@ -621,9 +732,14 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
   const totalStudents = roster?.students.length ?? 0;
   const holidayMarkers = useMemo(() => buildHolidayMarkers(holidays), [holidays]);
   const dayStats = buildClassDayStats(calendarMonth, totalStudents, classHistory?.entries ?? []);
-  const selectedDayEntries = selectedDate
-    ? (classHistory?.entries ?? []).filter((entry) => entry.attendance_date === selectedDate)
-    : [];
+  const selectedDayEntries = useMemo(
+    () => selectedDate
+      ? (classHistory?.entries ?? []).filter(
+        (entry) => entry.attendance_date === selectedDate && (!effectiveSlotId || entry.timetable_slot?.id === effectiveSlotId),
+      )
+      : [],
+    [classHistory?.entries, effectiveSlotId, selectedDate],
+  );
   const approvedLeaveStudentIds = useMemo(
     () => new Set(selectedDayEntries.filter((entry) => entry.source === "approved_leave").map((entry) => entry.student_id)),
     [selectedDayEntries],
@@ -656,9 +772,9 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         .filter((student) => !approvedLeaveStudentIds.has(student.id))
         .map((student) => [student.id, "present" as AttendanceStatus]),
     );
-    setMarked(defaults);
+    setMarked((current) => (areAttendanceMarksEqual(current, defaults) ? current : defaults));
     setHasUnsavedMarks(Object.keys(defaults).length > 0);
-    setSaveMessage("");
+    setSaveMessage((current) => current ? "" : current);
   }, [
     activeTab,
     approvedLeaveStudentIds,
@@ -690,7 +806,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
   const theme = useTheme();
   return (
-    <section>
+    <section className="attendancePanel">
       <Box sx={{ mb: 2 }}>
         <Box>
           <Typography variant="caption" sx={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: theme.palette.teal.dark }}>{headerEyebrow}</Typography>
@@ -743,7 +859,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               onClick={async () => {
                 if (!(await confirmDiscardUnsavedMarks())) return;
                 setAttendanceMode("students");
-                setSearchParams({});
+                setAttendanceRoute({ mode: "students", classId: null, sectionId: null, courseId: null, slotId: null, view: "calendar", studentId: null });
               }}
             >
               {t("studentAttendanceHeading")}
@@ -754,7 +870,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
               onClick={async () => {
                 if (!(await confirmDiscardUnsavedMarks())) return;
                 setAttendanceMode("students");
-                setSearchParams({});
+                setAttendanceRoute({ mode: "students", classId: null, sectionId: null, courseId: null, slotId: null, view: "calendar", studentId: null });
               }}
             >
               {t("studentAttendanceHeading")}
@@ -767,7 +883,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 if (!(await confirmDiscardUnsavedMarks())) return;
                 setAttendanceMode("teachers");
                 clearAttendanceSelection();
-                setSearchParams({ mode: "teachers" });
+                setAttendanceRoute({ mode: "teachers" });
               }}
             >
               {t("teacherAttendanceHeading")}
@@ -779,7 +895,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 if (!(await confirmDiscardUnsavedMarks())) return;
                 setAttendanceMode("teachers");
                 clearAttendanceSelection();
-                setSearchParams({ mode: "teachers" });
+                setAttendanceRoute({ mode: "teachers" });
               }}
             >
               {t("teacherAttendanceHeading")}
@@ -793,7 +909,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
       {attendanceMode === "students" && !selectedClassId && (
         <ClassGrid>
           {classes.flatMap((item) => item.sections.map((section) => (
-            <ClassCard key={section.id} variant="outlined" onClick={() => void selectClass(item.id, section.id)}>
+            <ClassCard className="attendanceClassButton" key={section.id} variant="outlined" onClick={() => void selectClass(item.id, section.id)}>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 3, backgroundColor: "divider" }}>
                 <BookOpen size={18} />
               </Box>
@@ -815,43 +931,43 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
 
       {attendanceMode === "students" && selectedClassId && (
         <>
-          <FilterBar
-            fields={[
-              {
-                key: "course",
-                type: "select",
-                label: t("courseLabel"),
-                value: selectedCourseId,
-                placeholder: t("selectCoursePrompt"),
-                options: (selectedClass?.courses ?? []).map((course) => ({ value: course.id, label: course.name })),
-                onChange: async (value) => {
-                  if (!(await confirmDiscardUnsavedMarks())) return;
-                  setSelectedCourseId(value);
-                  setSelectedSlotId("");
-                  setRoster(null);
-                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: value, slot: "", view: activeTab === "studentHistory" ? "history" : "calendar" });
-                },
-              },
-              {
-                key: "period",
-                type: "select",
-                label: t("periodCol"),
-                value: selectedSlotId,
-                placeholder: t("selectPeriodPrompt"),
-                options: timetableSlots
-                  .filter((slot) => slot.course_id === selectedCourseId && slot.day_of_week === ((new Date().getDay() + 6) % 7))
-                  .map((slot) => ({
+          <Box className="attendancePeriodFilter">
+            <FilterBar
+              fields={[
+                ...(shouldChooseCourse ? [{
+                  key: "course",
+                  type: "select" as const,
+                  label: t("courseLabel"),
+                  value: selectedCourseId,
+                  placeholder: t("selectCoursePrompt"),
+                  options: selectedSectionCourseOptions.map((course) => ({ value: course.id, label: course.name })),
+                  onChange: async (value: string) => {
+                    if (!(await confirmDiscardUnsavedMarks())) return;
+                    setSelectedCourseId(value);
+                    setSelectedSlotId("");
+                    setRoster(null);
+                    setAttendanceRoute({ courseId: value, slotId: null });
+                  },
+                }] : []),
+                ...(shouldChoosePeriod ? [{
+                  key: "period",
+                  type: "select" as const,
+                  label: t("periodCol"),
+                  value: selectedSlotId,
+                  placeholder: t("selectPeriodPrompt"),
+                  options: todaysCourseSlots.map((slot) => ({
                     value: slot.id,
                     label: t("scheduledPeriodOption", { day: t(attendanceDayKeys[slot.day_of_week] ?? "dayMon"), period: slot.period, start: formatTime(slot.start_time), end: formatTime(slot.end_time) }),
                   })),
-                onChange: async (value) => {
-                  if (!(await confirmDiscardUnsavedMarks())) return;
-                  setSelectedSlotId(value);
-                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: value, view: activeTab === "studentHistory" ? "history" : "calendar" });
-                },
-              },
-            ]}
-          />
+                  onChange: async (value: string) => {
+                    if (!(await confirmDiscardUnsavedMarks())) return;
+                    setSelectedSlotId(value);
+                    setAttendanceRoute({ slotId: value });
+                  },
+                }] : []),
+              ]}
+            />
+          </Box>
           <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
             {activeTab === "calendar" ? (
               <PrimaryButton
@@ -859,7 +975,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 onClick={async () => {
                   if (!(await confirmDiscardUnsavedMarks())) return;
                   setActiveTab("calendar");
-                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "calendar" });
+                  setAttendanceRoute({ view: "calendar" });
                 }}
               >
                 {t("calendarTab")}
@@ -870,7 +986,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 onClick={async () => {
                   if (!(await confirmDiscardUnsavedMarks())) return;
                   setActiveTab("calendar");
-                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "calendar" });
+                  setAttendanceRoute({ view: "calendar" });
                 }}
               >
                 {t("calendarTab")}
@@ -882,7 +998,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 onClick={async () => {
                   if (!(await confirmDiscardUnsavedMarks())) return;
                   setActiveTab("studentHistory");
-                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
+                  setAttendanceRoute({ view: "studentHistory" });
                 }}
               >
                 {t("studentAttendanceHistory")}
@@ -893,15 +1009,15 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                 onClick={async () => {
                   if (!(await confirmDiscardUnsavedMarks())) return;
                   setActiveTab("studentHistory");
-                  setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", ...(selectedStudentId ? { student: selectedStudentId } : {}) });
+                  setAttendanceRoute({ view: "studentHistory" });
                 }}
               >
                 {t("studentAttendanceHistory")}
               </SecondaryButton>
             )}
           </Box>
-          {!selectedCourseId ? <Typography>{t("chooseCoursePeriodPrompt")}</Typography> : null}
-          {selectedCourseId && selectedSlotId && (
+          {attendanceSelectionPrompt ? <Typography>{attendanceSelectionPrompt}</Typography> : null}
+          {canMarkSelectedCourseToday && (
             <PrimaryButton
               type="button"
               onClick={() => {
@@ -916,7 +1032,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
         </>
       )}
 
-      {attendanceMode === "students" && selectedClassId && selectedCourseId && selectedSlotId && activeTab === "calendar" && (
+      {attendanceMode === "students" && selectedClassId && selectedCourseId && canMarkSelectedCourseToday && activeTab === "calendar" && (
         <>
           <AttendanceCalendar
             mode="class"
@@ -1044,7 +1160,7 @@ export function AttendanceBoard({}: AttendanceBoardProps) {
                   onClick={() => {
                     setSelectedStudentId(student.id);
                     setStudentSelectedDate(null);
-                    setSearchParams({ class: selectedClassId, section: selectedSectionId ?? "", course: selectedCourseId, slot: selectedSlotId, view: "history", student: student.id });
+                    setAttendanceRoute({ view: "studentHistory", studentId: student.id });
                   }}
                 />
               ))}

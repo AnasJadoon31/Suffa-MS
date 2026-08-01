@@ -1,8 +1,8 @@
 import { Button } from "./ui/Button";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Chip from "@mui/material/Chip";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Chip } from "./ui/Mui";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode } from "react";
 import { Modal } from "../components/ui/Modal";
 import { Button, PrimaryButton, DangerButton } from "../components/ui/Button";
 import { Input } from "../components/ui/Field";
-import Box from "@mui/material/Box";
+import { Box } from "../components/ui/Mui";
 import { useTranslation } from "react-i18next";
 
 type DialogType = "alert" | "confirm" | "warning" | "prompt";

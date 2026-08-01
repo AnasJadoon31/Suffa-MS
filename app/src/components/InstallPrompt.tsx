@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { styled, useTheme } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import IconButton from "@mui/material/IconButton";
+import { Box } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Button } from "./ui/Mui";
+import { IconButton } from "./ui/Mui";
 import { X, Download, Share, PlusSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 

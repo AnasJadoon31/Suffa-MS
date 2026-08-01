@@ -5,6 +5,26 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-01 — PWA Visual Redesign Remaining Gate
+
+- Status: Foundation batch and custom MUI wrapper migration are implemented and verified for build, i18n, route runtime, drawer geometry, mobile records, students layout, assessment mobile cards, scripted current-issues journeys, and static UI-wrapper enforcement.
+- Release blocker: `cd app && npm run test:appwide-visual` still reports route-specific visual failures, so `npm run test:mobile-pwa` is not yet a valid final gate.
+- Remaining acceptance work:
+  - Continue migrating screen-specific visual structures to semantic shared components where appwide visual findings remain; the current static gate now prevents direct MUI component imports outside `app/src/components/ui/`.
+  - Resolve appwide visual audit overlaps in People, Admission Forms, Salary, Reports, Assessments setup, Finance donations, and dashboard quick/action rows at `320`, `390`, `768`, and `920px`.
+  - Finish secondary route polish for Timetable, Leave, Announcements, Blog, Settings, Profile, parent/student dashboard cards, and public admission where the appwide matrix still reports clipped or overlapping controls.
+  - Re-run `npm run test:appwide-visual`, then `npm run test:mobile-pwa`, and archive/review screenshots under `app/artifacts/ui-audit/pwa-appwide-release/`.
+  - Keep only documented matrix exceptions; normal records must use shared table/card primitives.
+
+## 2026-08-01 — Attendance Course Selection Follow-Up
+
+- Status: No additional backlog item opened for the route-wide invalid-hook/runtime cleanup; React dependency dedupe, dev service-worker cleanup, 33-route runtime scan, PWA status check, profile runtime check, attendance regression, and frontend build passed.
+- Status: No additional backlog item opened for the Profile `RadioGroup` invalid-hook crash; profile runtime regression, attendance regression, frontend build, and live `/my-profile` smoke passed.
+- Status: No additional backlog item opened for single-course teacher auto-selection; frontend build, focused attendance prompt regression, and live teacher smoke passed.
+- Status: No additional backlog item opened for the Attendance console/runtime cleanup; frontend build, console-aware attendance regression, and live backend browser smoke passed.
+- Status: No additional backlog item opened for the prompt clarification; focused attendance regression and frontend build passed.
+- Status: No additional backlog item opened for the route-reset/period-inference fix; focused backend attendance regressions, browser attendance regression, and frontend build passed.
+
 Evidence columns: **U/C** unit or component test · **API** PostgreSQL integration/API test ·
 **E2E** authenticated browser scenario · **Shot** screenshot/PDF render · **Done** link in
 `IMPLEMENTED.md`.

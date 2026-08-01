@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { ThemeProvider as MuiThemeProvider } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
+import { CssBaseline } from "../components/ui/Mui";
 import { darkTheme, lightTheme } from "../theme";
 
 const STORAGE_KEY = "mms-dark-mode";

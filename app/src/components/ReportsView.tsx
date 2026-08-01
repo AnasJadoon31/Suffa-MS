@@ -2,10 +2,10 @@ import { Button } from "./ui/Button";
 import { FileDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
 
 import { useAuth } from "../lib/AuthContext";
 import { academicsApi, operationsApi, type AcademicClass, type AcademicSession, type Section, type TimetableSlot, reportingApi } from "../lib/endpoints";

@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { Box } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
 
 import {
   academicsApi,

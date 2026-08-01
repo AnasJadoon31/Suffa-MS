@@ -27,8 +27,8 @@ class AttendanceEntry(BaseModel):
 
     @model_validator(mode="after")
     def period_scope_is_complete(self):
-        if (self.course_id is None) != (self.timetable_slot_id is None):
-            raise ValueError("course_id and timetable_slot_id must be provided together")
+        if self.timetable_slot_id is not None and self.course_id is None:
+            raise ValueError("course_id is required when timetable_slot_id is provided")
         if self.subject_type == "teacher" and self.course_id is not None:
             raise ValueError("period scope is only valid for student attendance")
         return self

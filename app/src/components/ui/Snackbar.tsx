@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, CheckCircle, Info, X } from "lucide-react";
-import IconButton from "@mui/material/IconButton";
+import { IconButton } from "./Mui";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
+import { Box } from "./Mui";
 import { useTranslation } from "react-i18next";
 import { API_NOTIFICATION_EVENT, type ApiNotificationDetail } from "../../lib/apiNotifications";
 
@@ -82,7 +82,7 @@ export function SnackbarProvider({ children }: Readonly<{ children: ReactNode }>
   return (
     <SnackbarContext.Provider value={value}>
       {children}
-      <SnackbarContainer aria-live="polite" aria-atomic="false">
+      <SnackbarContainer className="snackbarContainer" aria-live="polite" aria-atomic="false">
         {items.map((item) => (
           <SnackbarToast key={item.id} item={item} onDismiss={dismiss} t={t} />
         ))}
@@ -113,11 +113,11 @@ function SnackbarToast({
   }[item.variant];
 
   return (
-    <SnackbarToastRoot variant={item.variant} role="status" aria-describedby={descriptionId}>
+    <SnackbarToastRoot className={`snackbarToast ${item.variant}`} variant={item.variant} role="status" aria-describedby={descriptionId}>
       <Box aria-hidden="true" sx={{ display: "flex", alignItems: "center" }}>{icon}</Box>
       <Box id={descriptionId} component="span" sx={{ flex: 1 }}>{item.message}</Box>
       {item.dismissible && (
-        <IconButton type="button" aria-label={t("dismissLabel")} onClick={() => onDismiss(item.id)} size="small">
+        <IconButton className="snackbarDismiss" type="button" aria-label={t("dismissLabel")} onClick={() => onDismiss(item.id)} size="small">
           <X size={16} />
         </IconButton>
       )}

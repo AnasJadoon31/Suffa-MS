@@ -1,16 +1,16 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
-import Chip from "@mui/material/Chip";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
+import { Chip } from "./ui/Mui";
 import { Check, Copy, MessageCircle, Pencil, RefreshCw, Settings as SettingsIcon, Upload, Wifi, WifiOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { filesApi, messagingApi, operationsApi, type TypedSetting, type WhatsAppConnectionStatus } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
-import { Input, Select } from "./ui/Field";
+import { FileInput, Input, Select } from "./ui/Field";
 import { PhoneInput } from "./ui/PhoneInput";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
 import { useSessionReadOnly } from "./SessionSwitcher";
@@ -309,14 +309,14 @@ export function SettingsView() {
                 {editingKey === item.key && (
                   item.type === "file" ? (
                     <Modal title={item.label} onClose={() => setEditingKey(null)}>
-                      <label>
-                        <Button type="button"><Upload size={16} /> {t("chooseLogoBtn")}</Button>
-                        <Input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => {
-                          const file = event.target.files?.[0];
+                      <FileInput
+                        buttonLabel={t("chooseLogoBtn")}
+                        emptyLabel={t("noFileSelectedLabel")}
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onFileChange={(file) => {
                           if (file) void uploadFile(item, file).then(() => setEditingKey(null));
-                          event.target.value = "";
-                        }} />
-                      </label>
+                        }}
+                      />
                     </Modal>
                   ) : (
                     <FormModal

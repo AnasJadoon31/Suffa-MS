@@ -1,8 +1,8 @@
 import { Button, PrimaryButton, SecondaryButton } from "./ui/Button";
 import { Input, Select, CheckboxField } from "./ui/Field";
 import { Modal } from "./ui/Modal";
-import Paper from "@mui/material/Paper";
-import Box from "@mui/material/Box";
+import { Paper } from "./ui/Mui";
+import { Box } from "./ui/Mui";
 import { styled } from "@mui/material/styles";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";

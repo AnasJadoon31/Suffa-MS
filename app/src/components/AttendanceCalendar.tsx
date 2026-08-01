@@ -1,6 +1,6 @@
 import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, TableAction } from "./ui/Button";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -109,6 +109,9 @@ export function AttendanceCalendar({
               title={holidayName}
               sx={{
                 minHeight: 48,
+                minWidth: 0,
+                width: "100%",
+                px: 0.5,
                 flexDirection: "column",
                 gap: 0.25,
                 backgroundColor: isSelected ? "primary.main" : isToday ? "action.hover" : "transparent",

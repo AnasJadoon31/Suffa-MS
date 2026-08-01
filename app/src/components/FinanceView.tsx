@@ -2,14 +2,9 @@ import { Button, PrimaryButton, SecondaryButton, DangerButton, IconButton, Table
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FileDown, Landmark, MessageCircle, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Table from "@mui/material/Table";
-import TableHead from "@mui/material/TableHead";
-import TableBody from "@mui/material/TableBody";
-import TableRow from "@mui/material/TableRow";
-import TableCell from "@mui/material/TableCell";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
 import { styled } from "@mui/material/styles";
 
 import { academicsApi, financeApi, type AcademicClass, type Donation, type Donor, type Payment, type PaymentCategory, type FinanceSummary, type StudentFinanceProfile, type DonorFinanceProfile } from "../lib/endpoints";
@@ -25,6 +20,7 @@ import { MetricGrid, MetricCard } from "./ui/Card";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { ActionMenu } from "./ui/ActionMenu";
 import { DataCard, type DataField } from "./ui/DataCard";
+import { DataTable, type Column } from "./ui/DataTable";
 import { DataViewToggle, type ViewMode } from "./ui/DataViewToggle";
 import { FilterBar } from "./ui/FilterBar";
 
@@ -210,27 +206,64 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
     { label: t("notesLabel"), value: p.note ?? "—" },
   ];
 
+  const paymentColumns: Column<Payment>[] = [
+    {
+      header: t("studentCol"),
+      render: (p) => (
+        <SecondaryButton type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadContributions")))}>
+          {p.student_name ?? t("deletedPersonLabel")}
+        </SecondaryButton>
+      ),
+    },
+    { header: t("categoryCol"), render: (p) => p.category_name ?? t("unknownLabel") },
+    { header: t("amountCol"), render: (p) => `${p.currency} ${p.amount}` },
+    { header: t("dateCol"), render: (p) => <>{p.payment_date}<HijriTag date={p.payment_date} /></> },
+    { header: t("notesLabel"), render: (p) => p.note ?? "—" },
+    {
+      header: t("receiptCol"),
+      render: (p) => (
+        <ActionMenu items={[
+          { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadPaymentReceipt(p.id) },
+          ...(canManage ? [{
+            label: t("shareWhatsAppLabel"),
+            icon: <MessageCircle size={14} />,
+            onClick: async () => {
+              try {
+                const link = await financeApi.sharePaymentReceipt(p.id);
+                if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
+              } catch (err: any) {
+                setError(err.response?.data?.detail ?? t("failedShareReceipt"));
+              }
+            },
+          }] : []),
+        ]} ariaLabel={`${t("actionsCol")}: ${p.student_name ?? t("deletedPersonLabel")}`} />
+      ),
+    },
+  ];
+
   return (
     <>
-      <FilterBar
-        searchValue={recordSearch}
-        onSearchChange={setRecordSearch}
-        searchPlaceholder={t("searchContributionsPlaceholder")}
-        fields={[
-          { key: "class", type: "select", value: filters.class_id, ariaLabel: t("classCol"), placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
-          { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
-          { key: "date-from", type: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
-          { key: "date-to", type: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
-        ]}
-        onClearAll={() => { setRecordSearch(""); setFilters({ class_id: "", category_id: "", date_from: "", date_to: "" }); }}
-      >
-        <DataViewToggle viewKey="finance-contributions" onChange={setViewMode} />
-        {canManage && (
-          <PrimaryButton type="button" onClick={() => setShowCreate(true)}>
-            <Plus size={16} /> {t("recordPaymentBtn")}
-          </PrimaryButton>
-        )}
-      </FilterBar>
+      <Box className="financeRecordToolbar">
+        <FilterBar
+          searchValue={recordSearch}
+          onSearchChange={setRecordSearch}
+          searchPlaceholder={t("searchContributionsPlaceholder")}
+          fields={[
+            { key: "class", type: "select", value: filters.class_id, ariaLabel: t("classCol"), placeholder: t("allClasses"), options: classes.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, class_id: value }) },
+            { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((c) => ({ value: c.id, label: c.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
+            { key: "date-from", type: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
+            { key: "date-to", type: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
+          ]}
+          onClearAll={() => { setRecordSearch(""); setFilters({ class_id: "", category_id: "", date_from: "", date_to: "" }); }}
+        >
+          <DataViewToggle viewKey="finance-contributions" onChange={setViewMode} />
+          {canManage && (
+            <PrimaryButton type="button" onClick={() => setShowCreate(true)}>
+              <Plus size={16} /> {t("recordPaymentBtn")}
+            </PrimaryButton>
+          )}
+        </FilterBar>
+      </Box>
       {canManage && showCreate && (
         <FormModal
           title={t("recordPaymentBtn")} onClose={() => setShowCreate(false)}
@@ -316,58 +349,14 @@ function ContributionsTab({ categories, canManage }: Readonly<{ categories: Paym
           ))}
         </CardsList>
       ) : (
-        <Box sx={{ overflowX: "auto" }}>
-          <Table sx={{ width: "100%", borderCollapse: "collapse" }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("studentCol")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("categoryCol")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("amountCol")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("dateCol")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("notesLabel")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("receiptCol")}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {isLoading && (
-                <TableRow><TableCell colSpan={6}><LoadingState /></TableCell></TableRow>
-              )}
-              {!isLoading && !error && visiblePayments.length === 0 && (
-                <TableRow><TableCell colSpan={6}><Typography>{t("noContributionsYet")}</Typography></TableCell></TableRow>
-              )}
-              {!isLoading && !error && visiblePayments.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>
-                    <SecondaryButton type="button" onClick={() => void financeApi.studentProfile(p.student_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadContributions")))}>
-                      {p.student_name ?? t("deletedPersonLabel")}
-                    </SecondaryButton>
-                  </TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{p.category_name ?? t("unknownLabel")}</TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{p.currency} {p.amount}</TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{p.payment_date}<HijriTag date={p.payment_date} /></TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{p.note ?? "—"}</TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>
-                    <ActionMenu items={[
-                      { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadPaymentReceipt(p.id) },
-                      ...(canManage ? [{
-                        label: t("shareWhatsAppLabel"),
-                        icon: <MessageCircle size={14} />,
-                        onClick: async () => {
-                          try {
-                            const link = await financeApi.sharePaymentReceipt(p.id);
-                            if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
-                          } catch (err: any) {
-                            setError(err.response?.data?.detail ?? t("failedShareReceipt"));
-                          }
-                        },
-                      }] : []),
-                    ]} ariaLabel={`${t("actionsCol")}: ${p.student_name ?? t("deletedPersonLabel")}`} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Box>
+        <DataTable
+          columns={paymentColumns}
+          data={visiblePayments}
+          keyExtractor={(p) => p.id}
+          isLoading={isLoading}
+          error={error}
+          emptyMessage={t("noContributionsYet")}
+        />
       )}
       {profile && (
         <Modal title={profile.name} onClose={() => setProfile(null)}>
@@ -477,28 +466,66 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
     { label: t("notesLabel"), value: d.note ?? "—" },
   ];
 
+  const donationColumns: Column<Donation>[] = [
+    {
+      header: t("donorCol"),
+      render: (d) => (
+        <SecondaryButton type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDonations")))}>
+          {d.donor_name ?? t("deletedPersonLabel")}
+        </SecondaryButton>
+      ),
+    },
+    { header: t("categoryCol"), render: (d) => d.category_name ?? t("unknownLabel") },
+    { header: t("amountCol"), render: (d) => `${d.currency} ${d.amount}` },
+    { header: t("dateCol"), render: (d) => <>{d.donation_date}<HijriTag date={d.donation_date} /></> },
+    { header: t("notesLabel"), render: (d) => d.note ?? "—" },
+    {
+      header: t("receiptCol"),
+      render: (d) => (
+        <ActionMenu items={[
+          { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadDonationReceipt(d.id) },
+          ...(canManage ? [{
+            label: t("shareWhatsAppLabel"),
+            icon: <MessageCircle size={14} />,
+            onClick: async () => {
+              try {
+                const link = await financeApi.shareDonationReceipt(d.id);
+                if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
+              } catch (err: any) {
+                setError(err.response?.data?.detail ?? t("failedShareReceipt"));
+              }
+            },
+          }] : []),
+        ]} ariaLabel={`${t("actionsCol")}: ${d.donor_name ?? t("deletedPersonLabel")}`} />
+      ),
+    },
+  ];
+
   return (
     <>
-      <FilterBar
-        searchValue={recordSearch}
-        onSearchChange={setRecordSearch}
-        searchPlaceholder={t("searchDonationsPlaceholder")}
-        fields={[
-          { key: "donor", type: "select", value: filters.donor_id, ariaLabel: t("donorCol"), placeholder: t("allDonors"), options: donors.map((donor) => ({ value: donor.id, label: donor.name })), onChange: (value) => setFilters({ ...filters, donor_id: value }) },
-          { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((category) => ({ value: category.id, label: category.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
-          { key: "date-from", type: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
-          { key: "date-to", type: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
-        ]}
-        onClearAll={() => { setRecordSearch(""); setFilters({ donor_id: "", category_id: "", date_from: "", date_to: "" }); }}
-      >
-        <DataViewToggle viewKey="finance-donations" onChange={setViewMode} />
-        {canManage && (
-          <SecondaryButton type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</SecondaryButton>
-        )}
-        {canManage && (
-          <PrimaryButton type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</PrimaryButton>
-        )}
-      </FilterBar>
+      <Box className="financeRecordToolbar">
+        <FilterBar
+          searchValue={recordSearch}
+          onSearchChange={setRecordSearch}
+          searchAriaLabel={t("searchDonationsLabel")}
+          searchPlaceholder={t("searchDonationsPlaceholder")}
+          fields={[
+            { key: "donor", type: "select", value: filters.donor_id, ariaLabel: t("donorCol"), placeholder: t("allDonors"), options: donors.map((donor) => ({ value: donor.id, label: donor.name })), onChange: (value) => setFilters({ ...filters, donor_id: value }) },
+            { key: "category", type: "select", value: filters.category_id, ariaLabel: t("categoryCol"), placeholder: t("allCategories"), options: categories.map((category) => ({ value: category.id, label: category.name })), onChange: (value) => setFilters({ ...filters, category_id: value }) },
+            { key: "date-from", type: "date", label: t("fromLabel"), value: filters.date_from, onChange: (value) => setFilters({ ...filters, date_from: value }) },
+            { key: "date-to", type: "date", label: t("toLabel"), value: filters.date_to, onChange: (value) => setFilters({ ...filters, date_to: value }) },
+          ]}
+          onClearAll={() => { setRecordSearch(""); setFilters({ donor_id: "", category_id: "", date_from: "", date_to: "" }); }}
+        >
+          <DataViewToggle viewKey="finance-donations" defaultMode="table" onChange={setViewMode} />
+          {canManage && (
+            <SecondaryButton type="button" onClick={() => setCreateModal("donor")}><Plus size={16} /> {t("addDonorBtn")}</SecondaryButton>
+          )}
+          {canManage && (
+            <PrimaryButton type="button" onClick={() => setCreateModal("donation")}><Plus size={16} /> {t("recordDonationBtn")}</PrimaryButton>
+          )}
+        </FilterBar>
+      </Box>
       {canManage && createModal === "donor" && (
         <FormModal
           title={t("addDonorBtn")} onClose={() => setCreateModal(null)}
@@ -609,58 +636,15 @@ function DonationsTab({ categories, canManage }: Readonly<{ categories: PaymentC
           ))}
         </CardsList>
       ) : (
-        <Box sx={{ overflowX: "auto" }}>
-          <Table sx={{ width: "100%", borderCollapse: "collapse" }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("donorCol")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("categoryCol")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("amountCol")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("dateCol")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("notesLabel")}</TableCell>
-                <TableCell sx={{ textAlign: "left", padding: "12px", borderBottom: "2px solid", borderColor: "divider" }}>{t("receiptCol")}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {isLoading && (
-                <TableRow><TableCell colSpan={6}><LoadingState /></TableCell></TableRow>
-              )}
-              {!isLoading && !error && visibleDonations.length === 0 && (
-                <TableRow><TableCell colSpan={6}><Typography>{t("noDonationsYet")}</Typography></TableCell></TableRow>
-              )}
-              {!isLoading && !error && visibleDonations.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>
-                    <SecondaryButton type="button" onClick={() => void financeApi.donorProfile(d.donor_id).then(setProfile).catch((err: any) => setError(err.response?.data?.detail ?? t("failedLoadDonations")))}>
-                      {d.donor_name ?? t("deletedPersonLabel")}
-                    </SecondaryButton>
-                  </TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{d.category_name ?? t("unknownLabel")}</TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{d.currency} {d.amount}</TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{d.donation_date}<HijriTag date={d.donation_date} /></TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>{d.note ?? "—"}</TableCell>
-                  <TableCell sx={{ padding: "12px", borderBottom: "1px solid", borderColor: "divider" }}>
-                    <ActionMenu items={[
-                      { label: t("downloadReceiptLabel"), icon: <FileDown size={14} />, onClick: () => financeApi.downloadDonationReceipt(d.id) },
-                      ...(canManage ? [{
-                        label: t("shareWhatsAppLabel"),
-                        icon: <MessageCircle size={14} />,
-                        onClick: async () => {
-                          try {
-                            const link = await financeApi.shareDonationReceipt(d.id);
-                            if (link.url) window.open(link.url, "_blank", "noopener,noreferrer");
-                          } catch (err: any) {
-                            setError(err.response?.data?.detail ?? t("failedShareReceipt"));
-                          }
-                        },
-                      }] : []),
-                    ]} ariaLabel={`${t("actionsCol")}: ${d.donor_name ?? t("deletedPersonLabel")}`} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Box>
+        <DataTable
+          className="financeTable"
+          columns={donationColumns}
+          data={visibleDonations}
+          keyExtractor={(d) => d.id}
+          isLoading={isLoading}
+          error={error}
+          emptyMessage={t("noDonationsYet")}
+        />
       )}
       {profile && (
         <Modal title={profile.name} onClose={() => setProfile(null)}>

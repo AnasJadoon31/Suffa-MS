@@ -1,31 +1,30 @@
-import { useState } from "react";
+import { type ElementType } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router";
 import { styled } from "@mui/material/styles";
-import BottomNavigation from "@mui/material/BottomNavigation";
-import BottomNavigationAction from "@mui/material/BottomNavigationAction";
+import { BottomNavigation } from "./ui/Mui";
+import { BottomNavigationAction } from "./ui/Mui";
 import { LayoutDashboard, UsersRound, CalendarDays, Landmark, MoreHorizontal } from "lucide-react";
 import { navItems, resolveNavItemPath, isNavItemAccessible } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
+import { PWA_BOTTOM_NAV_HEIGHT, PWA_COMPACT_BREAKPOINT } from "./ui/Layout";
 
 const StyledBottomNavigation = styled(BottomNavigation)(({ theme }) => ({
-  position: "fixed",
-  bottom: 0,
-  left: 0,
-  right: 0,
+  flexShrink: 0,
   zIndex: theme.zIndex.appBar,
   backgroundColor: theme.palette.background.paper,
   borderTop: `1px solid ${theme.palette.divider}`,
   paddingBottom: "env(safe-area-inset-bottom)",
-  height: 64,
-  [theme.breakpoints.up(768)]: {
+  height: `calc(${PWA_BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
+  [`@media (min-width:${PWA_COMPACT_BREAKPOINT}px)`]: {
     display: "none",
   },
 }));
 
 const StyledAction = styled(BottomNavigationAction)(({ theme }) => ({
   minWidth: 0,
-  padding: "6px 8px",
+  padding: "8px 6px",
+  minHeight: 56,
   color: theme.palette.text.secondary,
   "&.Mui-selected": {
     color: theme.palette.teal?.main ?? theme.palette.primary.main,
@@ -38,6 +37,8 @@ const StyledAction = styled(BottomNavigationAction)(({ theme }) => ({
     },
   },
 }));
+
+const RoutedAction = StyledAction as ElementType;
 
 const Indicator = styled("span")(({ theme }) => ({
   position: "absolute",
@@ -53,15 +54,6 @@ const Indicator = styled("span")(({ theme }) => ({
     display: "block",
   },
 }));
-
-const NavLinkWrapper = styled(NavLink)({
-  display: "contents",
-  textDecoration: "none",
-  color: "inherit",
-  "&.active": {
-    color: "inherit",
-  },
-});
 
 const IconWrapper = styled("span")({
   position: "relative",
@@ -82,7 +74,6 @@ export function BottomTabBar({ onMoreClick }: BottomTabBarProps) {
   const { t } = useTranslation();
   const location = useLocation();
   const { user, hasPermission, hasFeature } = useAuth();
-  const [moreOpen, setMoreOpen] = useState(false);
 
   const getActiveValue = () => {
     const activeRoute = navItems.find((item) => {
@@ -96,7 +87,6 @@ export function BottomTabBar({ onMoreClick }: BottomTabBarProps) {
   };
 
   const handleMore = () => {
-    setMoreOpen(true);
     onMoreClick?.();
   };
 
@@ -115,18 +105,19 @@ export function BottomTabBar({ onMoreClick }: BottomTabBarProps) {
         const path = resolveNavItemPath(navItem, user?.role, hasPermission, hasFeature, user?.has_teaching_assignment, user?.is_principal_delegate);
         const Icon = item.icon;
         return (
-          <NavLinkWrapper key={item.id} to={path}>
-            <StyledAction
-              value={item.id}
-              label={t(navItem.labelKey)}
-              icon={
-                <IconWrapper>
-                  <Indicator />
-                  <Icon size={20} />
-                </IconWrapper>
-              }
-            />
-          </NavLinkWrapper>
+          <RoutedAction
+            key={item.id}
+            component={NavLink}
+            to={path}
+            value={item.id}
+            label={t(navItem.labelKey)}
+            icon={
+              <IconWrapper>
+                <Indicator />
+                <Icon size={20} />
+              </IconWrapper>
+            }
+          />
         );
       })}
       <StyledAction

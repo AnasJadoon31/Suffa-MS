@@ -2,26 +2,27 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router";
 import { styled } from "@mui/material/styles";
-import MuiDrawer from "@mui/material/Drawer";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import IconButton from "@mui/material/IconButton";
-import Typography from "@mui/material/Typography";
-import Collapse from "@mui/material/Collapse";
-import Avatar from "@mui/material/Avatar";
-import Divider from "@mui/material/Divider";
+import { Drawer as MuiDrawer } from "./ui/Mui";
+import { List } from "./ui/Mui";
+import { ListItem } from "./ui/Mui";
+import { ListItemButton } from "./ui/Mui";
+import { ListItemIcon } from "./ui/Mui";
+import { ListItemText } from "./ui/Mui";
+import { IconButton } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Collapse } from "./ui/Mui";
+import { Avatar } from "./ui/Mui";
+import { Divider } from "./ui/Mui";
 import { ChevronDown, ChevronRight, LogOut, X } from "lucide-react";
 import { isNavItemAccessible, navGroups, portalRoutes, resolveNavItemPath } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
 import { RoleBadge, initialsOf } from "./Sidebar";
+import { PWA_TOUCH_TARGET } from "./ui/Layout";
 
 const StyledDrawer = styled(MuiDrawer)(({ theme }) => ({
   "& .MuiDrawer-paper": {
-    width: 300,
-    maxWidth: "85vw",
+    width: 320,
+    maxWidth: "88vw",
     backgroundColor: theme.palette.background.paper,
   },
 }));
@@ -50,7 +51,7 @@ const NavItemButton = styled(ListItemButton, {
   marginInline: 0,
   marginBottom: 0,
   paddingInline: 16,
-  minHeight: 48,
+  minHeight: PWA_TOUCH_TARGET,
   width: "100%",
   ...(isActive && {
     backgroundColor: theme.palette.teal?.light
@@ -114,7 +115,7 @@ export type NavDrawerProps = Readonly<{
 }>;
 
 export function NavDrawer({ open, onClose }: NavDrawerProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const activeView = portalRoutes.find((route) => route.path === location.pathname)?.view;
   const { hasPermission, hasFeature, user, madrasa, logout } = useAuth();
@@ -134,11 +135,12 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
 
   return (
     <StyledDrawer
-      anchor="left"
+      anchor={i18n.dir() === "rtl" ? "right" : "left"}
       open={open}
       onClose={onClose}
       role="navigation"
       aria-label={t("primaryNavigationLabel")}
+      slotProps={{ paper: { className: `sidebar${open ? " sidebarOpen" : ""}` } }}
     >
       <DrawerHeader>
         <BrandInfo>
@@ -149,7 +151,7 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
             {madrasa?.name || t("appName")}
           </Typography>
         </BrandInfo>
-        <IconButton sx={{ width: 44, height: 44 }} onClick={onClose} aria-label="Close menu">
+        <IconButton sx={{ width: PWA_TOUCH_TARGET, height: PWA_TOUCH_TARGET }} onClick={onClose} aria-label={t("closeBtn")}>
           <X size={18} />
         </IconButton>
       </DrawerHeader>
@@ -188,13 +190,13 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
                   return (
                     <ListItem key={item.id} disablePadding sx={{ px: 0, width: "100%" }}>
                       <NavLinkWrapper to={path} onClick={onClose}>
-                        <NavItemButton isActive={isActive}>
+                        <NavItemButton className="navItem" isActive={isActive}>
                           <NavIcon>
                             <Icon size={18} />
                           </NavIcon>
                           <ListItemText
                             primary={
-                              <Typography variant="body2" sx={{ fontWeight: isActive ? 600 : 400 }}>
+                              <Typography component="span" variant="body2" sx={{ fontWeight: isActive ? 600 : 400 }}>
                                 {t(item.labelKey)}
                               </Typography>
                             }

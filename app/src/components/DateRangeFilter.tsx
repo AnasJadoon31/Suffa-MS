@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
+import { Box } from "./ui/Mui";
 
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Field";

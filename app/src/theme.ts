@@ -23,7 +23,7 @@ const urduFont = '"Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Segoe UI", sa
 const baseThemeOptions: ThemeOptions = {
   direction: document.documentElement.dir === "rtl" ? "rtl" : "ltr",
   shape: {
-    borderRadius: 10,
+    borderRadius: 8,
   },
   spacing: 8,
   typography: {
@@ -52,14 +52,14 @@ const baseThemeOptions: ThemeOptions = {
       },
       styleOverrides: {
         root: {
-          borderRadius: 999,
+          borderRadius: 8,
           minHeight: 44,
           paddingInline: 20,
           gap: 8,
           fontWeight: 600,
         },
         sizeSmall: {
-          minHeight: 36,
+          minHeight: 44,
           paddingInline: 14,
         },
         sizeLarge: {
@@ -76,7 +76,7 @@ const baseThemeOptions: ThemeOptions = {
     MuiPaper: {
       styleOverrides: {
         rounded: {
-          borderRadius: 16,
+          borderRadius: 8,
         },
         elevation1: {
           boxShadow: "0 1px 3px rgba(22, 33, 29, 0.06), 0 1px 2px rgba(22, 33, 29, 0.04)",
@@ -107,7 +107,7 @@ const baseThemeOptions: ThemeOptions = {
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 8,
           "& .MuiOutlinedInput-notchedOutline": {
             borderColor: "#c9d2c9",
           },
@@ -143,8 +143,16 @@ const baseThemeOptions: ThemeOptions = {
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 20,
+          borderRadius: 12,
           margin: 16,
+        },
+      },
+    },
+    MuiToggleButton: {
+      styleOverrides: {
+        root: {
+          minHeight: 44,
+          minWidth: 44,
         },
       },
     },

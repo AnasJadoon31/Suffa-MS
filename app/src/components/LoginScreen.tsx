@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import useMediaQuery from "@mui/material/useMediaQuery";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Stack } from "./ui/Mui";
+import { useMediaQuery } from "./ui/Mui";
 import { useTheme } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { styled } from "@mui/material/styles";
-import Typography from "@mui/material/Typography";
+import { Typography } from "./ui/Mui";
 import { LogIn, Building2, KeyRound } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { api } from "../lib/api";
@@ -137,7 +137,7 @@ export function LoginScreen() {
         <Tagline>{t("loginTagline")}</Tagline>
       </Box>
 
-      <form onSubmit={handleSubmit}>
+      <form className="login-form" onSubmit={handleSubmit}>
         <Stack spacing={2.5}>
           {error && <ErrorBox>{error}</ErrorBox>}
 
@@ -202,7 +202,7 @@ export function LoginScreen() {
 
   if (isMobile) {
     return (
-      <LoginWrapper>
+      <LoginWrapper className="login-container">
         <MobileWrapper>
           {formContent}
         </MobileWrapper>
@@ -211,7 +211,7 @@ export function LoginScreen() {
   }
 
   return (
-    <LoginWrapper>
+    <LoginWrapper className="login-container">
       <LoginCard variant="outlined">
         {formContent}
       </LoginCard>

@@ -1,8 +1,8 @@
 import { Button } from "./ui/Button";
-import Paper from "@mui/material/Paper";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
+import { Paper } from "./ui/Mui";
+import { Box } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
@@ -30,10 +30,10 @@ export function PublicAdmissionPage() {
       .finally(() => setLoading(false));
   }, [t, token]);
 
-  if (loading) return <Box component="main" sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", p: 2 }}><LoadingState /></Box>;
-  if (error || !definition) return <Box component="main" sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", p: 2 }}><ErrorState message={error || t("failedLoadAdmissionForms")} /></Box>;
+  if (loading) return <Box component="main" className="publicFormPage" sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", p: 2 }}><LoadingState /></Box>;
+  if (error || !definition) return <Box component="main" className="publicFormPage" sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", p: 2 }}><ErrorState message={error || t("failedLoadAdmissionForms")} /></Box>;
   if (submitted) return (
-    <Box component="main" sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", p: 2 }}>
+    <Box component="main" className="publicFormPage" sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", p: 2 }}>
       <Paper component="section" variant="outlined" sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 4, maxWidth: 600, width: "100%" }}>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>{t("applicationSubmitted")}</Typography>
       </Paper>
@@ -41,7 +41,7 @@ export function PublicAdmissionPage() {
   );
 
   return (
-    <Box component="main" sx={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: "100vh", p: 2, bgcolor: "background.default" }}>
+    <Box component="main" className="publicFormPage" sx={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: "100vh", p: 2, bgcolor: "background.default" }}>
       <Paper component="section" variant="outlined" sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 4, maxWidth: 800, width: "100%", my: 4 }}>
         <Box component="header" sx={{ mb: 3 }}>
           <Typography component="span" sx={{ display: "block", color: "text.secondary", fontSize: "0.875rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>

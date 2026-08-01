@@ -86,6 +86,12 @@ export default defineConfig({
       },
     }),
   ],
+  resolve: {
+    dedupe: ["react", "react-dom", "react-i18next", "@mui/material", "@emotion/react", "@emotion/styled"],
+  },
+  optimizeDeps: {
+    include: ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react-i18next", "@mui/material"],
+  },
   build: {
     rollupOptions: {
       output: {

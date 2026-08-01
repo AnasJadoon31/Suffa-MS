@@ -9,7 +9,7 @@ const project = new Project({
 project.addSourceFilesAtPaths("src/**/*.tsx");
 
 const issues = [];
-const styles = fs.readFileSync("src/styles.css", "utf8");
+const dataTableSource = fs.readFileSync("src/components/ui/DataTable.tsx", "utf8");
 
 function getAttr(node, name) {
   if (typeof node.getOpeningElement === "function") return node.getOpeningElement().getAttribute(name);
@@ -57,6 +57,10 @@ function hasAncestorClass(node, className) {
     current = current.getParent();
   }
   return false;
+}
+
+function isMatrixException(node) {
+  return hasClass(node, "matrixResponsiveException") || hasAncestorClass(node, "matrixResponsiveException");
 }
 
 function hasNonEmptyContent(node) {
@@ -147,6 +151,7 @@ function auditTableSurface(node) {
   const tagName = tagNameOf(node);
   const filePath = relativeFile(node);
   if (tagName === "Table") {
+    if (isMatrixException(node)) return;
     if (filePath !== "src/components/ui/DataTable.tsx") {
       issues.push(`${location(node)} MUI Table must be rendered through shared DataTable`);
       return;
@@ -160,6 +165,7 @@ function auditTableSurface(node) {
     return;
   }
   if (tagName !== "table") return;
+  if (isMatrixException(node)) return;
   if (!hasAncestorClass(node, "desktopOnlySheet")) {
     issues.push(`${location(node)} raw table must be wrapped in desktopOnlySheet and paired with mobile cards`);
   }
@@ -168,12 +174,12 @@ function auditTableSurface(node) {
   }
 }
 
-if (!/\.muiDataTable\s+\.desktopDataTable\s*\{[\s\S]*?display:\s*none/.test(styles)) {
-  issues.push("src/styles.css mobile rules must hide .muiDataTable .desktopDataTable");
+if (!/PWA_COMPACT_BREAKPOINT/.test(dataTableSource) || !/max-width:\s*\$\{PWA_COMPACT_BREAKPOINT - 1\}px/.test(dataTableSource)) {
+  issues.push("src/components/ui/DataTable.tsx must switch to mobile cards below the shared compact breakpoint");
 }
 
-if (!/\.desktopOnlySheet\s*\{[\s\S]*?display:\s*none\s*!important/.test(styles)) {
-  issues.push("src/styles.css mobile rules must hide .desktopOnlySheet");
+if (!/\bdesktopDataTable\b/.test(dataTableSource) || !/\bmobileDataCards\b/.test(dataTableSource) || !/\bmobileDataCard\b/.test(dataTableSource)) {
+  issues.push("src/components/ui/DataTable.tsx must keep desktopDataTable/mobileDataCards/mobileDataCard verification hooks");
 }
 
 for (const sourceFile of project.getSourceFiles()) {

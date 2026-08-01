@@ -1,10 +1,10 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
-import Chip from "@mui/material/Chip";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
+import { Chip } from "./ui/Mui";
 import { CheckCircle2, Newspaper, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";

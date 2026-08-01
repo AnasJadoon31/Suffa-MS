@@ -1,8 +1,8 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import Paper from "@mui/material/Paper";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { Paper } from "./ui/Mui";
+import { Box } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
 import { Pencil, Plus, Save, Trash2, X, Palmtree } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";

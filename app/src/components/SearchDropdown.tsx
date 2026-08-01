@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
+import { Box, Paper, Typography } from "./ui/Mui";
 import { styled } from "@mui/material/styles";
+import { SearchInput } from "./ui/Field";
 
 const SearchDropdownRoot = styled(Box)({
   position: "relative",
@@ -94,10 +92,9 @@ export function SearchDropdown<T>({
       id={id}
       ref={rootRef}
     >
-      <TextField
+      <SearchInput
         label={label}
         placeholder={placeholder}
-        size="small"
         fullWidth
         disabled={disabled}
         value={value}

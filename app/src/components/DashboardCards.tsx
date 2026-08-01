@@ -1,8 +1,8 @@
 import { styled, useTheme } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import useMediaQuery from "@mui/material/useMediaQuery";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { useMediaQuery } from "./ui/Mui";
 import {
   AlertTriangle,
   CalendarDays,
@@ -44,7 +44,7 @@ import {
 } from "../lib/endpoints";
 import { cachedFetch } from "../lib/offlineCache";
 import { setPendingClassNav } from "../lib/pendingNav";
-import { Input } from "./ui/Field";
+import { FileInput } from "./ui/Field";
 import { useSessionReadOnly } from "./SessionSwitcher";
 
 export type DashboardCardsProps = Readonly<{ onNavigate?: (view: import("../data/mockData").ViewId) => void }>;
@@ -708,7 +708,7 @@ function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readon
                     setPendingClassNav({ classId: entry.class_id, sectionId: entry.section_id, courseId: entry.course_id });
                     onNavigate?.("attendance");
                   }}
-                  sx={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: `1px solid ${theme.palette.divider}`, background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
+                  sx={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "8px 12px", minHeight: 44, borderRadius: 999, border: `1px solid ${theme.palette.divider}`, background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
                 >
                   <ExternalLink size={14} /> {t("openClassListBtn")}
                 </Box>
@@ -719,7 +719,7 @@ function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readon
                     setPendingClassNav({ classId: entry.class_id, sectionId: entry.section_id, courseId: entry.course_id });
                     onNavigate?.("assessments");
                   }}
-                  sx={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: `1px solid ${theme.palette.divider}`, background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
+                  sx={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "8px 12px", minHeight: 44, borderRadius: 999, border: `1px solid ${theme.palette.divider}`, background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
                 >
                   <ExternalLink size={14} /> {t("assessments")}
                 </Box>
@@ -737,7 +737,7 @@ function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readon
             disabled={readOnly || !!attendance?.check_in}
             onClick={() => checkIn()}
             sx={{
-              display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 999,
+              display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", minHeight: 44, borderRadius: 999,
               border: "none", backgroundColor: readOnly || attendance?.check_in ? theme.palette.divider : theme.palette.teal.main,
               color: readOnly || attendance?.check_in ? theme.palette.text.disabled : theme.palette.teal.contrastText, cursor: readOnly || attendance?.check_in ? "not-allowed" : "pointer",
               fontWeight: 600, fontSize: "0.875rem",
@@ -752,7 +752,7 @@ function TeacherDashboardCards({ data, onNavigate, readOnly, isDesktop }: Readon
             onClick={() => checkOut()}
             sx={{
               display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 999,
-              border: `1px solid ${theme.palette.divider}`, backgroundColor: readOnly || !attendance?.check_in || attendance?.check_out ? "transparent" : theme.palette.background.paper,
+              minHeight: 44, border: `1px solid ${theme.palette.divider}`, backgroundColor: readOnly || !attendance?.check_in || attendance?.check_out ? "transparent" : theme.palette.background.paper,
               color: readOnly || !attendance?.check_in || attendance?.check_out ? theme.palette.text.disabled : theme.palette.text.primary,
               cursor: readOnly || !attendance?.check_in || attendance?.check_out ? "not-allowed" : "pointer",
               fontWeight: 600, fontSize: "0.875rem",
@@ -834,7 +834,7 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
           </FeedbackText>
         )}
       </Typography>
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", width: { xs: "100%", md: "auto" }, "& input": { maxWidth: "100%" } }}>
         {submitted ? (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, alignItems: "flex-end" }}>
             <Typography component="span">{t("submittedLabel")}</Typography>
@@ -849,7 +849,7 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
                   const { url } = await filesApi.presignDownload(submittedFileKey);
                   window.open(url, "_blank", "noreferrer");
                 }}
-                sx={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 999, border: `1px solid ${theme.palette.divider}`, background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
+                sx={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "8px 12px", minHeight: 44, borderRadius: 999, border: `1px solid ${theme.palette.divider}`, background: "transparent", cursor: "pointer", fontSize: "0.8rem" }}
               >
                 <FileDown size={14} /> {t("downloadBtn")}
               </Box>
@@ -857,14 +857,20 @@ function DueAssignmentRow({ assignment, onSubmitted, readOnly }: Readonly<{ assi
           </Box>
         ) : (
           <>
-            <Input type="file" disabled={readOnly} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <FileInput
+              buttonLabel={t("chooseFileBtn")}
+              emptyLabel={t("noFileSelectedLabel")}
+              selectedLabel={file?.name}
+              disabled={readOnly}
+              onFileChange={setFile}
+            />
             <Box
               component="button"
               type="button"
               disabled={readOnly || !file}
               onClick={() => submit()}
               sx={{
-                display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 999,
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 20px", minHeight: 44, borderRadius: 999, flex: { xs: "1 1 140px", md: "0 0 auto" },
                 border: "none", backgroundColor: readOnly || !file ? theme.palette.divider : theme.palette.teal.main,
                 color: readOnly || !file ? theme.palette.text.disabled : theme.palette.teal.contrastText, cursor: readOnly || !file ? "not-allowed" : "pointer",
                 fontWeight: 600, fontSize: "0.875rem",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import { ToggleButton } from "./Mui";
+import { ToggleButtonGroup } from "./Mui";
 import { styled } from "@mui/material/styles";
 import { LayoutGrid, LayoutList } from "lucide-react";
 

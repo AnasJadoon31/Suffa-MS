@@ -1,8 +1,7 @@
 import { ReactNode } from "react";
-import Box from "@mui/material/Box";
+import { Box } from "./Mui";
 import { Input, Select } from "./Field";
-import { Button } from "./Button";
-import { FilterBarContainer } from "./Layout";
+import { FilterActions, FilterBarContainer, FilterFieldGroup, ResponsiveTabs } from "./Layout";
 
 export type FilterOption = { value: string; label: string };
 
@@ -39,58 +38,55 @@ export type InlineFilterConfig = {
 export function InlineFilter({ filters, children, sx }: { filters: InlineFilterConfig[], children?: ReactNode; sx?: any }) {
   return (
     <FilterBarContainer sx={{ ...sx }}>
-      {filters.map((filter) => {
-        if (filter.type === "select") {
-          return (
-            <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }} key={filter.key}>
-              {filter.label && <span>{filter.label}</span>}
-              <Select
-                aria-label={filter.ariaLabel ?? filter.label ?? filter.placeholder}
-                value={filter.value}
-                onChange={(e) => filter.onChange(e.target.value)}
-                disabled={filter.disabled}
-              >
-                {filter.placeholder && <option value="">{filter.placeholder}</option>}
-                {filter.options.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </Select>
-            </Box>
-          );
-        } else if (filter.type === "input") {
-          return (
-            <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }} key={filter.key}>
-              {filter.label && <span>{filter.label}</span>}
-              <Input
-                aria-label={filter.ariaLabel ?? filter.label ?? filter.placeholder}
-                type={filter.inputType ?? "text"}
-                value={filter.value}
-                placeholder={filter.placeholder}
-                disabled={filter.disabled}
-                onChange={(event) => filter.onChange(event.target.value)}
-              />
-            </Box>
-          );
-        } else if (filter.type === "tab") {
-          return (
-            <Box role="group" aria-label={filter.ariaLabel ?? filter.label} key={filter.key} sx={{ display: "flex", gap: 1 }}>
-              {filter.options.map(opt => (
-                <Button
-                  key={`${filter.key}-${opt.value}`}
-                  variant={filter.value === opt.value ? "contained" : "outlined"}
-                  type="button"
-                  aria-pressed={filter.value === opt.value}
-                  onClick={() => filter.onChange(opt.value)}
+      <FilterFieldGroup>
+        {filters.map((filter) => {
+          if (filter.type === "select") {
+            return (
+              <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 0 }} key={filter.key}>
+                {filter.label && <span>{filter.label}</span>}
+                <Select
+                  aria-label={filter.ariaLabel ?? filter.label ?? filter.placeholder}
+                  value={filter.value}
+                  onChange={(e) => filter.onChange(e.target.value)}
+                  disabled={filter.disabled}
                 >
-                  {opt.label}
-                </Button>
-              ))}
-            </Box>
-          );
-        }
-        return null;
-      })}
-      {children && <Box sx={{ display: "flex", gap: 1 }}>{children}</Box>}
+                  {filter.placeholder && <option value="">{filter.placeholder}</option>}
+                  {filter.options.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </Select>
+              </Box>
+            );
+          } else if (filter.type === "input") {
+            return (
+              <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 0 }} key={filter.key}>
+                {filter.label && <span>{filter.label}</span>}
+                <Input
+                  aria-label={filter.ariaLabel ?? filter.label ?? filter.placeholder}
+                  type={filter.inputType ?? "text"}
+                  value={filter.value}
+                  placeholder={filter.placeholder}
+                  disabled={filter.disabled}
+                  onChange={(event) => filter.onChange(event.target.value)}
+                />
+              </Box>
+            );
+          } else if (filter.type === "tab") {
+            return (
+              <Box key={filter.key} sx={{ gridColumn: "1 / -1", minWidth: 0 }}>
+                <ResponsiveTabs
+                  value={filter.value}
+                  ariaLabel={filter.ariaLabel ?? filter.label}
+                  options={filter.options}
+                  onChange={filter.onChange}
+                />
+              </Box>
+            );
+          }
+          return null;
+        })}
+      </FilterFieldGroup>
+      {children && <FilterActions>{children}</FilterActions>}
     </FilterBarContainer>
   );
 }

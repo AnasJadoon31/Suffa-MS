@@ -1,6 +1,6 @@
 import { useHijri } from "../lib/hijri";
 import { styled } from "@mui/material/styles";
-import Typography from "@mui/material/Typography";
+import { Typography } from "./ui/Mui";
 
 const HijriText = styled(Typography, {
   shouldForwardProp: (prop) => prop !== "inline",

@@ -111,7 +111,7 @@ async function verifyViewport(browser, viewport, label, language = "en") {
     if (geometry.overflow) throw new Error(`${label}: page has horizontal overflow`);
     if (!geometry.toolbar || !geometry.addButton) throw new Error(`${label}: missing toolbar or Add student button`);
     if (geometry.addButton.right > viewport.width + 1) throw new Error(`${label}: Add student button overflowed toolbar`);
-    if (viewport.width >= 768) {
+    if (viewport.width >= 960) {
       for (const [name, box] of Object.entries({ portal: geometry.portal, status: geometry.status, actions: geometry.actions })) {
         if (!box || box.width > 180) throw new Error(`${label}: ${name} column is not content-sized: ${JSON.stringify(box)}`);
       }

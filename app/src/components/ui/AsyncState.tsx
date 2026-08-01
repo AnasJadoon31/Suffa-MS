@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { Box } from "./Mui";
+import { Typography } from "./Mui";
 
 /**
  * §E cross-cutting polish: a shared loading/error/empty-state trio so views

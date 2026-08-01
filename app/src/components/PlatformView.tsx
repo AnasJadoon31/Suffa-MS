@@ -1,9 +1,9 @@
 import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
 import { Building2, Copy, Plus, ToggleLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -57,7 +57,7 @@ export function PlatformView() {
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <Box className="platformRoot" sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <Workspace sx={{ p: 3 }}>
         <Topbar>
           <Box sx={{ flex: 1 }}>

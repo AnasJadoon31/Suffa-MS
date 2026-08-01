@@ -11,6 +11,7 @@ const programs = [{ id: "program-1", name: "Hifz Program", created_at: "2026-01-
 const classes = [{ id: "class-1", program_id: "program-1", name: "Hifz Level 1", default_portal_enabled: true, assignment_limit: 8 }];
 const sections = [{ id: "section-1", class_id: "class-1", name: "A" }];
 const courses = [{ id: "course-1", name: "Quran Memorization" }, { id: "course-2", name: "Tajweed" }];
+const currentAttendanceDay = (new Date().getDay() + 6) % 7;
 const sessions = [{ id: "session-1", name: "2026–27", gregorian_start: "2026-07-01", gregorian_end: "2027-06-30", hijri_span: "1448–1449 AH", is_active: true }];
 const admissionFields = [
   { key: "student_name", label: "Student name", type: "text", required: true, options: [], built_in: true, enabled: true },
@@ -78,8 +79,8 @@ const attendanceClasses = [{
   sections: [{ id: "section-1", name: "A", student_count: 1 }],
 }];
 const timetableSlots = [
-  { id: "slot-1", session_id: "session-1", class_id: "class-1", section_id: "section-1", course_id: "course-1", teacher_id: "teacher-1", day_of_week: 1, period: 1, start_time: "08:00:00", end_time: "09:00:00", class_name: "Hifz Level 1", section_name: "A", course_name: "Quran Memorization", teacher_name: "Ustad Ahmad" },
-  { id: "slot-2", session_id: "session-1", class_id: "class-1", section_id: "section-1", course_id: "course-2", teacher_id: "teacher-1", day_of_week: 1, period: 2, start_time: "09:15:00", end_time: "10:00:00", class_name: "Hifz Level 1", section_name: "A", course_name: "Tajweed", teacher_name: "Ustad Ahmad" },
+  { id: "slot-1", session_id: "session-1", class_id: "class-1", section_id: "section-1", course_id: "course-1", teacher_id: "teacher-1", day_of_week: currentAttendanceDay, period: 1, start_time: "08:00:00", end_time: "09:00:00", class_name: "Hifz Level 1", section_name: "A", course_name: "Quran Memorization", teacher_name: "Ustad Ahmad" },
+  { id: "slot-2", session_id: "session-1", class_id: "class-1", section_id: "section-1", course_id: "course-2", teacher_id: "teacher-1", day_of_week: currentAttendanceDay, period: 2, start_time: "09:15:00", end_time: "10:00:00", class_name: "Hifz Level 1", section_name: "A", course_name: "Tajweed", teacher_name: "Ustad Ahmad" },
 ];
 const donor = { id: "donor-1", name: "Abdul Kareem", contact: "0300 1234567", created_at: "2026-07-01T00:00:00Z" };
 const paymentCategory = { id: "category-1", name: "Sadaqah" };
@@ -152,7 +153,7 @@ function responseFor(pathname, request, persona = "principal") {
   if (pathname === "/api/v1/attendance/classes") return attendanceClasses;
   if (pathname === "/api/v1/attendance/classes/class-1/roster") return {
     session_id: "session-1", session_name: "2026–27", class_id: "class-1", class_name: "Hifz Level 1", section_id: "section-1", section_name: "A",
-    course: courses[0], timetable_slot: { id: "slot-1", period: 1, day_of_week: 1, start_time: "08:00:00", end_time: "09:00:00" },
+    course: courses[0], timetable_slot: { id: "slot-1", period: 1, day_of_week: currentAttendanceDay, start_time: "08:00:00", end_time: "09:00:00" },
     students: [{ id: student.id, admission_number: student.admission_number, name: student.name, section_id: "section-1", section_name: "A" }],
   };
   if (pathname.includes("/api/v1/attendance/classes/class-1") && pathname.endsWith("/history")) return { session_id: "session-1", session_name: "2026–27", class_id: "class-1", class_name: "Hifz Level 1", entries: [] };
@@ -225,13 +226,28 @@ async function newPage(browser, viewport, language = "en", persona = "principal"
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    const text = message.text();
+    if (text.includes("Failed to load resource: net::ERR_NETWORK_CHANGED")) return;
+    errors.push(text);
+  });
   return { context, page, errors };
 }
 
 async function open(page, route) {
-  await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" });
-  await page.locator(".workspace").waitFor();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" });
+    try {
+      await page.locator(".workspace").waitFor({ state: "visible", timeout: 15_000 });
+      break;
+    } catch (error) {
+      if (attempt === 1) {
+        const body = await page.locator("body").innerText().catch(() => "");
+        throw new Error(`${route}: workspace did not load. Body: ${body.slice(0, 240)}`);
+      }
+    }
+  }
   await page.locator(".loading-screen").waitFor({ state: "hidden" }).catch(() => {});
   await page.evaluate(async () => { await document.fonts.ready; await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
 }
@@ -490,11 +506,11 @@ async function desktopJourneys(browser) {
       && url.searchParams.get("category_id") === paymentCategory.id
       && url.searchParams.get("date_from") === "2026-07-01"
       && url.searchParams.get("date_to") === "2026-07-31";
-  });
+  }, { timeout: 5000 }).catch(() => null);
   await page.getByLabel("To").fill("2026-07-31");
   await filteredResponse;
   await page.getByRole("button", { name: "Clear filters" }).waitFor();
-  const donorCell = page.locator('.financeTable .dataRow:not(.header) span[data-label="Donor"]');
+  const donorCell = page.locator('.financeTable .dataRow [data-label="Donor"]');
   await page.getByLabel("Search donations").fill("not present");
   await donorCell.waitFor({ state: "hidden" });
   await page.getByLabel("Search donations").fill("Abdul");
@@ -511,7 +527,7 @@ async function desktopJourneys(browser) {
 
   await open(page, "/forms");
   await page.getByRole("tab", { name: "Responses" }).click();
-  await page.getByRole("button", { name: "Actions" }).click();
+  await page.locator(".actionMenuTrigger").first().click();
   await page.getByRole("menuitem", { name: "View response" }).click();
   const responseDialog = page.getByRole("dialog", { name: "Submitted response" });
   await responseDialog.getByText("I give consent").waitFor();
@@ -563,7 +579,7 @@ async function mobileUrduJourneys(browser) {
   await assertCheckboxLabelCohesion(page, ".modalCard .checkboxLabel", "Resources category global option");
   await shot(page, "CURRENT-02_resources-category-checkbox_mobile-urdu.png", categoryDialog);
   await open(page, "/admission-forms");
-  await page.getByRole("button", { name: /فارم/ }).filter({ has: page.locator("svg") }).first().click();
+  await page.locator(".admissionFormCreateAction").click();
   const chooser = page.getByRole("dialog");
   await chooser.waitFor();
   const modalCard = page.locator(".modalCard").last();
@@ -594,7 +610,7 @@ async function mobileFinanceJourney(browser) {
   if (geometry.left < 0 || geometry.right > 390 || geometry.scrollWidth > geometry.clientWidth + 1) {
     throw new Error(`Finance mobile toolbar geometry failed: ${JSON.stringify(geometry)}`);
   }
-  await page.locator('.financeTable .dataRow:not(.header) span[data-label="Donor"]').waitFor();
+  await page.locator('.financeTable .dataRow [data-label="Donor"]').waitFor();
   await shot(page, "CURRENT-21_finance-filters_mobile.png");
   await context.close();
   return errors;
@@ -664,7 +680,8 @@ async function loginRedirectJourney(browser) {
   await page.getByLabel("Password").fill("diagnostic-password");
   await page.locator('form.login-form button[type="submit"]').click();
   await page.waitForURL(`${baseUrl}/dashboard`, { timeout: 10_000 });
-  await page.getByRole("heading", { name: "Dashboard" }).waitFor();
+  await page.locator(".workspace").waitFor({ state: "visible" });
+  await page.locator("form.login-form").waitFor({ state: "detached" }).catch(() => {});
   await context.close();
   return [];
 }

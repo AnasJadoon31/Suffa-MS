@@ -1,13 +1,10 @@
-import { type ReactNode, useState } from "react";
-import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
-import TextField from "@mui/material/TextField";
-import InputAdornment from "@mui/material/InputAdornment";
-import IconButton from "@mui/material/IconButton";
-import useMediaQuery from "@mui/material/useMediaQuery";
+import { type ReactNode } from "react";
+import { Box, Chip, IconButton, InputAdornment, useMediaQuery } from "./Mui";
 import { styled } from "@mui/material/styles";
-import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
-import { Select } from "./Field";
+import { Search, X } from "lucide-react";
+import { DateInput, Input, SearchInput, Select } from "./Field";
+import { PWA_COMPACT_BREAKPOINT, PageToolbar } from "./Layout";
+import { useTranslation } from "react-i18next";
 
 export interface FilterChip {
   key: string;
@@ -30,6 +27,7 @@ export interface FilterBarProps {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
+  searchAriaLabel?: string;
   chips?: FilterChip[];
   onChipToggle?: (key: string) => void;
   fields?: FilterField[];
@@ -40,8 +38,9 @@ export interface FilterBarProps {
 const FilterContainer = styled(Box)(({ theme }) => ({
   display: "flex",
   flexDirection: "column",
-  gap: theme.spacing(1.5),
+  gap: theme.spacing(1),
   marginBottom: theme.spacing(2),
+  minWidth: 0,
 }));
 
 const ChipsScroll = styled(Box)(() => ({
@@ -58,7 +57,9 @@ const DesktopFieldsRow = styled(Box)(({ theme }) => ({
   alignItems: "center",
   gap: "8px",
   flexWrap: "wrap",
-  [theme.breakpoints.down("md")]: {
+  flex: 1,
+  minWidth: 0,
+  [`@media (max-width:${PWA_COMPACT_BREAKPOINT - 1}px)`]: {
     display: "none",
   },
 }));
@@ -67,46 +68,51 @@ const MobileSearchRow = styled(Box)(({ theme }) => ({
   display: "flex",
   alignItems: "center",
   gap: "8px",
-  [theme.breakpoints.up("md")]: {
+  [`@media (min-width:${PWA_COMPACT_BREAKPOINT}px)`]: {
     display: "none",
   },
 }));
 
 const MobileFiltersRow = styled(Box)(({ theme }) => ({
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
   gap: "8px",
-  overflowX: "auto",
-  padding: "8px 0",
-  scrollbarWidth: "none",
-  "&::-webkit-scrollbar": { display: "none" },
+  minWidth: 0,
+  [`@media (min-width:${PWA_COMPACT_BREAKPOINT}px)`]: {
+    display: "none",
+  },
 }));
 
 export function FilterBar({
   searchValue,
   onSearchChange,
   searchPlaceholder = "Search...",
+  searchAriaLabel,
   chips,
   onChipToggle,
   fields = [],
   onClearAll,
   children,
 }: FilterBarProps) {
-  const isDesktop = useMediaQuery("(min-width: 900px)");
-  const [expanded, setExpanded] = useState(false);
+  const { t } = useTranslation();
+  const isDesktop = useMediaQuery(`(min-width:${PWA_COMPACT_BREAKPOINT}px)`);
   const hasFilters = fields.some((f) => f.value) || (searchValue && searchValue.length > 0);
 
   return (
-    <FilterContainer>
+    <PageToolbar className="inlineFilter pwaFilterStack">
+      <FilterContainer sx={{ flex: 1 }}>
       {/* Mobile: search + filters in horizontal scroll */}
-      <MobileSearchRow>
-        {onSearchChange && (
-          <TextField
-            size="small"
+      {!isDesktop && onSearchChange && (
+        <MobileSearchRow>
+          <SearchInput
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
-            sx={{ flex: 1, minWidth: 120 }}
+            sx={{ flex: 1, minWidth: 0 }}
             slotProps={{
+              htmlInput: {
+                "aria-label": searchAriaLabel ?? searchPlaceholder,
+              },
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
@@ -115,7 +121,7 @@ export function FilterBar({
                 ),
                 endAdornment: searchValue ? (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => onSearchChange("")}>
+                    <IconButton size="small" onClick={() => onSearchChange("")} aria-label={t("clearSearch", { defaultValue: "Clear search" })}>
                       <X size={16} />
                     </IconButton>
                   </InputAdornment>
@@ -123,8 +129,8 @@ export function FilterBar({
               },
             }}
           />
-        )}
-      </MobileSearchRow>
+        </MobileSearchRow>
+      )}
 
       {/* Chips row (horizontal scroll on mobile) */}
       {chips && chips.length > 0 && (
@@ -144,15 +150,18 @@ export function FilterBar({
       )}
 
       {/* Desktop: inline filter fields */}
-      <DesktopFieldsRow>
+      {isDesktop && (
+        <DesktopFieldsRow>
         {onSearchChange && (
-          <TextField
-            size="small"
+          <SearchInput
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
             sx={{ width: 220 }}
             slotProps={{
+              htmlInput: {
+                "aria-label": searchAriaLabel ?? searchPlaceholder,
+              },
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
@@ -166,7 +175,7 @@ export function FilterBar({
         {fields.map((field) => {
           if (field.type === "select") {
             return (
-              <Box component="label" key={field.key} sx={{ display: "flex", flexDirection: "column", gap: 0.5, width: 140 }}>
+                <Box component="label" key={field.key} sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 160, flex: "1 1 160px" }}>
                 {field.label && <span>{field.label}</span>}
                 <Select
                   aria-label={field.ariaLabel ?? field.label ?? field.placeholder}
@@ -182,26 +191,32 @@ export function FilterBar({
             );
           }
           return (
-            <TextField
-              key={field.key}
-              size="small"
-              type={field.type === "date" ? "date" : "text"}
-              label={field.label}
-              placeholder={field.placeholder}
-              value={field.value}
-              onChange={(e) => field.onChange(e.target.value)}
-              sx={{ width: field.type === "date" ? 160 : 140 }}
-              slotProps={{
-                htmlInput: field.type === "date" ? { shrink: true } : undefined,
-              }}
-            />
+            field.type === "date" ? (
+              <DateInput
+                key={field.key}
+                label={field.label}
+                placeholder={field.placeholder}
+                value={field.value}
+                onChange={(e) => field.onChange(e.target.value)}
+                sx={{ width: 170 }}
+              />
+            ) : (
+              <Input
+                key={field.key}
+                label={field.label}
+                placeholder={field.placeholder}
+                value={field.value}
+                onChange={(e) => field.onChange(e.target.value)}
+                sx={{ width: 180 }}
+              />
+            )
           );
         })}
         {hasFilters && onClearAll && (
-          <Chip label="Clear" size="small" onClick={onClearAll} />
+          <Chip label={t("clearFiltersBtn")} size="small" onClick={onClearAll} />
         )}
-        {children}
-      </DesktopFieldsRow>
+        </DesktopFieldsRow>
+      )}
 
       {/* Mobile: horizontal scrollable filters */}
       {!isDesktop && fields.length > 0 && (
@@ -209,7 +224,7 @@ export function FilterBar({
           {fields.map((field) => {
             if (field.type === "select") {
               return (
-                <Box component="label" key={field.key} sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 140 }}>
+                <Box component="label" key={field.key} sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 0 }}>
                   {field.label && <span>{field.label}</span>}
                   <Select
                     aria-label={field.ariaLabel ?? field.label ?? field.placeholder}
@@ -225,26 +240,34 @@ export function FilterBar({
               );
             }
             return (
-              <TextField
-                key={field.key}
-                size="small"
-                type={field.type === "date" ? "date" : "text"}
-                label={field.label}
-                placeholder={field.placeholder}
-                value={field.value}
-                onChange={(e) => field.onChange(e.target.value)}
-                sx={{ minWidth: field.type === "date" ? 160 : 140 }}
-                slotProps={{
-                  htmlInput: field.type === "date" ? { shrink: true } : undefined,
-                }}
-              />
+              field.type === "date" ? (
+                <DateInput
+                  key={field.key}
+                  label={field.label}
+                  placeholder={field.placeholder}
+                  value={field.value}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  sx={{ minWidth: 0 }}
+                />
+              ) : (
+                <Input
+                  key={field.key}
+                  label={field.label}
+                  placeholder={field.placeholder}
+                  value={field.value}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  sx={{ minWidth: 0 }}
+                />
+              )
             );
           })}
           {hasFilters && onClearAll && (
-            <Chip label="Clear filters" size="small" onClick={onClearAll} sx={{ alignSelf: "flex-start" }} />
+            <Chip label={t("clearFiltersBtn")} size="small" onClick={onClearAll} sx={{ alignSelf: "flex-start" }} />
           )}
         </MobileFiltersRow>
       )}
-    </FilterContainer>
+      </FilterContainer>
+      {children && <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>{children}</Box>}
+    </PageToolbar>
   );
 }

@@ -1,23 +1,18 @@
-import { CalendarDays, Languages, Menu } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ComponentType, type LazyExoticComponent } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { styled, keyframes } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import useMediaQuery from "@mui/material/useMediaQuery";
 
 import { LoginScreen } from "./components/LoginScreen";
-import { DelegateButton } from "./components/DelegateButton";
-import { SessionReadOnlyBanner, SessionSwitcher } from "./components/SessionSwitcher";
-import { initialsOf, RoleBadge, Sidebar } from "./components/Sidebar";
+import { SessionReadOnlyBanner } from "./components/SessionSwitcher";
+import { Sidebar } from "./components/Sidebar";
 import { BottomTabBar } from "./components/BottomTabBar";
 import { AppBar } from "./components/AppBar";
 import { NavDrawer } from "./components/NavDrawer";
-import { PwaStatus } from "./components/PwaStatus";
 import { NotFoundView } from "./components/NotFoundView";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { LoadingState, LoadingContainer } from "./components/ui/AsyncState";
-import { Button } from "./components/ui/Button";
+import { PWA_COMPACT_BREAKPOINT } from "./components/ui/Layout";
 import { useAuth } from "./lib/AuthContext";
 import { academicsApi } from "./lib/endpoints";
 import { useNavigationGuard } from "./lib/NavigationGuardContext";
@@ -63,28 +58,6 @@ const SetPasswordPage = lazyNamed(() => import("./components/SetPasswordPage"), 
 const SettingsView = lazyNamed(() => import("./components/SettingsView"), "SettingsView");
 const TimetableView = lazyNamed(() => import("./components/TimetableView"), "TimetableView");
 
-// Screen → permission modules, for the per-screen "Delegate…" control (§3).
-const VIEW_MODULES: Partial<Record<ViewId, string[]>> = {
-  attendance: ["attendance"],
-  timetable: ["timetable"],
-  holidays: ["holidays"],
-  leave: ["leave"],
-  announcements: ["announcements"],
-  academics: ["academics"],
-  assessments: ["assignments", "assessments"],
-  resources: ["resources"],
-  forms: ["forms"],
-  people: ["people", "auth"],
-  admissions: ["admissions"],
-  admission_forms: ["admissions"],
-  enquiries: ["admissions"],
-  finance: ["finance"],
-  salary: ["finance"],
-  reports: ["attendance", "assessments", "finance"],
-  blog: ["web"],
-  settings: ["settings"],
-};
-
 const WorkspaceContainer = styled("main")(({ theme }) => ({
   display: "flex",
   minHeight: "100vh",
@@ -96,33 +69,7 @@ const MainContent = styled("section")(({ theme }) => ({
   display: "flex",
   flexDirection: "column",
   minWidth: 0,
-  [theme.breakpoints.down(768)]: {
-    paddingBottom: 64, // Space for bottom tab bar
-  },
 }));
-
-const Topbar = styled("header")(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "12px 16px",
-  backgroundColor: theme.palette.background.paper,
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  [theme.breakpoints.up(768)]: {
-    display: "none",
-  },
-}));
-
-const TopbarContext = styled("div")({
-  flex: 1,
-  minWidth: 0,
-});
-
-const TopbarActions = styled("div")({
-  display: "flex",
-  alignItems: "center",
-  gap: 4,
-});
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(8px); }
@@ -133,12 +80,12 @@ const ContentArea = styled("div")(({ theme }) => ({
   flex: 1,
   overflow: "auto",
   animation: `${fadeIn} 0.2s ease-out`,
-  padding: theme.spacing(2),
+  padding: theme.spacing(1.5),
   [theme.breakpoints.up("sm")]: {
-    padding: theme.spacing(3),
+    padding: theme.spacing(2.5),
   },
-  [theme.breakpoints.up("md")]: {
-    padding: theme.spacing(4),
+  [theme.breakpoints.up(PWA_COMPACT_BREAKPOINT)]: {
+    padding: theme.spacing(3),
   },
   "@media (prefers-reduced-motion: reduce)": {
     animation: "none",
@@ -163,14 +110,12 @@ const SkipLink = styled("a")(({ theme }) => ({
 
 function Workspace() {
   const { t, i18n } = useTranslation();
-  const { isAuthenticated, isLoading, user, madrasa, hasPermission, hasFeature, updateProfile } = useAuth();
+  const { isAuthenticated, isLoading, user, hasPermission, hasFeature } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { confirmNavigation } = useNavigationGuard();
   const [navOpen, setNavOpen] = useState(false);
   const [today, setToday] = useState<{ gregorian: string; hijri: string } | null>(null);
-  const isUrdu = i18n.language === "ur";
-  const isDesktop = useMediaQuery("@media (min-width:768px)");
 
   const guardedNavigate = async (to: string) => {
     if (await confirmNavigation()) navigate(to);
@@ -196,14 +141,6 @@ function Workspace() {
     document.documentElement.dir = language === "ur" ? "rtl" : "ltr";
     document.documentElement.lang = language;
   }, [i18n, user]);
-
-  async function toggleLanguage(): Promise<void> {
-    const language = isUrdu ? "en" : "ur";
-    await i18n.changeLanguage(language);
-    document.documentElement.dir = language === "ur" ? "rtl" : "ltr";
-    document.documentElement.lang = language;
-    await updateProfile({ preferred_language: language });
-  }
 
   function renderRoute(route: PortalRoute) {
     switch (route.key) {
@@ -334,11 +271,11 @@ function Workspace() {
   const activeItem = navItems.find((item) => item.id === activeView);
 
   return (
-    <WorkspaceContainer>
+    <WorkspaceContainer className="appShell">
       <SkipLink href="#main-content">{t("skipToContent")}</SkipLink>
       <Sidebar onNavigate={() => setNavOpen(false)} />
       <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} />
-      <MainContent id="main-content" tabIndex={-1}>
+      <MainContent id="main-content" className="workspace" tabIndex={-1}>
         <AppBar
           onMenuClick={() => setNavOpen(true)}
           today={today}

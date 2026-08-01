@@ -1,9 +1,9 @@
 import { Button } from "./ui/Button";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
-import Chip from "@mui/material/Chip";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
+import { Chip } from "./ui/Mui";
 import { FileDown, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,7 +13,7 @@ import { useAuth } from "../lib/AuthContext";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { useSessionReadOnly } from "./SessionSwitcher";
 import { ErrorState, LoadingState } from "./ui/AsyncState";
-import { Input } from "./ui/Field";
+import { FileInput } from "./ui/Field";
 import { useDialog } from "../lib/DialogContext";
 import { DOCUMENT_UPLOAD_ACCEPT, getDocumentUploadContentType } from "../lib/filePolicy";
 
@@ -120,18 +120,38 @@ export function MyAssessmentsView() {
       )}
       {!loading && assignments.length === 0 && <Typography sx={{ color: "text.secondary", fontStyle: "italic" }}>{t("nothingDue")}</Typography>}
       <Box sx={{ mt: 2 }}>
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
+        <Box sx={{ display: { xs: "none", md: "grid" }, gridTemplateColumns: "repeat(4, 1fr)", gap: 1, fontWeight: 700, borderBottom: 2, borderColor: "divider", pb: 1, mb: 1 }}>
           <span>{t("assignmentLabel")}</span>
           <span>{t("dueDateLabel")}</span>
           <span>{t("instructionsLabel")}</span>
           <span>{t("submissionActionsLabel")}</span>
         </Box>
         {assignments.map((assignment) => (
-          <Box key={assignment.id} sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, py: 1, borderBottom: 1, borderColor: "divider", alignItems: "center" }}>
-            <span><strong>{assignment.title}</strong><br /><small>{assignment.course_name ?? "—"}</small></span>
-            <span>{new Date(assignment.due_date).toLocaleString()}</span>
-            <span>{assignment.instructions || "—"}</span>
-            <span>
+          <Box key={assignment.id} className="dataRow mobileDataCard" sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" },
+            gap: { xs: 1.25, md: 1 },
+            py: 1.25,
+            px: { xs: 1.25, md: 0 },
+            mb: { xs: 1, md: 0 },
+            border: { xs: 1, md: 0 },
+            borderBottom: 1,
+            borderColor: "divider",
+            borderRadius: { xs: 1, md: 0 },
+            alignItems: "center",
+            minWidth: 0,
+            "& > span": {
+              minWidth: 0,
+              overflowWrap: "anywhere",
+            },
+            "& input": {
+              maxWidth: "100%",
+            },
+          }}>
+            <span data-label={t("assignmentLabel")}><strong>{assignment.title}</strong><br /><small>{assignment.course_name ?? "—"}</small></span>
+            <span data-label={t("dueDateLabel")}>{new Date(assignment.due_date).toLocaleString()}</span>
+            <span data-label={t("instructionsLabel")}>{assignment.instructions || "—"}</span>
+            <span data-label={t("submissionActionsLabel")}>
               {(assignment.submission_file_key || submitted.has(assignment.id)) ? (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                   <Typography component="span">{t("submittedLabel")}</Typography>
@@ -149,7 +169,14 @@ export function MyAssessmentsView() {
                   )}
                   {!readOnly && new Date() <= new Date(assignment.due_date) && (
                     <>
-                      <Input aria-label={t("replacementFileLabel")} type="file" accept={DOCUMENT_UPLOAD_ACCEPT} onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
+                      <FileInput
+                        aria-label={t("replacementFileLabel")}
+                        buttonLabel={t("replacementFileLabel")}
+                        emptyLabel={t("noFileSelectedLabel")}
+                        selectedLabel={files[assignment.id]?.name}
+                        accept={DOCUMENT_UPLOAD_ACCEPT}
+                        onFileChange={(file) => setFiles({ ...files, [assignment.id]: file })}
+                      />
                       <Button type="button" disabled={!files[assignment.id]} onClick={() => submit(assignment)}>
                         <Upload size={14} /> {t("replaceSubmissionBtn")}
                       </Button>
@@ -161,7 +188,14 @@ export function MyAssessmentsView() {
                 </Box>
               ) : (
                 <>
-                  <Input type="file" accept={DOCUMENT_UPLOAD_ACCEPT} disabled={readOnly} onChange={(event) => setFiles({ ...files, [assignment.id]: event.target.files?.[0] ?? null })} />
+                  <FileInput
+                    buttonLabel={t("chooseFileBtn")}
+                    emptyLabel={t("noFileSelectedLabel")}
+                    selectedLabel={files[assignment.id]?.name}
+                    accept={DOCUMENT_UPLOAD_ACCEPT}
+                    disabled={readOnly}
+                    onFileChange={(file) => setFiles({ ...files, [assignment.id]: file })}
+                  />
                   <Button type="button" disabled={readOnly || !files[assignment.id]} onClick={() => submit(assignment)}>
                     <Upload size={14} /> {t("submitBtn")}
                   </Button>

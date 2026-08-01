@@ -1,9 +1,9 @@
 import { Button } from "./ui/Button";
 import { useEffect, useMemo, useState } from "react";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
 import { Edit2, Eye, FileText, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDialog } from "../lib/DialogContext";
@@ -39,12 +39,7 @@ import { ActionMenu } from "./ui/ActionMenu";
 import { PhoneInput } from "./ui/PhoneInput";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
 import { DataCard } from "./ui/DataCard";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
+import { DataTable, type Column } from "./ui/DataTable";
 import { styled } from "@mui/material/styles";
 
 const FormsGrid = styled(Box)(({ theme }) => ({
@@ -194,23 +189,51 @@ export function FormsView() {
   };
 
   const canEditForm = (form: FormDef) => !readOnly && (canManageAll || form.created_by_id === user?.id);
+  const responseColumns: Column<FormResponse>[] = [
+    {
+      header: t("formLabel"),
+      render: (response) => forms.find((form) => form.id === response.form_id)?.title ?? "—",
+    },
+    {
+      header: t("respondentLabel"),
+      render: (response) => response.submitted_by_name ?? t("deletedPersonLabel"),
+    },
+    {
+      header: t("wardLabel"),
+      render: (response) => response.ward_name ?? response.student_name ?? "—",
+    },
+    {
+      header: t("submittedCol"),
+      render: (response) => new Date(response.created_at).toLocaleString(),
+    },
+    {
+      header: t("actionsCol"),
+      render: (response) => (
+        <ActionMenu
+          inlineThreshold={0}
+          ariaLabel={`${t("actionsCol")}: ${response.submitted_by_name ?? t("deletedPersonLabel")}`}
+          items={[{ label: t("viewResponseBtn"), icon: <Eye size={14} />, onClick: () => setSelectedResponse(response) }]}
+        />
+      ),
+    },
+  ];
 
   return (
-    <PageSection>
+    <PageSection className="formsPanel">
       <PageHeader
         title={t("forms")}
         icon={<FileText size={18} />}
         notice={t("descForms")}
       />
 
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }} role="tablist" aria-label={t("forms")}>
+      <Box className="tabs" sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }} role="tablist" aria-label={t("forms")}>
         <Button type="button" role="tab" aria-selected={activeTab === "forms"} onClick={() => setActiveTab("forms")}>{t("formsTabLabel")}</Button>
         {canViewResponses && <Button type="button" role="tab" aria-selected={activeTab === "responses"} onClick={() => setActiveTab("responses")}>{t("responsesTabLabel")}</Button>}
       </Box>
 
       {activeTab === "forms" && (<>
       {canCreate && (
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+        <Box className="formsCreateActions" sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
           <Button type="button" onClick={() => setShowCreate(true)}><Plus size={16} /> {t("createFormBtn")}</Button>
         </Box>
       )}
@@ -502,32 +525,12 @@ export function FormsView() {
               }}>{t("cancelBtn")}</Button>
             )}
           </InlineFilter>
-          <Box sx={{ overflowX: "auto" }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>{t("formLabel")}</TableCell>
-                  <TableCell>{t("respondentLabel")}</TableCell>
-                  <TableCell>{t("wardLabel")}</TableCell>
-                  <TableCell>{t("submittedCol")}</TableCell>
-                  <TableCell>{t("actionsCol")}</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {responses.map((response) => (
-                  <TableRow key={response.id}>
-                    <TableCell>{forms.find((form) => form.id === response.form_id)?.title ?? "—"}</TableCell>
-                    <TableCell>{response.submitted_by_name ?? t("deletedPersonLabel")}</TableCell>
-                    <TableCell>{response.ward_name ?? response.student_name ?? "—"}</TableCell>
-                    <TableCell>{new Date(response.created_at).toLocaleString()}</TableCell>
-                    <TableCell>
-                      <ActionMenu items={[{ label: t("viewResponseBtn"), icon: <Eye size={14} />, onClick: () => setSelectedResponse(response) }]} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Box>
+          <DataTable
+            columns={responseColumns}
+            data={responses}
+            keyExtractor={(response) => response.id}
+            emptyMessage={t("noResponsesYet")}
+          />
         </>
       )}
       {selectedResponse && (

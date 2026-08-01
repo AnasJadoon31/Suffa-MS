@@ -1,8 +1,8 @@
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { Box } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
 
 const NotFoundSection = styled("section")(({ theme }) => ({
   display: "flex",

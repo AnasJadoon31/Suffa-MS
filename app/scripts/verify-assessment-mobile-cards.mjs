@@ -178,6 +178,8 @@ async function assertMobileAssessmentCards(page, label) {
       return style.overflowX === "hidden" && element.scrollWidth > element.clientWidth + 1;
     });
     const smallTargets = [...document.querySelectorAll(".assessmentMobileCard button, .assessmentMobileCard input, .assessmentMobileCard select")].filter((element) => {
+      const style = getComputedStyle(element);
+      if (element.getAttribute("aria-hidden") === "true" || style.display === "none" || style.visibility === "hidden") return false;
       const rect = element.getBoundingClientRect();
       return rect.width < 44 || rect.height < 44;
     });
@@ -230,6 +232,8 @@ async function assertSubmissionMobileCard(page) {
       clientWidth: field.clientWidth,
     }));
     const smallTargets = [...row.querySelectorAll("button, input, textarea, select, .MuiInputBase-root")].filter((element) => {
+      const style = getComputedStyle(element);
+      if (element.getAttribute("aria-hidden") === "true" || style.display === "none" || style.visibility === "hidden") return false;
       const rect = element.getBoundingClientRect();
       return rect.width < 44 || rect.height < 44;
     });

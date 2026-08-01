@@ -1,11 +1,11 @@
 import { type ReactNode } from "react";
-import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
-import CardActions from "@mui/material/CardActions";
-import Avatar from "@mui/material/Avatar";
-import Typography from "@mui/material/Typography";
-import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
+import { Card } from "./Mui";
+import { CardContent } from "./Mui";
+import { CardActions } from "./Mui";
+import { Avatar } from "./Mui";
+import { Typography } from "./Mui";
+import { Box } from "./Mui";
+import { Chip } from "./Mui";
 import { styled } from "@mui/material/styles";
 
 export interface DataField {
@@ -24,11 +24,15 @@ export interface DataCardProps {
 }
 
 const StyledCard = styled(Card)(({ theme }) => ({
-  borderRadius: 16,
+  borderRadius: 8,
   marginBottom: theme.spacing(1.5),
-  cursor: "pointer",
+  cursor: "default",
+  overflow: "visible",
   transition: "box-shadow 0.2s ease, transform 0.15s ease",
-  "&:hover": {
+  "&[data-clickable='true']": {
+    cursor: "pointer",
+  },
+  "&[data-clickable='true']:hover": {
     boxShadow: theme.shadows[4],
     transform: "translateY(-1px)",
   },
@@ -70,6 +74,7 @@ const FieldLabel = styled(Typography)(({ theme }) => ({
 const FieldValue = styled(Typography)(() => ({
   fontSize: "0.875rem",
   fontWeight: 500,
+  overflowWrap: "anywhere",
 }));
 
 export function DataCard({
@@ -82,7 +87,7 @@ export function DataCard({
   onClick,
 }: DataCardProps) {
   return (
-    <StyledCard variant="outlined" onClick={onClick}>
+    <StyledCard className="mobileDataCard" variant="outlined" onClick={onClick} data-clickable={Boolean(onClick)}>
       <CardHeader>
         {avatar && (
           <Avatar sx={{ width: 44, height: 44, bgcolor: "teal.main", color: "teal.contrastText" }}>
@@ -92,7 +97,7 @@ export function DataCard({
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
             variant="subtitle1"
-            sx={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
           >
             {title}
           </Typography>
@@ -100,7 +105,7 @@ export function DataCard({
             <Typography
               variant="body2"
               color="text.secondary"
-              sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              sx={{ overflowWrap: "anywhere" }}
             >
               {subtitle}
             </Typography>

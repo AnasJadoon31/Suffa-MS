@@ -1,6 +1,6 @@
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
+import { Box } from "./ui/Mui";
+import { Chip } from "./ui/Mui";
 import {
   CalendarCheck,
   ClipboardCheck,

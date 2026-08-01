@@ -2,28 +2,29 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Drawer from "@mui/material/Drawer";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import IconButton from "@mui/material/IconButton";
-import Avatar from "@mui/material/Avatar";
-import Typography from "@mui/material/Typography";
-import Collapse from "@mui/material/Collapse";
-import Tooltip from "@mui/material/Tooltip";
+import { Box } from "./ui/Mui";
+import { Drawer } from "./ui/Mui";
+import { List } from "./ui/Mui";
+import { ListItem } from "./ui/Mui";
+import { ListItemButton } from "./ui/Mui";
+import { ListItemIcon } from "./ui/Mui";
+import { ListItemText } from "./ui/Mui";
+import { IconButton } from "./ui/Mui";
+import { Avatar } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Collapse } from "./ui/Mui";
+import { Tooltip } from "./ui/Mui";
 import { LogOut, ChevronDown, ChevronRight } from "lucide-react";
 import { isNavItemAccessible, navGroups, portalRoutes, resolveNavItemPath } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
+import { PWA_COMPACT_BREAKPOINT, PWA_TOUCH_TARGET } from "./ui/Layout";
 
 const DRAWER_WIDTH = 240;
 const COLLAPSED_WIDTH = 60;
 
 const StyledDrawer = styled(Drawer)(({ theme }) => ({
   display: "none",
-  [theme.breakpoints.up(768)]: {
+  [`@media (min-width:${PWA_COMPACT_BREAKPOINT}px)`]: {
     display: "block",
   },
   "& .MuiDrawer-paper": {
@@ -47,7 +48,7 @@ const BrandLogo = styled("span")(({ theme }) => ({
   justifyContent: "center",
   width: 36,
   height: 36,
-  borderRadius: 10,
+  borderRadius: 8,
   backgroundColor: theme.palette.teal?.main ?? theme.palette.primary.main,
   color: theme.palette.teal?.contrastText ?? theme.palette.primary.contrastText,
   fontSize: "1.1rem",
@@ -60,11 +61,11 @@ const NavItemButton = styled(ListItemButton, {
 })<{ isActive: boolean }>(({ theme, isActive }) => ({
   display: "flex",
   alignItems: "center",
-  borderRadius: 10,
+  borderRadius: 8,
   marginInline: 0,
   marginBottom: 2,
   paddingInline: 10,
-  minHeight: 40,
+  minHeight: PWA_TOUCH_TARGET,
   width: "100%",
   "&::before": {
     content: '""',
@@ -119,8 +120,8 @@ const CollapseButton = styled(IconButton)(({ theme }) => ({
   position: "absolute",
   top: 14,
   right: 8,
-  width: 28,
-  height: 28,
+  width: 32,
+  height: 32,
   backgroundColor: theme.palette.background.default,
   "&:hover": {
     backgroundColor: theme.palette.divider,
@@ -204,6 +205,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           width: collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH,
         },
       }}
+      slotProps={{ paper: { className: "sidebar" } }}
     >
       <BrandArea>
         <BrandLogo>{madrasa?.name?.[0]?.toUpperCase() ?? "م"}</BrandLogo>
@@ -277,13 +279,13 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                   return (
                     <ListItem key={item.id} disablePadding sx={{ px: 0 }}>
                       <NavLinkWrapper to={path} onClick={onNavigate}>
-                        <NavItemButton isActive={isActive}>
+                        <NavItemButton className="navItem" isActive={isActive}>
                           <NavIcon>
                             <Icon size={18} />
                           </NavIcon>
                           <ListItemText
                             primary={
-                              <Typography variant="body2" sx={{ fontWeight: isActive ? 600 : 400 }}>
+                              <Typography component="span" variant="body2" sx={{ fontWeight: isActive ? 600 : 400 }}>
                                 {t(item.labelKey)}
                               </Typography>
                             }

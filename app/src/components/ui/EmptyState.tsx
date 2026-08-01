@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { Box } from "./Mui";
+import { Typography } from "./Mui";
 import { Inbox } from "lucide-react";
 
 export function EmptyState({

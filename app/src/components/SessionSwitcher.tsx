@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { styled } from "@mui/material/styles";
-import Box from "@mui/material/Box";
+import { Box } from "./ui/Mui";
 import { academicsApi, type AcademicSession } from "../lib/endpoints";
 import { useAuth } from "../lib/AuthContext";
 import { Select } from "./ui/Field";

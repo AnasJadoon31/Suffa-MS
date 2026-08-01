@@ -1,15 +1,17 @@
 import { useTranslation } from "react-i18next";
 import { styled } from "@mui/material/styles";
-import MuiAppBar from "@mui/material/AppBar";
-import Toolbar from "@mui/material/Toolbar";
-import IconButton from "@mui/material/IconButton";
-import Typography from "@mui/material/Typography";
-import Avatar from "@mui/material/Avatar";
-import Chip from "@mui/material/Chip";
+import { AppBar as MuiAppBar } from "./ui/Mui";
+import { Toolbar } from "./ui/Mui";
+import { IconButton } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Avatar } from "./ui/Mui";
+import { Chip } from "./ui/Mui";
 import { Menu, CalendarDays, Languages } from "lucide-react";
 import { navItems, portalRoutes } from "../data/mockData";
 import { useAuth } from "../lib/AuthContext";
 import { useNavigate, useLocation } from "react-router";
+import { PwaStatus } from "./PwaStatus";
+import { PWA_COMPACT_BREAKPOINT, PWA_TOUCH_TARGET } from "./ui/Layout";
 
 const StyledAppBar = styled(MuiAppBar)(({ theme }) => ({
   position: "sticky",
@@ -19,13 +21,13 @@ const StyledAppBar = styled(MuiAppBar)(({ theme }) => ({
   color: theme.palette.text.primary,
   boxShadow: "none",
   borderBottom: `1px solid ${theme.palette.divider}`,
-  [theme.breakpoints.up(768)]: {
+  [`@media (min-width:${PWA_COMPACT_BREAKPOINT}px)`]: {
     display: "none",
   },
 }));
 
 const StyledToolbar = styled(Toolbar)({
-  minHeight: 56,
+  minHeight: 60,
   paddingInline: 12,
   gap: 8,
 });
@@ -44,8 +46,8 @@ const ActionsArea = styled("div")({
 });
 
 const DateChipStyled = styled(Chip)(({ theme }) => ({
-  height: 28,
-  borderRadius: 999,
+  height: 32,
+  borderRadius: 8,
   fontSize: "0.7rem",
   fontWeight: 500,
   color: theme.palette.text.secondary,
@@ -78,8 +80,8 @@ const AvatarStyled = styled(Avatar)(({ theme }) => ({
 }));
 
 const LanguageButton = styled(IconButton)({
-  width: 36,
-  height: 36,
+  width: PWA_TOUCH_TARGET,
+  height: PWA_TOUCH_TARGET,
 });
 
 const DateLabel = styled("span")({
@@ -119,14 +121,19 @@ export function AppBar({ onMenuClick, today }: AppBarProps) {
   };
 
   return (
-    <StyledAppBar position="sticky">
+    <StyledAppBar position="sticky" className="topbar">
       <StyledToolbar>
         <IconButton
+          className="navToggle"
           edge="start"
           color="inherit"
           aria-label={t("openMenu")}
           onClick={onMenuClick}
-          sx={{ width: 40, height: 40 }}
+          sx={{
+            width: PWA_TOUCH_TARGET,
+            height: PWA_TOUCH_TARGET,
+            [`@media (min-width:${PWA_COMPACT_BREAKPOINT}px)`]: { display: "none" },
+          }}
         >
           <Menu size={20} />
         </IconButton>
@@ -135,12 +142,18 @@ export function AppBar({ onMenuClick, today }: AppBarProps) {
             {activeItem ? t(activeItem.labelKey) : t("appName")}
           </Typography>
           {activeItem && (
-            <Typography variant="caption" color="text.secondary" noWrap>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "none", [`@media (min-width:${PWA_COMPACT_BREAKPOINT}px)`]: { display: "block" } }}
+              noWrap
+            >
               {t(activeItem.descKey)}
             </Typography>
           )}
         </TitleArea>
         <ActionsArea>
+          <PwaStatus />
           {today && (
             <DateChipStyled
               icon={<CalendarDays size={14} />}
@@ -153,7 +166,7 @@ export function AppBar({ onMenuClick, today }: AppBarProps) {
               title={t("todayLabel")}
             />
           )}
-          <LanguageButton color="inherit" onClick={() => void toggleLanguage()} aria-label="Toggle language">
+          <LanguageButton color="inherit" onClick={() => void toggleLanguage()} aria-label={t("switchLanguageBtn")}>
             <Languages size={18} />
           </LanguageButton>
           {user && (

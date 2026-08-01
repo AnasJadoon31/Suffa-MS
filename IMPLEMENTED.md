@@ -3,6 +3,160 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-01 — Non-Docker Local Server Runner
+
+**Issue:** Agents and developers needed one clear command to run the FastAPI backend and Vite PWA frontend locally without Docker.
+
+**Fix:**
+- Added root `run-server.sh` with commented setup and runtime steps.
+- The script creates a development `backend/.env` when missing, preserves existing env files, prepares `backend/.venv`, installs backend/frontend dependencies unless `SKIP_INSTALL=1`, runs Alembic migrations and `backend/bootstrap.py`, then starts backend and frontend together.
+- Added clean shutdown handling and documented override flags for ports, install, migrations, and bootstrap.
+
+**Files:** `run-server.sh`
+
+**Verification:** `bash -n run-server.sh`; executable bit set.
+
+## 2026-08-01 — PWA Custom MUI Wrapper Migration
+
+**Issue:** Feature screens and shell components still imported MUI primitives directly, and upload controls were rendered through generic/native-looking file inputs instead of app-owned controls.
+
+**Fix:**
+- Added `app/src/components/ui/Mui.tsx` as the project-owned adapter for MUI primitives used by the PWA.
+- Migrated feature screens, shell components, lib contexts, and shared UI components to import MUI primitives through the adapter boundary.
+- Expanded `Field.tsx` with reusable `TextInput`, `SearchInput`, `DateInput`, `NumberInput`, and `FileInput` wrappers.
+- Replaced visible assignment/resource/settings upload controls with `FileInput`, including selected-file labels and English/Urdu strings.
+- Added `test:ui-wrappers` to prevent new direct MUI component imports outside the UI layer and to prevent native file inputs outside `Field.tsx`.
+
+**Files:**
+- `app/src/components/ui/Mui.tsx`, `app/src/components/ui/Field.tsx`
+- `app/src/components/ui/FilterBar.tsx`, `app/src/components/SearchDropdown.tsx`, `app/src/components/StagedAudiencePicker.tsx`
+- `app/src/components/MyAssessmentsView.tsx`, `AssessmentsView.tsx`, `DashboardCards.tsx`, `ResourcesView.tsx`, `SettingsView.tsx`
+- `app/scripts/check-ui-wrapper-usage.mjs`, `app/package.json`, `app/src/i18n/index.ts`
+
+**Verification:** `cd app && npm run test:ui-wrappers`; `npm run test:i18n`; `npm run test:foundation-components`; `npm run test:route-runtime`; `npm run build`.
+
+## 2026-08-01 — PWA Visual Redesign Foundation Batch
+
+**Issue:** The PWA was mixing mobile and desktop UI patterns: oversized modals, split filter behavior, raw tables on mobile, cramped action clusters, clipped route subtitles, and inconsistent shell breakpoints.
+
+**Fix:**
+- Established a shared 960px compact breakpoint for shell/navigation, page layout, filters, responsive record lists, and mobile action behavior.
+- Upgraded shared primitives: `Page`, `PageHeader`, `PageToolbar`, `ResponsiveTabs`, `DetailList`, `FormModal`, `DataTable`, `DataCard`, `FilterBar`, `ActionMenu`, shared buttons, and theme touch targets.
+- Fixed the oversized rounded modal pattern by making dialogs desktop-sized and mobile sheet/fullscreen aware.
+- Migrated key route surfaces toward shared records and responsive controls: Academics section/course mapping, Finance contribution/donation records, People action surfaces, My Assessments mobile submission cards, Platform/public-admission audit roots, and compact action-menu behavior.
+- Updated visual verification scripts for the 960px compact-tablet contract and refreshed current-issues screenshot artifacts.
+
+**Files:**
+- `app/src/components/ui/Layout.tsx`, `Modal.tsx`, `DataTable.tsx`, `DataCard.tsx`, `FilterBar.tsx`, `ActionMenu.tsx`, `Button.tsx`
+- `app/src/components/AppBar.tsx`, `Sidebar.tsx`, `NavDrawer.tsx`, `BottomTabBar.tsx`
+- `app/src/components/AcademicsView.tsx`, `FinanceView.tsx`, `PeopleView.tsx`, `MyAssessmentsView.tsx`, `DashboardCards.tsx`, `PlatformView.tsx`, `PublicAdmissionPage.tsx`
+- `app/scripts/check-mobile-record-cards.mjs`, `app/scripts/verify-current-issues.mjs`, `app/scripts/verify-students-layout.mjs`, `app/scripts/verify-assessment-mobile-cards.mjs`
+
+**Verification:** `cd app && npm run build`; `npm run test:i18n`; `npm run test:foundation-components`; `npm run test:route-runtime`; `npm run test:drawer`; `npm run test:mobile-records`; `npm run test:students-layout`; `npm run test:assessment-mobile-cards`; `npm run test:visual-issues`. Screenshots refreshed under `app/artifacts/issue-verification/`. `npm run test:appwide-visual` still reports route-specific visual issues; the release gate remains open in `TO_IMPLEMENT.md`.
+
+## 2026-08-01 — Fix Route-Wide Invalid Hook Runtime Failures
+
+**Issue:** Multiple lazy portal routes could report invalid-hook/dispatcher-null failures at the first hook in otherwise valid components, including `AttendanceBoard`, `ProfileView`, and `PeopleView`.
+
+**Fix:**
+- Disabled PWA service-worker registration in development and actively unregisters old dev service workers/caches so localhost cannot mix stale cached route chunks with the current Vite React runtime.
+- Added Vite `resolve.dedupe` and `optimizeDeps.include` entries for React, React DOM, React i18n, MUI, and Emotion so lazy route chunks and dependency prebundles resolve one React graph.
+- Added `test:route-runtime`, a live browser scanner that logs in and visits 33 portal routes, including every People tab, failing on invalid-hook, dispatcher-null, max-update-depth, and known leaked-prop runtime regressions.
+- Reconnected `PwaStatus` to the app bar with stable diagnostic classes and restored its 44px touch target so PWA checks remain meaningful after the dev registration change.
+
+**Files:**
+- `app/src/lib/pwaRegistration.ts` — dev-only service-worker/cache cleanup
+- `app/vite.config.ts` — React/MUI/i18n dependency dedupe and optimization
+- `app/scripts/verify-route-runtime.mjs` — route-wide hook/runtime browser scan
+- `app/package.json` — `test:route-runtime`
+- `app/src/components/AppBar.tsx` and `app/src/components/PwaStatus.tsx` — restored PWA status placement/test hooks
+
+**Verification:** `cd app && TEST_BASE_URL=http://localhost:5173 npm run test:route-runtime` scanned 33 portal routes; `cd app && npm run build`; `cd app && APP_URL=http://localhost:5173 npm run test:pwa-status`; `cd app && npm run test:profile-runtime`; `cd app && TEST_BASE_URL=http://localhost:5173 npm run test:attendance-defaults`.
+
+## 2026-08-01 — Remove Profile RadioGroup Hook Failure Point
+
+**Issue:** `/my-profile` could emit an invalid-hook crash from MUI `RadioGroup2` while rendering the theme selector.
+
+**Fix:**
+- Replaced the Profile theme `RadioGroup`/`FormControlLabel` controls with controlled app buttons using ARIA radio semantics.
+- Added a focused profile runtime browser regression that opens `/my-profile`, switches theme options, and fails on invalid-hook, dispatcher-null, `RadioGroup`, max-depth, `showLabel`, or `InputProps` console/page errors.
+
+**Files:**
+- `app/src/components/ProfileView.tsx` — theme selector no longer imports or renders MUI `RadioGroup`
+- `app/scripts/verify-profile-runtime.mjs` — profile runtime console regression
+- `app/package.json` — `test:profile-runtime`
+
+**Verification:** `cd app && TEST_BASE_URL=http://localhost:5173 npm run test:profile-runtime`; `cd app && TEST_BASE_URL=http://localhost:5173 npm run test:attendance-defaults`; `cd app && npm run build`; live `/my-profile` smoke on the restarted dev server clicked theme options with no matching console/page errors.
+
+## 2026-08-01 — Fix Attendance Console Runtime Regressions
+
+**Issue:** Attendance emitted React console errors for leaked `showLabel`/`InputProps` DOM props and could hit a maximum update-depth loop while defaulting today's unmarked roster to Present.
+
+**Fix:**
+- Stabilized Attendance's selected-day derived entries and guarded default Present state writes so the effect no longer re-renders indefinitely.
+- Moved mobile bottom-tab routing onto the MUI `BottomNavigationAction` itself so MUI's injected `showLabel` prop is consumed by the action instead of leaking onto an anchor element.
+- Updated the shared `Input` wrapper to use MUI slot props for adornments instead of the old `InputProps` prop.
+- Extended the attendance browser regression to fail on `showLabel`, `InputProps`, maximum-update-depth, invalid-hook, or dispatcher-null console regressions.
+
+**Files:**
+- `app/src/components/AttendanceBoard.tsx` — stable selected-day memoization and default-mark guard
+- `app/src/components/BottomTabBar.tsx` — bottom navigation route/action composition
+- `app/src/components/ui/Field.tsx` — slot-based input adornments
+- `app/scripts/verify-attendance-defaults.mjs` — console regression assertions
+
+**Verification:** `cd app && npm run build`; `cd app && TEST_BASE_URL=http://localhost:5173 npm run test:attendance-defaults`; live backend browser smoke of `/attendance` with `admin/password` found no matching console/page errors.
+
+## 2026-08-01 — Auto-Select Single Attendance Course
+
+**Issue:** Course teachers could still be prompted to choose a course after selecting a class/section, even when their timetable scope had only one course for that class/section.
+
+**Fix:**
+- Derived attendance course choices from the selected class/section timetable slots instead of only the class-level course list.
+- Auto-selected the only available course and hid the Course filter when the teacher/class/section combination has one course.
+- Kept the Course filter visible only when the selected class/section has multiple course choices, and kept the Period filter visible only when the chosen course has multiple periods today.
+- Extended the attendance browser regression to cover single-course auto-selection, multiple-course course prompting, and same-course multiple-period prompting.
+
+**Files:**
+- `app/src/components/AttendanceBoard.tsx` — section-scoped course choices and single-course auto-selection
+- `app/scripts/verify-attendance-defaults.mjs` — course/period prompt regression coverage
+
+**Verification:** `cd app && npm run build`; `cd app && TEST_BASE_URL=http://localhost:5173 npm run test:attendance-defaults`; live teacher smoke with `teacher1/password` auto-selected `course=...` and rendered no Course or Period selector for a single-course class/section.
+
+## 2026-08-01 — Clarify Attendance Course/Period Prompts
+
+**Issue:** After a course was selected, Attendance could still show the generic “Choose a course and scheduled period” message, making it look like the selected course was ignored.
+
+**Fix:**
+- Replaced the generic fallback with state-specific prompts: select a course, select one of multiple periods today, or course not scheduled today.
+- Added English and Urdu translations for the new attendance period states.
+
+**Files:**
+- `app/src/components/AttendanceBoard.tsx` — attendance selection prompt state
+- `app/src/i18n/index.ts` — English/Urdu prompt copy
+
+**Verification:** `cd app && npm run test:attendance-defaults`; `cd app && npm run build`.
+
+## 2026-08-01 — Fix Attendance Course Selection Route Reset & Period Inference
+
+**Issue:** Selecting a course on Attendance could jump back to the class-selection screen after the period auto-selection effect ran.
+
+**Fix:**
+- Added one route-sync helper in `app/src/components/AttendanceBoard.tsx` so attendance URL updates preserve class, section, course, period, tab, and student-history state.
+- Replaced the auto-period effect's `URLSearchParams` spread with explicit param construction; empty period clears only `slot` instead of dropping the selected class/course.
+- Changed the flow so period choice is only shown when the selected course has multiple periods on the current day.
+- Added backend period inference for roster and sync: `course_id` without `timetable_slot_id` resolves to the unique scheduled period for that class/section/course/date; multiple periods return a clear conflict.
+- Corrected the MUI `ToggleButtonGroup` import so default Present marks are visually selected and grouped correctly.
+
+**Files:**
+- `app/src/components/AttendanceBoard.tsx` — attendance filter/tab route-state preservation, conditional period choice, and status toggle grouping
+- `app/src/lib/endpoints.ts` — sends course-only roster requests so the backend can infer single periods
+- `backend/app/modules/attendance/schemas.py` — allows student course scope without a provided slot
+- `backend/app/modules/attendance/routes.py` — backend unique-period inference and multi-period conflict handling
+- `backend/tests/test_attendance_period_enrollment_history.py` — API regressions for inferred single period, multiple-period conflict, and sync inference
+- `app/scripts/verify-attendance-defaults.mjs` — browser regression for hidden single-period selector and visible multi-period selector
+
+**Verification:** `cd backend && .venv/bin/python -m pytest tests/test_attendance.py tests/test_attendance_period_enrollment_history.py -q`; `cd app && npm run test:attendance-defaults`; `cd app && npm run build`.
+
 
 ## 2026-08-01 — Fix Attendance Class Roster Parameter Coupling & Day-of-Week Mismatch
 

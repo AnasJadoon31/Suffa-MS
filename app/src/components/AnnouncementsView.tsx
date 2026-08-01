@@ -14,11 +14,11 @@ import { Modal, FormModal } from "./ui/Modal";
 import { PageSection, PageHeader } from "./ui/Layout";
 import { InlineFilter } from "./ui/InlineFilter";
 import { FormStack, FormRow, FormField } from "./ui/FormLayout";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Typography from "@mui/material/Typography";
-import Chip from "@mui/material/Chip";
-import Alert from "@mui/material/Alert";
+import { Box } from "./ui/Mui";
+import { Paper } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
+import { Chip } from "./ui/Mui";
+import { Alert } from "./ui/Mui";
 import { styled } from "@mui/material/styles";
 
 const AnnouncementCard = styled(Paper)(({ theme }) => ({
@@ -180,7 +180,7 @@ export function AnnouncementsView() {
   };
 
   return (
-    <PageSection>
+    <PageSection className="announcementsPanel">
       <PageHeader
         title={t("announcementsHeading")}
         notice={t("announcementsSubtitle")}

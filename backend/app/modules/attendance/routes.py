@@ -225,6 +225,75 @@ async def _assert_can_mark_section(
         raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SECTION_NOT_ASSIGNED)
 
 
+async def _resolve_unique_timetable_slot(
+    session: AsyncSession,
+    *,
+    madrasa_id: UUID,
+    session_id: UUID,
+    class_id: UUID,
+    section_id: UUID,
+    course_id: UUID,
+    attendance_date: date,
+) -> TimetableSlot | None:
+    slots = (
+        await session.execute(
+            select(TimetableSlot)
+            .where(
+                TimetableSlot.madrasa_id == madrasa_id,
+                TimetableSlot.session_id == session_id,
+                TimetableSlot.class_id == class_id,
+                TimetableSlot.section_id == section_id,
+                TimetableSlot.course_id == course_id,
+                TimetableSlot.day_of_week == attendance_date.weekday(),
+            )
+            .order_by(TimetableSlot.period, TimetableSlot.start_time)
+        )
+    ).scalars().all()
+    if len(slots) > 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Multiple timetable periods found for this course today; choose a period",
+        )
+    return slots[0] if slots else None
+
+
+async def _resolve_entry_period_scope(
+    session: AsyncSession,
+    *,
+    madrasa_id: UUID,
+    entry: AttendanceEntry,
+) -> AttendanceEntry:
+    if entry.subject_type != "student" or entry.course_id is None or entry.timetable_slot_id is not None:
+        return entry
+
+    enrollment_scope = (
+        await session.execute(
+            select(Enrollment.class_id, Enrollment.section_id).where(
+                Enrollment.madrasa_id == madrasa_id,
+                Enrollment.student_id == entry.subject_id,
+                Enrollment.session_id == entry.session_id,
+                Enrollment.ended_on.is_(None),
+            )
+        )
+    ).one_or_none()
+    if enrollment_scope is None:
+        return entry
+
+    class_id, section_id = enrollment_scope
+    slot = await _resolve_unique_timetable_slot(
+        session,
+        madrasa_id=madrasa_id,
+        session_id=entry.session_id,
+        class_id=class_id,
+        section_id=section_id,
+        course_id=entry.course_id,
+        attendance_date=entry.attendance_date,
+    )
+    if slot is None:
+        raise HTTPException(status_code=422, detail="No scheduled period found for this course today")
+    return entry.model_copy(update={"timetable_slot_id": slot.id})
+
+
 async def _assert_can_mark_entry(
     current_user: User,
     session: AsyncSession,
@@ -405,8 +474,8 @@ async def attendance_class_roster(
         raise HTTPException(status_code=404, detail="Class not found")
 
     section = None
-    if (course_id is None) != (timetable_slot_id is None):
-        raise HTTPException(status_code=422, detail="course_id and timetable_slot_id must be provided together")
+    if timetable_slot_id is not None and course_id is None:
+        raise HTTPException(status_code=422, detail="course_id is required when timetable_slot_id is provided")
     if section_id is not None:
         section = await session.get(Section, section_id)
         if section is None or section.madrasa_id != madrasa.id or section.class_id != class_id:
@@ -419,7 +488,22 @@ async def attendance_class_roster(
 
     course = None
     timetable_slot = None
-    if timetable_slot_id is not None:
+    if course_id is not None and timetable_slot_id is None:
+        course = await session.get(Course, course_id)
+        if course is None or course.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Course not found")
+        if section_id is None:
+            raise HTTPException(status_code=422, detail="section_id is required when course_id is provided")
+        timetable_slot = await _resolve_unique_timetable_slot(
+            session,
+            madrasa_id=madrasa.id,
+            session_id=active_session.id,
+            class_id=class_id,
+            section_id=section_id,
+            course_id=course_id,
+            attendance_date=datetime.now(UTC).date(),
+        )
+    elif timetable_slot_id is not None:
         timetable_slot = await session.get(TimetableSlot, timetable_slot_id)
         if (
             timetable_slot is None
@@ -436,6 +520,7 @@ async def attendance_class_roster(
         if section_id is None:
             section_id = timetable_slot.section_id
             section = await session.get(Section, section_id)
+    if timetable_slot is not None and course is not None:
         await _assert_can_mark_section(
             current_user, session, madrasa.id, active_session.id, class_id, timetable_slot.section_id
         )
@@ -1342,7 +1427,8 @@ async def sync_attendance(
     locked_keys: list[str] = []
     idempotency_keys = []
 
-    for entry in payload.entries:
+    for raw_entry in payload.entries:
+        entry = await _resolve_entry_period_scope(session, madrasa_id=madrasa.id, entry=raw_entry)
         await _assert_can_mark_entry(current_user, session, madrasa.id, entry)
         if entry.subject_type == "student" and await _student_has_approved_leave(
             session,
@@ -1425,7 +1511,7 @@ async def override_locked_attendance(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> AttendanceOverrideResponse:
-    entry = payload.entry
+    entry = await _resolve_entry_period_scope(session, madrasa_id=madrasa.id, entry=payload.entry)
     await _assert_can_mark_entry(current_user, session, madrasa.id, entry)
     if entry.subject_type == "student" and await _student_has_approved_leave(
         session,

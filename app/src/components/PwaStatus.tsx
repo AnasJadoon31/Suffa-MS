@@ -16,7 +16,7 @@ const PwaButton = styled(Button)(({ theme }) => ({
   borderRadius: 999,
   padding: theme.spacing(0.75, 1.5),
   fontSize: "0.75rem",
-  minHeight: 32,
+  minHeight: 44,
   gap: theme.spacing(0.5),
 }));
 
@@ -95,10 +95,16 @@ export function PwaStatus() {
     if (choice?.outcome !== "dismissed") setInstallPrompt(null);
   }
 
-  if (!status) return <span data-pwa-status="idle" hidden />;
+  if (!status) return <span className="pwaStatusProbe" data-pwa-status="idle" hidden />;
 
   return (
-    <PwaButton type="button" title={status.title} aria-label={status.title} onClick={status.action}>
+    <PwaButton
+      type="button"
+      className={`pwaStatusProbe pwaStatusChip pwaStatusChip-${status.key}`}
+      title={status.title}
+      aria-label={status.title}
+      onClick={status.action}
+    >
       {status.icon}
       <span>{status.label}</span>
     </PwaButton>

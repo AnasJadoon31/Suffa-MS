@@ -1,7 +1,7 @@
 import { Button } from "./ui/Button";
-import Paper from "@mui/material/Paper";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { Paper } from "./ui/Mui";
+import { Box } from "./ui/Mui";
+import { Typography } from "./ui/Mui";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
