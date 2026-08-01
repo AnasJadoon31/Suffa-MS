@@ -3,6 +3,18 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-02 — Deployment Checkout Cleanup
+
+**Issue:** Coolify failed during repository clone/checkout for commit `119a427` before Docker build started. The repository still tracked generated screenshots, visual-audit artifacts, dev PWA output, bundled `app/dist.tar.gz`, and local SQLite databases, increasing checkout weight and polluting deploy clones.
+
+**Fix:**
+- Removed generated deployment-irrelevant artifacts from Git tracking while keeping local files intact.
+- Added ignore rules for `app/artifacts/`, `app/dev-dist/`, `app/dist.tar.gz`, and local `*.db` files so visual/test/build output does not re-enter commits.
+
+**Files:** `.gitignore`, tracked removal of `app/artifacts/**`, `app/dev-dist/**`, `app/dist.tar.gz`, `backend/temp.db`, `backend/test.db`
+
+**Verification:** `git ls-files app/artifacts app/dev-dist app/dist.tar.gz backend/temp.db backend/test.db` returns no tracked files; `cd app && npm run build`.
+
 ## 2026-08-01 — Non-Docker Local Server Runner
 
 **Issue:** Agents and developers needed one clear command to run the FastAPI backend and Vite PWA frontend locally without Docker.

@@ -4,11 +4,15 @@ __pycache__/
 *.pyc
 node_modules/
 dist/
+app/dev-dist/
+app/dist.tar.gz
+app/artifacts/
 .next/
 .pytest_cache/
 .mypy_cache/
 coverage/
 uploads/
 *.tsbuildinfo
+*.db
 backend/uvicorn.log
 app/artifacts/live-verification-state.json
