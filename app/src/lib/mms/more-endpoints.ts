@@ -523,6 +523,7 @@ export interface Submission {
   mark: number | null;
   feedback: string | null;
   submitted_at: string;
+  is_late: boolean;
 }
 
 export const opsMutations = {

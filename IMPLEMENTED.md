@@ -603,7 +603,14 @@ Evidence:
   `git diff --check` passed, and Alembic has one head
   `iss3_028_guardian_forms`.
 
-## 2026-07-22 — Live role and release qualification
+## 2026-08-02 — Fix attendance roster empty states and period selection UX
+
+- Addressed an issue in the `/attendance` route where users saw "No attendance recorded" without any students listed or marking options when attempting to mark attendance today.
+- Fixed the silent failure path when a user hasn't selected a period (for courses with multiple periods) or when no periods exist for them today.
+- Implemented explicit empty states ("Pick a period", "No periods today", "Could not load roster") to guide the user rather than falling back to the history view prematurely.
+- Verified fix by running the frontend React build.
+
+## 2026-07-29 — Staff Profile Tabs and UI primitive modernization
 
 The previously open `PDF-02`, `PDF-05`, `PDF-08`, `PDF-11`, `PDF-14`,
 `PDF-16`, `PDF-23`, and `PDF-28..31` rows now have authenticated live-API

@@ -18,7 +18,7 @@ import {
 } from "@/components/app/Primitives";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { useAuth } from "@/lib/mms/auth";
-import { academicsExtraApi, assessmentsApi, reportsApi } from "@/lib/mms/more-endpoints";
+import { academicsExtraApi, assessmentsApi, assessmentsMutations, reportsApi } from "@/lib/mms/more-endpoints";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/results")({
@@ -62,7 +62,7 @@ function StudentResultsView() {
   });
 
   const resultCard = useMutation({
-    mutationFn: () => assessmentsApi.downloadMyResultCard(activeSession),
+    mutationFn: () => assessmentsMutations.downloadMyResultCard(activeSession),
     onSuccess: () => toast.success("Result card downloaded"),
   });
 
@@ -163,7 +163,7 @@ function StaffResultsView() {
   });
 
   const publish = useMutation({
-    mutationFn: (studentIds: string[]) => assessmentsApi.publishResults(sessionId, studentIds),
+    mutationFn: (studentIds: string[]) => assessmentsMutations.publishResults(sessionId, studentIds),
     onSuccess: async () => {
       toast.success("Results published");
       await client.invalidateQueries({ queryKey: ["results-matrix", sessionId, classId] });

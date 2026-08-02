@@ -11,6 +11,7 @@ import { FormSheet } from "@/components/app/FormSheet";
 import {
   Card,
   EmptyState,
+  Field,
   CustomDropdown,
   SkeletonList,
   TextInput,
@@ -100,7 +101,7 @@ function ResourcesPage() {
     onSuccess: (category) => {
       toast.success("Category created");
       setNewCategory("");
-      setFormCategory(category.id);
+      setForm({ ...form, categoryId: category.id });
       void client.invalidateQueries({ queryKey: ["resource-categories"] });
     },
   });

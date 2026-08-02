@@ -517,7 +517,21 @@ function AttendanceBoard() {
               {roster.isLoading || history.isLoading ? <SkeletonList rows={5} /> : null}
 
               {!canMark ? (
-                <DayEntries entries={dayEntries} />
+                isToday && !hasRecords && todaysSlots.length > 1 && !slotId ? (
+                  <div className="mt-4">
+                    <EmptyState title="Pick a period" hint="Multiple periods found for this course today." />
+                  </div>
+                ) : isToday && !hasRecords && todaysSlots.length === 0 ? (
+                  <div className="mt-4">
+                    <EmptyState title="No periods today" hint="This course is not scheduled for you today." />
+                  </div>
+                ) : isToday && !hasRecords && roster.isError ? (
+                  <div className="mt-4">
+                    <EmptyState title="Could not load roster" hint="You may not be assigned to this class." />
+                  </div>
+                ) : (
+                  <DayEntries entries={dayEntries} />
+                )
               ) : (
                 <>
                   <label className="card-surface mb-3 flex items-center gap-2 px-3.5 py-2.5">

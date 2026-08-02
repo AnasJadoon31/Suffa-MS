@@ -544,10 +544,12 @@ function AssignmentDetailSheet({
                       </div>
                       <div className="flex gap-2">
                         {submission.is_late ? <Pill tone="warning">Late</Pill> : null}
-                        <ActionButton variant="soft" onClick={() => void openSubmission(submission.file_key)}>
-                          <Download className="h-4 w-4" />
-                          File
-                        </ActionButton>
+                        {submission.file_key ? (
+                          <ActionButton variant="soft" onClick={() => void openSubmission(submission.file_key!)}>
+                            <Download className="h-4 w-4" />
+                            File
+                          </ActionButton>
+                        ) : null}
                       </div>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
