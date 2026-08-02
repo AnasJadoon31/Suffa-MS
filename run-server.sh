@@ -87,6 +87,8 @@ create_backend_env_if_missing() {
 
   if [[ -f "$env_file" ]]; then
     log "Using existing ${env_file#$ROOT_DIR/}"
+    ensure_backend_env_key "$env_file" "SUPER_ADMIN_USERNAME" "platform-admin"
+    ensure_backend_env_key "$env_file" "SUPER_ADMIN_PASSWORD" "password"
     return
   fi
 
@@ -119,6 +121,23 @@ EVOLUTION_INSTANCE=
 EVOLUTION_TENANT_SLUG=
 EOF
   log "Created backend/.env with local development defaults. Update DATABASE_URL/REDIS_URL if your services use different credentials."
+}
+
+ensure_backend_env_key() {
+  local env_file="$1"
+  local key="$2"
+  local value="$3"
+
+  if grep -q "^${key}=" "$env_file"; then
+    return
+  fi
+
+  {
+    printf '\n'
+    printf '# Added by ./run-server.sh for local development bootstrap.\n'
+    printf '%s=%s\n' "$key" "$value"
+  } >>"$env_file"
+  log "Added missing ${key} to ${env_file#$ROOT_DIR/}"
 }
 
 wait_for_http() {

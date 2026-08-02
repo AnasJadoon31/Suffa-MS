@@ -10,11 +10,12 @@ Running log of completed work (newest first). Design rationale lives in
 **Fix:**
 - Added optional first-boot platform account creation to `backend/bootstrap.py` using `SUPER_ADMIN_USERNAME` and `SUPER_ADMIN_PASSWORD`.
 - Exposed the super-admin environment variables in `.env.example`, `docker-compose.yml`, and the non-Docker `run-server.sh`.
+- Made `run-server.sh` backfill missing local super-admin keys into an existing `backend/.env`, because the script intentionally preserves old env files.
 - Added a focused bootstrap regression test proving that the optional super-admin is tenantless, active, and password-verifiable.
 
 **Files:** `backend/bootstrap.py`, `backend/tests/test_bootstrap.py`, `.env.example`, `docker-compose.yml`, `run-server.sh`
 
-**Verification:** `cd backend && .venv/bin/python -m pytest tests/test_bootstrap.py -q`; `bash -n run-server.sh`; `docker compose config`.
+**Verification:** `cd backend && .venv/bin/python -m pytest tests/test_bootstrap.py -q`; `bash -n run-server.sh`; `docker compose config`; local Docker API login and `/api/v1/auth/me` returned `platform-admin` with role `super_admin`.
 
 ## 2026-08-02 — Coolify Backend Healthcheck Startup Fix
 
