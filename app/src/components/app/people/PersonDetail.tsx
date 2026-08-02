@@ -3,8 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { ActionButton, Pill } from "@/components/app/Primitives";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { ActionButton, Pill, ManagedSheet, ActionBar } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
 import { StudentForm } from "./StudentForm";
 import { TeacherForm } from "./TeacherForm";
@@ -62,23 +61,23 @@ export function StudentDetailSheet({
   async function deactivate() {
     await peopleMutations.deactivateStudent(student!.id);
     toast.success("Student deactivated");
-    void client.invalidateQueries({ queryKey: ["people", "students"] });
+    void client.invalidateQueries({ queryKey: ["people"] });
     onOpenChange(false);
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[88vh] overflow-y-auto rounded-t-3xl border-border bg-card px-4 pb-8 pt-5"
-      >
-        <SheetTitle className="mb-1 font-display text-lg font-extrabold">{student.name}</SheetTitle>
-        <div className="mb-3 flex items-center gap-2">
+    <ManagedSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={student.name}
+      subtitle={
+        <div className="flex items-center gap-2">
           <Pill tone={student.status === "active" ? "success" : "muted"}>{student.status}</Pill>
           <span className="text-xs text-muted-foreground">{student.admission_number}</span>
         </div>
-
-        <div className="mb-4">
+      }
+    >
+      <div className="mb-4">
           <Row label="Date of birth" value={student.date_of_birth} />
           <Row label="Phone" value={student.phone} />
           <Row label="B-Form #" value={student.b_form_number} />
@@ -118,11 +117,12 @@ export function StudentDetailSheet({
           }}
         />
 
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          <ActionButton variant="soft" onClick={() => setEditOpen(true)}>
+        <ActionBar>
+          <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
             Edit
           </ActionButton>
           <ActionButton
+            className="flex-1"
             variant="soft"
             onClick={() =>
               copyCredentialsLink(() => peopleMutations.studentCredentialsLink(student.id))
@@ -130,31 +130,32 @@ export function StudentDetailSheet({
           >
             <Copy className="h-4 w-4" /> Credentials link
           </ActionButton>
-        </div>
+        </ActionBar>
         {student.status === "active" ? (
           confirmDeactivate ? (
-            <div className="mt-2 flex gap-2">
+            <ActionBar className="mt-2">
               <ActionButton variant="danger" className="flex-1" onClick={deactivate}>
                 <ShieldOff className="h-4 w-4" /> Confirm deactivate
               </ActionButton>
-              <ActionButton variant="ghost" onClick={() => setConfirmDeactivate(false)}>
+              <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmDeactivate(false)}>
                 Cancel
               </ActionButton>
-            </div>
+            </ActionBar>
           ) : (
-            <ActionButton
-              variant="danger"
-              className="mt-2 w-full"
-              onClick={() => setConfirmDeactivate(true)}
-            >
-              <ShieldOff className="h-4 w-4" /> Deactivate
-            </ActionButton>
+            <ActionBar className="mt-2">
+              <ActionButton
+                variant="danger"
+                className="w-full"
+                onClick={() => setConfirmDeactivate(true)}
+              >
+                <ShieldOff className="h-4 w-4" /> Deactivate
+              </ActionButton>
+            </ActionBar>
           )
         ) : null}
 
         <StudentForm student={student} open={editOpen} onOpenChange={setEditOpen} />
-      </SheetContent>
-    </Sheet>
+    </ManagedSheet>
   );
 }
 
@@ -175,22 +176,23 @@ export function TeacherDetailSheet({
   async function deactivate() {
     await peopleMutations.deactivateTeacher(teacher!.id);
     toast.success("Teacher deactivated");
-    void client.invalidateQueries({ queryKey: ["people", "teachers"] });
+    void client.invalidateQueries({ queryKey: ["people"] });
     onOpenChange(false);
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[88vh] overflow-y-auto rounded-t-3xl border-border bg-card px-4 pb-8 pt-5"
-      >
-        <SheetTitle className="mb-1 font-display text-lg font-extrabold">{teacher.name}</SheetTitle>
-        <div className="mb-3 flex items-center gap-2">
+    <ManagedSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={teacher.name}
+      subtitle={
+        <div className="flex items-center gap-2">
           <Pill tone={teacher.status === "active" ? "success" : "muted"}>{teacher.status}</Pill>
           <span className="text-xs text-muted-foreground">{teacher.employee_code}</span>
         </div>
-        <div className="mb-4">
+      }
+    >
+      <div className="mb-4">
           <Row label="WhatsApp" value={teacher.whatsapp_number} />
           <Row label="Qualifications" value={teacher.qualifications} />
           <Row label="Join date" value={teacher.join_date} />
@@ -199,11 +201,12 @@ export function TeacherDetailSheet({
           <Row label="Emergency contact" value={teacher.emergency_contact} />
           <Row label="Principal delegate" value={teacher.is_principal_delegate ? "Yes" : "No"} />
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <ActionButton variant="soft" onClick={() => setEditOpen(true)}>
+        <ActionBar>
+          <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
             Edit
           </ActionButton>
           <ActionButton
+            className="flex-1"
             variant="soft"
             onClick={() =>
               copyCredentialsLink(() => peopleMutations.teacherCredentialsLink(teacher.id))
@@ -211,30 +214,31 @@ export function TeacherDetailSheet({
           >
             <Copy className="h-4 w-4" /> Credentials link
           </ActionButton>
-        </div>
+        </ActionBar>
         {teacher.status === "active" ? (
           confirmDeactivate ? (
-            <div className="mt-2 flex gap-2">
+            <ActionBar className="mt-2">
               <ActionButton variant="danger" className="flex-1" onClick={deactivate}>
                 <ShieldOff className="h-4 w-4" /> Confirm deactivate
               </ActionButton>
-              <ActionButton variant="ghost" onClick={() => setConfirmDeactivate(false)}>
+              <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmDeactivate(false)}>
                 Cancel
               </ActionButton>
-            </div>
+            </ActionBar>
           ) : (
-            <ActionButton
-              variant="danger"
-              className="mt-2 w-full"
-              onClick={() => setConfirmDeactivate(true)}
-            >
-              <ShieldOff className="h-4 w-4" /> Deactivate
-            </ActionButton>
+            <ActionBar className="mt-2">
+              <ActionButton
+                variant="danger"
+                className="w-full"
+                onClick={() => setConfirmDeactivate(true)}
+              >
+                <ShieldOff className="h-4 w-4" /> Deactivate
+              </ActionButton>
+            </ActionBar>
           )
         ) : null}
         <TeacherForm teacher={teacher} open={editOpen} onOpenChange={setEditOpen} />
-      </SheetContent>
-    </Sheet>
+    </ManagedSheet>
   );
 }
 
@@ -259,18 +263,17 @@ export function GuardianDetailSheet({
   if (!guardian) return null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[88vh] overflow-y-auto rounded-t-3xl border-border bg-card px-4 pb-8 pt-5"
-      >
-        <SheetTitle className="mb-1 font-display text-lg font-extrabold">
-          {guardian.name}
-        </SheetTitle>
-        <div className="mb-3">
+    <ManagedSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={guardian.name}
+      subtitle={
+        <div className="flex items-center gap-2">
           <Pill tone="muted">{guardian.relationship}</Pill>
         </div>
-        <div className="mb-4">
+      }
+    >
+      <div className="mb-4">
           <Row label="Phone(s)" value={guardian.phone_numbers} />
           <Row label="CNIC" value={guardian.cnic} />
           <Row label="Address" value={guardian.address} />
@@ -296,11 +299,12 @@ export function GuardianDetailSheet({
           }}
         />
 
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          <ActionButton variant="soft" onClick={() => setEditOpen(true)}>
+        <ActionBar>
+          <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
             Edit
           </ActionButton>
           <ActionButton
+            className="flex-1"
             variant="soft"
             onClick={() =>
               copyCredentialsLink(() => peopleMutations.guardianCredentialsLink(guardian.id))
@@ -308,9 +312,8 @@ export function GuardianDetailSheet({
           >
             <Copy className="h-4 w-4" /> Credentials link
           </ActionButton>
-        </div>
+        </ActionBar>
         <GuardianForm guardian={guardian} open={editOpen} onOpenChange={setEditOpen} />
-      </SheetContent>
-    </Sheet>
+    </ManagedSheet>
   );
 }

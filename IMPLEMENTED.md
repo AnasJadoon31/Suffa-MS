@@ -3,6 +3,72 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-02 — Frontend Completion Recovery (Core Journeys)
+
+**Issue:** After the TanStack frontend replacement, several authenticated screens were still only partially connected to backend workflows. The highest-risk gaps were profile/account management, assignments, admissions, results, settings, and lifecycle actions on content/resource screens.
+
+**Fix:**
+- Restored real account management on `/me`: editable user preferences, academic-session selection, password change, logout, and session/account details using the existing auth endpoints.
+- Completed assignment lifecycle wiring: teacher/principal create, edit, delete, submission review, grading, and student submit/withdraw flows using real backend submission endpoints and presigned file upload/download.
+- Completed admissions review flow: backend-backed application creation from admission forms, applicant detail editing, status-history viewing, reject/return-to-pending actions, and accepted-student conversion via the admissions conversion API.
+- Restored results parity by keeping the student results path and adding staff-side class/section results management with matrix loading, section publish, and export entry points where backend support already existed.
+- Replaced the generic settings surface with catalog-driven typed controls for boolean, integer, and string settings backed by the existing settings catalog/update APIs.
+- Added missing edit/lifecycle behavior to Resources, Holidays, Announcements, and Blog, including file-backed resource upload/edit/download flows.
+- Tightened People refresh consistency by broadening linked entity invalidation after student/teacher/guardian mutations and deactivation.
+- Replaced the unsupported-role dashboard dead-end with a safe fallback that routes users toward still-supported workflows.
+
+**Files:**
+- `app/src/lib/mms/endpoints.ts`
+- `app/src/lib/mms/more-endpoints.ts`
+- `app/src/routes/me.tsx`
+- `app/src/routes/assignments.tsx`
+- `app/src/routes/admissions.tsx`
+- `app/src/routes/results.tsx`
+- `app/src/routes/settings.tsx`
+- `app/src/routes/resources.tsx`
+- `app/src/routes/holidays.tsx`
+- `app/src/routes/announcements.tsx`
+- `app/src/routes/blog.tsx`
+- `app/src/routes/dashboard.tsx`
+- `app/src/components/app/people/StudentForm.tsx`
+- `app/src/components/app/people/TeacherForm.tsx`
+- `app/src/components/app/people/GuardianForm.tsx`
+- `app/src/components/app/people/PersonDetail.tsx`
+
+**Verification:** `cd app && npm run build`; `cd backend && .venv/bin/python -m pytest tests/test_platform.py tests/test_reported_portal_issues.py tests/test_session_context.py -q` (`33 passed`); local auth/session smoke against `http://localhost:8001` verified login with tenant header, bearer-token access to `/api/v1/auth/me`, and academic sessions loading from `/api/v1/academics/sessions`.
+
+**Limitations:** This tranche intentionally stayed lean. It did not rebuild the older browser automation pack for the new TanStack markup, did not run the full role/language visual matrix, and did not complete broader parity work still pending in finance, reports, timetable conflict editing, leave history/review, and other secondary routes listed in `TO_IMPLEMENT.md`.
+
+## 2026-08-02 — Frontend Refactor: Shared Dropdowns and CRUD Form Composition
+
+**Issue:** After the completion recovery pass, the frontend still repeated select styling, create/edit form markup, file-picker UI, and common mutation-success flow across multiple route screens.
+
+**Fix:**
+- Added one themed `CustomDropdown` and made it the shared select surface for the TanStack frontend, while keeping a `SelectInput` alias for compatibility.
+- Replaced remaining route-level raw select usage with `CustomDropdown`, including public admission, reports, and attendance helper selectors.
+- Added shared `applyMutationSuccess` handling for repeated success toast + query invalidation flows.
+- Extracted shared content CRUD field blocks into reusable components for announcements, blog posts, holidays, and resources.
+- Extracted a reusable `FilePickerField` so attachment selection no longer redefines the same control markup in multiple screens.
+- Rewired create/edit flows in announcements, blog, holidays, and resources to use shared form-value objects and shared field components instead of duplicating markup per route.
+
+**Files:**
+- `app/src/components/app/Primitives.tsx`
+- `app/src/components/app/FilePickerField.tsx`
+- `app/src/components/app/content/AnnouncementFormFields.tsx`
+- `app/src/components/app/content/BlogPostFormFields.tsx`
+- `app/src/components/app/content/HolidayFormFields.tsx`
+- `app/src/components/app/content/ResourceFormFields.tsx`
+- `app/src/lib/mms/mutation-helpers.ts`
+- `app/src/routes/admission.$token.tsx`
+- `app/src/routes/attendance.tsx`
+- `app/src/routes/reports.tsx`
+- `app/src/routes/announcements.tsx`
+- `app/src/routes/blog.tsx`
+- `app/src/routes/holidays.tsx`
+- `app/src/routes/resources.tsx`
+
+**Verification:** `cd app && npm run build`
+
 ## 2026-08-02 — Frontend Replacement With TanStack Design
 
 **Issue:** The existing `app/` PWA needed to be replaced with the new frontend design from `/home/anas/Development/Personal/suffa-frontend` while preserving backend integration, auth, routes, and deployment flow.

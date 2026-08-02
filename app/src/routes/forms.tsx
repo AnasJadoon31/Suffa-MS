@@ -13,7 +13,7 @@ import {
   EmptyState,
   Pill,
   Segmented,
-  SelectInput,
+  CustomDropdown,
   SkeletonList,
   TextInput,
 } from "@/components/app/Primitives";
@@ -128,14 +128,14 @@ function FormsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <SelectInput value={category} onChange={(e) => setCategory(e.target.value)}>
+            <CustomDropdown value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="">All categories</option>
               {categories.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
               ))}
-            </SelectInput>
+            </CustomDropdown>
           </div>
 
           {query.isLoading ? <SkeletonList rows={4} /> : null}

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { FormSheet } from "@/components/app/FormSheet";
-import { Field, SelectInput, TextArea, TextInput } from "@/components/app/Primitives";
+import { Field, CustomDropdown, TextArea, TextInput } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
 import { reportingApi } from "@/lib/mms/endpoints";
 import { formsApi, type FormDef } from "@/lib/mms/more-endpoints";
@@ -84,13 +84,13 @@ export function FillFormSheet({
 
       {isGuardian && wards.length > 0 ? (
         <Field label="Ward">
-          <SelectInput value={wardId} onChange={(e) => setWardId(e.target.value)}>
+          <CustomDropdown value={wardId} onChange={(e) => setWardId(e.target.value)}>
             {wards.map((w) => (
               <option key={w.id} value={w.id}>
                 {w.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
       ) : null}
 
@@ -129,7 +129,7 @@ export function FillFormSheet({
         if (field.type === "dropdown") {
           return (
             <Field key={field.key} label={label}>
-              <SelectInput
+              <CustomDropdown
                 required={field.required}
                 value={(answers[field.key] as string) ?? ""}
                 onChange={(e) => setAnswers((a) => ({ ...a, [field.key]: e.target.value }))}
@@ -140,7 +140,7 @@ export function FillFormSheet({
                     {option}
                   </option>
                 ))}
-              </SelectInput>
+              </CustomDropdown>
             </Field>
           );
         }

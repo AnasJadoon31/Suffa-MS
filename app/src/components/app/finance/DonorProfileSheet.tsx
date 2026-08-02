@@ -1,7 +1,7 @@
-import { Download, X } from "lucide-react";
+import { Download } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-import { Card, EmptyState, SkeletonList } from "@/components/app/Primitives";
+import { Card, EmptyState, SkeletonList, ManagedSheet } from "@/components/app/Primitives";
 import { financeApi, financeMutations } from "@/lib/mms/more-endpoints";
 
 function money(amount: number, currency?: string) {
@@ -18,18 +18,14 @@ export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClo
   const total = (profile.data?.donations ?? []).reduce((sum, d) => sum + Number(d.amount ?? 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40" onClick={onClose}>
-      <div
-        className="max-h-[88vh] overflow-y-auto rounded-t-3xl border-t border-border bg-card px-4 pb-8 pt-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-extrabold">{profile.data?.name ?? "Donor"}</h2>
-          <button onClick={onClose} aria-label="Close" className="rounded-full bg-muted p-2">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        {profile.isLoading ? (
+    <ManagedSheet
+      open={true}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={profile.data?.name ?? "Donor"}
+    >
+      {profile.isLoading ? (
           <SkeletonList rows={3} />
         ) : profile.data ? (
           <div className="space-y-3">
@@ -80,7 +76,6 @@ export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClo
         ) : (
           <EmptyState title="Couldn't load donor" />
         )}
-      </div>
-    </div>
+    </ManagedSheet>
   );
 }

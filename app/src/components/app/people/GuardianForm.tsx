@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { FormSheet } from "@/components/app/FormSheet";
-import { Field, SelectInput, TextInput } from "@/components/app/Primitives";
+import { Field, CustomDropdown, TextInput } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
 import { peopleApi } from "@/lib/mms/endpoints";
 import { peopleMutations, type GuardianDetail } from "@/lib/mms/more-endpoints";
@@ -67,7 +67,7 @@ export function GuardianForm({
       setAddress("");
       setStudents([]);
     }
-    void client.invalidateQueries({ queryKey: ["people", "guardians"] });
+    void client.invalidateQueries({ queryKey: ["people"] });
   }
 
   return (
@@ -88,7 +88,7 @@ export function GuardianForm({
         />
       </Field>
       <Field label="Relationship *">
-        <SelectInput
+        <CustomDropdown
           required
           value={relationship}
           onChange={(e) => setRelationship(e.target.value)}
@@ -97,7 +97,7 @@ export function GuardianForm({
           <option value="mother">Mother</option>
           <option value="guardian">Guardian</option>
           <option value="other">Other</option>
-        </SelectInput>
+        </CustomDropdown>
       </Field>
       <Field label="Phone number(s) *">
         <TextInput
@@ -119,10 +119,10 @@ export function GuardianForm({
         />
       </Field>
       <Field label="Preferred language">
-        <SelectInput value={lang} onChange={(e) => setLang(e.target.value)}>
+        <CustomDropdown value={lang} onChange={(e) => setLang(e.target.value)}>
           <option value="en">English</option>
           <option value="ur">Urdu</option>
-        </SelectInput>
+        </CustomDropdown>
       </Field>
       {!isEdit ? (
         <MultiPicker

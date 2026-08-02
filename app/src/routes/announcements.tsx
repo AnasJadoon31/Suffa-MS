@@ -1,23 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Megaphone, Search, Trash2 } from "lucide-react";
+import { Edit2, Megaphone, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
-import { FormSheet } from "@/components/app/FormSheet";
 import {
-  Card,
-  EmptyState,
-  Field,
-  Pill,
-  SelectInput,
-  SkeletonList,
-  TextInput,
-} from "@/components/app/Primitives";
+  AnnouncementFormFields,
+  type AnnouncementFormValues,
+} from "@/components/app/content/AnnouncementFormFields";
+import { FormSheet } from "@/components/app/FormSheet";
+import { Card, EmptyState, Field, Pill, CustomDropdown, SkeletonList, TextInput } from "@/components/app/Primitives";
 import { RichText } from "@/components/app/RichText";
-import { RichTextEditor } from "@/components/app/RichTextEditor";
 import { useAuth } from "@/lib/mms/auth";
+import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import { opsApi, opsMutations } from "@/lib/mms/more-endpoints";
 
 export const Route = createFileRoute("/announcements")({
@@ -62,38 +57,44 @@ function AnnouncementsPage() {
     queryFn: () => opsApi.listAnnouncements(filterParams),
   });
   const items = query.data ?? [];
+  const [editing, setEditing] = useState<(typeof items)[number] | null>(null);
 
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [category, setCategory] = useState("");
-  const [audience, setAudience] = useState("all");
-  const [link, setLink] = useState("");
+  const [form, setForm] = useState<AnnouncementFormValues>({
+    title: "",
+    body: "",
+    category: "",
+    audience: "all",
+    link: "",
+  });
 
   const create = useMutation({
     mutationFn: () =>
       opsMutations.createAnnouncement({
-        title: title.trim(),
-        body: body.trim(),
-        ...(category.trim() ? { category: category.trim() } : {}),
-        ...(link.trim() ? { attachment_link: link.trim() } : {}),
-        audience_scope: audience === "all" ? { all: true } : { all: false, roles: [audience] },
+        title: form.title.trim(),
+        body: form.body.trim(),
+        ...(form.category.trim() ? { category: form.category.trim() } : {}),
+        ...(form.link.trim() ? { attachment_link: form.link.trim() } : {}),
+        audience_scope:
+          form.audience === "all" ? { all: true } : { all: false, roles: [form.audience] },
       }),
-    onSuccess: () => {
-      toast.success("Announcement published");
-      setTitle("");
-      setBody("");
-      setCategory("");
-      setLink("");
-      void client.invalidateQueries({ queryKey: ["announcements"] });
-    },
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Announcement published",
+        queryKeys: [["announcements"]],
+        afterSuccess: () =>
+          setForm({ title: "", body: "", category: "", audience: "all", link: "" }),
+      }),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => opsMutations.deleteAnnouncement(id),
-    onSuccess: () => {
-      toast.success("Deleted");
-      void client.invalidateQueries({ queryKey: ["announcements"] });
-    },
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Deleted",
+        queryKeys: [["announcements"]],
+      }),
   });
 
   return (
@@ -108,34 +109,10 @@ function AnnouncementsPage() {
             submitLabel="Publish"
             onSubmit={() => create.mutateAsync()}
           >
-            <Field label="Title">
-              <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} />
-            </Field>
-            <Field label="Message">
-              <RichTextEditor value={body} onChange={setBody} placeholder="Write the notice…" />
-            </Field>
-            <Field label="Category">
-              <TextInput
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="General"
-              />
-            </Field>
-            <Field label="Audience">
-              <SelectInput value={audience} onChange={(e) => setAudience(e.target.value)}>
-                <option value="all">Everyone</option>
-                <option value="teacher">Teachers</option>
-                <option value="student">Students</option>
-                <option value="parent">Guardians</option>
-              </SelectInput>
-            </Field>
-            <Field label="Attachment link">
-              <TextInput
-                value={link}
-                onChange={(e) => setLink(e.target.value)}
-                placeholder="https://"
-              />
-            </Field>
+            <AnnouncementFormFields
+              values={form}
+              onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+            />
           </FormSheet>
         ) : undefined
       }
@@ -152,14 +129,14 @@ function AnnouncementsPage() {
         </div>
         <div className="grid grid-cols-2 gap-2.5">
           <Field label="Audience">
-            <SelectInput
+            <CustomDropdown
               value={audienceFilter}
               onChange={(e) => setAudienceFilter(e.target.value as typeof audienceFilter)}
             >
               <option value="all">All</option>
               <option value="teachers">Teachers</option>
               <option value="students">Students</option>
-            </SelectInput>
+            </CustomDropdown>
           </Field>
           <Field label="Category">
             <TextInput
@@ -210,18 +187,91 @@ function AnnouncementsPage() {
                 </a>
               ) : null}
               {canManage ? (
-                <button
-                  onClick={() => remove.mutate(item.id)}
-                  className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </button>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={() => setEditing(item)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
+                  >
+                    <Edit2 className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => remove.mutate(item.id)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </button>
+                </div>
               ) : null}
             </div>
           </Card>
         ))}
       </div>
+
+      {editing ? (
+        <EditAnnouncementSheet announcement={editing} onClose={() => setEditing(null)} />
+      ) : null}
     </AppShell>
+  );
+}
+
+function EditAnnouncementSheet({
+  announcement,
+  onClose,
+}: {
+  announcement: {
+    id: string;
+    title: string;
+    body: string;
+    category: string | null;
+    attachment_link: string | null;
+    audience_scope: { all?: boolean; roles?: string[] };
+  };
+  onClose: () => void;
+}) {
+  const client = useQueryClient();
+  const [form, setForm] = useState<AnnouncementFormValues>({
+    title: announcement.title,
+    body: announcement.body,
+    category: announcement.category ?? "",
+    link: announcement.attachment_link ?? "",
+    audience: announcement.audience_scope?.all
+      ? "all"
+      : announcement.audience_scope?.roles?.[0] ?? "all",
+  });
+
+  const update = useMutation({
+    mutationFn: () =>
+      opsMutations.updateAnnouncement(announcement.id, {
+        title: form.title.trim(),
+        body: form.body.trim(),
+        category: form.category.trim() || undefined,
+        attachment_link: form.link.trim() || undefined,
+        audience_scope:
+          form.audience === "all" ? { all: true } : { all: false, roles: [form.audience] },
+      }),
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Announcement updated",
+        queryKeys: [["announcements"]],
+        afterSuccess: onClose,
+      }),
+  });
+
+  return (
+    <FormSheet
+      title="Edit announcement"
+      submitLabel="Save changes"
+      open
+      onOpenChange={(next) => !next && onClose()}
+      onSubmit={() => update.mutateAsync()}
+    >
+      <AnnouncementFormFields
+        values={form}
+        onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+      />
+    </FormSheet>
   );
 }

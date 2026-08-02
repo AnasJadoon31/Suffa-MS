@@ -13,7 +13,7 @@ import {
   EmptyState,
   Field,
   SectionTitle,
-  SelectInput,
+  CustomDropdown,
   SkeletonList,
   StatCard,
   TextInput,
@@ -285,7 +285,7 @@ function FinancePage() {
         onSubmit={() => createPayment.mutateAsync()}
       >
         <Field label="Student">
-          <SelectInput
+          <CustomDropdown
             required
             value={payStudentId}
             onChange={(e) => setPayStudentId(e.target.value)}
@@ -296,10 +296,10 @@ function FinancePage() {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="Category">
-          <SelectInput
+          <CustomDropdown
             required
             value={payCategoryId}
             onChange={(e) => setPayCategoryId(e.target.value)}
@@ -310,7 +310,7 @@ function FinancePage() {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Amount">
@@ -344,17 +344,17 @@ function FinancePage() {
         onSubmit={() => createDonation.mutateAsync()}
       >
         <Field label="Donor">
-          <SelectInput required value={donDonorId} onChange={(e) => setDonDonorId(e.target.value)}>
+          <CustomDropdown required value={donDonorId} onChange={(e) => setDonDonorId(e.target.value)}>
             <option value="">Select donor</option>
             {(donors.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="Category">
-          <SelectInput
+          <CustomDropdown
             required
             value={donCategoryId}
             onChange={(e) => setDonCategoryId(e.target.value)}
@@ -365,7 +365,7 @@ function FinancePage() {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Amount">
@@ -489,7 +489,7 @@ function FinancePage() {
         <>
           <Card className="mt-4 grid grid-cols-2 gap-3 p-3.5">
             <Field label="Class">
-              <SelectInput
+              <CustomDropdown
                 value={paymentClassId}
                 onChange={(e) => setPaymentClassId(e.target.value)}
               >
@@ -499,10 +499,10 @@ function FinancePage() {
                     {c.name}
                   </option>
                 ))}
-              </SelectInput>
+              </CustomDropdown>
             </Field>
             <Field label="Category">
-              <SelectInput
+              <CustomDropdown
                 value={paymentCategoryId}
                 onChange={(e) => setPaymentCategoryId(e.target.value)}
               >
@@ -512,11 +512,11 @@ function FinancePage() {
                     {c.name}
                   </option>
                 ))}
-              </SelectInput>
+              </CustomDropdown>
             </Field>
             {canManage ? (
               <Field label="Student">
-                <SelectInput
+                <CustomDropdown
                   value={paymentStudentId}
                   onChange={(e) => setPaymentStudentId(e.target.value)}
                   className="col-span-2"
@@ -527,7 +527,7 @@ function FinancePage() {
                       {s.name}
                     </option>
                   ))}
-                </SelectInput>
+                </CustomDropdown>
               </Field>
             ) : null}
           </Card>
@@ -562,7 +562,7 @@ function FinancePage() {
         <>
           <Card className="mt-4 grid grid-cols-2 gap-3 p-3.5">
             <Field label="Donor">
-              <SelectInput
+              <CustomDropdown
                 value={donationDonorId}
                 onChange={(e) => setDonationDonorId(e.target.value)}
               >
@@ -572,10 +572,10 @@ function FinancePage() {
                     {d.name}
                   </option>
                 ))}
-              </SelectInput>
+              </CustomDropdown>
             </Field>
             <Field label="Category">
-              <SelectInput
+              <CustomDropdown
                 value={donationCategoryId}
                 onChange={(e) => setDonationCategoryId(e.target.value)}
               >
@@ -585,7 +585,7 @@ function FinancePage() {
                     {c.name}
                   </option>
                 ))}
-              </SelectInput>
+              </CustomDropdown>
             </Field>
           </Card>
           <SectionTitle

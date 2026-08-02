@@ -1,23 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, Newspaper, Search, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit2, Newspaper, Search, Send, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { BlogPostFormFields, type BlogPostFormValues } from "@/components/app/content/BlogPostFormFields";
 import { FormSheet } from "@/components/app/FormSheet";
-import {
-  Card,
-  EmptyState,
-  Field,
-  Pill,
-  Segmented,
-  SkeletonList,
-  TextInput,
-} from "@/components/app/Primitives";
+import { Card, EmptyState, Pill, Segmented, SkeletonList, TextInput } from "@/components/app/Primitives";
 import { RichText } from "@/components/app/RichText";
-import { RichTextEditor } from "@/components/app/RichTextEditor";
 import { useAuth } from "@/lib/mms/auth";
+import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import { opsApi, opsMutations, type BlogPost } from "@/lib/mms/more-endpoints";
 
 export const Route = createFileRoute("/blog")({
@@ -57,36 +49,41 @@ function BlogPage() {
   }, [items, search]);
 
   const [active, setActive] = useState<BlogPost | null>(null);
+  const [editing, setEditing] = useState<BlogPost | null>(null);
 
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  const [form, setForm] = useState<BlogPostFormValues>({ title: "", body: "" });
 
   const create = useMutation({
     mutationFn: (published: boolean) =>
-      opsMutations.createBlogPost({ title: title.trim(), body: body.trim(), published }),
-    onSuccess: () => {
-      toast.success("Post saved");
-      setTitle("");
-      setBody("");
-      void client.invalidateQueries({ queryKey: ["blog"] });
-    },
+      opsMutations.createBlogPost({ title: form.title.trim(), body: form.body.trim(), published }),
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Post saved",
+        queryKeys: [["blog"]],
+        afterSuccess: () => setForm({ title: "", body: "" }),
+      }),
   });
 
   const publish = useMutation({
     mutationFn: (id: string) => opsMutations.publishBlogPost(id),
-    onSuccess: () => {
-      toast.success("Published");
-      void client.invalidateQueries({ queryKey: ["blog"] });
-    },
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Published",
+        queryKeys: [["blog"]],
+      }),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => opsMutations.deleteBlogPost(id),
-    onSuccess: () => {
-      toast.success("Deleted");
-      setActive(null);
-      void client.invalidateQueries({ queryKey: ["blog"] });
-    },
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Deleted",
+        queryKeys: [["blog"]],
+        afterSuccess: () => setActive(null),
+      }),
   });
 
   if (active) {
@@ -117,6 +114,13 @@ function BlogPage() {
           <RichText html={active.body} />
           {canManage ? (
             <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setEditing(active)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+                Edit
+              </button>
               {!active.published ? (
                 <button
                   onClick={() => publish.mutate(active.id)}
@@ -152,12 +156,10 @@ function BlogPage() {
             submitLabel="Save draft"
             onSubmit={() => create.mutateAsync(false)}
           >
-            <Field label="Title">
-              <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} />
-            </Field>
-            <Field label="Body">
-              <RichTextEditor value={body} onChange={setBody} placeholder="Write your post…" />
-            </Field>
+            <BlogPostFormFields
+              values={form}
+              onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+            />
           </FormSheet>
         ) : undefined
       }
@@ -208,6 +210,13 @@ function BlogPage() {
             </button>
             {canManage ? (
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setEditing(post)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                  Edit
+                </button>
                 {!post.published ? (
                   <button
                     onClick={() => publish.mutate(post.id)}
@@ -229,6 +238,43 @@ function BlogPage() {
           </Card>
         ))}
       </div>
+
+      {editing ? <EditBlogSheet post={editing} onClose={() => setEditing(null)} /> : null}
     </AppShell>
+  );
+}
+
+function EditBlogSheet({ post, onClose }: { post: BlogPost; onClose: () => void }) {
+  const client = useQueryClient();
+  const [form, setForm] = useState<BlogPostFormValues>({ title: post.title, body: post.body });
+
+  const update = useMutation({
+    mutationFn: () =>
+      opsMutations.updateBlogPost(post.id, {
+        title: form.title.trim(),
+        body: form.body.trim(),
+      }),
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Post updated",
+        queryKeys: [["blog"]],
+        afterSuccess: onClose,
+      }),
+  });
+
+  return (
+    <FormSheet
+      title="Edit post"
+      submitLabel="Save changes"
+      open
+      onOpenChange={(next) => !next && onClose()}
+      onSubmit={() => update.mutateAsync()}
+    >
+      <BlogPostFormFields
+        values={form}
+        onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+      />
+    </FormSheet>
   );
 }

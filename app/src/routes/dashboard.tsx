@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import {
   BookOpen,
   CalendarClock,
@@ -82,13 +82,43 @@ function DashboardPage() {
       {data?.role === "principal" ? <PrincipalView data={data as PrincipalDashboard} /> : null}
       {data?.role === "teacher" ? <TeacherView data={data as TeacherDashboard} /> : null}
       {data?.role === "student" ? <StudentView data={data as StudentDashboard} /> : null}
-      {data && !["principal", "teacher", "student"].includes(data.role) ? (
-        <EmptyState
-          title="Portal ready"
-          hint="Your role's home view is coming in the next rollout phase."
-        />
-      ) : null}
+      {data && !["principal", "teacher", "student"].includes(data.role) ? <FallbackView /> : null}
     </AppShell>
+  );
+}
+
+function FallbackView() {
+  const shortcuts = [
+    { to: "/attendance", label: "Attendance", hint: "Check daily records and history" },
+    { to: "/forms", label: "Forms", hint: "Open active form workflows" },
+    { to: "/announcements", label: "Announcements", hint: "See current notices" },
+    { to: "/me", label: "My Profile", hint: "Manage your account and session" },
+  ];
+
+  return (
+    <>
+      <EmptyState
+        title="Portal ready"
+        hint="Your role does not have a custom home card yet, but the core routes are available."
+      />
+      <SectionTitle>Shortcuts</SectionTitle>
+      <div className="space-y-2.5">
+        {shortcuts.map((shortcut) => (
+          <Card key={shortcut.to} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+            <div className="min-w-0">
+              <p className="font-semibold">{shortcut.label}</p>
+              <p className="text-xs text-muted-foreground">{shortcut.hint}</p>
+            </div>
+            <Link
+              to={shortcut.to}
+              className="rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
+            >
+              Open
+            </Link>
+          </Card>
+        ))}
+      </div>
+    </>
   );
 }
 

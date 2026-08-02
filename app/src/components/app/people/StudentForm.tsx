@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { FormSheet } from "@/components/app/FormSheet";
-import { Field, SelectInput, TextInput } from "@/components/app/Primitives";
+import { Field, CustomDropdown, TextInput } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
 import { useUsernameProposal } from "./useUsernameProposal";
 import { peopleApi } from "@/lib/mms/endpoints";
@@ -73,7 +73,7 @@ export function StudentForm({
       setGuardians([]);
       usernameField.reset();
     }
-    void client.invalidateQueries({ queryKey: ["people", "students"] });
+    void client.invalidateQueries({ queryKey: ["people"] });
   }
 
   return (
@@ -121,10 +121,10 @@ export function StudentForm({
       </Field>
       {!isEdit ? (
         <Field label="Preferred language">
-          <SelectInput value={lang} onChange={(e) => setLang(e.target.value)}>
+          <CustomDropdown value={lang} onChange={(e) => setLang(e.target.value)}>
             <option value="en">English</option>
             <option value="ur">Urdu</option>
-          </SelectInput>
+          </CustomDropdown>
         </Field>
       ) : null}
       <label className="flex items-center gap-2 text-sm font-semibold">

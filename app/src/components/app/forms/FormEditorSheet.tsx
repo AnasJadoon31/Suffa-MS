@@ -8,7 +8,7 @@ import {
   validateFormFields,
 } from "./FormFieldsEditor";
 import { FormSheet } from "@/components/app/FormSheet";
-import { Field, SelectInput, TextArea, TextInput } from "@/components/app/Primitives";
+import { Field, CustomDropdown, TextArea, TextInput } from "@/components/app/Primitives";
 import { formsApi, type FormDef, type FormFieldDefinition } from "@/lib/mms/more-endpoints";
 
 export function FormEditorSheet({
@@ -93,12 +93,12 @@ export function FormEditorSheet({
         />
       </Field>
       <Field label="Visible to">
-        <SelectInput value={audience} onChange={(e) => setAudience(e.target.value)}>
+        <CustomDropdown value={audience} onChange={(e) => setAudience(e.target.value)}>
           <option value="all">Everyone</option>
           <option value="teacher">Teachers</option>
           <option value="student">Students</option>
           <option value="parent">Guardians</option>
-        </SelectInput>
+        </CustomDropdown>
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Opens">

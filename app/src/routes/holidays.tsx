@@ -1,23 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Palmtree, Trash2 } from "lucide-react";
+import { Edit2, Palmtree, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { HolidayFormFields, type HolidayFormValues } from "@/components/app/content/HolidayFormFields";
 import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
 import {
   Card,
   EmptyState,
-  Field,
   Pill,
-  SelectInput,
+  CustomDropdown,
   SkeletonList,
   TextInput,
 } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi } from "@/lib/mms/endpoints";
+import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import { opsApi, opsMutations } from "@/lib/mms/more-endpoints";
 
 export const Route = createFileRoute("/holidays")({
@@ -69,33 +69,42 @@ function HolidaysPage() {
     Boolean,
   ).length;
 
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
-  const [start, setStart] = useState(today);
-  const [end, setEnd] = useState(today);
+  const [form, setForm] = useState<HolidayFormValues>({
+    name: "",
+    category: "",
+    start: today,
+    end: today,
+    classId: "",
+  });
+  const [editing, setEditing] = useState<(typeof items)[number] | null>(null);
 
   const create = useMutation({
     mutationFn: () =>
       opsMutations.createHoliday({
-        name: name.trim(),
-        start_date: start,
-        end_date: end,
-        ...(category.trim() ? { category: category.trim() } : {}),
+        name: form.name.trim(),
+        start_date: form.start,
+        end_date: form.end,
+        ...(form.category.trim() ? { category: form.category.trim() } : {}),
+        ...(form.classId ? { class_ids: [form.classId] } : {}),
       }),
-    onSuccess: () => {
-      toast.success("Holiday added");
-      setName("");
-      setCategory("");
-      void client.invalidateQueries({ queryKey: ["holidays"] });
-    },
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Holiday added",
+        queryKeys: [["holidays"]],
+        afterSuccess: () =>
+          setForm({ name: "", category: "", start: today, end: today, classId: "" }),
+      }),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => opsMutations.deleteHoliday(id),
-    onSuccess: () => {
-      toast.success("Holiday removed");
-      void client.invalidateQueries({ queryKey: ["holidays"] });
-    },
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Holiday removed",
+        queryKeys: [["holidays"]],
+      }),
   });
 
   return (
@@ -105,41 +114,18 @@ function HolidaysPage() {
       right={
         canManage ? (
           <FormSheet title="New holiday" triggerLabel="Add" onSubmit={() => create.mutateAsync()}>
-            <Field label="Name">
-              <TextInput required value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            <Field label="Category">
-              <TextInput
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Public / Religious"
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Start">
-                <TextInput
-                  type="date"
-                  required
-                  value={start}
-                  onChange={(e) => setStart(e.target.value)}
-                />
-              </Field>
-              <Field label="End">
-                <TextInput
-                  type="date"
-                  required
-                  value={end}
-                  onChange={(e) => setEnd(e.target.value)}
-                />
-              </Field>
-            </div>
+            <HolidayFormFields
+              values={form}
+              classOptions={classes.data ?? []}
+              onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+            />
           </FormSheet>
         ) : undefined
       }
     >
       <FilterBar activeCount={activeCount} onClear={() => setFilters(emptyFilters)}>
         <Field label="Category">
-          <SelectInput
+          <CustomDropdown
             value={filters.category}
             onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
           >
@@ -149,10 +135,10 @@ function HolidaysPage() {
                 {cat}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="Class">
-          <SelectInput
+          <CustomDropdown
             value={filters.classId}
             onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value }))}
           >
@@ -162,7 +148,7 @@ function HolidaysPage() {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="From">
@@ -205,13 +191,22 @@ function HolidaysPage() {
                 </p>
               </div>
               {canManage ? (
-                <button
-                  aria-label="Delete holiday"
-                  onClick={() => remove.mutate(item.id)}
-                  className="grid h-9 w-9 place-items-center rounded-xl bg-destructive/10 text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    aria-label="Edit holiday"
+                    onClick={() => setEditing(item)}
+                    className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    aria-label="Delete holiday"
+                    onClick={() => remove.mutate(item.id)}
+                    className="grid h-9 w-9 place-items-center rounded-xl bg-destructive/10 text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               ) : (
                 <Pill tone={upcoming ? "success" : "muted"}>{upcoming ? "Upcoming" : "Past"}</Pill>
               )}
@@ -219,6 +214,70 @@ function HolidaysPage() {
           );
         })}
       </div>
+
+      {editing ? (
+        <EditHolidaySheet holiday={editing} classes={classes.data ?? []} onClose={() => setEditing(null)} />
+      ) : null}
     </AppShell>
+  );
+}
+
+function EditHolidaySheet({
+  holiday,
+  classes,
+  onClose,
+}: {
+  holiday: {
+    id: string;
+    name: string;
+    category: string | null;
+    start_date: string;
+    end_date: string;
+    class_ids: string[] | null;
+  };
+  classes: { id: string; name: string }[];
+  onClose: () => void;
+}) {
+  const client = useQueryClient();
+  const [form, setForm] = useState<HolidayFormValues>({
+    name: holiday.name,
+    category: holiday.category ?? "",
+    start: holiday.start_date,
+    end: holiday.end_date,
+    classId: holiday.class_ids?.[0] ?? "",
+  });
+
+  const update = useMutation({
+    mutationFn: () =>
+      opsMutations.updateHoliday(holiday.id, {
+        name: form.name.trim(),
+        category: form.category.trim() || null,
+        start_date: form.start,
+        end_date: form.end,
+        class_ids: form.classId ? [form.classId] : null,
+      }),
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Holiday updated",
+        queryKeys: [["holidays"]],
+        afterSuccess: onClose,
+      }),
+  });
+
+  return (
+    <FormSheet
+      title="Edit holiday"
+      submitLabel="Save changes"
+      open
+      onOpenChange={(next) => !next && onClose()}
+      onSubmit={() => update.mutateAsync()}
+    >
+      <HolidayFormFields
+        values={form}
+        classOptions={classes}
+        onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+      />
+    </FormSheet>
   );
 }

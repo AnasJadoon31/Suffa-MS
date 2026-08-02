@@ -27,7 +27,14 @@ import {
   type HolidayMarkers,
   type StudentDayStatus,
 } from "@/components/app/AttendanceCalendar";
-import { Card, EmptyState, Pill, SectionTitle, SkeletonList } from "@/components/app/Primitives";
+import {
+  Card,
+  CustomDropdown,
+  EmptyState,
+  Pill,
+  SectionTitle,
+  SkeletonList,
+} from "@/components/app/Primitives";
 import { cn } from "@/lib/utils";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { useAuth } from "@/lib/mms/auth";
@@ -38,6 +45,7 @@ import {
   type AttendanceStatus,
   type AttendanceSyncEntry,
 } from "@/lib/mms/endpoints";
+import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 
 export const Route = createFileRoute("/attendance")({
   head: () => ({
@@ -716,17 +724,17 @@ function Select({
       <span className="shrink-0 text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
-      <select
+      <CustomDropdown
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-0 flex-1 bg-transparent text-right text-sm font-semibold outline-none"
+        className="min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-right text-sm font-semibold shadow-none focus:border-0"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
-      </select>
+      </CustomDropdown>
     </label>
   );
 }
@@ -749,11 +757,12 @@ function TeacherAttendancePanel() {
   const check = useMutation({
     mutationFn: (action: "in" | "out") =>
       action === "in" ? attendanceApi.teacherCheckIn() : attendanceApi.teacherCheckOut(),
-    onSuccess: () => {
-      toast.success("Saved");
-      void queryClient.invalidateQueries({ queryKey: ["teacher-attendance-today"] });
-      void queryClient.invalidateQueries({ queryKey: ["teacher-attendance-history"] });
-    },
+    onSuccess: () =>
+      applyMutationSuccess({
+        client: queryClient,
+        message: "Saved",
+        queryKeys: [["teacher-attendance-today"], ["teacher-attendance-history"]],
+      }),
     onError: (error) => toast.error(apiErrorMessage(error, "Couldn't update attendance")),
   });
 

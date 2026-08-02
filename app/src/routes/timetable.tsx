@@ -25,7 +25,7 @@ import {
   Field,
   Pill,
   SectionTitle,
-  SelectInput,
+  CustomDropdown,
   SkeletonList,
   TextArea,
   TextInput,
@@ -215,14 +215,14 @@ function MineView() {
       {classOptions.length > 1 ? (
         <div className="mb-3">
           <Field label="Class">
-            <SelectInput value={classId} onChange={(e) => setClassId(e.target.value)}>
+            <CustomDropdown value={classId} onChange={(e) => setClassId(e.target.value)}>
               <option value="">All classes</option>
               {classOptions.map(([id, name]) => (
                 <option key={id} value={id}>
                   {name}
                 </option>
               ))}
-            </SelectInput>
+            </CustomDropdown>
           </Field>
         </div>
       ) : null}
@@ -279,7 +279,7 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
     <>
       <div className="mb-3 grid grid-cols-2 gap-2">
         <Field label="Class">
-          <SelectInput
+          <CustomDropdown
             value={classId}
             onChange={(e) => {
               setClassId(e.target.value);
@@ -292,10 +292,10 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="Section">
-          <SelectInput
+          <CustomDropdown
             value={sectionId}
             disabled={!classId}
             onChange={(e) => setSectionId(e.target.value)}
@@ -306,7 +306,7 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
       </div>
 
@@ -418,7 +418,7 @@ function ListView({ canManage }: { canManage: boolean }) {
 
       <div className="mb-3 grid grid-cols-2 gap-2">
         <Field label="Class">
-          <SelectInput
+          <CustomDropdown
             value={filters.class_id}
             onChange={(e) => setFilters({ ...filters, class_id: e.target.value, section_id: "" })}
           >
@@ -428,10 +428,10 @@ function ListView({ canManage }: { canManage: boolean }) {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="Section">
-          <SelectInput
+          <CustomDropdown
             value={filters.section_id}
             disabled={!filters.class_id}
             onChange={(e) => setFilters({ ...filters, section_id: e.target.value })}
@@ -442,10 +442,10 @@ function ListView({ canManage }: { canManage: boolean }) {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="Course">
-          <SelectInput
+          <CustomDropdown
             value={filters.course_id}
             onChange={(e) => setFilters({ ...filters, course_id: e.target.value })}
           >
@@ -455,10 +455,10 @@ function ListView({ canManage }: { canManage: boolean }) {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="Teacher">
-          <SelectInput
+          <CustomDropdown
             value={filters.teacher_id}
             onChange={(e) => setFilters({ ...filters, teacher_id: e.target.value })}
           >
@@ -468,10 +468,10 @@ function ListView({ canManage }: { canManage: boolean }) {
                 {item.name}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="Day">
-          <SelectInput
+          <CustomDropdown
             value={filters.day}
             onChange={(e) => setFilters({ ...filters, day: e.target.value })}
           >
@@ -481,7 +481,7 @@ function ListView({ canManage }: { canManage: boolean }) {
                 {day}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
       </div>
 
@@ -562,7 +562,7 @@ function AddSlotSheet() {
       onSubmit={submit}
     >
       <Field label="Class">
-        <SelectInput
+        <CustomDropdown
           value={form.class_id}
           onChange={(e) =>
             setForm({ ...form, class_id: e.target.value, section_id: "", course_id: "" })
@@ -574,10 +574,10 @@ function AddSlotSheet() {
               {item.name}
             </option>
           ))}
-        </SelectInput>
+        </CustomDropdown>
       </Field>
       <Field label="Section">
-        <SelectInput
+        <CustomDropdown
           value={form.section_id}
           disabled={!form.class_id}
           onChange={(e) => setForm({ ...form, section_id: e.target.value })}
@@ -588,10 +588,10 @@ function AddSlotSheet() {
               {item.name}
             </option>
           ))}
-        </SelectInput>
+        </CustomDropdown>
       </Field>
       <Field label="Course">
-        <SelectInput
+        <CustomDropdown
           value={form.course_id}
           disabled={!form.class_id}
           onChange={(e) => setForm({ ...form, course_id: e.target.value })}
@@ -602,10 +602,10 @@ function AddSlotSheet() {
               {item.name}
             </option>
           ))}
-        </SelectInput>
+        </CustomDropdown>
       </Field>
       <Field label="Teacher">
-        <SelectInput
+        <CustomDropdown
           value={form.teacher_id}
           onChange={(e) => setForm({ ...form, teacher_id: e.target.value })}
         >
@@ -615,10 +615,10 @@ function AddSlotSheet() {
               {item.name}
             </option>
           ))}
-        </SelectInput>
+        </CustomDropdown>
       </Field>
       <Field label="Day">
-        <SelectInput
+        <CustomDropdown
           value={form.day_of_week}
           onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}
         >
@@ -627,7 +627,7 @@ function AddSlotSheet() {
               {day}
             </option>
           ))}
-        </SelectInput>
+        </CustomDropdown>
       </Field>
       <Field label="Start time">
         <TextInput

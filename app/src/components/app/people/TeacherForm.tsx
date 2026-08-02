@@ -80,7 +80,7 @@ export function TeacherForm({
       setDelegate(false);
       usernameField.reset();
     }
-    void client.invalidateQueries({ queryKey: ["people", "teachers"] });
+    void client.invalidateQueries({ queryKey: ["people"] });
   }
 
   return (

@@ -1,25 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { FileText, Trash2, Video } from "lucide-react";
+import { Download, Edit2, FileText, Trash2, Upload, Video } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { ResourceFormFields, type ResourceFormValues } from "@/components/app/content/ResourceFormFields";
 import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
 import {
   Card,
   EmptyState,
-  Field,
-  SelectInput,
+  CustomDropdown,
   SkeletonList,
-  TextArea,
   TextInput,
 } from "@/components/app/Primitives";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi } from "@/lib/mms/endpoints";
-import { academicsExtraApi, opsApi, opsMutations } from "@/lib/mms/more-endpoints";
+import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
+import {
+  academicsExtraApi,
+  filesApi,
+  opsApi,
+  opsMutations,
+  uploadFile,
+  type ResourceItem,
+} from "@/lib/mms/more-endpoints";
 
 export const Route = createFileRoute("/resources")({
   head: () => ({
@@ -78,11 +85,15 @@ function ResourcesPage() {
     Boolean,
   ).length;
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [formCategory, setFormCategory] = useState("");
+  const [form, setForm] = useState<ResourceFormValues>({
+    categoryId: "",
+    title: "",
+    description: "",
+    videoUrl: "",
+    file: null,
+  });
   const [newCategory, setNewCategory] = useState("");
+  const [editing, setEditing] = useState<ResourceItem | null>(null);
 
   const createCategory = useMutation({
     mutationFn: () => opsMutations.createResourceCategory(newCategory.trim()),
@@ -95,28 +106,32 @@ function ResourcesPage() {
   });
 
   const createResource = useMutation({
-    mutationFn: () =>
+    mutationFn: async () =>
       opsMutations.createResource({
-        category_id: formCategory,
-        title: title.trim(),
-        ...(description.trim() ? { description: description.trim() } : {}),
-        ...(videoUrl.trim() ? { video_url: videoUrl.trim() } : {}),
+        category_id: form.categoryId,
+        title: form.title.trim(),
+        ...(form.description.trim() ? { description: form.description.trim() } : {}),
+        ...(form.videoUrl.trim() ? { video_url: form.videoUrl.trim() } : {}),
+        ...(form.file ? { file_key: await uploadFile(form.file, "resources") } : {}),
       }),
-    onSuccess: () => {
-      toast.success("Resource shared");
-      setTitle("");
-      setDescription("");
-      setVideoUrl("");
-      void client.invalidateQueries({ queryKey: ["resources"] });
-    },
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Resource shared",
+        queryKeys: [["resources"]],
+        afterSuccess: () =>
+          setForm({ categoryId: "", title: "", description: "", videoUrl: "", file: null }),
+      }),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => opsMutations.deleteResource(id),
-    onSuccess: () => {
-      toast.success("Removed");
-      void client.invalidateQueries({ queryKey: ["resources"] });
-    },
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Removed",
+        queryKeys: [["resources"]],
+      }),
   });
 
   return (
@@ -131,50 +146,30 @@ function ResourcesPage() {
             submitLabel="Share"
             onSubmit={() => createResource.mutateAsync()}
           >
-            <Field label="Category">
-              <SelectInput
-                required
-                value={formCategory}
-                onChange={(e) => setFormCategory(e.target.value)}
-              >
-                <option value="">Select category</option>
-                {(categories.data ?? []).map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </SelectInput>
-            </Field>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
-              <Field label="New category">
-                <TextInput
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  placeholder="e.g. Tajweed notes"
-                />
-              </Field>
-              <button
-                type="button"
-                disabled={!newCategory.trim()}
-                onClick={() => createCategory.mutate()}
-                className="rounded-2xl bg-muted px-3.5 py-2.5 text-sm font-bold disabled:opacity-50"
-              >
-                Add
-              </button>
-            </div>
-            <Field label="Title">
-              <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} />
-            </Field>
-            <Field label="Description">
-              <TextArea value={description} onChange={(e) => setDescription(e.target.value)} />
-            </Field>
-            <Field label="Video link">
-              <TextInput
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="https://"
-              />
-            </Field>
+            <ResourceFormFields
+              values={form}
+              categories={categories.data ?? []}
+              onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+              categoryComposer={
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                  <Field label="New category">
+                    <TextInput
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      placeholder="e.g. Tajweed notes"
+                    />
+                  </Field>
+                  <button
+                    type="button"
+                    disabled={!newCategory.trim()}
+                    onClick={() => createCategory.mutate()}
+                    className="rounded-2xl bg-muted px-3.5 py-2.5 text-sm font-bold disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </div>
+              }
+            />
           </FormSheet>
         ) : undefined
       }
@@ -199,7 +194,7 @@ function ResourcesPage() {
       >
         <div className="grid grid-cols-2 gap-3">
           <Field label="Class">
-            <SelectInput
+            <CustomDropdown
               value={extra.classId}
               onChange={(e) => setExtra((f) => ({ ...f, classId: e.target.value, sectionId: "" }))}
             >
@@ -209,10 +204,10 @@ function ResourcesPage() {
                   {item.name}
                 </option>
               ))}
-            </SelectInput>
+            </CustomDropdown>
           </Field>
           <Field label="Section">
-            <SelectInput
+            <CustomDropdown
               value={extra.sectionId}
               disabled={!extra.classId}
               onChange={(e) => setExtra((f) => ({ ...f, sectionId: e.target.value }))}
@@ -223,7 +218,7 @@ function ResourcesPage() {
                   {item.name}
                 </option>
               ))}
-            </SelectInput>
+            </CustomDropdown>
           </Field>
         </div>
         <label className="flex items-center gap-2 text-sm font-semibold">
@@ -269,22 +264,106 @@ function ResourcesPage() {
                   Watch
                 </a>
               ) : null}
+              {item.file_key ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const url = await filesApi.presignDownload(item.file_key!);
+                    window.open(url, "_blank", "noopener,noreferrer");
+                  }}
+                  className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-primary underline underline-offset-4"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Open file
+                </button>
+              ) : null}
             </div>
             {canManage ? (
-              <button
-                aria-label="Delete resource"
-                onClick={() => remove.mutate(item.id)}
-                className="grid h-9 w-9 place-items-center rounded-xl bg-destructive/10 text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex gap-2">
+                <button
+                  aria-label="Edit resource"
+                  onClick={() => setEditing(item)}
+                  className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+                <button
+                  aria-label="Delete resource"
+                  onClick={() => remove.mutate(item.id)}
+                  className="grid h-9 w-9 place-items-center rounded-xl bg-destructive/10 text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             ) : (
               <span />
             )}
           </Card>
         ))}
       </div>
+
+      {editing ? (
+        <EditResourceSheet
+          resource={editing}
+          categories={categories.data ?? []}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
     </AppShell>
+  );
+}
+
+function EditResourceSheet({
+  resource,
+  categories,
+  onClose,
+}: {
+  resource: ResourceItem;
+  categories: { id: string; name: string }[];
+  onClose: () => void;
+}) {
+  const client = useQueryClient();
+  const [form, setForm] = useState<ResourceFormValues>({
+    title: resource.title,
+    description: resource.description ?? "",
+    videoUrl: resource.video_url ?? "",
+    categoryId: resource.category_id,
+    file: null,
+  });
+
+  const update = useMutation({
+    mutationFn: async () =>
+      opsMutations.updateResource(resource.id, {
+        title: form.title.trim(),
+        category_id: form.categoryId,
+        description: form.description.trim() || undefined,
+        video_url: form.videoUrl.trim() || undefined,
+        ...(form.file ? { file_key: await uploadFile(form.file, "resources") } : {}),
+      }),
+    onSuccess: () =>
+      applyMutationSuccess({
+        client,
+        message: "Resource updated",
+        queryKeys: [["resources"]],
+        afterSuccess: onClose,
+      }),
+  });
+
+  return (
+    <FormSheet
+      title="Edit resource"
+      submitLabel="Save changes"
+      open
+      onOpenChange={(next) => !next && onClose()}
+      onSubmit={() => update.mutateAsync()}
+    >
+      <ResourceFormFields
+        values={form}
+        categories={categories}
+        fileLabel="Replace file"
+        onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+      />
+    </FormSheet>
   );
 }
 

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
-import { Card, SectionTitle } from "@/components/app/Primitives";
+import { Card, CustomDropdown, SectionTitle } from "@/components/app/Primitives";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { reportsApi } from "@/lib/mms/more-endpoints";
@@ -73,30 +73,22 @@ function ReportsPage() {
             className="rounded-xl bg-muted px-3 py-2.5 text-sm outline-none"
           />
         </div>
-        <select
-          value={classId}
-          onChange={(e) => setClassId(e.target.value)}
-          className="w-full rounded-xl bg-muted px-3 py-2.5 text-sm outline-none"
-        >
+        <CustomDropdown value={classId} onChange={(e) => setClassId(e.target.value)}>
           <option value="">Select class</option>
           {(classes.data ?? []).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
             </option>
           ))}
-        </select>
-        <select
-          value={sessionId}
-          onChange={(e) => setSessionId(e.target.value)}
-          className="w-full rounded-xl bg-muted px-3 py-2.5 text-sm outline-none"
-        >
+        </CustomDropdown>
+        <CustomDropdown value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
           <option value="">Select session</option>
           {(sessions.data ?? []).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
             </option>
           ))}
-        </select>
+        </CustomDropdown>
       </Card>
 
       <SectionTitle>Available reports</SectionTitle>

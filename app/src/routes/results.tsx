@@ -1,19 +1,25 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { Download, FileCheck2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
 import {
+  ActionButton,
   Card,
   EmptyState,
+  Field,
   Pill,
   SectionTitle,
+  CustomDropdown,
   SkeletonList,
   StatCard,
 } from "@/components/app/Primitives";
-import { cn } from "@/lib/utils";
 import { academicsApi } from "@/lib/mms/endpoints";
-import { assessmentsApi, academicsExtraApi } from "@/lib/mms/more-endpoints";
+import { useAuth } from "@/lib/mms/auth";
+import { academicsExtraApi, assessmentsApi, reportsApi } from "@/lib/mms/more-endpoints";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/results")({
   head: () => ({
@@ -28,6 +34,16 @@ export const Route = createFileRoute("/results")({
 });
 
 function ResultsPage() {
+  const { user, hasPermission } = useAuth();
+  const isStudent = user?.role === "student";
+  return isStudent || !hasPermission("assessments.results.publish") ? (
+    <StudentResultsView />
+  ) : (
+    <StaffResultsView />
+  );
+}
+
+function StudentResultsView() {
   const [sessionId, setSessionId] = useState<string>("");
 
   const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => academicsApi.listSessions() });
@@ -43,6 +59,11 @@ function ResultsPage() {
     queryFn: () => assessmentsApi.myResult(activeSession),
     enabled: Boolean(activeSession),
     retry: false,
+  });
+
+  const resultCard = useMutation({
+    mutationFn: () => assessmentsApi.downloadMyResultCard(activeSession),
+    onSuccess: () => toast.success("Result card downloaded"),
   });
 
   const courseName = (id: string) => courses.data?.find((c) => c.id === id)?.name ?? "Course";
@@ -87,9 +108,17 @@ function ResultsPage() {
 
           <SectionTitle
             action={
-              <Pill tone={data.published ? "success" : "muted"}>
-                {data.published ? "Published" : "Draft"}
-              </Pill>
+              <div className="flex gap-2">
+                <Pill tone={data.published ? "success" : "muted"}>
+                  {data.published ? "Published" : "Draft"}
+                </Pill>
+                {data.published ? (
+                  <ActionButton variant="soft" onClick={() => resultCard.mutate()}>
+                    <Download className="h-4 w-4" />
+                    Card
+                  </ActionButton>
+                ) : null}
+              </div>
             }
           >
             Course breakdown
@@ -115,6 +144,124 @@ function ResultsPage() {
           </div>
         </>
       ) : null}
+    </AppShell>
+  );
+}
+
+function StaffResultsView() {
+  const client = useQueryClient();
+  const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => academicsApi.listSessions() });
+  const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses() });
+  const [sessionId, setSessionId] = useState("");
+  const [classId, setClassId] = useState("");
+
+  const matrix = useQuery({
+    queryKey: ["results-matrix", sessionId, classId],
+    queryFn: () => assessmentsApi.resultsMatrix({ class_id: classId, session_id: sessionId }),
+    enabled: Boolean(sessionId && classId),
+    retry: false,
+  });
+
+  const publish = useMutation({
+    mutationFn: (studentIds: string[]) => assessmentsApi.publishResults(sessionId, studentIds),
+    onSuccess: async () => {
+      toast.success("Results published");
+      await client.invalidateQueries({ queryKey: ["results-matrix", sessionId, classId] });
+    },
+  });
+
+  const sectionRows = matrix.data?.sections ?? [];
+
+  return (
+    <AppShell title="Results" subtitle="Review and publish class results">
+      <Card className="grid gap-3 p-3.5 md:grid-cols-2">
+        <Field label="Session">
+          <CustomDropdown value={sessionId} onChange={(event) => setSessionId(event.target.value)}>
+            <option value="">Select session</option>
+            {(sessions.data ?? []).map((session) => (
+              <option key={session.id} value={session.id}>
+                {session.name}
+              </option>
+            ))}
+          </CustomDropdown>
+        </Field>
+        <Field label="Class">
+          <CustomDropdown value={classId} onChange={(event) => setClassId(event.target.value)}>
+            <option value="">Select class</option>
+            {(classes.data ?? []).map((academicClass) => (
+              <option key={academicClass.id} value={academicClass.id}>
+                {academicClass.name}
+              </option>
+            ))}
+          </CustomDropdown>
+        </Field>
+      </Card>
+
+      {!sessionId || !classId ? (
+        <EmptyState title="Pick a session and class" hint="The results matrix loads after both." />
+      ) : matrix.isLoading ? (
+        <SkeletonList rows={4} />
+      ) : matrix.isError ? (
+        <EmptyState title="Results unavailable" hint="Check class scope or publication permissions." />
+      ) : sectionRows.length === 0 ? (
+        <EmptyState title="No results found" />
+      ) : (
+        <div className="space-y-5">
+          {sectionRows.map((section) => (
+            <div key={section.section_id}>
+              <SectionTitle
+                action={
+                  <div className="flex gap-2">
+                    <ActionButton
+                      variant="soft"
+                      onClick={() => void reportsApi.results({ class_id: classId, session_id: sessionId }, "pdf")}
+                    >
+                      <Download className="h-4 w-4" />
+                      Export
+                    </ActionButton>
+                    <ActionButton
+                      onClick={() => publish.mutate(section.students.map((student) => student.student_id))}
+                      disabled={publish.isPending}
+                    >
+                      <FileCheck2 className="h-4 w-4" />
+                      Publish section
+                    </ActionButton>
+                  </div>
+                }
+              >
+                {section.class_name} · {section.section_name}
+              </SectionTitle>
+              <div className="space-y-2">
+                {section.students.map((student) => (
+                  <Card key={student.student_id} className="space-y-2 p-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{student.name}</p>
+                        <p className="text-xs text-muted-foreground">{student.admission_number}</p>
+                      </div>
+                      <Pill tone="gold">{student.overall_score ?? "—"}</Pill>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {student.courses.map((course) => {
+                        const courseMeta = section.courses.find((entry) => entry.course_id === course.course_id);
+                        return (
+                          <div key={course.course_id} className="rounded-2xl bg-muted px-3 py-2">
+                            <p className="text-sm font-semibold">{courseMeta?.course_name ?? "Course"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {course.raw_score ?? "—"}
+                              {course.band ? ` · ${course.band}` : ""}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </AppShell>
   );
 }

@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 
-import { Field, SelectInput, TextInput } from "@/components/app/Primitives";
+import { Field, CustomDropdown, TextInput } from "@/components/app/Primitives";
 import type { FormFieldDefinition } from "@/lib/mms/more-endpoints";
 
 const FIELD_TYPES: FormFieldDefinition["type"][] = [
@@ -125,7 +125,7 @@ export function FormFieldsEditor({
           </Field>
 
           <Field label="Type">
-            <SelectInput
+            <CustomDropdown
               value={field.type}
               onChange={(e) => {
                 const type = e.target.value as FormFieldDefinition["type"];
@@ -141,7 +141,7 @@ export function FormFieldsEditor({
                   {type.replace("_", " ")}
                 </option>
               ))}
-            </SelectInput>
+            </CustomDropdown>
           </Field>
 
           {OPTION_TYPES.has(field.type) ? (

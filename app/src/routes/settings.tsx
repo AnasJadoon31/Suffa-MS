@@ -1,13 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Building2, Check, Moon, Settings2, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
-import { Card, EmptyState, SectionTitle, SkeletonList } from "@/components/app/Primitives";
+import {
+  Card,
+  EmptyState,
+  SectionTitle,
+  CustomDropdown,
+  SkeletonList,
+  TextInput,
+} from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
-import { opsApi, opsMutations } from "@/lib/mms/more-endpoints";
+import { opsApi, opsMutations, type TypedMadrasaSetting } from "@/lib/mms/more-endpoints";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -27,8 +34,9 @@ export const Route = createFileRoute("/settings")({
 const THEME_KEY = "mms_theme";
 
 function SettingsPage() {
-  const { madrasa } = useAuth();
+  const { madrasa, hasPermission } = useAuth();
   const [dark, setDark] = useState(false);
+  const canManage = hasPermission("settings.manage");
 
   useEffect(() => {
     const stored = window.localStorage.getItem(THEME_KEY) === "dark";
@@ -44,10 +52,20 @@ function SettingsPage() {
   };
 
   const settings = useQuery({
-    queryKey: ["settings"],
-    queryFn: () => opsApi.listSettings(),
+    queryKey: ["settings-catalog"],
+    queryFn: () => opsApi.listSettingsCatalog(),
     retry: false,
   });
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, TypedMadrasaSetting[]>();
+    for (const setting of settings.data ?? []) {
+      const existing = map.get(setting.category) ?? [];
+      existing.push(setting);
+      map.set(setting.category, existing);
+    }
+    return Array.from(map.entries());
+  }, [settings.data]);
 
   return (
     <AppShell title="Settings" subtitle={madrasa?.name ?? "Suffa MS"}>
@@ -93,31 +111,44 @@ function SettingsPage() {
 
       <SectionTitle>Configuration</SectionTitle>
       {settings.isLoading ? <SkeletonList rows={4} /> : null}
-      {!settings.isLoading && (settings.data ?? []).length === 0 ? (
+      {!settings.isLoading && grouped.length === 0 ? (
         <EmptyState
           title="No settings available"
-          hint="Only administrators can view configuration."
+          hint="Only administrators can change configuration."
         />
       ) : null}
-      <div className="space-y-2">
-        {(settings.data ?? []).map((setting) => (
-          <SettingRow key={setting.id} settingKey={setting.key} value={setting.value} />
+      <div className="space-y-5">
+        {grouped.map(([category, entries]) => (
+          <div key={category}>
+            <SectionTitle>{category}</SectionTitle>
+            <div className="space-y-2">
+              {entries.map((setting) => (
+                <SettingRow key={setting.key} setting={setting} canManage={canManage} />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </AppShell>
   );
 }
 
-function SettingRow({ settingKey, value }: { settingKey: string; value: string }) {
+function SettingRow({
+  setting,
+  canManage,
+}: {
+  setting: TypedMadrasaSetting;
+  canManage: boolean;
+}) {
   const client = useQueryClient();
-  const [draft, setDraft] = useState(value);
-  const dirty = draft !== value;
+  const [draft, setDraft] = useState(setting.value);
+  const dirty = draft !== setting.value;
 
   const save = useMutation({
-    mutationFn: () => opsMutations.updateSetting(settingKey, draft),
+    mutationFn: () => opsMutations.updateSetting(setting.key, draft),
     onSuccess: () => {
       toast.success("Setting saved");
-      void client.invalidateQueries({ queryKey: ["settings"] });
+      void client.invalidateQueries({ queryKey: ["settings-catalog"] });
     },
   });
 
@@ -128,22 +159,44 @@ function SettingRow({ settingKey, value }: { settingKey: string; value: string }
       </span>
       <label className="min-w-0">
         <span className="block truncate text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground">
-          {settingKey}
+          {setting.label}
         </span>
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          className="w-full bg-transparent text-sm font-bold outline-none"
-        />
+        {setting.type === "bool" ? (
+          <CustomDropdown
+            disabled={!canManage}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          >
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+          </CustomDropdown>
+        ) : setting.type === "int" ? (
+          <TextInput
+            disabled={!canManage}
+            type="number"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        ) : (
+          <TextInput
+            disabled={!canManage}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        )}
       </label>
-      <button
-        aria-label="Save setting"
-        disabled={!dirty || save.isPending}
-        onClick={() => save.mutate()}
-        className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary disabled:opacity-40"
-      >
-        <Check className="h-4 w-4" />
-      </button>
+      {canManage ? (
+        <button
+          aria-label="Save setting"
+          disabled={!dirty || save.isPending}
+          onClick={() => save.mutate()}
+          className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary disabled:opacity-40"
+        >
+          <Check className="h-4 w-4" />
+        </button>
+      ) : (
+        <span />
+      )}
     </Card>
   );
 }

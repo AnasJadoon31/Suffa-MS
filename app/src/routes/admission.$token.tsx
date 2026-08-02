@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Loader2, SendHorizonal } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 
+import { CustomDropdown } from "@/components/app/Primitives";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { publicApi, type FormFieldDefinition } from "@/lib/mms/more-endpoints";
 
@@ -195,7 +196,7 @@ function AdmissionField({
           required={field.required}
         />
       ) : field.type === "dropdown" ? (
-        <select
+        <CustomDropdown
           className={commonClass}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
@@ -207,7 +208,7 @@ function AdmissionField({
               {option}
             </option>
           ))}
-        </select>
+        </CustomDropdown>
       ) : field.type === "radio" ? (
         <span className="mt-2 flex flex-wrap gap-2">
           {field.options.map((option) => (

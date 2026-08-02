@@ -6,7 +6,7 @@ import {
   Card,
   EmptyState,
   Field,
-  SelectInput,
+  CustomDropdown,
   SkeletonList,
   TextInput,
 } from "@/components/app/Primitives";
@@ -60,22 +60,22 @@ export function ResponsesPanel({ forms }: { forms: FormDef[] }) {
     <div className="space-y-3">
       <Card className="grid grid-cols-2 gap-2.5 p-3.5">
         <Field label="Form">
-          <SelectInput value={formId} onChange={(e) => setFormId(e.target.value)}>
+          <CustomDropdown value={formId} onChange={(e) => setFormId(e.target.value)}>
             <option value="">All forms</option>
             {forms.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.title}
               </option>
             ))}
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="Role">
-          <SelectInput value={role} onChange={(e) => setRole(e.target.value)}>
+          <CustomDropdown value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="">All roles</option>
             <option value="teacher">Teacher</option>
             <option value="student">Student</option>
             <option value="parent">Guardian</option>
-          </SelectInput>
+          </CustomDropdown>
         </Field>
         <Field label="From">
           <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />

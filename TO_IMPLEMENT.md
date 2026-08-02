@@ -5,6 +5,17 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-02 — Frontend Completion Recovery Follow-Up
+
+- Status: Core completion work landed for `/me`, assignments, admissions review/conversion, staff/student results, typed settings, resource uploads/edits, announcement/blog/holiday edits, linked-people refresh consistency, and the unsupported-role dashboard fallback.
+- Remaining release work:
+  - Recreate a compact authenticated route/runtime browser gate for the current TanStack routes so `/profile`, `/my-profile`, auth redirects, and common portal screens are checked automatically again.
+  - Run focused browser fundamentals for login, persisted token/tenant state across refresh, logout, protected-route handling, and legacy profile redirects on the current frontend.
+  - Finish parity on still-thin management areas: finance detail/edit history, reports filter parity, timetable edit/conflict management, leave review/history, and any remaining linked-entity refresh gaps discovered during browser use.
+  - Expand People and Academics browser verification from API/build confidence to end-to-end create/edit/detail/deactivate and relationship-management flows on current TanStack screens.
+  - Validate admissions conversion against a richer fixture set covering independent students, guardian overrides, and multiple open admission forms.
+  - Add focused upload/download validation for resources and assignments covering at least one real file replacement and one staff review path in-browser.
+
 ## 2026-08-02 — Frontend Replacement Follow-Up
 
 - Status: The `app/` frontend has been replaced by the TanStack Start design and smoke-verified against the local FastAPI backend for login, token/tenant state, representative authenticated routes, legacy profile redirects, public set-password rendering, PWA build output, Compose config, and generated Node-server startup.

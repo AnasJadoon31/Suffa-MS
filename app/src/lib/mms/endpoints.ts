@@ -338,6 +338,11 @@ export const authApi = {
       )
       .then((r) => r.data),
   me: () => api.get("/api/v1/auth/me").then((r) => r.data),
+  updateMe: (payload: {
+    preferred_language?: string;
+    selected_session_id?: string | null;
+    clear_selected_session?: boolean;
+  }) => api.patch("/api/v1/auth/me", payload).then((r) => r.data),
   changePassword: (payload: { current_password: string; new_password: string }) =>
     api.post("/api/v1/auth/change-password", payload).then((r) => r.data),
 };

@@ -1,6 +1,7 @@
-import type { LucideIcon } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
@@ -158,9 +159,34 @@ export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   return <textarea rows={4} {...props} className={cn(controlClass, "resize-y", props.className)} />;
 }
 
-export function SelectInput(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cn(controlClass, "appearance-none", props.className)} />;
+export function CustomDropdown(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const { className, children, disabled, ...rest } = props;
+  return (
+    <div className="relative">
+      <select
+        {...rest}
+        disabled={disabled}
+        className={cn(
+          controlClass,
+          "appearance-none pr-10",
+          disabled && "cursor-not-allowed opacity-60",
+          className,
+        )}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors",
+          disabled && "opacity-60",
+        )}
+      />
+    </div>
+  );
 }
+
+export const SelectInput = CustomDropdown;
 
 export function Segmented<T extends string>({
   value,
@@ -188,5 +214,44 @@ export function Segmented<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+export function ActionBar({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("mt-5 flex gap-2", className)}>
+      {children}
+    </div>
+  );
+}
+
+export function ManagedSheet({
+  open,
+  onOpenChange,
+  title,
+  subtitle,
+  children,
+}: {
+  open?: boolean;
+  onOpenChange?: (next: boolean) => void;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        className="max-h-[88vh] overflow-y-auto rounded-t-3xl border-border bg-card px-4 pb-8 pt-5"
+      >
+        <SheetTitle
+          className={cn("font-display text-lg font-extrabold", subtitle ? "mb-1" : "mb-4")}
+        >
+          {title}
+        </SheetTitle>
+        {subtitle ? <div className="mb-3">{subtitle}</div> : null}
+        {children}
+      </SheetContent>
+    </Sheet>
   );
 }

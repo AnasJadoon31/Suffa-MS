@@ -12,7 +12,7 @@ import {
   Field,
   Pill,
   SectionTitle,
-  SelectInput,
+  CustomDropdown,
   SkeletonList,
 } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
@@ -196,7 +196,7 @@ function LeavePage() {
         {canReview ? (
           <>
             <Field label="Person type">
-              <SelectInput
+              <CustomDropdown
                 value={filters.personType}
                 onChange={(e) =>
                   setFilters((f) => ({
@@ -208,10 +208,10 @@ function LeavePage() {
                 <option value="">All</option>
                 <option value="teacher">Teacher</option>
                 <option value="student">Student</option>
-              </SelectInput>
+              </CustomDropdown>
             </Field>
             <Field label="Class">
-              <SelectInput
+              <CustomDropdown
                 value={filters.classId}
                 onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value }))}
               >
@@ -221,7 +221,7 @@ function LeavePage() {
                     {item.name}
                   </option>
                 ))}
-              </SelectInput>
+              </CustomDropdown>
             </Field>
           </>
         ) : null}

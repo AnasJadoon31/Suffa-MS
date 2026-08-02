@@ -109,6 +109,34 @@ export interface SessionResult {
   published: boolean;
 }
 
+export interface ResultsMatrix {
+  session_id: string;
+  sections: {
+    class_id: string;
+    class_name: string;
+    section_id: string;
+    section_name: string;
+    courses: {
+      course_id: string;
+      course_name: string;
+      teacher_name: string | null;
+      exam_types: { id: string; name: string; weightage: number }[];
+    }[];
+    students: {
+      student_id: string;
+      name: string;
+      admission_number: string;
+      courses: {
+        course_id: string;
+        raw_score: number | null;
+        band: string | null;
+        marks: { exam_type_id: string; score: number | null }[];
+      }[];
+      overall_score: number | null;
+    }[];
+  }[];
+}
+
 export interface Payment {
   id: string;
   student_id: string;
@@ -153,6 +181,15 @@ export interface AdmissionApplication {
   notes: string | null;
   status: string;
   created_at: string;
+  status_history?: { status: string; changed_at: string; changed_by_id?: string }[];
+  form_id?: string | null;
+  extra_data?: Record<string, unknown> | null;
+  form_title_snapshot?: string | null;
+  fields_definition_snapshot?: FormFieldDefinition[];
+  converted_student_id?: string | null;
+  converted_guardian_id?: string | null;
+  converted_by_id?: string | null;
+  converted_at?: string | null;
 }
 
 export interface MadrasaSetting {
@@ -160,6 +197,14 @@ export interface MadrasaSetting {
   key: string;
   value: string;
   updated_at: string;
+}
+
+export interface TypedMadrasaSetting {
+  key: string;
+  category: string;
+  type: "string" | "int" | "bool" | "file";
+  label: string;
+  value: string;
 }
 
 export interface BlogPost {
@@ -218,6 +263,38 @@ export interface FormResponse {
   created_at: string;
 }
 
+export interface AdmissionForm {
+  id: string;
+  program_id: string | null;
+  title: string;
+  category: string;
+  description: string;
+  fields_definition: FormFieldDefinition[];
+  public_token: string;
+  is_open: boolean;
+  created_at: string;
+  program_name: string | null;
+}
+
+export interface AdmissionConversion {
+  application: AdmissionApplication;
+  student: {
+    id: string;
+    name: string;
+    admission_number: string;
+    current_class?: string | null;
+  };
+  guardian: {
+    id: string;
+    name: string;
+    relationship: string;
+    phone_numbers: string;
+  };
+  student_set_password_url?: string | null;
+  guardian_set_password_url?: string | null;
+  already_converted: boolean;
+}
+
 export const opsApi = {
   listTimetable: (params?: { class_id?: string; section_id?: string }) =>
     getAllPages<Record<string, unknown>>("/api/v1/operations/timetable", params),
@@ -261,6 +338,10 @@ export const opsApi = {
   }) => getAllPages<Announcement>("/api/v1/operations/announcements", params),
   listAdmissions: (params?: { status?: string; q?: string }) =>
     getAllPages<AdmissionApplication>("/api/v1/operations/admissions", params),
+  getAdmissionStatusHistory: (id: string) =>
+    getAllPages<{ status: string; changed_at: string; changed_by_id?: string }>(
+      `/api/v1/operations/admissions/${id}/status-history`,
+    ),
   setAdmissionStatus: (id: string, status: string) =>
     api
       .post<AdmissionApplication>(`/api/v1/operations/admissions/${id}/status`, null, {
@@ -268,8 +349,11 @@ export const opsApi = {
       })
       .then((r) => r.data),
   listSettings: () => getAllPages<MadrasaSetting>("/api/v1/operations/settings"),
+  listSettingsCatalog: () => getAllPages<TypedMadrasaSetting>("/api/v1/operations/settings/catalog"),
   listBlog: (publishedOnly = true) =>
     getAllPages<BlogPost>("/api/v1/operations/blog", { published_only: publishedOnly }),
+  listAdmissionForms: (params?: { category?: string; program_id?: string }) =>
+    getAllPages<AdmissionForm>("/api/v1/operations/admission-forms", params),
 };
 
 export const formsApi = {
@@ -331,6 +415,8 @@ export const assessmentsApi = {
     api
       .get<SessionResult>("/api/v1/assessments/results/me", { params: { session_id: sessionId } })
       .then((r) => r.data),
+  resultsMatrix: (params: { class_id?: string; section_id?: string; session_id: string }) =>
+    api.get<ResultsMatrix>("/api/v1/assessments/results/matrix", { params }).then((r) => r.data),
 };
 
 export interface StudentFinanceProfile {
@@ -447,6 +533,18 @@ export const opsMutations = {
     attachment_link?: string;
     audience_scope?: Scope;
   }) => api.post<Announcement>("/api/v1/operations/announcements", payload).then((r) => r.data),
+  updateAnnouncement: (
+    id: string,
+    payload: {
+      title?: string;
+      body?: string;
+      category?: string;
+      attachment_link?: string;
+      audience_scope?: Scope;
+      publish_at?: string | null;
+      expires_at?: string | null;
+    },
+  ) => api.put<Announcement>(`/api/v1/operations/announcements/${id}`, payload).then((r) => r.data),
   deleteAnnouncement: (id: string) =>
     api.delete(`/api/v1/operations/announcements/${id}`).then((r) => r.data),
 
@@ -455,7 +553,18 @@ export const opsMutations = {
     category?: string;
     start_date: string;
     end_date: string;
+    class_ids?: string[] | null;
   }) => api.post<Holiday>("/api/v1/operations/holidays", payload).then((r) => r.data),
+  updateHoliday: (
+    id: string,
+    payload: {
+      name?: string;
+      category?: string | null;
+      start_date?: string;
+      end_date?: string;
+      class_ids?: string[] | null;
+    },
+  ) => api.put<Holiday>(`/api/v1/operations/holidays/${id}`, payload).then((r) => r.data),
   deleteHoliday: (id: string) =>
     api.delete(`/api/v1/operations/holidays/${id}`).then((r) => r.data),
 
@@ -463,6 +572,10 @@ export const opsMutations = {
     api.post<BlogPost>("/api/v1/operations/blog", payload).then((r) => r.data),
   publishBlogPost: (id: string) =>
     api.post<BlogPost>(`/api/v1/operations/blog/${id}/publish`).then((r) => r.data),
+  updateBlogPost: (
+    id: string,
+    payload: { title?: string; body?: string; published?: boolean; publish_at?: string | null },
+  ) => api.put<BlogPost>(`/api/v1/operations/blog/${id}`, payload).then((r) => r.data),
   deleteBlogPost: (id: string) => api.delete(`/api/v1/operations/blog/${id}`).then((r) => r.data),
 
   createResourceCategory: (name: string, isGlobal = false) =>
@@ -478,7 +591,19 @@ export const opsMutations = {
     description?: string;
     video_url?: string;
     file_key?: string;
+    visibility_scope?: Scope;
   }) => api.post<ResourceItem>("/api/v1/operations/resources", payload).then((r) => r.data),
+  updateResource: (
+    id: string,
+    payload: {
+      category_id?: string;
+      title?: string;
+      description?: string;
+      video_url?: string;
+      file_key?: string;
+      visibility_scope?: Scope;
+    },
+  ) => api.put<ResourceItem>(`/api/v1/operations/resources/${id}`, payload).then((r) => r.data),
   deleteResource: (id: string) =>
     api.delete(`/api/v1/operations/resources/${id}`).then((r) => r.data),
 
@@ -758,15 +883,80 @@ export const peopleMutations = {
 };
 
 export const admissionsMutations = {
+  updateAdmission: (
+    id: string,
+    payload: {
+      applicant_name?: string;
+      guardian_contact?: string;
+      program_id?: string;
+      date_of_birth?: string;
+      notes?: string;
+      extra_data?: Record<string, unknown>;
+    },
+  ) => api.put<AdmissionApplication>(`/api/v1/operations/admissions/${id}`, payload).then((r) => r.data),
   createAdmission: (payload: {
     applicant_name: string;
     guardian_contact: string;
+    form_id: string;
     program_id?: string;
     date_of_birth?: string;
     notes?: string;
+    extra_data?: Record<string, unknown>;
   }) =>
     api.post<AdmissionApplication>("/api/v1/operations/admissions", payload).then((r) => r.data),
+  convertAdmission: (
+    id: string,
+    payload: {
+      student_username: string;
+      guardian_username?: string | null;
+      session_id: string;
+      class_id: string;
+      section_id: string;
+      student_preferred_language?: string;
+      student_portal_enabled?: boolean;
+      guardian_portal_enabled?: boolean;
+      guardian_name?: string;
+      guardian_relationship?: string;
+      guardian_cnic?: string;
+      guardian_address?: string;
+      guardian_preferred_language?: string;
+    },
+  ) => api.post<AdmissionConversion>(`/api/v1/operations/admissions/${id}/convert`, payload).then((r) => r.data),
 };
+
+export interface PresignUpload {
+  object_key: string;
+  upload_url: string;
+}
+
+export const filesApi = {
+  presignUpload: (payload: {
+    category: string;
+    filename: string;
+    content_type: string;
+    size_bytes: number;
+  }) => api.post<PresignUpload>("/api/v1/files/presign-upload", payload).then((r) => r.data),
+  presignDownload: (objectKey: string) =>
+    api.get<{ url: string }>("/api/v1/files/presign-download", { params: { object_key: objectKey } }).then((r) => r.data.url),
+};
+
+export async function uploadFile(file: File, category: string): Promise<string> {
+  const { object_key, upload_url } = await filesApi.presignUpload({
+    category,
+    filename: file.name,
+    content_type: file.type || "application/octet-stream",
+    size_bytes: file.size,
+  });
+  const response = await fetch(upload_url, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  if (!response.ok) {
+    throw new Error("File upload failed");
+  }
+  return object_key;
+}
 
 export interface PublicAdmissionForm {
   id: string;

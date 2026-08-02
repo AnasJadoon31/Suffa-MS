@@ -11,7 +11,7 @@ import {
   EmptyState,
   Field,
   Pill,
-  SelectInput,
+  CustomDropdown,
   SkeletonList,
   TextInput,
 } from "@/components/app/Primitives";
@@ -108,7 +108,7 @@ function AcademicsPage() {
             </Field>
             {tab === "classes" ? (
               <Field label="Program">
-                <SelectInput
+                <CustomDropdown
                   required
                   value={programId}
                   onChange={(e) => setProgramId(e.target.value)}
@@ -119,7 +119,7 @@ function AcademicsPage() {
                       {program.name}
                     </option>
                   ))}
-                </SelectInput>
+                </CustomDropdown>
               </Field>
             ) : null}
             {tab === "sessions" ? (
