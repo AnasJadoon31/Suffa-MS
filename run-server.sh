@@ -101,6 +101,8 @@ DEFAULT_TENANT=default
 MADRASA_NAME=Suffa Madrasa
 BOOTSTRAP_ADMIN_USERNAME=admin
 BOOTSTRAP_ADMIN_PASSWORD=password
+SUPER_ADMIN_USERNAME=platform-admin
+SUPER_ADMIN_PASSWORD=password
 CORS_ORIGINS=http://127.0.0.1:$FRONTEND_PORT,http://localhost:$FRONTEND_PORT
 
 # Optional local S3-compatible storage. Leave blank to keep upload endpoints disabled.

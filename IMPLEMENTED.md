@@ -3,6 +3,19 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-02 — Super Admin Bootstrap Login
+
+**Issue:** The PWA already routed `super_admin` users to `/platform`, and the backend protected platform APIs with `require_super_admin`, but fresh deployments had no documented or automated first super-admin account creation path.
+
+**Fix:**
+- Added optional first-boot platform account creation to `backend/bootstrap.py` using `SUPER_ADMIN_USERNAME` and `SUPER_ADMIN_PASSWORD`.
+- Exposed the super-admin environment variables in `.env.example`, `docker-compose.yml`, and the non-Docker `run-server.sh`.
+- Added a focused bootstrap regression test proving that the optional super-admin is tenantless, active, and password-verifiable.
+
+**Files:** `backend/bootstrap.py`, `backend/tests/test_bootstrap.py`, `.env.example`, `docker-compose.yml`, `run-server.sh`
+
+**Verification:** `cd backend && .venv/bin/python -m pytest tests/test_bootstrap.py -q`; `bash -n run-server.sh`; `docker compose config`.
+
 ## 2026-08-02 — Coolify Backend Healthcheck Startup Fix
 
 **Issue:** Coolify deployment for `e185809` built all images successfully but failed during `docker compose up -d` while waiting on `backend` health. The backend healthcheck used `/readyz`, which performs a database query and can block Compose's `service_healthy` dependency during startup.

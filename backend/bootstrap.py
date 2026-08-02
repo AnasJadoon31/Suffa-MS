@@ -1,6 +1,10 @@
-"""Idempotent first-boot setup: ensures the default tenant and one Principal
-login exist so a fresh deploy is immediately usable. Safe to run on every
-container start — does nothing once the madrasa/admin already exist."""
+"""Idempotent first-boot setup.
+
+Ensures the default tenant and one Principal login exist so a fresh deploy is
+immediately usable. Optionally creates a platform super-admin when
+SUPER_ADMIN_PASSWORD is provided. Safe to run on every container start — it
+does nothing once the relevant users already exist.
+"""
 import asyncio
 import os
 
@@ -84,6 +88,8 @@ async def bootstrap() -> None:
     tenant_name = os.getenv("MADRASA_NAME", tenant_slug.title())
     admin_username = os.getenv("BOOTSTRAP_ADMIN_USERNAME", "admin")
     admin_password = os.getenv("BOOTSTRAP_ADMIN_PASSWORD")
+    super_admin_username = os.getenv("SUPER_ADMIN_USERNAME", "platform-admin")
+    super_admin_password = os.getenv("SUPER_ADMIN_PASSWORD")
 
     async with SessionLocal() as session:
         madrasa = (
@@ -118,6 +124,31 @@ async def bootstrap() -> None:
             print(f"[bootstrap] created Principal login '{admin_username}' for tenant '{tenant_slug}'")
         else:
             print(f"[bootstrap] tenant '{tenant_slug}' already has a Principal login, skipping")
+
+        existing_super_admin = (
+            await session.execute(
+                select(User).where(
+                    User.madrasa_id.is_(None),
+                    User.username == super_admin_username,
+                    User.role == UserRole.super_admin,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing_super_admin is None and super_admin_password:
+            session.add(
+                User(
+                    madrasa_id=None,
+                    username=super_admin_username,
+                    password_hash=await hash_password(super_admin_password),
+                    role=UserRole.super_admin,
+                    status=UserStatus.active,
+                )
+            )
+            print(f"[bootstrap] created platform super-admin login '{super_admin_username}'")
+        elif existing_super_admin is not None:
+            print(f"[bootstrap] platform super-admin '{super_admin_username}' already exists, skipping")
+        else:
+            print("[bootstrap] SUPER_ADMIN_PASSWORD not set, skipping platform super-admin creation")
 
         existing_codes = set(
             (
