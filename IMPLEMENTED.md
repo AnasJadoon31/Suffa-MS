@@ -3,6 +3,24 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-02 — Frontend Replacement With TanStack Design
+
+**Issue:** The existing `app/` PWA needed to be replaced with the new frontend design from `/home/anas/Development/Personal/suffa-frontend` while preserving backend integration, auth, routes, and deployment flow.
+
+**Fix:**
+- Replaced the old React Router/MUI frontend with the new TanStack Start/Radix/Tailwind design.
+- Synced `VITE_API_BASE` defaults to the local FastAPI backend and kept production API targeting configurable through Docker build args/env.
+- Preserved backend auth integration with `/api/v1/auth/token`, `/api/v1/auth/me`, bearer token storage, tenant headers, academic-session headers, and normalized FastAPI validation error messages.
+- Added public route coverage for `/set-password?token=...` and `/admission/:token`, plus legacy `/my-profile` and `/profile` redirects to the new `/me` screen.
+- Changed the app image from static nginx serving to the generated TanStack/Nitro Node server on port `80`, matching the existing `docker-compose.yml` app service.
+- Corrected PWA output so the generated service worker precaches the new `.output/public` assets.
+
+**Files:** `app/src/**`, `app/public/**`, `app/package.json`, `app/package-lock.json`, `app/vite.config.ts`, `app/Dockerfile`, `app/.env.example`
+
+**Verification:** `cd app && npm run build`; `cd app && npm run lint` (0 errors, 18 imported-design warnings); `docker compose config`; backend `/healthz` and `/readyz`; browser smoke at `http://localhost:8081` logged in with `admin/password`, persisted `mms_token` and `mms_tenant=suffa`, visited `/dashboard`, `/people`, `/attendance`, `/timetable`, `/forms`, `/reports`, `/settings`, verified `/my-profile` and `/profile` redirect to `/me`, and captured screenshots in `app/artifacts/replacement-smoke/` with no failed backend API responses or serious console errors. Generated production server smoke on port `4180` returned 200 for `/dashboard`.
+
+**Limitation:** Local Docker image validation was attempted after adapting the Dockerfile, but the containerized `npm ci` step could not complete in this environment. Node 20 surfaced unsupported-engine warnings, Node 22 hit an npm CLI crash, and the Node 24 retry stalled during dependency install. The Dockerfile remains aligned to the new Node-server output and Node 24 runtime, but image build completion still needs confirmation in CI/Coolify or a Docker environment with stable npm install behavior. Full backend verification was also run and finished with `269 passed, 2 skipped, 1 failed`; the failure was the pre-existing attendance period inference case `tests/test_attendance_period_enrollment_history.py::test_roster_infers_single_current_day_period_from_course`, where roster inference returned 409 because multiple periods existed.
+
 ## 2026-08-02 — Super Admin Bootstrap Login
 
 **Issue:** The PWA already routed `super_admin` users to `/platform`, and the backend protected platform APIs with `require_super_admin`, but fresh deployments had no documented or automated first super-admin account creation path.

@@ -5,6 +5,18 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-02 — Frontend Replacement Follow-Up
+
+- Status: The `app/` frontend has been replaced by the TanStack Start design and smoke-verified against the local FastAPI backend for login, token/tenant state, representative authenticated routes, legacy profile redirects, public set-password rendering, PWA build output, Compose config, and generated Node-server startup.
+- Remaining release work:
+  - Rebuild route-specific browser regression coverage for the new TanStack/Radix frontend. The old `app/scripts/*` checks were tied to removed MUI/React Router markup and are no longer valid.
+  - Run a full role journey matrix for principal, teacher, student, guardian, and super-admin once fixtures/users are refreshed for the new UI.
+  - Recreate EN/UR and RTL visual verification for the new design. The smoke pass covered mobile and desktop English only.
+  - Validate a real public admission token end to end after creating/opening an admission form in the new UI; the local database had no public admission forms during replacement verification.
+  - Confirm the updated frontend Docker image build in CI/Coolify. Local image validation was blocked by containerized npm install behavior after Node/runtime alignment fixes.
+  - Revisit the unrelated backend attendance regression observed during full-suite verification: `test_roster_infers_single_current_day_period_from_course` returned 409 for multiple periods instead of the expected inferred roster.
+  - Address imported-design lint warnings for Fast Refresh exports and hook dependency memoization before treating `npm run lint` as a zero-warning gate.
+
 ## 2026-08-01 — PWA Visual Redesign Remaining Gate
 
 - Status: Foundation batch and custom MUI wrapper migration are implemented and verified for build, i18n, route runtime, drawer geometry, mobile records, students layout, assessment mobile cards, scripted current-issues journeys, and static UI-wrapper enforcement.

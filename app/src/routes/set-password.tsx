@@ -1,0 +1,134 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { KeyRound, Loader2 } from "lucide-react";
+import { useState, type FormEvent } from "react";
+
+import { api, apiErrorMessage } from "@/lib/mms/api";
+
+export const Route = createFileRoute("/set-password")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    token: typeof search["token"] === "string" ? search["token"] : "",
+  }),
+  head: () => ({
+    meta: [
+      { title: "Set Password — Suffa MS" },
+      { name: "description", content: "Create or reset your Suffa MS account password." },
+    ],
+  }),
+  component: SetPasswordPage,
+});
+
+function SetPasswordPage() {
+  const { token } = Route.useSearch();
+  const navigate = useNavigate();
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    if (!token) {
+      setError("This setup link is missing its token.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.post("/api/v1/auth/set-password", { token, password });
+      setDone(true);
+      window.setTimeout(() => void navigate({ to: "/" }), 1200);
+    } catch (err) {
+      setError(apiErrorMessage(err, "This link is invalid or has expired."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="gradient-emerald flex min-h-screen flex-col text-primary-foreground">
+      <section className="pt-safe px-6 pb-8 pt-16">
+        <div className="mx-auto max-w-lg">
+          <span className="gradient-gold grid h-14 w-14 place-items-center rounded-2xl text-accent-foreground shadow-[var(--shadow-raised)]">
+            <KeyRound className="h-6 w-6" />
+          </span>
+          <h1 className="mt-6 font-display text-3xl font-extrabold leading-tight">
+            Set your password
+          </h1>
+          <p className="mt-2 max-w-sm text-sm text-primary-foreground/75">
+            Create a secure password to finish setting up your Suffa MS account.
+          </p>
+        </div>
+      </section>
+
+      <section className="flex-1 rounded-t-[2rem] bg-background px-6 pb-10 pt-8 text-foreground">
+        <div className="mx-auto max-w-lg">
+          {done ? (
+            <div className="card-surface p-5 text-center">
+              <p className="font-display text-lg font-extrabold">Password saved</p>
+              <p className="mt-1 text-sm text-muted-foreground">Taking you back to sign in.</p>
+            </div>
+          ) : (
+            <form onSubmit={onSubmit} className="space-y-4">
+              <Field label="New password">
+                <input
+                  type="password"
+                  className="w-full bg-transparent text-base outline-none"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+              </Field>
+              <Field label="Confirm password">
+                <input
+                  type="password"
+                  className="w-full bg-transparent text-base outline-none"
+                  value={confirm}
+                  onChange={(event) => setConfirm(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+              </Field>
+
+              {error ? (
+                <p className="rounded-xl bg-destructive/10 px-3 py-2.5 text-sm font-medium text-destructive">
+                  {error}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="gradient-emerald flex w-full items-center justify-center gap-2 rounded-2xl py-4 font-display text-base font-extrabold text-primary-foreground shadow-[var(--shadow-raised)] transition-transform active:scale-[0.98] disabled:opacity-60"
+              >
+                {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+                Save password
+              </button>
+            </form>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="card-surface block px-4 py-3">
+      <span className="block text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
+        {label}
+      </span>
+      <span className="mt-1 block">{children}</span>
+    </label>
+  );
+}
