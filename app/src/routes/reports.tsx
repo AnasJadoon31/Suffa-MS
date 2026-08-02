@@ -9,6 +9,7 @@ import { Card, CustomDropdown, SectionTitle } from "@/components/app/Primitives"
 import { apiErrorMessage } from "@/lib/mms/api";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { reportsApi } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -34,6 +35,7 @@ function firstOfMonth() {
 }
 
 function ReportsPage() {
+    const { t } = useTranslation();
   const [start, setStart] = useState(firstOfMonth());
   const [end, setEnd] = useState(new Date().toISOString().slice(0, 10));
   const [classId, setClassId] = useState("");
@@ -56,9 +58,9 @@ function ReportsPage() {
   };
 
   return (
-    <AppShell title="Reports" subtitle="Export CSV or PDF">
+    <AppShell title={t("Reports")} subtitle={t("Export CSV or PDF")}>
       <Card className="space-y-3">
-        <p className="font-display text-sm font-extrabold">Filters</p>
+        <p className="font-display text-sm font-extrabold">{t("Filters")}</p>
         <div className="grid grid-cols-2 gap-2">
           <input
             type="date"
@@ -74,7 +76,7 @@ function ReportsPage() {
           />
         </div>
         <CustomDropdown value={classId} onChange={(e) => setClassId(e.target.value)}>
-          <option value="">Select class</option>
+          <option value="">{t("Select class")}</option>
           {(classes.data ?? []).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
@@ -82,7 +84,7 @@ function ReportsPage() {
           ))}
         </CustomDropdown>
         <CustomDropdown value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
-          <option value="">Select session</option>
+          <option value="">{t("Select session")}</option>
           {(sessions.data ?? []).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
@@ -91,10 +93,10 @@ function ReportsPage() {
         </CustomDropdown>
       </Card>
 
-      <SectionTitle>Available reports</SectionTitle>
+      <SectionTitle>{t("Available reports")}</SectionTitle>
       <div className="space-y-2.5">
         <ReportRow
-          title="Attendance"
+          title={t("Attendance")}
           hint="Requires a class and date range"
           busy={busy}
           id="attendance"
@@ -109,7 +111,7 @@ function ReportsPage() {
           }
         />
         <ReportRow
-          title="Finance"
+          title={t("Finance")}
           hint="Fee contributions in the range"
           busy={busy}
           id="finance"
@@ -118,7 +120,7 @@ function ReportsPage() {
           }
         />
         <ReportRow
-          title="Salary"
+          title={t("Salary")}
           hint="Staff salary payments"
           busy={busy}
           id="salary"
@@ -127,7 +129,7 @@ function ReportsPage() {
           }
         />
         <ReportRow
-          title="Donations"
+          title={t("Donations")}
           hint="Donor contributions"
           busy={busy}
           id="donations"
@@ -138,7 +140,7 @@ function ReportsPage() {
           }
         />
         <ReportRow
-          title="Results"
+          title={t("Results")}
           hint="Requires a class and session"
           busy={busy}
           id="results"
@@ -169,6 +171,7 @@ function ReportRow({
   disabled?: boolean;
   onPick: (format: "csv" | "pdf") => void;
 }) {
+    const { t } = useTranslation();
   const pending = busy === id;
   return (
     <Card className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">

@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/mms/auth";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import { opsApi, opsMutations } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/holidays")({
   head: () => ({
@@ -36,6 +37,7 @@ export const Route = createFileRoute("/holidays")({
 const emptyFilters = { category: "", classId: "", dateFrom: "", dateTo: "" };
 
 function HolidaysPage() {
+    const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
   const canManage = user?.role === "principal" || user?.role === "super_admin";
@@ -110,11 +112,11 @@ function HolidaysPage() {
 
   return (
     <AppShell
-      title="Holidays"
+      title={t("Holidays")}
       subtitle={`${items.length} in the calendar`}
       right={
         canManage ? (
-          <FormSheet title="New holiday" triggerLabel="Add" onSubmit={() => create.mutateAsync()}>
+          <FormSheet title={t("New holiday")} triggerLabel="Add" onSubmit={() => create.mutateAsync()}>
             <HolidayFormFields
               values={form}
               classOptions={classes.data ?? []}
@@ -125,12 +127,12 @@ function HolidaysPage() {
       }
     >
       <FilterBar activeCount={activeCount} onClear={() => setFilters(emptyFilters)}>
-        <Field label="Category">
+        <Field label={t("Category")}>
           <CustomDropdown
             value={filters.category}
             onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
           >
-            <option value="">All categories</option>
+            <option value="">{t("All categories")}</option>
             {categories.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
@@ -138,12 +140,12 @@ function HolidaysPage() {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Class">
+        <Field label={t("Class")}>
           <CustomDropdown
             value={filters.classId}
             onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value }))}
           >
-            <option value="">All classes</option>
+            <option value="">{t("All classes")}</option>
             {(classes.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -152,14 +154,14 @@ function HolidaysPage() {
           </CustomDropdown>
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="From">
+          <Field label={t("From")}>
             <TextInput
               type="date"
               value={filters.dateFrom}
               onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
             />
           </Field>
-          <Field label="To">
+          <Field label={t("To")}>
             <TextInput
               type="date"
               value={filters.dateTo}
@@ -170,7 +172,7 @@ function HolidaysPage() {
       </FilterBar>
 
       {query.isLoading ? <SkeletonList rows={4} /> : null}
-      {!query.isLoading && items.length === 0 ? <EmptyState title="No holidays scheduled" /> : null}
+      {!query.isLoading && items.length === 0 ? <EmptyState title={t("No holidays scheduled")} /> : null}
 
       <div className="space-y-2.5">
         {items.map((item) => {
@@ -239,6 +241,7 @@ function EditHolidaySheet({
   classes: { id: string; name: string }[];
   onClose: () => void;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const [form, setForm] = useState<HolidayFormValues>({
     name: holiday.name,
@@ -268,7 +271,7 @@ function EditHolidaySheet({
 
   return (
     <FormSheet
-      title="Edit holiday"
+      title={t("Edit holiday")}
       submitLabel="Save changes"
       open
       onOpenChange={(next) => !next && onClose()}

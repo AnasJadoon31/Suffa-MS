@@ -19,6 +19,7 @@ import {
 } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
 import { formsApi, type FormDef } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/forms")({
   head: () => ({
@@ -48,6 +49,7 @@ function scopeLabel(form: FormDef): string {
 }
 
 function FormsPage() {
+    const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const client = useQueryClient();
   const canCreate =
@@ -92,7 +94,7 @@ function FormsPage() {
 
   return (
     <AppShell
-      title="Forms"
+      title={t("Forms")}
       subtitle={`${forms.length} forms`}
       right={
         canCreate && tab === "forms" ? (
@@ -104,8 +106,7 @@ function FormsPage() {
             }}
             className="gradient-emerald inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground shadow-[var(--shadow-raised)]"
           >
-            New
-          </button>
+            {t("New")}</button>
         ) : undefined
       }
     >
@@ -124,12 +125,12 @@ function FormsPage() {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2.5">
             <TextInput
-              placeholder="Search forms…"
+              placeholder={t("Search forms…")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <CustomDropdown value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">All categories</option>
+              <option value="">{t("All categories")}</option>
               {categories.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -140,7 +141,7 @@ function FormsPage() {
 
           {query.isLoading ? <SkeletonList rows={4} /> : null}
           {!query.isLoading && visibleForms.length === 0 ? (
-            <EmptyState title="No forms found" hint="New forms will appear here." />
+            <EmptyState title={t("No forms found")} hint="New forms will appear here." />
           ) : null}
 
           <div className="space-y-2.5">
@@ -172,8 +173,7 @@ function FormsPage() {
                       onClick={() => setFillForm(form)}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary disabled:opacity-40"
                     >
-                      <Send className="h-3.5 w-3.5" /> Fill out
-                    </button>
+                      <Send className="h-3.5 w-3.5" /> {t("Fill out")}</button>
                     {canEditForm(form) ? (
                       <>
                         <button
@@ -184,15 +184,13 @@ function FormsPage() {
                           }}
                           className="inline-flex items-center gap-1.5 rounded-xl bg-muted px-3 py-1.5 text-xs font-bold"
                         >
-                          <Edit2 className="h-3.5 w-3.5" /> Edit
-                        </button>
+                          <Edit2 className="h-3.5 w-3.5" /> {t("Edit")}</button>
                         <button
                           type="button"
                           onClick={() => setDeleteTarget(form)}
                           className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
                         >
-                          <Trash2 className="h-3.5 w-3.5" /> Delete
-                        </button>
+                          <Trash2 className="h-3.5 w-3.5" /> {t("Delete")}</button>
                       </>
                     ) : null}
                   </div>
@@ -230,26 +228,23 @@ function FormsPage() {
       {deleteTarget ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
           <div className="w-full max-w-sm space-y-3 rounded-3xl bg-card p-5">
-            <p className="font-display text-base font-extrabold">Delete this form?</p>
+            <p className="font-display text-base font-extrabold">{t("Delete this form?")}</p>
             <p className="text-sm text-muted-foreground">
-              "{deleteTarget.title}" and its responses will be removed. This cannot be undone.
-            </p>
+              "{deleteTarget.title}{t("\" and its responses will be removed. This cannot be undone.")}</p>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 className="flex-1 rounded-2xl bg-muted px-4 py-2.5 text-sm font-bold"
               >
-                Cancel
-              </button>
+                {t("Cancel")}</button>
               <button
                 type="button"
                 onClick={() => remove.mutate(deleteTarget.id)}
                 disabled={remove.isPending}
                 className="flex-1 rounded-2xl bg-destructive px-4 py-2.5 text-sm font-bold text-destructive-foreground disabled:opacity-60"
               >
-                Delete
-              </button>
+                {t("Delete")}</button>
             </div>
           </div>
         </div>

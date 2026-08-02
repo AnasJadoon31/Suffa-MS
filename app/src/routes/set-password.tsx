@@ -3,6 +3,7 @@ import { KeyRound, Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { api, apiErrorMessage } from "@/lib/mms/api";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/set-password")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/set-password")({
 });
 
 function SetPasswordPage() {
+    const { t } = useTranslation();
   const { token } = Route.useSearch();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
@@ -62,11 +64,9 @@ function SetPasswordPage() {
             <KeyRound className="h-6 w-6" />
           </span>
           <h1 className="mt-6 font-display text-3xl font-extrabold leading-tight">
-            Set your password
-          </h1>
+            {t("Set your password")}</h1>
           <p className="mt-2 max-w-sm text-sm text-primary-foreground/75">
-            Create a secure password to finish setting up your Suffa MS account.
-          </p>
+            {t("Create a secure password to finish setting up your Suffa MS account.")}</p>
         </div>
       </section>
 
@@ -74,12 +74,12 @@ function SetPasswordPage() {
         <div className="mx-auto max-w-lg">
           {done ? (
             <div className="card-surface p-5 text-center">
-              <p className="font-display text-lg font-extrabold">Password saved</p>
-              <p className="mt-1 text-sm text-muted-foreground">Taking you back to sign in.</p>
+              <p className="font-display text-lg font-extrabold">{t("Password saved")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t("Taking you back to sign in.")}</p>
             </div>
           ) : (
             <form onSubmit={onSubmit} className="space-y-4">
-              <Field label="New password">
+              <Field label={t("New password")}>
                 <input
                   type="password"
                   className="w-full bg-transparent text-base outline-none"
@@ -89,7 +89,7 @@ function SetPasswordPage() {
                   required
                 />
               </Field>
-              <Field label="Confirm password">
+              <Field label={t("Confirm password")}>
                 <input
                   type="password"
                   className="w-full bg-transparent text-base outline-none"
@@ -112,8 +112,7 @@ function SetPasswordPage() {
                 className="gradient-emerald flex w-full items-center justify-center gap-2 rounded-2xl py-4 font-display text-base font-extrabold text-primary-foreground shadow-[var(--shadow-raised)] transition-transform active:scale-[0.98] disabled:opacity-60"
               >
                 {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
-                Save password
-              </button>
+                {t("Save password")}</button>
             </form>
           )}
         </div>
@@ -123,6 +122,7 @@ function SetPasswordPage() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+    const { t } = useTranslation();
   return (
     <label className="card-surface block px-4 py-3">
       <span className="block text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">

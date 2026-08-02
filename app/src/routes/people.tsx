@@ -24,6 +24,7 @@ import { GuardianForm } from "@/components/app/people/GuardianForm";
 import { useAuth } from "@/lib/mms/auth";
 import { peopleApi, type Guardian, type Student, type Teacher } from "@/lib/mms/endpoints";
 import { peopleMutations } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/people")({
   head: () => ({
@@ -52,6 +53,7 @@ const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
 const PAGE_SIZE = 20;
 
 function PeoplePage() {
+    const { t } = useTranslation();
   const { user } = useAuth();
   const canManage = user?.role === "principal" || user?.role === "super_admin";
 
@@ -111,7 +113,7 @@ function PeoplePage() {
 
   return (
     <AppShell
-      title="People"
+      title={t("People")}
       subtitle={query.data ? `${total} records` : "Directory"}
       right={
         canManage ? (

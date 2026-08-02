@@ -38,6 +38,7 @@ import {
   type TimetableImportResponse,
   type TimetableImportRow,
 } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/timetable")({
   head: () => ({
@@ -60,6 +61,7 @@ const SHORT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 type Tab = "mine" | "grid" | "list" | "teachers" | "import";
 
 function TimetablePage() {
+    const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const isTeacher = user?.role === "teacher";
   const isStudentish = user?.role === "student" || user?.role === "guardian";
@@ -81,7 +83,7 @@ function TimetablePage() {
   ];
 
   return (
-    <AppShell title="Timetable" subtitle="Weekly periods and schedules">
+    <AppShell title={t("Timetable")} subtitle={t("Weekly periods and schedules")}>
       <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
         <div
           className="grid min-w-0 gap-1 rounded-2xl bg-muted p-1"
@@ -156,6 +158,7 @@ function useTeachers(enabled: boolean) {
 }
 
 function SlotRow({ slot, onDelete }: { slot: TimetableSlot; onDelete?: () => void }) {
+    const { t } = useTranslation();
   return (
     <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft font-display text-sm font-extrabold text-primary">
@@ -189,6 +192,7 @@ function SlotRow({ slot, onDelete }: { slot: TimetableSlot; onDelete?: () => voi
 /* -------------------------------------------------------------------- mine */
 
 function MineView() {
+    const { t } = useTranslation();
   const query = useQuery({
     queryKey: ["timetable", "me"],
     queryFn: () => operationsApi.listMyTimetable(),
@@ -214,9 +218,9 @@ function MineView() {
     <>
       {classOptions.length > 1 ? (
         <div className="mb-3">
-          <Field label="Class">
+          <Field label={t("Class")}>
             <CustomDropdown value={classId} onChange={(e) => setClassId(e.target.value)}>
-              <option value="">All classes</option>
+              <option value="">{t("All classes")}</option>
               {classOptions.map(([id, name]) => (
                 <option key={id} value={id}>
                   {name}
@@ -230,7 +234,7 @@ function MineView() {
       {query.isLoading ? <SkeletonList rows={6} /> : null}
       {!query.isLoading && byDay.length === 0 ? (
         <EmptyState
-          title="No periods scheduled"
+          title={t("No periods scheduled")}
           hint="Your timetable will appear once it is published."
         />
       ) : null}
@@ -238,7 +242,7 @@ function MineView() {
       {byDay.map((group) => (
         <div key={group.day}>
           <SectionTitle
-            action={group.index === todayIndex ? <Pill tone="gold">Today</Pill> : undefined}
+            action={group.index === todayIndex ? <Pill tone="gold">{t("Today")}</Pill> : undefined}
           >
             {group.day}
           </SectionTitle>
@@ -256,6 +260,7 @@ function MineView() {
 /* -------------------------------------------------------------------- grid */
 
 function GridView({ lockToOwn }: { lockToOwn: boolean }) {
+    const { t } = useTranslation();
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
 
@@ -278,7 +283,7 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
   return (
     <>
       <div className="mb-3 grid grid-cols-2 gap-2">
-        <Field label="Class">
+        <Field label={t("Class")}>
           <CustomDropdown
             value={classId}
             onChange={(e) => {
@@ -286,7 +291,7 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
               setSectionId("");
             }}
           >
-            <option value="">Choose class…</option>
+            <option value="">{t("Choose class…")}</option>
             {(classes.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -294,13 +299,13 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Section">
+        <Field label={t("Section")}>
           <CustomDropdown
             value={sectionId}
             disabled={!classId}
             onChange={(e) => setSectionId(e.target.value)}
           >
-            <option value="">Choose section…</option>
+            <option value="">{t("Choose section…")}</option>
             {(sections.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -311,11 +316,11 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
       </div>
 
       {!classId || !sectionId ? (
-        <EmptyState title="Pick a class and section" hint="The weekly grid loads after both." />
+        <EmptyState title={t("Pick a class and section")} hint="The weekly grid loads after both." />
       ) : slots.isLoading ? (
         <SkeletonList rows={5} />
       ) : periods.length === 0 ? (
-        <EmptyState title="No periods for this section" />
+        <EmptyState title={t("No periods for this section")} />
       ) : (
         <div className="space-y-3">
           {periods.map((period) => {
@@ -323,7 +328,7 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
             return (
               <Card key={period} className="p-3.5">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="font-display text-sm font-extrabold">Period {period}</p>
+                  <p className="font-display text-sm font-extrabold">{t("Period")}{period}</p>
                   <span className="text-xs font-bold text-muted-foreground">
                     {sample?.start_time?.slice(0, 5)}–{sample?.end_time?.slice(0, 5)}
                   </span>
@@ -367,6 +372,7 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
 /* -------------------------------------------------------------------- list */
 
 function ListView({ canManage }: { canManage: boolean }) {
+    const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({
     class_id: "",
@@ -417,12 +423,12 @@ function ListView({ canManage }: { canManage: boolean }) {
       ) : null}
 
       <div className="mb-3 grid grid-cols-2 gap-2">
-        <Field label="Class">
+        <Field label={t("Class")}>
           <CustomDropdown
             value={filters.class_id}
             onChange={(e) => setFilters({ ...filters, class_id: e.target.value, section_id: "" })}
           >
-            <option value="">All classes</option>
+            <option value="">{t("All classes")}</option>
             {(classes.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -430,13 +436,13 @@ function ListView({ canManage }: { canManage: boolean }) {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Section">
+        <Field label={t("Section")}>
           <CustomDropdown
             value={filters.section_id}
             disabled={!filters.class_id}
             onChange={(e) => setFilters({ ...filters, section_id: e.target.value })}
           >
-            <option value="">All sections</option>
+            <option value="">{t("All sections")}</option>
             {(sections.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -444,12 +450,12 @@ function ListView({ canManage }: { canManage: boolean }) {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Course">
+        <Field label={t("Course")}>
           <CustomDropdown
             value={filters.course_id}
             onChange={(e) => setFilters({ ...filters, course_id: e.target.value })}
           >
-            <option value="">All courses</option>
+            <option value="">{t("All courses")}</option>
             {(allCourses.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -457,12 +463,12 @@ function ListView({ canManage }: { canManage: boolean }) {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Teacher">
+        <Field label={t("Teacher")}>
           <CustomDropdown
             value={filters.teacher_id}
             onChange={(e) => setFilters({ ...filters, teacher_id: e.target.value })}
           >
-            <option value="">All teachers</option>
+            <option value="">{t("All teachers")}</option>
             {(teachers.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -470,12 +476,12 @@ function ListView({ canManage }: { canManage: boolean }) {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Day">
+        <Field label={t("Day")}>
           <CustomDropdown
             value={filters.day}
             onChange={(e) => setFilters({ ...filters, day: e.target.value })}
           >
-            <option value="">All days</option>
+            <option value="">{t("All days")}</option>
             {DAYS.map((day, index) => (
               <option key={day} value={index}>
                 {day}
@@ -487,7 +493,7 @@ function ListView({ canManage }: { canManage: boolean }) {
 
       {slots.isLoading ? <SkeletonList rows={6} /> : null}
       {!slots.isLoading && filtered.length === 0 ? (
-        <EmptyState title="No slots yet" hint="Add a slot or relax the filters." />
+        <EmptyState title={t("No slots yet")} hint="Add a slot or relax the filters." />
       ) : null}
 
       <div className="space-y-2">
@@ -512,6 +518,7 @@ function ListView({ canManage }: { canManage: boolean }) {
 }
 
 function AddSlotSheet() {
+    const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     class_id: "",
@@ -556,19 +563,19 @@ function AddSlotSheet() {
 
   return (
     <FormSheet
-      title="Add timetable slot"
+      title={t("Add timetable slot")}
       triggerLabel="Add slot"
       submitLabel="Add slot"
       onSubmit={submit}
     >
-      <Field label="Class">
+      <Field label={t("Class")}>
         <CustomDropdown
           value={form.class_id}
           onChange={(e) =>
             setForm({ ...form, class_id: e.target.value, section_id: "", course_id: "" })
           }
         >
-          <option value="">Select…</option>
+          <option value="">{t("Select…")}</option>
           {(classes.data ?? []).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
@@ -576,13 +583,13 @@ function AddSlotSheet() {
           ))}
         </CustomDropdown>
       </Field>
-      <Field label="Section">
+      <Field label={t("Section")}>
         <CustomDropdown
           value={form.section_id}
           disabled={!form.class_id}
           onChange={(e) => setForm({ ...form, section_id: e.target.value })}
         >
-          <option value="">Select…</option>
+          <option value="">{t("Select…")}</option>
           {(sections.data ?? []).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
@@ -590,13 +597,13 @@ function AddSlotSheet() {
           ))}
         </CustomDropdown>
       </Field>
-      <Field label="Course">
+      <Field label={t("Course")}>
         <CustomDropdown
           value={form.course_id}
           disabled={!form.class_id}
           onChange={(e) => setForm({ ...form, course_id: e.target.value })}
         >
-          <option value="">Select…</option>
+          <option value="">{t("Select…")}</option>
           {(courses.data ?? []).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
@@ -604,12 +611,12 @@ function AddSlotSheet() {
           ))}
         </CustomDropdown>
       </Field>
-      <Field label="Teacher">
+      <Field label={t("Teacher")}>
         <CustomDropdown
           value={form.teacher_id}
           onChange={(e) => setForm({ ...form, teacher_id: e.target.value })}
         >
-          <option value="">Select…</option>
+          <option value="">{t("Select…")}</option>
           {(teachers.data ?? []).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
@@ -617,7 +624,7 @@ function AddSlotSheet() {
           ))}
         </CustomDropdown>
       </Field>
-      <Field label="Day">
+      <Field label={t("Day")}>
         <CustomDropdown
           value={form.day_of_week}
           onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}
@@ -629,14 +636,14 @@ function AddSlotSheet() {
           ))}
         </CustomDropdown>
       </Field>
-      <Field label="Start time">
+      <Field label={t("Start time")}>
         <TextInput
           type="time"
           value={form.start_time}
           onChange={(e) => setForm({ ...form, start_time: e.target.value })}
         />
       </Field>
-      <Field label="End time">
+      <Field label={t("End time")}>
         <TextInput
           type="time"
           value={form.end_time}
@@ -650,6 +657,7 @@ function AddSlotSheet() {
 /* -------------------------------------------------------------- by teacher */
 
 function ByTeacherView() {
+    const { t } = useTranslation();
   const classes = useClasses();
   const classList = classes.data ?? [];
 
@@ -678,7 +686,7 @@ function ByTeacherView() {
   void classList;
 
   if (slots.isLoading) return <SkeletonList rows={6} />;
-  if (grouped.length === 0) return <EmptyState title="No slots yet" />;
+  if (grouped.length === 0) return <EmptyState title={t("No slots yet")} />;
 
   return (
     <div className="space-y-3">
@@ -701,6 +709,7 @@ function ByTeacherView() {
 /* ------------------------------------------------------------------ import */
 
 function ImportView() {
+    const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const [result, setResult] = useState<TimetableImportResponse | null>(null);
@@ -746,38 +755,34 @@ function ImportView() {
     <div className="space-y-3">
       <Card className="p-3.5">
         <p className="text-xs text-muted-foreground">
-          One slot per line: class, section, course, teacher code, day (0=Mon), start, end.
-        </p>
+          {t("One slot per line: class, section, course, teacher code, day (0=Mon), start, end.")}</p>
         <pre className="mt-2 overflow-x-auto rounded-xl bg-muted px-3 py-2 text-[0.7rem]">
-          Class 1, Alif, Nazra, TCH-0001, 0, 08:00, 08:40
-        </pre>
+          {t("Class 1, Alif, Nazra, TCH-0001, 0, 08:00, 08:40")}</pre>
       </Card>
 
-      <Field label="Rows">
+      <Field label={t("Rows")}>
         <TextArea rows={8} value={text} onChange={(e) => setText(e.target.value)} />
       </Field>
 
       <div className="flex gap-2">
         <ActionButton variant="soft" onClick={() => run.mutate(true)} className="flex-1">
-          Dry run
-        </ActionButton>
+          {t("Dry run")}</ActionButton>
         <ActionButton disabled={!allOk} onClick={() => run.mutate(false)} className="flex-1">
-          <Upload className="h-4 w-4" /> Import
-        </ActionButton>
+          <Upload className="h-4 w-4" /> {t("Import")}</ActionButton>
       </div>
 
       {result ? (
         <Card className="space-y-1.5 p-3.5">
           {result.results.map((row) => (
             <div key={row.row} className="flex items-start justify-between gap-3 text-xs">
-              <span className="font-bold">Row {row.row}</span>
+              <span className="font-bold">{t("Row")}{row.row}</span>
               <span className={row.ok ? "text-primary" : "text-destructive"}>
                 {row.ok ? "OK" : (row.error ?? "Failed")}
               </span>
             </div>
           ))}
           {result.created > 0 ? (
-            <p className="text-xs text-muted-foreground">Created {result.created} slots.</p>
+            <p className="text-xs text-muted-foreground">{t("Created")}{result.created} {t("slots.")}</p>
           ) : null}
         </Card>
       ) : null}

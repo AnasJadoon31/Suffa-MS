@@ -8,6 +8,7 @@ import { MultiPicker } from "./MultiPicker";
 import { useUsernameProposal } from "./useUsernameProposal";
 import { peopleApi } from "@/lib/mms/endpoints";
 import { peopleMutations, type StudentDetail } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export function StudentForm({
   student,
@@ -20,6 +21,7 @@ export function StudentForm({
   onOpenChange?: (next: boolean) => void;
   triggerLabel?: string;
 }) {
+    const { t } = useTranslation();
   const isEdit = Boolean(student);
   const client = useQueryClient();
   const [name, setName] = useState(student?.name ?? "");
@@ -86,7 +88,7 @@ export function StudentForm({
       onOpenChange={onOpenChange}
     >
       {!isEdit ? (
-        <Field label="Username *">
+        <Field label={t("Username *")}>
           <TextInput
             required
             maxLength={40}
@@ -95,7 +97,7 @@ export function StudentForm({
           />
         </Field>
       ) : null}
-      <Field label="Full name *">
+      <Field label={t("Full name *")}>
         <TextInput
           required
           maxLength={120}
@@ -103,16 +105,16 @@ export function StudentForm({
           onChange={(e) => setName(e.target.value)}
         />
       </Field>
-      <Field label="Date of birth">
+      <Field label={t("Date of birth")}>
         <TextInput type="date" value={dob ?? ""} onChange={(e) => setDob(e.target.value)} />
       </Field>
-      <Field label="Phone">
+      <Field label={t("Phone")}>
         <TextInput maxLength={20} value={phone ?? ""} onChange={(e) => setPhone(e.target.value)} />
       </Field>
-      <Field label="B-Form number">
+      <Field label={t("B-Form number")}>
         <TextInput maxLength={20} value={bForm ?? ""} onChange={(e) => setBForm(e.target.value)} />
       </Field>
-      <Field label="Address">
+      <Field label={t("Address")}>
         <TextInput
           maxLength={200}
           value={address ?? ""}
@@ -120,10 +122,10 @@ export function StudentForm({
         />
       </Field>
       {!isEdit ? (
-        <Field label="Preferred language">
+        <Field label={t("Preferred language")}>
           <CustomDropdown value={lang} onChange={(e) => setLang(e.target.value)}>
-            <option value="en">English</option>
-            <option value="ur">Urdu</option>
+            <option value="en">{t("English")}</option>
+            <option value="ur">{t("Urdu")}</option>
           </CustomDropdown>
         </Field>
       ) : null}
@@ -133,15 +135,13 @@ export function StudentForm({
           checked={independent}
           onChange={(e) => setIndependent(e.target.checked)}
         />
-        Independent student
-      </label>
+        {t("Independent student")}</label>
       <label className="flex items-center gap-2 text-sm font-semibold">
         <input type="checkbox" checked={portal} onChange={(e) => setPortal(e.target.checked)} />
-        Portal access enabled
-      </label>
+        {t("Portal access enabled")}</label>
       {!isEdit ? (
         <MultiPicker
-          label="Guardians"
+          label={t("Guardians")}
           selected={guardians}
           onChange={setGuardians}
           queryKey="student-form-guardians"

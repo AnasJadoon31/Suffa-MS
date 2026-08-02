@@ -602,6 +602,7 @@ async def _student_dashboard_for_profile(
 
     return {
         "role": "student",
+        "class_id": str(viewer_class_id) if viewer_class_id else None,
         "my_attendance": my_attendance,
         "my_attendance_periods": my_attendance_periods,
         "today_timetable": today_timetable,

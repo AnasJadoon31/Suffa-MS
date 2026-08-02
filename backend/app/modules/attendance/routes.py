@@ -38,7 +38,7 @@ from app.modules.attendance.schemas import (
     TeacherAttendanceTodayResponse,
 )
 from app.modules.operations.models import Holiday, Leave, TimetableSlot
-from app.modules.people.models import StudentProfile, TeacherProfile
+from app.modules.people.models import StudentProfile, TeacherProfile, Guardian, StudentGuardian
 
 router = APIRouter()
 
@@ -143,7 +143,7 @@ def build_record(entry: AttendanceEntry, madrasa_id: UUID, marked_by_id: UUID, o
 
 
 async def _require_student_attendance_access(current_user: User, session: AsyncSession) -> None:
-    if current_user.role == "teacher":
+    if current_user.role == "teacher" or current_user.role == "parent":
         return
     if await user_has_permission(current_user, "attendance.take", session):
         return
@@ -1046,6 +1046,20 @@ async def attendance_student_history(
     academic_class = await session.get(AcademicClass, class_id)
     if academic_class is None or academic_class.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Class not found")
+
+    if current_user.role == "parent":
+        is_guardian = (
+            await session.execute(
+                select(StudentGuardian.id)
+                .join(Guardian, Guardian.id == StudentGuardian.guardian_id)
+                .where(
+                    StudentGuardian.student_id == student_id,
+                    Guardian.user_id == current_user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not is_guardian:
+            raise HTTPException(status_code=403, detail="Not authorized to view this student")
 
     if section_id is not None:
         section = await session.get(Section, section_id)

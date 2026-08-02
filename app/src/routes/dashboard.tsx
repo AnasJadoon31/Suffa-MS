@@ -29,6 +29,7 @@ import {
   type StudentDashboard,
   type TeacherDashboard,
 } from "@/lib/mms/endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -46,6 +47,7 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
+    const { t } = useTranslation();
   const { user, madrasa } = useAuth();
 
   const today = useQuery({
@@ -76,7 +78,7 @@ function DashboardPage() {
     >
       {dashboard.isLoading ? <SkeletonList rows={4} /> : null}
       {dashboard.isError ? (
-        <EmptyState title="Couldn't load your dashboard" hint="Pull down or retry in a moment." />
+        <EmptyState title={t("Couldn't load your dashboard")} hint="Pull down or retry in a moment." />
       ) : null}
 
       {data?.role === "principal" ? <PrincipalView data={data as PrincipalDashboard} /> : null}
@@ -88,6 +90,7 @@ function DashboardPage() {
 }
 
 function FallbackView() {
+    const { t } = useTranslation();
   const shortcuts = [
     { to: "/attendance", label: "Attendance", hint: "Check daily records and history" },
     { to: "/forms", label: "Forms", hint: "Open active form workflows" },
@@ -98,10 +101,10 @@ function FallbackView() {
   return (
     <>
       <EmptyState
-        title="Portal ready"
+        title={t("Portal ready")}
         hint="Your role does not have a custom home card yet, but the core routes are available."
       />
-      <SectionTitle>Shortcuts</SectionTitle>
+      <SectionTitle>{t("Shortcuts")}</SectionTitle>
       <div className="space-y-2.5">
         {shortcuts.map((shortcut) => (
           <Card key={shortcut.to} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">
@@ -113,8 +116,7 @@ function FallbackView() {
               to={shortcut.to}
               className="rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
             >
-              Open
-            </Link>
+              {t("Open")}</Link>
           </Card>
         ))}
       </div>
@@ -123,6 +125,7 @@ function FallbackView() {
 }
 
 function PrincipalView({ data }: { data: PrincipalDashboard }) {
+    const { t } = useTranslation();
   const rate = data.attendance.total_students
     ? Math.round((data.attendance.present / data.attendance.total_students) * 100)
     : 0;
@@ -131,27 +134,23 @@ function PrincipalView({ data }: { data: PrincipalDashboard }) {
     <>
       <Card className="gradient-emerald border-0 text-primary-foreground">
         <p className="text-[0.68rem] font-bold uppercase tracking-widest text-primary-foreground/70">
-          Attendance today
-        </p>
+          {t("Attendance today")}</p>
         <p className="mt-1 font-display text-4xl font-extrabold">{rate}%</p>
         <div className="mt-4 flex flex-wrap gap-2 text-[0.7rem] font-bold">
           <span className="rounded-full bg-primary-foreground/15 px-3 py-1">
-            {data.attendance.present} present
-          </span>
+            {data.attendance.present} {t("present")}</span>
           <span className="rounded-full bg-primary-foreground/15 px-3 py-1">
-            {data.attendance.absent} absent
-          </span>
+            {data.attendance.absent} {t("absent")}</span>
           <span className="rounded-full bg-primary-foreground/15 px-3 py-1">
-            {data.attendance.leave} on leave
-          </span>
+            {data.attendance.leave} {t("on leave")}</span>
         </div>
       </Card>
 
-      <SectionTitle>Madrasa at a glance</SectionTitle>
+      <SectionTitle>{t("Madrasa at a glance")}</SectionTitle>
       <div className="grid grid-cols-2 gap-2.5">
-        <StatCard label="Students" value={data.counts.students} icon={GraduationCap} />
-        <StatCard label="Teachers" value={data.counts.teachers} icon={Users} tone="gold" />
-        <StatCard label="Classes" value={data.counts.classes} icon={BookOpen} />
+        <StatCard label={t("Students")} value={data.counts.students} icon={GraduationCap} />
+        <StatCard label={t("Teachers")} value={data.counts.teachers} icon={Users} tone="gold" />
+        <StatCard label={t("Classes")} value={data.counts.classes} icon={BookOpen} />
         <StatCard
           label={`This month (${data.finance.currency})`}
           value={data.finance.month_total?.toLocaleString?.() ?? data.finance.month_total}
@@ -162,11 +161,10 @@ function PrincipalView({ data }: { data: PrincipalDashboard }) {
 
       {data.attendance.missing_sync_teachers > 0 ? (
         <>
-          <SectionTitle>Needs attention</SectionTitle>
+          <SectionTitle>{t("Needs attention")}</SectionTitle>
           <Card>
             <p className="text-sm font-semibold">
-              {data.attendance.missing_sync_teachers} teacher(s) haven't synced attendance
-            </p>
+              {data.attendance.missing_sync_teachers} {t("teacher(s) haven't synced attendance")}</p>
             <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
               {data.attendance.missing_sync_teacher_list.slice(0, 5).map((teacher) => (
                 <li key={teacher.id}>{teacher.name}</li>
@@ -178,7 +176,7 @@ function PrincipalView({ data }: { data: PrincipalDashboard }) {
 
       {data.activity?.length ? (
         <>
-          <SectionTitle>Recent activity</SectionTitle>
+          <SectionTitle>{t("Recent activity")}</SectionTitle>
           <Card className="space-y-2.5">
             {data.activity.slice(0, 6).map((entry, index) => (
               <p
@@ -196,6 +194,7 @@ function PrincipalView({ data }: { data: PrincipalDashboard }) {
 }
 
 function TeacherView({ data }: { data: TeacherDashboard }) {
+    const { t } = useTranslation();
   const attendance = data.today_attendance;
 
   return (
@@ -206,9 +205,9 @@ function TeacherView({ data }: { data: TeacherDashboard }) {
         checkOut={attendance?.check_out ?? null}
       />
 
-      <SectionTitle>My classes</SectionTitle>
+      <SectionTitle>{t("My classes")}</SectionTitle>
       {data.my_classes.length === 0 ? (
-        <EmptyState title="No classes assigned yet" />
+        <EmptyState title={t("No classes assigned yet")} />
       ) : (
         <div className="space-y-2.5">
           {data.my_classes.map((entry) => (
@@ -228,12 +227,12 @@ function TeacherView({ data }: { data: TeacherDashboard }) {
         </div>
       )}
 
-      <SectionTitle>Today's periods</SectionTitle>
+      <SectionTitle>{t("Today's periods")}</SectionTitle>
       <TimetableStrip entries={data.today_timetable} />
 
-      <SectionTitle>Grading</SectionTitle>
+      <SectionTitle>{t("Grading")}</SectionTitle>
       <StatCard
-        label="Pending submissions"
+        label={t("Pending submissions")}
         value={data.pending_submissions}
         icon={ClipboardList}
         tone="gold"
@@ -243,6 +242,7 @@ function TeacherView({ data }: { data: TeacherDashboard }) {
 }
 
 function StudentView({ data }: { data: StudentDashboard }) {
+    const { t } = useTranslation();
   const values = Object.values(data.my_attendance ?? {});
   const present = values.filter((status) => status === "present").length;
   const rate = values.length ? Math.round((present / values.length) * 100) : 0;
@@ -251,18 +251,16 @@ function StudentView({ data }: { data: StudentDashboard }) {
     <>
       <Card className="gradient-emerald border-0 text-primary-foreground">
         <p className="text-[0.68rem] font-bold uppercase tracking-widest text-primary-foreground/70">
-          My attendance
-        </p>
+          {t("My attendance")}</p>
         <p className="mt-1 font-display text-4xl font-extrabold">{rate}%</p>
         <p className="mt-1 text-xs text-primary-foreground/70">
-          {present} present of {values.length} recorded days
-        </p>
+          {present} {t("present of")}{values.length} {t("recorded days")}</p>
       </Card>
 
-      <SectionTitle>Today's periods</SectionTitle>
+      <SectionTitle>{t("Today's periods")}</SectionTitle>
       <TimetableStrip entries={data.today_timetable} />
 
-      <SectionTitle>Due assignments</SectionTitle>
+      <SectionTitle>{t("Due assignments")}</SectionTitle>
       {data.due_assignments?.length ? (
         <div className="space-y-2.5">
           {data.due_assignments.map((assignment) => (
@@ -273,7 +271,7 @@ function StudentView({ data }: { data: StudentDashboard }) {
               <div className="min-w-0">
                 <p className="truncate font-semibold">{assignment.title}</p>
                 <p className="text-xs text-muted-foreground">
-                  Due {assignment.due_date?.slice(0, 10)}
+                  {t("Due")}{assignment.due_date?.slice(0, 10)}
                 </p>
               </div>
               <Pill tone={assignment.submitted ? "success" : "warning"}>
@@ -283,7 +281,7 @@ function StudentView({ data }: { data: StudentDashboard }) {
           ))}
         </div>
       ) : (
-        <EmptyState title="Nothing due right now" />
+        <EmptyState title={t("Nothing due right now")} />
       )}
     </>
   );
@@ -294,7 +292,8 @@ function TimetableStrip({
 }: {
   entries: { period: number; start_time: string; end_time: string }[];
 }) {
-  if (!entries?.length) return <EmptyState title="No periods scheduled today" />;
+    const { t } = useTranslation();
+  if (!entries?.length) return <EmptyState title={t("No periods scheduled today")} />;
 
   return (
     <div className="-mx-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1">
@@ -303,7 +302,7 @@ function TimetableStrip({
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent-soft text-accent-foreground">
             <CalendarClock className="h-4 w-4" />
           </span>
-          <p className="mt-2 font-display text-sm font-extrabold">Period {entry.period}</p>
+          <p className="mt-2 font-display text-sm font-extrabold">{t("Period")}{entry.period}</p>
           <p className="text-xs text-muted-foreground">
             {entry.start_time?.slice(0, 5)}–{entry.end_time?.slice(0, 5)}
           </p>
@@ -322,6 +321,7 @@ function CheckInCard({
   checkIn: string | null;
   checkOut: string | null;
 }) {
+    const { t } = useTranslation();
   const query = useQuery({
     queryKey: ["teacher-attendance-today"],
     queryFn: () => attendanceApi.myTeacherAttendanceToday(),
@@ -339,13 +339,12 @@ function CheckInCard({
     <Card className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
       <div className="min-w-0">
         <p className="text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
-          My check-in
-        </p>
+          {t("My check-in")}</p>
         <p className="font-display text-lg font-extrabold">
           {current.check_in ? current.check_in.slice(11, 16) : "Not checked in"}
         </p>
         {current.check_out ? (
-          <p className="text-xs text-muted-foreground">Out at {current.check_out.slice(11, 16)}</p>
+          <p className="text-xs text-muted-foreground">{t("Out at")}{current.check_out.slice(11, 16)}</p>
         ) : null}
       </div>
       <button

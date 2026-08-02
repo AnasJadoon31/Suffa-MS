@@ -3,6 +3,7 @@ import { Bold, Eraser, Heading2, Italic, Link2, List } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 const SANITIZE_CONFIG = {
   ALLOWED_TAGS: ["p", "br", "strong", "b", "em", "i", "u", "a", "ul", "li", "h2"],
@@ -18,6 +19,7 @@ function ToolbarButton({
   label: string;
   children: React.ReactNode;
 }) {
+    const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -45,6 +47,7 @@ export function RichTextEditor({
   placeholder?: string;
   className?: string;
 }) {
+    const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const lastValue = useRef<string>("");
 
@@ -77,22 +80,22 @@ export function RichTextEditor({
   return (
     <div className={cn("overflow-hidden rounded-2xl border border-border bg-card", className)}>
       <div className="flex items-center gap-0.5 border-b border-border px-1.5 py-1">
-        <ToolbarButton label="Bold" onClick={() => exec("bold")}>
+        <ToolbarButton label={t("Bold")} onClick={() => exec("bold")}>
           <Bold className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton label="Italic" onClick={() => exec("italic")}>
+        <ToolbarButton label={t("Italic")} onClick={() => exec("italic")}>
           <Italic className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton label="Heading" onClick={() => exec("formatBlock", "h2")}>
+        <ToolbarButton label={t("Heading")} onClick={() => exec("formatBlock", "h2")}>
           <Heading2 className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton label="Bullet list" onClick={() => exec("insertUnorderedList")}>
+        <ToolbarButton label={t("Bullet list")} onClick={() => exec("insertUnorderedList")}>
           <List className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton label="Link" onClick={handleLink}>
+        <ToolbarButton label={t("Link")} onClick={handleLink}>
           <Link2 className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton label="Clear formatting" onClick={() => exec("removeFormat")}>
+        <ToolbarButton label={t("Clear formatting")} onClick={() => exec("removeFormat")}>
           <Eraser className="h-4 w-4" />
         </ToolbarButton>
       </div>

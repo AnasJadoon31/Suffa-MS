@@ -7,6 +7,7 @@ import { Field, CustomDropdown, TextInput } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
 import { peopleApi } from "@/lib/mms/endpoints";
 import { peopleMutations, type GuardianDetail } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export function GuardianForm({
   guardian,
@@ -19,6 +20,7 @@ export function GuardianForm({
   onOpenChange?: (next: boolean) => void;
   triggerLabel?: string;
 }) {
+    const { t } = useTranslation();
   const isEdit = Boolean(guardian);
   const client = useQueryClient();
   const [name, setName] = useState(guardian?.name ?? "");
@@ -79,7 +81,7 @@ export function GuardianForm({
       open={open}
       onOpenChange={onOpenChange}
     >
-      <Field label="Full name *">
+      <Field label={t("Full name *")}>
         <TextInput
           required
           maxLength={120}
@@ -87,46 +89,46 @@ export function GuardianForm({
           onChange={(e) => setName(e.target.value)}
         />
       </Field>
-      <Field label="Relationship *">
+      <Field label={t("Relationship *")}>
         <CustomDropdown
           required
           value={relationship}
           onChange={(e) => setRelationship(e.target.value)}
         >
-          <option value="father">Father</option>
-          <option value="mother">Mother</option>
-          <option value="guardian">Guardian</option>
-          <option value="other">Other</option>
+          <option value="father">{t("Father")}</option>
+          <option value="mother">{t("Mother")}</option>
+          <option value="guardian">{t("Guardian")}</option>
+          <option value="other">{t("Other")}</option>
         </CustomDropdown>
       </Field>
-      <Field label="Phone number(s) *">
+      <Field label={t("Phone number(s) *")}>
         <TextInput
           required
           maxLength={100}
-          placeholder="Separate multiple with commas"
+          placeholder={t("Separate multiple with commas")}
           value={phones ?? ""}
           onChange={(e) => setPhones(e.target.value)}
         />
       </Field>
-      <Field label="CNIC">
+      <Field label={t("CNIC")}>
         <TextInput maxLength={20} value={cnic ?? ""} onChange={(e) => setCnic(e.target.value)} />
       </Field>
-      <Field label="Address">
+      <Field label={t("Address")}>
         <TextInput
           maxLength={200}
           value={address ?? ""}
           onChange={(e) => setAddress(e.target.value)}
         />
       </Field>
-      <Field label="Preferred language">
+      <Field label={t("Preferred language")}>
         <CustomDropdown value={lang} onChange={(e) => setLang(e.target.value)}>
-          <option value="en">English</option>
-          <option value="ur">Urdu</option>
+          <option value="en">{t("English")}</option>
+          <option value="ur">{t("Urdu")}</option>
         </CustomDropdown>
       </Field>
       {!isEdit ? (
         <MultiPicker
-          label="Students"
+          label={t("Students")}
           selected={students}
           onChange={setStudents}
           queryKey="guardian-form-students"

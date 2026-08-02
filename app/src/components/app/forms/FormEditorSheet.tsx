@@ -10,6 +10,7 @@ import {
 import { FormSheet } from "@/components/app/FormSheet";
 import { Field, CustomDropdown, TextArea, TextInput } from "@/components/app/Primitives";
 import { formsApi, type FormDef, type FormFieldDefinition } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export function FormEditorSheet({
   form,
@@ -22,6 +23,7 @@ export function FormEditorSheet({
   onOpenChange: (next: boolean) => void;
   onSaved: () => void;
 }) {
+    const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -79,36 +81,36 @@ export function FormEditorSheet({
       onOpenChange={onOpenChange}
       onSubmit={handleSubmit}
     >
-      <Field label="Title">
+      <Field label={t("Title")}>
         <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
-      <Field label="Description">
+      <Field label={t("Description")}>
         <TextArea value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
-      <Field label="Category">
+      <Field label={t("Category")}>
         <TextInput
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          placeholder="e.g. Trip permission"
+          placeholder={t("e.g. Trip permission")}
         />
       </Field>
-      <Field label="Visible to">
+      <Field label={t("Visible to")}>
         <CustomDropdown value={audience} onChange={(e) => setAudience(e.target.value)}>
-          <option value="all">Everyone</option>
-          <option value="teacher">Teachers</option>
-          <option value="student">Students</option>
-          <option value="parent">Guardians</option>
+          <option value="all">{t("Everyone")}</option>
+          <option value="teacher">{t("Teachers")}</option>
+          <option value="student">{t("Students")}</option>
+          <option value="parent">{t("Guardians")}</option>
         </CustomDropdown>
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
-        <Field label="Opens">
+        <Field label={t("Opens")}>
           <TextInput
             type="datetime-local"
             value={openFrom}
             onChange={(e) => setOpenFrom(e.target.value)}
           />
         </Field>
-        <Field label="Closes">
+        <Field label={t("Closes")}>
           <TextInput
             type="datetime-local"
             value={openUntil}
@@ -123,8 +125,7 @@ export function FormEditorSheet({
           onChange={(e) => setAllowMultiple(e.target.checked)}
           className="h-4 w-4 rounded border-border accent-primary"
         />
-        Allow multiple submissions per person
-      </label>
+        {t("Allow multiple submissions per person")}</label>
 
       <FormFieldsEditor fields={fields} onChange={setFields} />
     </FormSheet>

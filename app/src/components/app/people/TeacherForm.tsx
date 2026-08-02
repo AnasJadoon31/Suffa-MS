@@ -6,6 +6,7 @@ import { FormSheet } from "@/components/app/FormSheet";
 import { Field, TextInput } from "@/components/app/Primitives";
 import { useUsernameProposal } from "./useUsernameProposal";
 import { peopleMutations, type TeacherDetail } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export function TeacherForm({
   teacher,
@@ -18,6 +19,7 @@ export function TeacherForm({
   onOpenChange?: (next: boolean) => void;
   triggerLabel?: string;
 }) {
+    const { t } = useTranslation();
   const isEdit = Boolean(teacher);
   const client = useQueryClient();
   const [name, setName] = useState(teacher?.name ?? "");
@@ -93,7 +95,7 @@ export function TeacherForm({
       onOpenChange={onOpenChange}
     >
       {!isEdit ? (
-        <Field label="Username *">
+        <Field label={t("Username *")}>
           <TextInput
             required
             maxLength={40}
@@ -102,7 +104,7 @@ export function TeacherForm({
           />
         </Field>
       ) : null}
-      <Field label="Full name *">
+      <Field label={t("Full name *")}>
         <TextInput
           required
           maxLength={120}
@@ -110,7 +112,7 @@ export function TeacherForm({
           onChange={(e) => setName(e.target.value)}
         />
       </Field>
-      <Field label="WhatsApp number *">
+      <Field label={t("WhatsApp number *")}>
         <TextInput
           required
           maxLength={20}
@@ -118,31 +120,31 @@ export function TeacherForm({
           onChange={(e) => setWhatsapp(e.target.value)}
         />
       </Field>
-      <Field label="Qualifications">
+      <Field label={t("Qualifications")}>
         <TextInput
           maxLength={200}
           value={qualifications ?? ""}
           onChange={(e) => setQualifications(e.target.value)}
         />
       </Field>
-      <Field label="Join date">
+      <Field label={t("Join date")}>
         <TextInput
           type="date"
           value={joinDate ?? ""}
           onChange={(e) => setJoinDate(e.target.value)}
         />
       </Field>
-      <Field label="CNIC">
+      <Field label={t("CNIC")}>
         <TextInput maxLength={20} value={cnic ?? ""} onChange={(e) => setCnic(e.target.value)} />
       </Field>
-      <Field label="Address">
+      <Field label={t("Address")}>
         <TextInput
           maxLength={200}
           value={address ?? ""}
           onChange={(e) => setAddress(e.target.value)}
         />
       </Field>
-      <Field label="Emergency contact">
+      <Field label={t("Emergency contact")}>
         <TextInput
           maxLength={40}
           value={emergency ?? ""}
@@ -151,8 +153,7 @@ export function TeacherForm({
       </Field>
       <label className="flex items-center gap-2 text-sm font-semibold">
         <input type="checkbox" checked={delegate} onChange={(e) => setDelegate(e.target.checked)} />
-        Delegate as Principal (access all menus)
-      </label>
+        {t("Delegate as Principal (access all menus)")}</label>
     </FormSheet>
   );
 }

@@ -15,6 +15,7 @@ import {
 } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
 import { opsApi, opsMutations, type TypedMadrasaSetting } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/settings")({
 const THEME_KEY = "mms_theme";
 
 function SettingsPage() {
+    const { t } = useTranslation();
   const { madrasa, hasPermission } = useAuth();
   const [dark, setDark] = useState(false);
   const canManage = hasPermission("settings.manage");
@@ -68,15 +70,15 @@ function SettingsPage() {
   }, [settings.data]);
 
   return (
-    <AppShell title="Settings" subtitle={madrasa?.name ?? "Suffa MS"}>
-      <SectionTitle>Appearance</SectionTitle>
+    <AppShell title={t("Settings")} subtitle={madrasa?.name ?? "Suffa MS"}>
+      <SectionTitle>{t("Appearance")}</SectionTitle>
       <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
           {dark ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
         </span>
         <div className="min-w-0">
-          <p className="truncate font-semibold">Dark mode</p>
-          <p className="truncate text-xs text-muted-foreground">Easier on the eyes at night</p>
+          <p className="truncate font-semibold">{t("Dark mode")}</p>
+          <p className="truncate text-xs text-muted-foreground">{t("Easier on the eyes at night")}</p>
         </div>
         <button
           onClick={toggleTheme}
@@ -97,7 +99,7 @@ function SettingsPage() {
         </button>
       </Card>
 
-      <SectionTitle>Madrasa</SectionTitle>
+      <SectionTitle>{t("Madrasa")}</SectionTitle>
       <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
           <Building2 className="h-5 w-5" />
@@ -109,11 +111,11 @@ function SettingsPage() {
         <span />
       </Card>
 
-      <SectionTitle>Configuration</SectionTitle>
+      <SectionTitle>{t("Configuration")}</SectionTitle>
       {settings.isLoading ? <SkeletonList rows={4} /> : null}
       {!settings.isLoading && grouped.length === 0 ? (
         <EmptyState
-          title="No settings available"
+          title={t("No settings available")}
           hint="Only administrators can change configuration."
         />
       ) : null}
@@ -140,6 +142,7 @@ function SettingRow({
   setting: TypedMadrasaSetting;
   canManage: boolean;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const [draft, setDraft] = useState(setting.value);
   const dirty = draft !== setting.value;
@@ -167,8 +170,8 @@ function SettingRow({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
           >
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
+            <option value="true">{t("Enabled")}</option>
+            <option value="false">{t("Disabled")}</option>
           </CustomDropdown>
         ) : setting.type === "int" ? (
           <TextInput

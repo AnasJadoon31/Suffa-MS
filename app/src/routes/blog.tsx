@@ -11,6 +11,7 @@ import { RichText } from "@/components/app/RichText";
 import { useAuth } from "@/lib/mms/auth";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import { opsApi, opsMutations, type BlogPost } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/blog")({
   head: () => ({
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/blog")({
 });
 
 function BlogPage() {
+    const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
   const canManage = user?.role === "principal" || user?.role === "super_admin";
@@ -88,14 +90,13 @@ function BlogPage() {
 
   if (active) {
     return (
-      <AppShell title="Post" subtitle={active.published ? "Live" : "Draft"}>
+      <AppShell title={t("Post")} subtitle={active.published ? "Live" : "Draft"}>
         <button
           onClick={() => setActive(null)}
           className="mb-3 inline-flex items-center gap-1.5 text-sm font-bold text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to blog
-        </button>
+          {t("Back to blog")}</button>
         <Card className="space-y-3 p-4">
           <div className="flex items-start gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
@@ -119,24 +120,21 @@ function BlogPage() {
                 className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
               >
                 <Edit2 className="h-3.5 w-3.5" />
-                Edit
-              </button>
+                {t("Edit")}</button>
               {!active.published ? (
                 <button
                   onClick={() => publish.mutate(active.id)}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
                 >
                   <Send className="h-3.5 w-3.5" />
-                  Publish
-                </button>
+                  {t("Publish")}</button>
               ) : null}
               <button
                 onClick={() => remove.mutate(active.id)}
                 className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </button>
+                {t("Delete")}</button>
             </div>
           ) : null}
         </Card>
@@ -146,12 +144,12 @@ function BlogPage() {
 
   return (
     <AppShell
-      title="Blog"
+      title={t("Blog")}
       subtitle={`${filtered.length} posts`}
       right={
         canManage ? (
           <FormSheet
-            title="New post"
+            title={t("New post")}
             triggerLabel="Write"
             submitLabel="Save draft"
             onSubmit={() => create.mutateAsync(false)}
@@ -169,7 +167,7 @@ function BlogPage() {
         <TextInput
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search posts…"
+          placeholder={t("Search posts…")}
           className="pl-9"
         />
       </div>
@@ -186,7 +184,7 @@ function BlogPage() {
       ) : null}
 
       {query.isLoading ? <SkeletonList rows={4} /> : null}
-      {!query.isLoading && filtered.length === 0 ? <EmptyState title="No posts yet" /> : null}
+      {!query.isLoading && filtered.length === 0 ? <EmptyState title={t("No posts yet")} /> : null}
 
       <div className="space-y-2.5">
         {filtered.map((post) => (
@@ -215,24 +213,21 @@ function BlogPage() {
                   className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
                 >
                   <Edit2 className="h-3.5 w-3.5" />
-                  Edit
-                </button>
+                  {t("Edit")}</button>
                 {!post.published ? (
                   <button
                     onClick={() => publish.mutate(post.id)}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
                   >
                     <Send className="h-3.5 w-3.5" />
-                    Publish
-                  </button>
+                    {t("Publish")}</button>
                 ) : null}
                 <button
                   onClick={() => remove.mutate(post.id)}
                   className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </button>
+                  {t("Delete")}</button>
               </div>
             ) : null}
           </Card>
@@ -245,6 +240,7 @@ function BlogPage() {
 }
 
 function EditBlogSheet({ post, onClose }: { post: BlogPost; onClose: () => void }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const [form, setForm] = useState<BlogPostFormValues>({ title: post.title, body: post.body });
 
@@ -265,7 +261,7 @@ function EditBlogSheet({ post, onClose }: { post: BlogPost; onClose: () => void 
 
   return (
     <FormSheet
-      title="Edit post"
+      title={t("Edit post")}
       submitLabel="Save changes"
       open
       onOpenChange={(next) => !next && onClose()}

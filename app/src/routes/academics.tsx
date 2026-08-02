@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { academicsExtraApi, academicsMutations } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/academics")({
   head: () => ({
@@ -35,6 +36,7 @@ export const Route = createFileRoute("/academics")({
 type Tab = "sessions" | "programs" | "classes" | "courses";
 
 function AcademicsPage() {
+    const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
   const canManage = user?.role === "principal" || user?.role === "super_admin";
@@ -93,8 +95,8 @@ function AcademicsPage() {
 
   return (
     <AppShell
-      title="Academics"
-      subtitle="Structure of your madrasa"
+      title={t("Academics")}
+      subtitle={t("Structure of your madrasa")}
       right={
         canManage ? (
           <FormSheet
@@ -103,17 +105,17 @@ function AcademicsPage() {
             submitLabel="Create"
             onSubmit={() => create.mutateAsync()}
           >
-            <Field label="Name">
+            <Field label={t("Name")}>
               <TextInput required value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
             {tab === "classes" ? (
-              <Field label="Program">
+              <Field label={t("Program")}>
                 <CustomDropdown
                   required
                   value={programId}
                   onChange={(e) => setProgramId(e.target.value)}
                 >
-                  <option value="">Select program</option>
+                  <option value="">{t("Select program")}</option>
                   {(programs.data ?? []).map((program) => (
                     <option key={program.id} value={program.id}>
                       {program.name}
@@ -124,7 +126,7 @@ function AcademicsPage() {
             ) : null}
             {tab === "sessions" ? (
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Start">
+                <Field label={t("Start")}>
                   <TextInput
                     type="date"
                     required
@@ -132,7 +134,7 @@ function AcademicsPage() {
                     onChange={(e) => setStart(e.target.value)}
                   />
                 </Field>
-                <Field label="End">
+                <Field label={t("End")}>
                   <TextInput
                     type="date"
                     required
@@ -236,7 +238,8 @@ function Items({
     action?: { label: string; onClick: () => void } | undefined;
   }[];
 }) {
-  if (empty) return <EmptyState title="Nothing here yet" />;
+    const { t } = useTranslation();
+  if (empty) return <EmptyState title={t("Nothing here yet")} />;
   return (
     <div className="space-y-2">
       {rows.map((row) => (

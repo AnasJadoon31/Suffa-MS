@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { TextInput } from "@/components/app/Primitives";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 /** Generic search + multi-select picker for linking students/guardians. */
 export function MultiPicker({
@@ -18,6 +19,7 @@ export function MultiPicker({
   fetchOptions: (search: string) => Promise<{ id: string; name: string }[]>;
   queryKey: string;
 }) {
+    const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const query = useQuery({
     queryKey: [queryKey, search],
@@ -61,9 +63,9 @@ export function MultiPicker({
       />
       <div className="max-h-40 space-y-1 overflow-y-auto rounded-2xl border border-border p-1.5">
         {query.isLoading ? (
-          <p className="px-2 py-1.5 text-xs text-muted-foreground">Loading…</p>
+          <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("Loading…")}</p>
         ) : options.length === 0 ? (
-          <p className="px-2 py-1.5 text-xs text-muted-foreground">No matches</p>
+          <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("No matches")}</p>
         ) : (
           options.map((option) => (
             <button

@@ -14,6 +14,7 @@ import { RichText } from "@/components/app/RichText";
 import { useAuth } from "@/lib/mms/auth";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import { opsApi, opsMutations } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/announcements")({
   head: () => ({
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/announcements")({
 });
 
 function AnnouncementsPage() {
+    const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const client = useQueryClient();
   const canManage =
@@ -99,12 +101,12 @@ function AnnouncementsPage() {
 
   return (
     <AppShell
-      title="Announcements"
+      title={t("Announcements")}
       subtitle={`${items.length} notices`}
       right={
         canManage ? (
           <FormSheet
-            title="New announcement"
+            title={t("New announcement")}
             triggerLabel="New"
             submitLabel="Publish"
             onSubmit={() => create.mutateAsync()}
@@ -123,32 +125,32 @@ function AnnouncementsPage() {
           <TextInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search announcements…"
+            placeholder={t("Search announcements…")}
             className="pl-9"
           />
         </div>
         <div className="grid grid-cols-2 gap-2.5">
-          <Field label="Audience">
+          <Field label={t("Audience")}>
             <CustomDropdown
               value={audienceFilter}
               onChange={(e) => setAudienceFilter(e.target.value as typeof audienceFilter)}
             >
-              <option value="all">All</option>
-              <option value="teachers">Teachers</option>
-              <option value="students">Students</option>
+              <option value="all">{t("All")}</option>
+              <option value="teachers">{t("Teachers")}</option>
+              <option value="students">{t("Students")}</option>
             </CustomDropdown>
           </Field>
-          <Field label="Category">
+          <Field label={t("Category")}>
             <TextInput
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              placeholder="Any"
+              placeholder={t("Any")}
             />
           </Field>
-          <Field label="From">
+          <Field label={t("From")}>
             <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </Field>
-          <Field label="To">
+          <Field label={t("To")}>
             <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </Field>
         </div>
@@ -156,7 +158,7 @@ function AnnouncementsPage() {
 
       {query.isLoading ? <SkeletonList rows={4} /> : null}
       {!query.isLoading && items.length === 0 ? (
-        <EmptyState title="Nothing announced yet" hint="New notices will appear here." />
+        <EmptyState title={t("Nothing announced yet")} hint="New notices will appear here." />
       ) : null}
 
       <div className="space-y-2.5">
@@ -183,8 +185,7 @@ function AnnouncementsPage() {
                   rel="noreferrer"
                   className="text-sm font-bold text-primary underline underline-offset-4"
                 >
-                  Open attachment
-                </a>
+                  {t("Open attachment")}</a>
               ) : null}
               {canManage ? (
                 <div className="ml-auto flex items-center gap-2">
@@ -193,15 +194,13 @@ function AnnouncementsPage() {
                     className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
                   >
                     <Edit2 className="h-3.5 w-3.5" />
-                    Edit
-                  </button>
+                    {t("Edit")}</button>
                   <button
                     onClick={() => remove.mutate(item.id)}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Delete
-                  </button>
+                    {t("Delete")}</button>
                 </div>
               ) : null}
             </div>
@@ -230,6 +229,7 @@ function EditAnnouncementSheet({
   };
   onClose: () => void;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const [form, setForm] = useState<AnnouncementFormValues>({
     title: announcement.title,
@@ -262,7 +262,7 @@ function EditAnnouncementSheet({
 
   return (
     <FormSheet
-      title="Edit announcement"
+      title={t("Edit announcement")}
       submitLabel="Save changes"
       open
       onOpenChange={(next) => !next && onClose()}

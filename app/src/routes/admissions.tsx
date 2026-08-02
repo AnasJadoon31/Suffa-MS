@@ -27,6 +27,7 @@ import {
   peopleMutations,
   type AdmissionApplication,
 } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/admissions")({
   head: () => ({
@@ -47,6 +48,7 @@ const FILTERS = ["all", "pending", "accepted", "rejected"] as const;
 const emptyExtra = { search: "" };
 
 function AdmissionsPage() {
+    const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const canManage = hasPermission("admissions.manage");
   const queryClient = useQueryClient();
@@ -129,19 +131,19 @@ function AdmissionsPage() {
 
   return (
     <AppShell
-      title="Admissions"
+      title={t("Admissions")}
       subtitle={`${items.length} applications`}
       right={
         canManage ? (
           <FormSheet
-            title="New application"
+            title={t("New application")}
             triggerLabel="Add"
             submitLabel="Create"
             onSubmit={() => create.mutateAsync()}
           >
-            <Field label="Admission form">
+            <Field label={t("Admission form")}>
               <CustomDropdown value={formId} onChange={(e) => setFormId(e.target.value)}>
-                <option value="">Use first open form</option>
+                <option value="">{t("Use first open form")}</option>
                 {(forms.data ?? []).map((form) => (
                   <option key={form.id} value={form.id}>
                     {form.title}
@@ -150,15 +152,15 @@ function AdmissionsPage() {
                 ))}
               </CustomDropdown>
             </Field>
-            <Field label="Applicant name">
+            <Field label={t("Applicant name")}>
               <TextInput required value={applicant} onChange={(e) => setApplicant(e.target.value)} />
             </Field>
-            <Field label="Guardian contact">
+            <Field label={t("Guardian contact")}>
               <TextInput required value={contact} onChange={(e) => setContact(e.target.value)} />
             </Field>
-            <Field label="Program">
+            <Field label={t("Program")}>
               <CustomDropdown value={programId} onChange={(e) => setProgramId(e.target.value)}>
-                <option value="">Keep form program</option>
+                <option value="">{t("Keep form program")}</option>
                 {(programs.data ?? []).map((program) => (
                   <option key={program.id} value={program.id}>
                     {program.name}
@@ -166,10 +168,10 @@ function AdmissionsPage() {
                 ))}
               </CustomDropdown>
             </Field>
-            <Field label="Date of birth">
+            <Field label={t("Date of birth")}>
               <TextInput type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
             </Field>
-            <Field label="Notes">
+            <Field label={t("Notes")}>
               <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
           </FormSheet>
@@ -197,10 +199,10 @@ function AdmissionsPage() {
 
       {query.isLoading ? <SkeletonList rows={5} /> : null}
       {query.isError ? (
-        <EmptyState title="Admissions unavailable" hint="You may not have access to this module." />
+        <EmptyState title={t("Admissions unavailable")} hint="You may not have access to this module." />
       ) : null}
       {!query.isLoading && !query.isError && items.length === 0 ? (
-        <EmptyState title="No applications" />
+        <EmptyState title={t("No applications")} />
       ) : null}
 
       <div className="space-y-2.5">
@@ -256,6 +258,7 @@ function AdmissionDetailSheet({
   onClose: () => void;
   canManage: boolean;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => academicsApi.listSessions(), enabled: canManage });
   const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses(), enabled: canManage });
@@ -350,27 +353,25 @@ function AdmissionDetailSheet({
             </p>
           </div>
           <ActionButton variant="ghost" onClick={onClose}>
-            Close
-          </ActionButton>
+            {t("Close")}</ActionButton>
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <Card className="space-y-3 p-3.5">
-            <Field label="Applicant name">
+            <Field label={t("Applicant name")}>
               <TextInput value={applicantName} onChange={(e) => setApplicantName(e.target.value)} />
             </Field>
-            <Field label="Guardian contact">
+            <Field label={t("Guardian contact")}>
               <TextInput value={guardianContact} onChange={(e) => setGuardianContact(e.target.value)} />
             </Field>
-            <Field label="Date of birth">
+            <Field label={t("Date of birth")}>
               <TextInput type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
             </Field>
-            <Field label="Notes">
+            <Field label={t("Notes")}>
               <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
             <ActionButton onClick={() => save.mutate()} disabled={save.isPending} className="w-full">
-              Save application
-            </ActionButton>
+              {t("Save application")}</ActionButton>
           </Card>
 
           <Card className="space-y-3 p-3.5">
@@ -386,23 +387,21 @@ function AdmissionDetailSheet({
               >
                 {application.status}
               </Pill>
-              {application.converted_at ? <Pill tone="gold">Converted</Pill> : null}
+              {application.converted_at ? <Pill tone="gold">{t("Converted")}</Pill> : null}
             </div>
             <div className="flex flex-wrap gap-2">
               {application.status !== "rejected" ? (
                 <ActionButton variant="danger" onClick={() => setStatus.mutate("rejected")}>
                   <XCircle className="h-4 w-4" />
-                  Reject
-                </ActionButton>
+                  {t("Reject")}</ActionButton>
               ) : null}
               {application.status !== "pending" ? (
                 <ActionButton variant="soft" onClick={() => setStatus.mutate("pending")}>
-                  Return to pending
-                </ActionButton>
+                  {t("Return to pending")}</ActionButton>
               ) : null}
             </div>
 
-            <Field label="Status history">
+            <Field label={t("Status history")}>
               {statusHistory.isLoading ? <SkeletonList rows={2} /> : null}
               <div className="space-y-2">
                 {(statusHistory.data ?? application.status_history ?? []).map((entry, index) => (
@@ -423,21 +422,21 @@ function AdmissionDetailSheet({
 
         {canManage ? (
           <>
-            <SectionHeader title="Convert to student" />
+            <SectionHeader title={t("Convert to student")} />
             <Card className="grid gap-3 p-3.5 lg:grid-cols-2">
-              <Field label="Student username">
+              <Field label={t("Student username")}>
                 <TextInput
                   value={studentUsername}
                   onChange={(e) => setStudentUsername(e.target.value)}
                   placeholder={proposal.data ?? "student username"}
                 />
               </Field>
-              <Field label="Guardian username">
+              <Field label={t("Guardian username")}>
                 <TextInput value={guardianUsername} onChange={(e) => setGuardianUsername(e.target.value)} />
               </Field>
-              <Field label="Session">
+              <Field label={t("Session")}>
                 <CustomDropdown value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
-                  <option value="">Select session</option>
+                  <option value="">{t("Select session")}</option>
                   {(sessions.data ?? []).map((session) => (
                     <option key={session.id} value={session.id}>
                       {session.name}
@@ -445,9 +444,9 @@ function AdmissionDetailSheet({
                   ))}
                 </CustomDropdown>
               </Field>
-              <Field label="Class">
+              <Field label={t("Class")}>
                 <CustomDropdown value={classId} onChange={(e) => setClassId(e.target.value)}>
-                  <option value="">Select class</option>
+                  <option value="">{t("Select class")}</option>
                   {(classes.data ?? []).map((academicClass) => (
                     <option key={academicClass.id} value={academicClass.id}>
                       {academicClass.name}
@@ -455,9 +454,9 @@ function AdmissionDetailSheet({
                   ))}
                 </CustomDropdown>
               </Field>
-              <Field label="Section">
+              <Field label={t("Section")}>
                 <CustomDropdown value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-                  <option value="">Select section</option>
+                  <option value="">{t("Select section")}</option>
                   {(sections.data ?? [])
                     .filter((section) => !classId || section.class_id === classId)
                     .map((section) => (
@@ -467,10 +466,10 @@ function AdmissionDetailSheet({
                     ))}
                 </CustomDropdown>
               </Field>
-              <Field label="Guardian name override">
+              <Field label={t("Guardian name override")}>
                 <TextInput value={guardianName} onChange={(e) => setGuardianName(e.target.value)} />
               </Field>
-              <Field label="Guardian relationship">
+              <Field label={t("Guardian relationship")}>
                 <TextInput
                   value={guardianRelationship}
                   onChange={(e) => setGuardianRelationship(e.target.value)}
@@ -479,8 +478,7 @@ function AdmissionDetailSheet({
               <div className="lg:col-span-2">
                 <ActionButton onClick={() => convert.mutate()} disabled={convert.isPending} className="w-full">
                   <CheckCircle2 className="h-4 w-4" />
-                  Convert application
-                </ActionButton>
+                  {t("Convert application")}</ActionButton>
               </div>
             </Card>
           </>
@@ -491,5 +489,6 @@ function AdmissionDetailSheet({
 }
 
 function SectionHeader({ title }: { title: string }) {
+    const { t } = useTranslation();
   return <h3 className="mb-3 mt-6 font-display text-sm font-extrabold uppercase tracking-[0.14em] text-muted-foreground">{title}</h3>;
 }

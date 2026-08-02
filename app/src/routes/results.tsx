@@ -20,6 +20,7 @@ import { academicsApi } from "@/lib/mms/endpoints";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsExtraApi, assessmentsApi, assessmentsMutations, reportsApi } from "@/lib/mms/more-endpoints";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/results")({
   head: () => ({
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/results")({
 });
 
 function ResultsPage() {
+    const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const isStudent = user?.role === "student";
   return isStudent || !hasPermission("assessments.results.publish") ? (
@@ -44,6 +46,7 @@ function ResultsPage() {
 }
 
 function StudentResultsView() {
+    const { t } = useTranslation();
   const [sessionId, setSessionId] = useState<string>("");
 
   const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => academicsApi.listSessions() });
@@ -70,7 +73,7 @@ function StudentResultsView() {
   const data = result.data;
 
   return (
-    <AppShell title="Results" subtitle="Your session performance">
+    <AppShell title={t("Results")} subtitle={t("Your session performance")}>
       {sessions.data && sessions.data.length > 0 ? (
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
           {sessions.data.map((session) => (
@@ -94,7 +97,7 @@ function StudentResultsView() {
 
       {result.isError ? (
         <EmptyState
-          title="Results unavailable"
+          title={t("Results unavailable")}
           hint="Results are visible once published for your account."
         />
       ) : null}
@@ -102,8 +105,8 @@ function StudentResultsView() {
       {data ? (
         <>
           <div className="grid grid-cols-2 gap-2.5">
-            <StatCard label="Overall" value={data.overall_score ?? "—"} />
-            <StatCard label="Courses" value={data.course_results.length} />
+            <StatCard label={t("Overall")} value={data.overall_score ?? "—"} />
+            <StatCard label={t("Courses")} value={data.course_results.length} />
           </div>
 
           <SectionTitle
@@ -115,17 +118,15 @@ function StudentResultsView() {
                 {data.published ? (
                   <ActionButton variant="soft" onClick={() => resultCard.mutate()}>
                     <Download className="h-4 w-4" />
-                    Card
-                  </ActionButton>
+                    {t("Card")}</ActionButton>
                 ) : null}
               </div>
             }
           >
-            Course breakdown
-          </SectionTitle>
+            {t("Course breakdown")}</SectionTitle>
 
           <div className="space-y-2">
-            {data.course_results.length === 0 ? <EmptyState title="No course results yet" /> : null}
+            {data.course_results.length === 0 ? <EmptyState title={t("No course results yet")} /> : null}
             {data.course_results.map((course) => (
               <Card
                 key={course.course_id}
@@ -133,7 +134,7 @@ function StudentResultsView() {
               >
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{courseName(course.course_id)}</p>
-                  <p className="text-xs text-muted-foreground">{course.exam_count} exams</p>
+                  <p className="text-xs text-muted-foreground">{course.exam_count} {t("exams")}</p>
                 </div>
                 <span className="font-display text-lg font-extrabold">
                   {course.raw_score ?? "—"}
@@ -149,6 +150,7 @@ function StudentResultsView() {
 }
 
 function StaffResultsView() {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => academicsApi.listSessions() });
   const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses() });
@@ -173,11 +175,11 @@ function StaffResultsView() {
   const sectionRows = matrix.data?.sections ?? [];
 
   return (
-    <AppShell title="Results" subtitle="Review and publish class results">
+    <AppShell title={t("Results")} subtitle={t("Review and publish class results")}>
       <Card className="grid gap-3 p-3.5 md:grid-cols-2">
-        <Field label="Session">
+        <Field label={t("Session")}>
           <CustomDropdown value={sessionId} onChange={(event) => setSessionId(event.target.value)}>
-            <option value="">Select session</option>
+            <option value="">{t("Select session")}</option>
             {(sessions.data ?? []).map((session) => (
               <option key={session.id} value={session.id}>
                 {session.name}
@@ -185,9 +187,9 @@ function StaffResultsView() {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Class">
+        <Field label={t("Class")}>
           <CustomDropdown value={classId} onChange={(event) => setClassId(event.target.value)}>
-            <option value="">Select class</option>
+            <option value="">{t("Select class")}</option>
             {(classes.data ?? []).map((academicClass) => (
               <option key={academicClass.id} value={academicClass.id}>
                 {academicClass.name}
@@ -198,13 +200,13 @@ function StaffResultsView() {
       </Card>
 
       {!sessionId || !classId ? (
-        <EmptyState title="Pick a session and class" hint="The results matrix loads after both." />
+        <EmptyState title={t("Pick a session and class")} hint="The results matrix loads after both." />
       ) : matrix.isLoading ? (
         <SkeletonList rows={4} />
       ) : matrix.isError ? (
-        <EmptyState title="Results unavailable" hint="Check class scope or publication permissions." />
+        <EmptyState title={t("Results unavailable")} hint="Check class scope or publication permissions." />
       ) : sectionRows.length === 0 ? (
-        <EmptyState title="No results found" />
+        <EmptyState title={t("No results found")} />
       ) : (
         <div className="space-y-5">
           {sectionRows.map((section) => (
@@ -217,15 +219,13 @@ function StaffResultsView() {
                       onClick={() => void reportsApi.results({ class_id: classId, session_id: sessionId }, "pdf")}
                     >
                       <Download className="h-4 w-4" />
-                      Export
-                    </ActionButton>
+                      {t("Export")}</ActionButton>
                     <ActionButton
                       onClick={() => publish.mutate(section.students.map((student) => student.student_id))}
                       disabled={publish.isPending}
                     >
                       <FileCheck2 className="h-4 w-4" />
-                      Publish section
-                    </ActionButton>
+                      {t("Publish section")}</ActionButton>
                   </div>
                 }
               >

@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
 import { financeApi, financeMutations } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/finance")({
   head: () => ({
@@ -45,6 +46,7 @@ function money(amount: number, currency?: string) {
 }
 
 function FinancePage() {
+    const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
   const canManage = user?.role === "principal" || user?.role === "super_admin";
@@ -279,18 +281,18 @@ function FinancePage() {
   const action =
     canManage && tab === "payments" ? (
       <FormSheet
-        title="Record payment"
+        title={t("Record payment")}
         triggerLabel="Record"
         submitLabel="Save"
         onSubmit={() => createPayment.mutateAsync()}
       >
-        <Field label="Student">
+        <Field label={t("Student")}>
           <CustomDropdown
             required
             value={payStudentId}
             onChange={(e) => setPayStudentId(e.target.value)}
           >
-            <option value="">Select student</option>
+            <option value="">{t("Select student")}</option>
             {(students.data?.items ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -298,13 +300,13 @@ function FinancePage() {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Category">
+        <Field label={t("Category")}>
           <CustomDropdown
             required
             value={payCategoryId}
             onChange={(e) => setPayCategoryId(e.target.value)}
           >
-            <option value="">Select category</option>
+            <option value="">{t("Select category")}</option>
             {(categories.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -313,7 +315,7 @@ function FinancePage() {
           </CustomDropdown>
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Amount">
+          <Field label={t("Amount")}>
             <TextInput
               type="number"
               min={0}
@@ -323,7 +325,7 @@ function FinancePage() {
               onChange={(e) => setPayAmount(e.target.value)}
             />
           </Field>
-          <Field label="Date">
+          <Field label={t("Date")}>
             <TextInput
               type="date"
               required
@@ -332,20 +334,20 @@ function FinancePage() {
             />
           </Field>
         </div>
-        <Field label="Note">
+        <Field label={t("Note")}>
           <TextInput value={payNote} onChange={(e) => setPayNote(e.target.value)} />
         </Field>
       </FormSheet>
     ) : canManage && tab === "donations" ? (
       <FormSheet
-        title="Record donation"
+        title={t("Record donation")}
         triggerLabel="Record"
         submitLabel="Save"
         onSubmit={() => createDonation.mutateAsync()}
       >
-        <Field label="Donor">
+        <Field label={t("Donor")}>
           <CustomDropdown required value={donDonorId} onChange={(e) => setDonDonorId(e.target.value)}>
-            <option value="">Select donor</option>
+            <option value="">{t("Select donor")}</option>
             {(donors.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -353,13 +355,13 @@ function FinancePage() {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Category">
+        <Field label={t("Category")}>
           <CustomDropdown
             required
             value={donCategoryId}
             onChange={(e) => setDonCategoryId(e.target.value)}
           >
-            <option value="">Select category</option>
+            <option value="">{t("Select category")}</option>
             {(categories.data ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -368,7 +370,7 @@ function FinancePage() {
           </CustomDropdown>
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Amount">
+          <Field label={t("Amount")}>
             <TextInput
               type="number"
               min={0}
@@ -378,7 +380,7 @@ function FinancePage() {
               onChange={(e) => setDonAmount(e.target.value)}
             />
           </Field>
-          <Field label="Date">
+          <Field label={t("Date")}>
             <TextInput
               type="date"
               required
@@ -387,36 +389,36 @@ function FinancePage() {
             />
           </Field>
         </div>
-        <Field label="Note">
+        <Field label={t("Note")}>
           <TextInput value={donNote} onChange={(e) => setDonNote(e.target.value)} />
         </Field>
       </FormSheet>
     ) : canManage && tab === "donors" ? (
       <FormSheet
-        title="Add donor"
+        title={t("Add donor")}
         triggerLabel="Add"
         submitLabel="Save"
         onSubmit={() => createDonor.mutateAsync()}
       >
-        <Field label="Name">
+        <Field label={t("Name")}>
           <TextInput required value={donorName} onChange={(e) => setDonorName(e.target.value)} />
         </Field>
-        <Field label="Contact">
+        <Field label={t("Contact")}>
           <TextInput value={donorContact} onChange={(e) => setDonorContact(e.target.value)} />
         </Field>
       </FormSheet>
     ) : undefined;
 
   return (
-    <AppShell title="Finance" subtitle="Contributions, donations and salary" right={action}>
+    <AppShell title={t("Finance")} subtitle={t("Contributions, donations and salary")} right={action}>
       <div className="grid grid-cols-2 gap-2.5">
         <StatCard
-          label="Contributions"
+          label={t("Contributions")}
           value={summary.data ? money(summary.data.total_contributions) : "—"}
           icon={Receipt}
         />
         <StatCard
-          label="Donations"
+          label={t("Donations")}
           value={summary.data ? money(summary.data.total_donations) : "—"}
           icon={HandCoins}
           tone="gold"
@@ -425,10 +427,10 @@ function FinancePage() {
 
       {tab !== "salary" ? (
         <Card className="mt-3 grid grid-cols-2 gap-3 p-3.5">
-          <Field label="From">
+          <Field label={t("From")}>
             <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </Field>
-          <Field label="To">
+          <Field label={t("To")}>
             <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </Field>
         </Card>
@@ -458,11 +460,11 @@ function FinancePage() {
 
       {tab === "overview" ? (
         <>
-          <SectionTitle>By category</SectionTitle>
+          <SectionTitle>{t("By category")}</SectionTitle>
           {summary.isLoading ? (
             <SkeletonList rows={3} />
           ) : Object.keys(byCategory).length === 0 ? (
-            <EmptyState title="No category breakdown yet" />
+            <EmptyState title={t("No category breakdown yet")} />
           ) : (
             <div className="space-y-2">
               {Object.entries(byCategory).map(([name, amount]) => (
@@ -475,9 +477,9 @@ function FinancePage() {
               ))}
             </div>
           )}
-          <SectionTitle>Total</SectionTitle>
+          <SectionTitle>{t("Total")}</SectionTitle>
           <Card className="flex items-center justify-between p-3.5">
-            <p className="font-semibold text-muted-foreground">Overall total</p>
+            <p className="font-semibold text-muted-foreground">{t("Overall total")}</p>
             <span className="font-display text-base font-extrabold">
               {summary.data ? money(summary.data.total) : "—"}
             </span>
@@ -488,12 +490,12 @@ function FinancePage() {
       {tab === "payments" ? (
         <>
           <Card className="mt-4 grid grid-cols-2 gap-3 p-3.5">
-            <Field label="Class">
+            <Field label={t("Class")}>
               <CustomDropdown
                 value={paymentClassId}
                 onChange={(e) => setPaymentClassId(e.target.value)}
               >
-                <option value="">All classes</option>
+                <option value="">{t("All classes")}</option>
                 {(classes.data ?? []).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -501,12 +503,12 @@ function FinancePage() {
                 ))}
               </CustomDropdown>
             </Field>
-            <Field label="Category">
+            <Field label={t("Category")}>
               <CustomDropdown
                 value={paymentCategoryId}
                 onChange={(e) => setPaymentCategoryId(e.target.value)}
               >
-                <option value="">All categories</option>
+                <option value="">{t("All categories")}</option>
                 {(categories.data ?? []).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -515,13 +517,13 @@ function FinancePage() {
               </CustomDropdown>
             </Field>
             {canManage ? (
-              <Field label="Student">
+              <Field label={t("Student")}>
                 <CustomDropdown
                   value={paymentStudentId}
                   onChange={(e) => setPaymentStudentId(e.target.value)}
                   className="col-span-2"
                 >
-                  <option value="">All students</option>
+                  <option value="">{t("All students")}</option>
                   {(students.data?.items ?? []).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -538,8 +540,7 @@ function FinancePage() {
               </span>
             }
           >
-            Payments
-          </SectionTitle>
+            {t("Payments")}</SectionTitle>
           <List
             loading={payments.isLoading}
             empty={(payments.data ?? []).length === 0}
@@ -561,12 +562,12 @@ function FinancePage() {
       {tab === "donations" ? (
         <>
           <Card className="mt-4 grid grid-cols-2 gap-3 p-3.5">
-            <Field label="Donor">
+            <Field label={t("Donor")}>
               <CustomDropdown
                 value={donationDonorId}
                 onChange={(e) => setDonationDonorId(e.target.value)}
               >
-                <option value="">All donors</option>
+                <option value="">{t("All donors")}</option>
                 {(donors.data ?? []).map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
@@ -574,12 +575,12 @@ function FinancePage() {
                 ))}
               </CustomDropdown>
             </Field>
-            <Field label="Category">
+            <Field label={t("Category")}>
               <CustomDropdown
                 value={donationCategoryId}
                 onChange={(e) => setDonationCategoryId(e.target.value)}
               >
-                <option value="">All categories</option>
+                <option value="">{t("All categories")}</option>
                 {(categories.data ?? []).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -595,8 +596,7 @@ function FinancePage() {
               </span>
             }
           >
-            Donations
-          </SectionTitle>
+            {t("Donations")}</SectionTitle>
           <List
             loading={donations.isLoading}
             empty={(donations.data ?? []).length === 0}
@@ -622,20 +622,19 @@ function FinancePage() {
             <TextInput
               value={donorQuery}
               onChange={(e) => setDonorQuery(e.target.value)}
-              placeholder="Search donors"
+              placeholder={t("Search donors")}
               className="pl-10"
             />
           </div>
           {canManage ? (
             <Card className="mt-3 space-y-3 p-3.5">
               <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground">
-                Add category
-              </p>
+                {t("Add category")}</p>
               <div className="flex gap-2">
                 <TextInput
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="Category name"
+                  placeholder={t("Category name")}
                 />
                 <ActionButton variant="soft" onClick={() => createCategory.mutate()}>
                   <Plus className="h-4 w-4" />
@@ -643,7 +642,7 @@ function FinancePage() {
               </div>
             </Card>
           ) : null}
-          <SectionTitle>Donors</SectionTitle>
+          <SectionTitle>{t("Donors")}</SectionTitle>
           <List
             loading={donors.isLoading}
             empty={(donors.data ?? []).length === 0}
@@ -676,7 +675,7 @@ function FinancePage() {
         ) : salary.data ? (
           <div className="mt-4 space-y-2.5">
             <StatCard
-              label="Base salary"
+              label={t("Base salary")}
               value={money(salary.data.base_amount ?? 0, salary.data.currency ?? undefined)}
               icon={Wallet}
             />
@@ -691,7 +690,7 @@ function FinancePage() {
           </div>
         ) : (
           <EmptyState
-            title="No salary record"
+            title={t("No salary record")}
             hint="Salary details are available to staff accounts."
           />
         )
@@ -715,6 +714,7 @@ function List({
   emptyTitle: string;
   children: React.ReactNode;
 }) {
+    const { t } = useTranslation();
   if (loading) return <SkeletonList rows={5} />;
   if (empty) return <EmptyState title={emptyTitle} />;
   return <div className="space-y-2">{children}</div>;
@@ -731,6 +731,7 @@ function Row({
   value: string;
   onReceipt?: () => void;
 }) {
+    const { t } = useTranslation();
   return (
     <Card className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 p-3.5">
       <div className="min-w-0">

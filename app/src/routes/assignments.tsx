@@ -39,6 +39,7 @@ import {
   type Submission,
   uploadFile,
 } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/assignments")({
   head: () => ({
@@ -66,6 +67,7 @@ const emptyFilters = {
 };
 
 function AssignmentsPage() {
+    const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
   const isStudent = user?.role === "student";
@@ -184,19 +186,19 @@ function AssignmentsPage() {
 
   return (
     <AppShell
-      title="Assignments"
+      title={t("Assignments")}
       subtitle={`${items.length} total`}
       right={
         canManage ? (
           <FormSheet
-            title="New assignment"
+            title={t("New assignment")}
             triggerLabel="New"
             submitLabel="Create"
             onSubmit={() => create.mutateAsync()}
           >
-            <Field label="Class">
+            <Field label={t("Class")}>
               <CustomDropdown required value={classId} onChange={(e) => setClassId(e.target.value)}>
-                <option value="">Select class</option>
+                <option value="">{t("Select class")}</option>
                 {(classes.data ?? []).map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -204,9 +206,9 @@ function AssignmentsPage() {
                 ))}
               </CustomDropdown>
             </Field>
-            <Field label="Course">
+            <Field label={t("Course")}>
               <CustomDropdown required value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-                <option value="">Select course</option>
+                <option value="">{t("Select course")}</option>
                 {(courses.data ?? []).map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -214,10 +216,10 @@ function AssignmentsPage() {
                 ))}
               </CustomDropdown>
             </Field>
-            <Field label="Title">
+            <Field label={t("Title")}>
               <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} />
             </Field>
-            <Field label="Instructions">
+            <Field label={t("Instructions")}>
               <TextArea
                 required
                 value={instructions}
@@ -225,7 +227,7 @@ function AssignmentsPage() {
               />
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Due date">
+              <Field label={t("Due date")}>
                 <TextInput
                   type="date"
                   required
@@ -233,7 +235,7 @@ function AssignmentsPage() {
                   onChange={(e) => setDueDate(e.target.value)}
                 />
               </Field>
-              <Field label="Max marks">
+              <Field label={t("Max marks")}>
                 <TextInput
                   type="number"
                   min={0}
@@ -250,14 +252,14 @@ function AssignmentsPage() {
         {canManage ? (
           <>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Class">
+              <Field label={t("Class")}>
                 <CustomDropdown
                   value={filters.classId}
                   onChange={(e) =>
                     setFilters((f) => ({ ...f, classId: e.target.value, sectionId: "" }))
                   }
                 >
-                  <option value="">All classes</option>
+                  <option value="">{t("All classes")}</option>
                   {(classes.data ?? []).map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
@@ -265,13 +267,13 @@ function AssignmentsPage() {
                   ))}
                 </CustomDropdown>
               </Field>
-              <Field label="Section">
+              <Field label={t("Section")}>
                 <CustomDropdown
                   value={filters.sectionId}
                   disabled={!filters.classId}
                   onChange={(e) => setFilters((f) => ({ ...f, sectionId: e.target.value }))}
                 >
-                  <option value="">All sections</option>
+                  <option value="">{t("All sections")}</option>
                   {(sections.data ?? []).map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
@@ -280,12 +282,12 @@ function AssignmentsPage() {
                 </CustomDropdown>
               </Field>
             </div>
-            <Field label="Course">
+            <Field label={t("Course")}>
               <CustomDropdown
                 value={filters.courseId}
                 onChange={(e) => setFilters((f) => ({ ...f, courseId: e.target.value }))}
               >
-                <option value="">All courses</option>
+                <option value="">{t("All courses")}</option>
                 {(courses.data ?? []).map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -295,22 +297,22 @@ function AssignmentsPage() {
             </Field>
           </>
         ) : null}
-        <Field label="Category">
+        <Field label={t("Category")}>
           <TextInput
             value={filters.category}
             onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
-            placeholder="e.g. Homework"
+            placeholder={t("e.g. Homework")}
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Due from">
+          <Field label={t("Due from")}>
             <TextInput
               type="date"
               value={filters.dateFrom}
               onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
             />
           </Field>
-          <Field label="Due to">
+          <Field label={t("Due to")}>
             <TextInput
               type="date"
               value={filters.dateTo}
@@ -325,13 +327,12 @@ function AssignmentsPage() {
             onChange={(e) => setFilters((f) => ({ ...f, mineOnly: e.target.checked }))}
             className="h-4 w-4 rounded border-border"
           />
-          Mine only
-        </label>
+          {t("Mine only")}</label>
       </FilterBar>
 
       {query.isLoading ? <SkeletonList rows={5} /> : null}
       {!query.isLoading && items.length === 0 ? (
-        <EmptyState title="No assignments" hint="New tasks will show up here." />
+        <EmptyState title={t("No assignments")} hint="New tasks will show up here." />
       ) : null}
 
       <div className="space-y-2.5">
@@ -353,7 +354,7 @@ function AssignmentsPage() {
                   </p>
                 </button>
                 {item.submitted_at ? (
-                  <Pill tone="success">Submitted</Pill>
+                  <Pill tone="success">{t("Submitted")}</Pill>
                 ) : (
                   <Pill tone={overdue ? "destructive" : "muted"}>
                     {overdue ? "Overdue" : "Open"}
@@ -370,7 +371,7 @@ function AssignmentsPage() {
                   <CalendarDays className="h-3.5 w-3.5" />
                   {new Date(item.due_date).toLocaleDateString()}
                 </span>
-                {item.max_marks != null ? <span>Max {item.max_marks}</span> : null}
+                {item.max_marks != null ? <span>{t("Max")}{item.max_marks}</span> : null}
                 {item.submission_mark != null ? (
                   <span className="inline-flex items-center gap-1.5 font-bold text-success">
                     <CheckCircle2 className="h-3.5 w-3.5" />
@@ -388,13 +389,11 @@ function AssignmentsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <ActionButton variant="soft" onClick={() => setSelectedAssignment(item)}>
                   <Eye className="h-4 w-4" />
-                  Open
-                </ActionButton>
+                  {t("Open")}</ActionButton>
                 {isStudent ? (
                   item.submitted_at ? (
                     <ActionButton variant="soft" onClick={() => unsubmit.mutate(item.id)}>
-                      Withdraw
-                    </ActionButton>
+                      {t("Withdraw")}</ActionButton>
                   ) : (
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-muted px-4 py-2.5 font-display text-sm font-extrabold">
                       <Upload className="h-4 w-4" />
@@ -421,19 +420,16 @@ function AssignmentsPage() {
                     disabled={submit.isPending}
                   >
                     {submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Submit
-                  </ActionButton>
+                    {t("Submit")}</ActionButton>
                 ) : null}
                 {canManage ? (
                   <>
                     <ActionButton variant="soft" onClick={() => setEditingAssignment(item)}>
                       <Edit2 className="h-4 w-4" />
-                      Edit
-                    </ActionButton>
+                      {t("Edit")}</ActionButton>
                     <ActionButton variant="danger" onClick={() => remove.mutate(item.id)}>
                       <Trash2 className="h-4 w-4" />
-                      Delete
-                    </ActionButton>
+                      {t("Delete")}</ActionButton>
                   </>
                 ) : null}
               </div>
@@ -473,6 +469,7 @@ function AssignmentDetailSheet({
   onOpenChange: (next: boolean) => void;
   canManage: boolean;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const submissions = useQuery({
     queryKey: ["assignment-submissions", assignment.id],
@@ -515,22 +512,21 @@ function AssignmentDetailSheet({
             </p>
           </div>
           <ActionButton variant="ghost" onClick={() => onOpenChange(false)}>
-            Close
-          </ActionButton>
+            {t("Close")}</ActionButton>
         </div>
 
         <p className="mt-4 whitespace-pre-line text-sm text-muted-foreground">{assignment.instructions}</p>
         <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-          <span>Due {new Date(assignment.due_date).toLocaleString()}</span>
-          {assignment.max_marks != null ? <span>Max {assignment.max_marks}</span> : null}
+          <span>{t("Due")}{new Date(assignment.due_date).toLocaleString()}</span>
+          {assignment.max_marks != null ? <span>{t("Max")}{assignment.max_marks}</span> : null}
         </div>
 
         {canManage ? (
           <>
-            <Field label="Submissions">
+            <Field label={t("Submissions")}>
               {submissions.isLoading ? <SkeletonList rows={3} /> : null}
               {!submissions.isLoading && (submissions.data ?? []).length === 0 ? (
-                <EmptyState title="No submissions yet" />
+                <EmptyState title={t("No submissions yet")} />
               ) : null}
               <div className="space-y-3">
                 {(submissions.data ?? []).map((submission: Submission) => (
@@ -543,12 +539,11 @@ function AssignmentDetailSheet({
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        {submission.is_late ? <Pill tone="warning">Late</Pill> : null}
+                        {submission.is_late ? <Pill tone="warning">{t("Late")}</Pill> : null}
                         {submission.file_key ? (
                           <ActionButton variant="soft" onClick={() => void openSubmission(submission.file_key!)}>
                             <Download className="h-4 w-4" />
-                            File
-                          </ActionButton>
+                            {t("File")}</ActionButton>
                         ) : null}
                       </div>
                     </div>
@@ -567,7 +562,7 @@ function AssignmentDetailSheet({
                         onChange={(event) =>
                           setFeedback((current) => ({ ...current, [submission.id]: event.target.value }))
                         }
-                        placeholder="Feedback"
+                        placeholder={t("Feedback")}
                       />
                       <ActionButton
                         onClick={() =>
@@ -582,8 +577,7 @@ function AssignmentDetailSheet({
                         }
                         disabled={grade.isPending}
                       >
-                        Save
-                      </ActionButton>
+                        {t("Save")}</ActionButton>
                     </div>
                   </Card>
                 ))}
@@ -605,6 +599,7 @@ function EditAssignmentSheet({
   open: boolean;
   onOpenChange: (next: boolean) => void;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const [title, setTitle] = useState(assignment.title);
   const [instructions, setInstructions] = useState(assignment.instructions);
@@ -630,23 +625,23 @@ function EditAssignmentSheet({
 
   return (
     <FormSheet
-      title="Edit assignment"
+      title={t("Edit assignment")}
       submitLabel="Save changes"
       open={open}
       onOpenChange={onOpenChange}
       onSubmit={() => update.mutateAsync()}
     >
-      <Field label="Title">
+      <Field label={t("Title")}>
         <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
-      <Field label="Instructions">
+      <Field label={t("Instructions")}>
         <TextArea required value={instructions} onChange={(e) => setInstructions(e.target.value)} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Due date">
+        <Field label={t("Due date")}>
           <TextInput type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </Field>
-        <Field label="Max marks">
+        <Field label={t("Max marks")}>
           <TextInput
             type="number"
             min={0}

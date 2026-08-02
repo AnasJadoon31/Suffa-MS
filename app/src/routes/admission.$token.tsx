@@ -6,6 +6,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { CustomDropdown } from "@/components/app/Primitives";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { publicApi, type FormFieldDefinition } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/admission/$token")({
   head: () => ({
@@ -27,6 +28,7 @@ const GUARDIAN_CONTACT_KEYS = new Set([
 const DOB_KEYS = new Set(["student_date_of_birth", "student.date_of_birth", "date_of_birth"]);
 
 function PublicAdmissionPage() {
+    const { t } = useTranslation();
   const { token } = Route.useParams();
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [website, setWebsite] = useState("");
@@ -76,14 +78,14 @@ function PublicAdmissionPage() {
 
   if (form.isLoading) {
     return (
-      <CenteredState icon={<Loader2 className="h-6 w-6 animate-spin" />} title="Loading form" />
+      <CenteredState icon={<Loader2 className="h-6 w-6 animate-spin" />} title={t("Loading form")} />
     );
   }
 
   if (form.isError || !form.data) {
     return (
       <CenteredState
-        title="Admission form unavailable"
+        title={t("Admission form unavailable")}
         hint={apiErrorMessage(form.error, "This admission link is invalid or unavailable.")}
       />
     );
@@ -92,7 +94,7 @@ function PublicAdmissionPage() {
   if (submit.isSuccess) {
     return (
       <CenteredState
-        title="Application submitted"
+        title={t("Application submitted")}
         hint="Your madrasa office has received the application."
       />
     );
@@ -115,10 +117,9 @@ function PublicAdmissionPage() {
 
         {!form.data.is_open ? (
           <div className="card-surface mt-4 p-4">
-            <p className="font-display text-base font-extrabold">This form is closed</p>
+            <p className="font-display text-base font-extrabold">{t("This form is closed")}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Please contact the madrasa office for the next admission window.
-            </p>
+              {t("Please contact the madrasa office for the next admission window.")}</p>
           </div>
         ) : (
           <form onSubmit={onSubmit} className="mt-4 space-y-3">
@@ -132,8 +133,7 @@ function PublicAdmissionPage() {
             ))}
 
             <label className="hidden">
-              Website
-              <input
+              {t("Website")}<input
                 tabIndex={-1}
                 autoComplete="off"
                 value={website}
@@ -157,8 +157,7 @@ function PublicAdmissionPage() {
               ) : (
                 <SendHorizonal className="h-5 w-5" />
               )}
-              Submit application
-            </button>
+              {t("Submit application")}</button>
           </form>
         )}
       </section>
@@ -175,6 +174,7 @@ function AdmissionField({
   value: unknown;
   onChange: (value: unknown) => void;
 }) {
+    const { t } = useTranslation();
   if (field.type === "label") {
     return <p className="px-1 pt-2 text-sm font-semibold text-muted-foreground">{field.label}</p>;
   }
@@ -202,7 +202,7 @@ function AdmissionField({
           onChange={(event) => onChange(event.target.value)}
           required={field.required}
         >
-          <option value="">Select</option>
+          <option value="">{t("Select")}</option>
           {field.options.map((option) => (
             <option key={option} value={option}>
               {option}
@@ -275,6 +275,7 @@ function CenteredState({
   title: string;
   hint?: string;
 }) {
+    const { t } = useTranslation();
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
       <div className="card-surface w-full max-w-md p-6 text-center">

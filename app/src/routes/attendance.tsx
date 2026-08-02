@@ -41,11 +41,13 @@ import { useAuth } from "@/lib/mms/auth";
 import {
   attendanceApi,
   operationsApi,
+  reportingApi,
   type AttendanceLogEntry,
   type AttendanceStatus,
   type AttendanceSyncEntry,
 } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/attendance")({
   head: () => ({
@@ -82,14 +84,51 @@ function formatTime(value: string | null | undefined) {
 }
 
 function AttendancePage() {
+    const { t } = useTranslation();
   const { user } = useAuth();
-  if (user?.role === "student" || user?.role === "guardian") return <MyStudentAttendance />;
+  if (user?.role === "student") return <MyStudentAttendance />;
+  if (user?.role === "parent") return <ParentAttendance />;
   return <AttendanceBoard />;
+}
+
+/* ------------------------------------------------------------------ Parent */
+
+function ParentAttendance() {
+  const { t } = useTranslation();
+  const dashboard = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: () => reportingApi.dashboard(),
+  });
+  const data = dashboard.data;
+  
+  if (dashboard.isLoading) return <AppShell title={t("Attendance")}><SkeletonList rows={4} /></AppShell>;
+  if (dashboard.isError) return <AppShell title={t("Attendance")}><EmptyState title={t("Attendance unavailable")} /></AppShell>;
+
+  const children = Array.isArray((data as any)?.children) ? (data as any).children : [];
+  if (children.length === 0) return <AppShell title={t("Attendance")}><EmptyState title={t("No children found")} /></AppShell>;
+
+  return (
+    <AppShell title={t("Attendance")}>
+      <div className="space-y-8">
+        {children.map((child: any) => (
+          <MyStudentAttendance 
+            key={child.id} 
+            child={{ 
+              id: child.id, 
+              name: child.name, 
+              classId: child.class_id 
+            }} 
+          />
+        ))}
+      </div>
+    </AppShell>
+  );
 }
 
 /* ------------------------------------------------------------------ Board */
 
 function AttendanceBoard() {
+    const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManageTeachers = hasPermission("teachers.attendance.manage");
@@ -320,7 +359,7 @@ function AttendanceBoard() {
 
   if (mode === "teachers" && canManageTeachers) {
     return (
-      <AppShell title="Attendance" subtitle="Teacher attendance log">
+      <AppShell title={t("Attendance")} subtitle={t("Teacher attendance log")}>
         <ModeToggle mode={mode} setMode={setMode} canManageTeachers={canManageTeachers} />
         <TeacherAttendancePanel />
       </AppShell>
@@ -329,12 +368,12 @@ function AttendanceBoard() {
 
   if (!classId || !sectionId) {
     return (
-      <AppShell title="Attendance" subtitle="Choose a class to begin">
+      <AppShell title={t("Attendance")} subtitle={t("Choose a class to begin")}>
         <ModeToggle mode={mode} setMode={setMode} canManageTeachers={canManageTeachers} />
         {classes.isLoading ? <SkeletonList rows={5} /> : null}
         {!classes.isLoading && (classes.data ?? []).every((item) => item.sections.length === 0) ? (
           <EmptyState
-            title="No classes assigned"
+            title={t("No classes assigned")}
             hint="Ask your principal to assign classes to you."
           />
         ) : null}
@@ -366,8 +405,7 @@ function AttendanceBoard() {
                   </p>
                   <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                     <UsersRound className="h-3.5 w-3.5" />
-                    {section.student_count} students
-                  </p>
+                    {section.student_count} {t("students")}</p>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>
@@ -388,12 +426,11 @@ function AttendanceBoard() {
         className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
-        Classes
-      </button>
+        {t("Classes")}</button>
 
       <div className="space-y-2.5">
         <Select
-          label="Course"
+          label={t("Course")}
           value={courseId}
           onChange={(value) => {
             setCourseId(value);
@@ -408,7 +445,7 @@ function AttendanceBoard() {
         />
         {todaysSlots.length > 1 ? (
           <Select
-            label="Period"
+            label={t("Period")}
             value={slotId}
             onChange={(value) => {
               setSlotId(value);
@@ -427,7 +464,7 @@ function AttendanceBoard() {
 
       {!courseId ? (
         <div className="mt-4">
-          <EmptyState title="Pick a course" hint="Attendance is recorded per course and period." />
+          <EmptyState title={t("Pick a course")} hint="Attendance is recorded per course and period." />
         </div>
       ) : null}
 
@@ -452,7 +489,7 @@ function AttendanceBoard() {
 
           {tab === "calendar" ? (
             <>
-              <SectionTitle>Month</SectionTitle>
+              <SectionTitle>{t("Month")}</SectionTitle>
               <AttendanceCalendar
                 month={month}
                 onMonthChange={setMonth}
@@ -483,8 +520,7 @@ function AttendanceBoard() {
                       className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-3 py-1 text-[0.68rem] font-bold uppercase text-primary"
                     >
                       <Pencil className="h-3 w-3" />
-                      Edit
-                    </button>
+                      {t("Edit")}</button>
                   ) : canMark ? (
                     <div className="flex gap-1.5">
                       <button
@@ -499,14 +535,12 @@ function AttendanceBoard() {
                         }
                         className="rounded-full bg-primary-soft px-3 py-1 text-[0.68rem] font-bold uppercase text-primary"
                       >
-                        All present
-                      </button>
+                        {t("All present")}</button>
                       <button
                         onClick={() => setMarks({})}
                         className="rounded-full bg-muted px-3 py-1 text-[0.68rem] font-bold uppercase text-muted-foreground"
                       >
-                        Clear
-                      </button>
+                        {t("Clear")}</button>
                     </div>
                   ) : undefined
                 }
@@ -519,15 +553,15 @@ function AttendanceBoard() {
               {!canMark ? (
                 isToday && !hasRecords && todaysSlots.length > 1 && !slotId ? (
                   <div className="mt-4">
-                    <EmptyState title="Pick a period" hint="Multiple periods found for this course today." />
+                    <EmptyState title={t("Pick a period")} hint="Multiple periods found for this course today." />
                   </div>
                 ) : isToday && !hasRecords && todaysSlots.length === 0 ? (
                   <div className="mt-4">
-                    <EmptyState title="No periods today" hint="This course is not scheduled for you today." />
+                    <EmptyState title={t("No periods today")} hint="This course is not scheduled for you today." />
                   </div>
                 ) : isToday && !hasRecords && roster.isError ? (
                   <div className="mt-4">
-                    <EmptyState title="Could not load roster" hint="You may not be assigned to this class." />
+                    <EmptyState title={t("Could not load roster")} hint="You may not be assigned to this class." />
                   </div>
                 ) : (
                   <DayEntries entries={dayEntries} />
@@ -539,13 +573,13 @@ function AttendanceBoard() {
                     <input
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Search name or admission no."
+                      placeholder={t("Search name or admission no.")}
                       className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                     />
                   </label>
 
                   {students.length === 0 && !roster.isLoading ? (
-                    <EmptyState title="No students in this roster" />
+                    <EmptyState title={t("No students in this roster")} />
                   ) : null}
 
                   <div className="space-y-2 pb-24">
@@ -607,8 +641,7 @@ function AttendanceBoard() {
                         className="gradient-emerald mx-auto flex w-full max-w-lg items-center justify-center gap-2 rounded-2xl py-3.5 font-display font-extrabold text-primary-foreground shadow-[var(--shadow-raised)] active:scale-[0.99] disabled:opacity-60"
                       >
                         {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                        Save {Object.keys(marks).length} mark
-                        {Object.keys(marks).length === 1 ? "" : "s"}
+                        {t("Save")}{Object.keys(marks).length} {t("mark")}{Object.keys(marks).length === 1 ? "" : "s"}
                       </button>
                     </div>
                   ) : null}
@@ -617,9 +650,9 @@ function AttendanceBoard() {
             </>
           ) : (
             <>
-              <SectionTitle>Student</SectionTitle>
+              <SectionTitle>{t("Student")}</SectionTitle>
               <Select
-                label="Student"
+                label={t("Student")}
                 value={studentId}
                 onChange={setStudentId}
                 options={[
@@ -657,7 +690,7 @@ function AttendanceBoard() {
                 </>
               ) : (
                 <div className="mt-3">
-                  <EmptyState title="Pick a student" hint="See their month at a glance." />
+                  <EmptyState title={t("Pick a student")} hint="See their month at a glance." />
                 </div>
               )}
             </>
@@ -677,6 +710,7 @@ function ModeToggle({
   setMode: (mode: "students" | "teachers") => void;
   canManageTeachers: boolean;
 }) {
+    const { t } = useTranslation();
   if (!canManageTeachers) return null;
   return (
     <div className="mb-3 grid grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1">
@@ -699,7 +733,8 @@ function ModeToggle({
 }
 
 function DayEntries({ entries }: { entries: AttendanceLogEntry[] }) {
-  if (entries.length === 0) return <EmptyState title="No attendance recorded" />;
+    const { t } = useTranslation();
+  if (entries.length === 0) return <EmptyState title={t("No attendance recorded")} />;
   return (
     <div className="space-y-2">
       {entries.map((entry) => (
@@ -733,6 +768,7 @@ function Select({
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
 }) {
+    const { t } = useTranslation();
   return (
     <label className="card-surface flex items-center gap-3 px-4 py-2.5">
       <span className="shrink-0 text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
@@ -741,7 +777,7 @@ function Select({
       <CustomDropdown
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-right text-sm font-semibold shadow-none focus:border-0"
+        className="min-w-0 flex-1 border-0 bg-transparent px-0 py-0 ltr:text-right rtl:text-left text-sm font-semibold shadow-none focus:border-0"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -756,6 +792,7 @@ function Select({
 /* --------------------------------------------------------- Teacher panel */
 
 function TeacherAttendancePanel() {
+    const { t } = useTranslation();
   const queryClient = useQueryClient();
   const today = useQuery({
     queryKey: ["teacher-attendance-today"],
@@ -789,7 +826,7 @@ function TeacherAttendancePanel() {
           className="flex items-center justify-center gap-2 rounded-xl bg-primary-soft py-3 font-display text-sm font-extrabold text-primary disabled:opacity-40"
         >
           <LogIn className="h-4 w-4" />
-          Check in {today.data?.check_in ? `· ${formatTime(today.data.check_in)}` : ""}
+          {t("Check in")}{today.data?.check_in ? `· ${formatTime(today.data.check_in)}` : ""}
         </button>
         <button
           disabled={!today.data?.check_in || Boolean(today.data?.check_out) || check.isPending}
@@ -797,14 +834,14 @@ function TeacherAttendancePanel() {
           className="flex items-center justify-center gap-2 rounded-xl bg-accent-soft py-3 font-display text-sm font-extrabold text-accent-foreground disabled:opacity-40"
         >
           <LogOut className="h-4 w-4" />
-          Check out {today.data?.check_out ? `· ${formatTime(today.data.check_out)}` : ""}
+          {t("Check out")}{today.data?.check_out ? `· ${formatTime(today.data.check_out)}` : ""}
         </button>
       </Card>
 
-      <SectionTitle>Teacher log</SectionTitle>
+      <SectionTitle>{t("Teacher log")}</SectionTitle>
       {logs.isLoading ? <SkeletonList rows={5} /> : null}
       {!logs.isLoading && (logs.data ?? []).length === 0 ? (
-        <EmptyState title="No teacher attendance logs" />
+        <EmptyState title={t("No teacher attendance logs")} />
       ) : null}
       <div className="space-y-2">
         {(logs.data ?? []).map((entry) => (
@@ -815,7 +852,7 @@ function TeacherAttendancePanel() {
             <div className="min-w-0">
               <p className="truncate font-semibold">{entry.teacher_name}</p>
               <p className="truncate text-xs text-muted-foreground">
-                {entry.attendance_date} · in {formatTime(entry.check_in)} · out{" "}
+                {entry.attendance_date} {t("· in")}{formatTime(entry.check_in)} {t("· out")}{" "}
                 {formatTime(entry.check_out)}
               </p>
             </div>
@@ -829,13 +866,16 @@ function TeacherAttendancePanel() {
 
 /* -------------------------------------------------------- Student's own */
 
-function MyStudentAttendance() {
+function MyStudentAttendance({ child }: { child?: { id: string; name: string; classId: string } }) {
+    const { t } = useTranslation();
   const [month, setMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
 
   const history = useQuery({
-    queryKey: ["my-attendance", month.getFullYear(), month.getMonth()],
-    queryFn: () => attendanceApi.myStudentHistory(monthRange(month)),
+    queryKey: ["my-attendance", child?.id, month.getFullYear(), month.getMonth()],
+    queryFn: () => child 
+      ? attendanceApi.studentHistory(child.classId, child.id, monthRange(month)) 
+      : attendanceApi.myStudentHistory(monthRange(month)),
     retry: false,
   });
 
@@ -855,33 +895,24 @@ function MyStudentAttendance() {
   ).length;
   const total = history.data?.entries.length ?? 0;
 
-  return (
-    <AppShell
-      title="My Attendance"
-      subtitle={
-        history.data
-          ? `${history.data.class_name} · ${history.data.session_name}`
-          : "Your monthly record"
-      }
-    >
+  const content = (
+    <>
       {history.isLoading ? <SkeletonList rows={4} /> : null}
-      {history.isError ? <EmptyState title="Attendance unavailable" /> : null}
+      {history.isError ? <EmptyState title={t("Attendance unavailable")} /> : null}
 
       {history.data ? (
         <>
           <Card className="mb-3 grid grid-cols-2 gap-3">
             <div>
               <p className="text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
-                Present
-              </p>
+                {t("Present")}</p>
               <p className="font-display text-xl font-extrabold">
                 {present}/{total}
               </p>
             </div>
             <div>
               <p className="text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
-                Rate
-              </p>
+                {t("Rate")}</p>
               <p className="font-display text-xl font-extrabold">
                 {total ? Math.round((present / total) * 100) : 0}%
               </p>
@@ -901,6 +932,31 @@ function MyStudentAttendance() {
           <DayEntries entries={dayEntries} />
         </>
       ) : null}
+    </>
+  );
+
+  if (child) {
+    return (
+      <div className="rounded-2xl border bg-card p-4">
+        <h3 className="mb-1 font-display text-lg font-bold">{child.name}</h3>
+        <p className="mb-4 text-sm text-muted-foreground">
+          {history.data ? `${history.data.class_name} · ${history.data.session_name}` : t("Monthly record")}
+        </p>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <AppShell
+      title={t("My Attendance")}
+      subtitle={
+        history.data
+          ? `${history.data.class_name} · ${history.data.session_name}`
+          : "Your monthly record"
+      }
+    >
+      {content}
     </AppShell>
   );
 }

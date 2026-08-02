@@ -15,8 +15,10 @@ import {
   type StudentDetail,
   type TeacherDetail,
 } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
+    const { t } = useTranslation();
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-border py-2 text-sm last:border-0">
       <span className="font-semibold text-muted-foreground">{label}</span>
@@ -46,6 +48,7 @@ export function StudentDetailSheet({
   open: boolean;
   onOpenChange: (next: boolean) => void;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
@@ -78,28 +81,28 @@ export function StudentDetailSheet({
       }
     >
       <div className="mb-4">
-          <Row label="Date of birth" value={student.date_of_birth} />
-          <Row label="Phone" value={student.phone} />
-          <Row label="B-Form #" value={student.b_form_number} />
-          <Row label="Address" value={student.address} />
-          <Row label="Independent" value={student.is_independent ? "Yes" : "No"} />
-          <Row label="Portal access" value={student.portal_enabled ? "Enabled" : "Disabled"} />
+          <Row label={t("Date of birth")} value={student.date_of_birth} />
+          <Row label={t("Phone")} value={student.phone} />
+          <Row label={t("B-Form #")} value={student.b_form_number} />
+          <Row label={t("Address")} value={student.address} />
+          <Row label={t("Independent")} value={student.is_independent ? "Yes" : "No"} />
+          <Row label={t("Portal access")} value={student.portal_enabled ? "Enabled" : "Disabled"} />
           {student.active_enrollment ? (
             <>
-              <Row label="Session" value={student.active_enrollment.session_name} />
+              <Row label={t("Session")} value={student.active_enrollment.session_name} />
               <Row
-                label="Class"
+                label={t("Class")}
                 value={`${student.active_enrollment.class_name} · ${student.active_enrollment.section_name}`}
               />
-              <Row label="Program" value={student.active_enrollment.program_name} />
+              <Row label={t("Program")} value={student.active_enrollment.program_name} />
             </>
           ) : (
-            <Row label="Enrollment" value="No active enrollment" />
+            <Row label={t("Enrollment")} value="No active enrollment" />
           )}
         </div>
 
         <MultiPicker
-          label="Guardians"
+          label={t("Guardians")}
           selected={(guardiansQuery.data ?? []).map((g) => ({ id: g.id, name: g.name }))}
           onChange={async (next) => {
             const previous = new Set((guardiansQuery.data ?? []).map((g) => g.id));
@@ -119,8 +122,7 @@ export function StudentDetailSheet({
 
         <ActionBar>
           <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
-            Edit
-          </ActionButton>
+            {t("Edit")}</ActionButton>
           <ActionButton
             className="flex-1"
             variant="soft"
@@ -128,18 +130,15 @@ export function StudentDetailSheet({
               copyCredentialsLink(() => peopleMutations.studentCredentialsLink(student.id))
             }
           >
-            <Copy className="h-4 w-4" /> Credentials link
-          </ActionButton>
+            <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
         </ActionBar>
         {student.status === "active" ? (
           confirmDeactivate ? (
             <ActionBar className="mt-2">
               <ActionButton variant="danger" className="flex-1" onClick={deactivate}>
-                <ShieldOff className="h-4 w-4" /> Confirm deactivate
-              </ActionButton>
+                <ShieldOff className="h-4 w-4" /> {t("Confirm deactivate")}</ActionButton>
               <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmDeactivate(false)}>
-                Cancel
-              </ActionButton>
+                {t("Cancel")}</ActionButton>
             </ActionBar>
           ) : (
             <ActionBar className="mt-2">
@@ -148,8 +147,7 @@ export function StudentDetailSheet({
                 className="w-full"
                 onClick={() => setConfirmDeactivate(true)}
               >
-                <ShieldOff className="h-4 w-4" /> Deactivate
-              </ActionButton>
+                <ShieldOff className="h-4 w-4" /> {t("Deactivate")}</ActionButton>
             </ActionBar>
           )
         ) : null}
@@ -168,6 +166,7 @@ export function TeacherDetailSheet({
   open: boolean;
   onOpenChange: (next: boolean) => void;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
@@ -193,18 +192,17 @@ export function TeacherDetailSheet({
       }
     >
       <div className="mb-4">
-          <Row label="WhatsApp" value={teacher.whatsapp_number} />
-          <Row label="Qualifications" value={teacher.qualifications} />
-          <Row label="Join date" value={teacher.join_date} />
-          <Row label="CNIC" value={teacher.cnic} />
-          <Row label="Address" value={teacher.address} />
-          <Row label="Emergency contact" value={teacher.emergency_contact} />
-          <Row label="Principal delegate" value={teacher.is_principal_delegate ? "Yes" : "No"} />
+          <Row label={t("WhatsApp")} value={teacher.whatsapp_number} />
+          <Row label={t("Qualifications")} value={teacher.qualifications} />
+          <Row label={t("Join date")} value={teacher.join_date} />
+          <Row label={t("CNIC")} value={teacher.cnic} />
+          <Row label={t("Address")} value={teacher.address} />
+          <Row label={t("Emergency contact")} value={teacher.emergency_contact} />
+          <Row label={t("Principal delegate")} value={teacher.is_principal_delegate ? "Yes" : "No"} />
         </div>
         <ActionBar>
           <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
-            Edit
-          </ActionButton>
+            {t("Edit")}</ActionButton>
           <ActionButton
             className="flex-1"
             variant="soft"
@@ -212,18 +210,15 @@ export function TeacherDetailSheet({
               copyCredentialsLink(() => peopleMutations.teacherCredentialsLink(teacher.id))
             }
           >
-            <Copy className="h-4 w-4" /> Credentials link
-          </ActionButton>
+            <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
         </ActionBar>
         {teacher.status === "active" ? (
           confirmDeactivate ? (
             <ActionBar className="mt-2">
               <ActionButton variant="danger" className="flex-1" onClick={deactivate}>
-                <ShieldOff className="h-4 w-4" /> Confirm deactivate
-              </ActionButton>
+                <ShieldOff className="h-4 w-4" /> {t("Confirm deactivate")}</ActionButton>
               <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmDeactivate(false)}>
-                Cancel
-              </ActionButton>
+                {t("Cancel")}</ActionButton>
             </ActionBar>
           ) : (
             <ActionBar className="mt-2">
@@ -232,8 +227,7 @@ export function TeacherDetailSheet({
                 className="w-full"
                 onClick={() => setConfirmDeactivate(true)}
               >
-                <ShieldOff className="h-4 w-4" /> Deactivate
-              </ActionButton>
+                <ShieldOff className="h-4 w-4" /> {t("Deactivate")}</ActionButton>
             </ActionBar>
           )
         ) : null}
@@ -251,6 +245,7 @@ export function GuardianDetailSheet({
   open: boolean;
   onOpenChange: (next: boolean) => void;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
 
@@ -274,14 +269,14 @@ export function GuardianDetailSheet({
       }
     >
       <div className="mb-4">
-          <Row label="Phone(s)" value={guardian.phone_numbers} />
-          <Row label="CNIC" value={guardian.cnic} />
-          <Row label="Address" value={guardian.address} />
-          <Row label="Preferred language" value={guardian.preferred_language} />
+          <Row label={t("Phone(s)")} value={guardian.phone_numbers} />
+          <Row label={t("CNIC")} value={guardian.cnic} />
+          <Row label={t("Address")} value={guardian.address} />
+          <Row label={t("Preferred language")} value={guardian.preferred_language} />
         </div>
 
         <MultiPicker
-          label="Linked students"
+          label={t("Linked students")}
           selected={(studentsQuery.data ?? []).map((s) => ({ id: s.id, name: s.name }))}
           onChange={async (next) => {
             const previous = new Set((studentsQuery.data ?? []).map((s) => s.id));
@@ -301,8 +296,7 @@ export function GuardianDetailSheet({
 
         <ActionBar>
           <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
-            Edit
-          </ActionButton>
+            {t("Edit")}</ActionButton>
           <ActionButton
             className="flex-1"
             variant="soft"
@@ -310,8 +304,7 @@ export function GuardianDetailSheet({
               copyCredentialsLink(() => peopleMutations.guardianCredentialsLink(guardian.id))
             }
           >
-            <Copy className="h-4 w-4" /> Credentials link
-          </ActionButton>
+            <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
         </ActionBar>
         <GuardianForm guardian={guardian} open={editOpen} onOpenChange={setEditOpen} />
     </ManagedSheet>

@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { SectionTitle } from "@/components/app/Primitives";
 import { navGroups } from "@/lib/mms/nav";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/more")({
   head: () => ({
@@ -21,8 +22,9 @@ export const Route = createFileRoute("/more")({
 });
 
 function MorePage() {
+    const { t } = useTranslation();
   return (
-    <AppShell title="More" subtitle="Every module in one place">
+    <AppShell title={t("More")} subtitle={t("Every module in one place")}>
       {navGroups.map((group) => (
         <div key={group.title}>
           <SectionTitle>{group.title}</SectionTitle>

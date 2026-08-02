@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/mms/auth";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { opsApi, type Leave } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/leave")({
   head: () => ({
@@ -50,6 +51,7 @@ const emptyFilters = {
 };
 
 function LeavePage() {
+    const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const canReview = hasPermission("leave.manage");
   const queryClient = useQueryClient();
@@ -128,7 +130,7 @@ function LeavePage() {
 
   return (
     <AppShell
-      title="Leave"
+      title={t("Leave")}
       subtitle={canReview ? "All requests" : "My requests"}
       right={
         <button
@@ -142,7 +144,7 @@ function LeavePage() {
     >
       {open ? (
         <form onSubmit={submit} className="card-surface mb-3 space-y-3 p-4">
-          <p className="font-display text-sm font-extrabold">New request</p>
+          <p className="font-display text-sm font-extrabold">{t("New request")}</p>
           <div className="grid grid-cols-2 gap-2">
             <input
               type="date"
@@ -162,7 +164,7 @@ function LeavePage() {
           <textarea
             required
             rows={3}
-            placeholder="Reason"
+            placeholder={t("Reason")}
             value={form.reason}
             onChange={(e) => setForm({ ...form, reason: e.target.value })}
             className="w-full rounded-xl bg-muted px-3 py-2.5 text-sm outline-none"
@@ -173,8 +175,7 @@ function LeavePage() {
             className="gradient-emerald flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-display text-sm font-extrabold text-primary-foreground disabled:opacity-60"
           >
             {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Submit request
-          </button>
+            {t("Submit request")}</button>
         </form>
       ) : null}
 
@@ -195,7 +196,7 @@ function LeavePage() {
       >
         {canReview ? (
           <>
-            <Field label="Person type">
+            <Field label={t("Person type")}>
               <CustomDropdown
                 value={filters.personType}
                 onChange={(e) =>
@@ -205,17 +206,17 @@ function LeavePage() {
                   }))
                 }
               >
-                <option value="">All</option>
-                <option value="teacher">Teacher</option>
-                <option value="student">Student</option>
+                <option value="">{t("All")}</option>
+                <option value="teacher">{t("Teacher")}</option>
+                <option value="student">{t("Student")}</option>
               </CustomDropdown>
             </Field>
-            <Field label="Class">
+            <Field label={t("Class")}>
               <CustomDropdown
                 value={filters.classId}
                 onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value }))}
               >
-                <option value="">All classes</option>
+                <option value="">{t("All classes")}</option>
                 {(classes.data ?? []).map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -226,7 +227,7 @@ function LeavePage() {
           </>
         ) : null}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="From">
+          <Field label={t("From")}>
             <input
               type="date"
               value={filters.dateFrom}
@@ -234,7 +235,7 @@ function LeavePage() {
               className="w-full rounded-2xl border border-border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-primary"
             />
           </Field>
-          <Field label="To">
+          <Field label={t("To")}>
             <input
               type="date"
               value={filters.dateTo}
@@ -245,9 +246,9 @@ function LeavePage() {
         </div>
       </FilterBar>
 
-      <SectionTitle>Requests</SectionTitle>
+      <SectionTitle>{t("Requests")}</SectionTitle>
       {query.isLoading ? <SkeletonList rows={4} /> : null}
-      {!query.isLoading && items.length === 0 ? <EmptyState title="No leave requests" /> : null}
+      {!query.isLoading && items.length === 0 ? <EmptyState title={t("No leave requests")} /> : null}
 
       <div className="space-y-2.5">
         {items.map((item: Leave) => (
@@ -270,14 +271,12 @@ function LeavePage() {
                   onClick={() => review.mutate({ id: item.id, status: "approved" })}
                   className="rounded-xl bg-primary-soft py-2 text-xs font-bold uppercase tracking-wide text-success"
                 >
-                  Approve
-                </button>
+                  {t("Approve")}</button>
                 <button
                   onClick={() => review.mutate({ id: item.id, status: "rejected" })}
                   className="rounded-xl bg-destructive/10 py-2 text-xs font-bold uppercase tracking-wide text-destructive"
                 >
-                  Reject
-                </button>
+                  {t("Reject")}</button>
               </div>
             ) : null}
           </Card>

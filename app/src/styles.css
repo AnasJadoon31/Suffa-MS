@@ -1,5 +1,4 @@
-@import "tailwindcss" source(none);
-@source "../src";
+@import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -137,7 +136,6 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    overscroll-behavior-y: none;
   }
 
   h1,
@@ -151,6 +149,31 @@
 
   [dir="rtl"] body {
     font-family: var(--font-urdu), var(--font-sans);
+    line-height: 1.75;
+  }
+
+  [dir="rtl"] label,
+  [dir="rtl"] span,
+  [dir="rtl"] p,
+  [dir="rtl"] h1,
+  [dir="rtl"] h2,
+  [dir="rtl"] h3,
+  [dir="rtl"] h4,
+  [dir="rtl"] legend,
+  [dir="rtl"] button {
+    letter-spacing: 0 !important;
+    position: relative;
+    top: -5px;
+  }
+
+  [dir="rtl"] .truncate {
+    padding-bottom: 4px;
+  }
+
+  [dir="rtl"] input::placeholder,
+  [dir="rtl"] textarea::placeholder {
+    font-size: 12px;
+    opacity: 0.8;
   }
 }
 
@@ -161,6 +184,10 @@
 
 @utility pb-safe {
   padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+
+@utility pb-safe-nav {
+  padding-bottom: calc(5.5rem + max(env(safe-area-inset-bottom), 0px));
 }
 
 @utility mb-safe-nav {

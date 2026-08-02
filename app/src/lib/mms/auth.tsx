@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, setAcademicSessionId, DEFAULT_TENANT, TENANT_KEY, TOKEN_KEY } from "./api";
+import i18n from "@/i18n";
 
 export interface MmsUser {
   id: string;
@@ -69,6 +70,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPermissions(payload.permissions ?? []);
     setFeatures(payload.features ?? {});
     setAcademicSessionId(payload.user?.selected_session_id ?? null);
+    
+    if (payload.user?.preferred_language) {
+      const lang = payload.user.preferred_language;
+      localStorage.setItem("mms_lang", lang);
+      void i18n.changeLanguage(lang);
+      const dir = lang === "ur" || lang === "ar" ? "rtl" : "ltr";
+      document.documentElement.dir = dir;
+      document.documentElement.lang = lang;
+    }
   }, []);
 
   const refresh = useCallback(async () => {

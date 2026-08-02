@@ -3,6 +3,32 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-03 — Parent Attendance View & Comprehensive Urdu i18n
+
+**Issue:** 
+- The `ParentAttendance` view crashed/failed to render children due to nested `<AppShell>` wrappers and missing `class_id` in student dashboard API response.
+- Injected `t()` calls in shadcn `forwardRef` UI primitives (`breadcrumb.tsx`, `carousel.tsx`, `dialog.tsx`, `pagination.tsx`, `sheet.tsx`, `sidebar.tsx`) caused runtime crashes ("This page didn't load") because React hooks cannot be used in static/forwardRef definitions without hook context.
+- Urdu translations were 93% incomplete (372 out of 399 keys were raw English duplicates).
+
+**Fix:**
+- Refactored `MyStudentAttendance` to return a standalone `div` when called for a child inside `ParentAttendance`, and only wrap in `AppShell` for student self-viewing.
+- Added `class_id` output to `_student_dashboard_for_profile` in backend `reporting/routes.py` and mapped `classId: child.class_id` in `attendance.tsx`.
+- Reverted invalid `t()` calls in `forwardRef` components back to static string labels, resolving the runtime error boundary crashes.
+- Added full Urdu translations for all 397 UI strings across every route, modal, table, form, empty state, and status tag in `app/src/i18n/locales/ur.json`.
+
+**Files:**
+- `app/src/routes/attendance.tsx`
+- `app/src/components/ui/breadcrumb.tsx`
+- `app/src/components/ui/carousel.tsx`
+- `app/src/components/ui/dialog.tsx`
+- `app/src/components/ui/pagination.tsx`
+- `app/src/components/ui/sheet.tsx`
+- `app/src/components/ui/sidebar.tsx`
+- `app/src/i18n/locales/ur.json`
+- `backend/app/modules/reporting/routes.py`
+
+**Verification:** `cd app && npm run build` (passed cleanly, 0 errors). Verified full application loads without crashes on port 8081.
+
 ## 2026-08-02 — Frontend Completion Recovery (Core Journeys)
 
 **Issue:** After the TanStack frontend replacement, several authenticated screens were still only partially connected to backend workflows. The highest-risk gaps were profile/account management, assignments, admissions, results, settings, and lifecycle actions on content/resource screens.

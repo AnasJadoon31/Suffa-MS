@@ -16,6 +16,7 @@ import {
 } from "@/components/app/Primitives";
 import { academicsApi, authApi } from "@/lib/mms/endpoints";
 import { useAuth } from "@/lib/mms/auth";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/me")({
   head: () => ({
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/me")({
 });
 
 function MePage() {
+    const { t } = useTranslation();
   const { user, madrasa, permissions, logout, refresh } = useAuth();
   const navigate = useNavigate();
   const client = useQueryClient();
@@ -90,7 +92,7 @@ function MePage() {
   });
 
   return (
-    <AppShell title="My Profile" subtitle={madrasa?.name ?? "Suffa MS"}>
+    <AppShell title={t("My Profile")} subtitle={madrasa?.name ?? "Suffa MS"}>
       <Card className="flex items-center gap-3">
         <span className="gradient-emerald grid h-14 w-14 shrink-0 place-items-center rounded-2xl font-display text-xl font-extrabold text-primary-foreground">
           {user?.username?.slice(0, 1).toUpperCase()}
@@ -104,34 +106,34 @@ function MePage() {
         </div>
       </Card>
 
-      <SectionTitle>Account</SectionTitle>
+      <SectionTitle>{t("Account")}</SectionTitle>
       <div className="space-y-2.5">
-        <Row icon={<Building2 className="h-4 w-4" />} label="Madrasa" value={madrasa?.name ?? "—"} />
-        <Row icon={<IdCard className="h-4 w-4" />} label="Tenant" value={madrasa?.slug ?? "—"} />
+        <Row icon={<Building2 className="h-4 w-4" />} label={t("Madrasa")} value={madrasa?.name ?? "—"} />
+        <Row icon={<IdCard className="h-4 w-4" />} label={t("Tenant")} value={madrasa?.slug ?? "—"} />
         <Row
           icon={<ShieldCheck className="h-4 w-4" />}
-          label="Permissions"
+          label={t("Permissions")}
           value={`${permissions.length} granted`}
         />
-        <Row icon={<Globe className="h-4 w-4" />} label="Session" value={activeSessionLabel} />
+        <Row icon={<Globe className="h-4 w-4" />} label={t("Session")} value={activeSessionLabel} />
       </div>
 
-      <SectionTitle>Preferences</SectionTitle>
+      <SectionTitle>{t("Preferences")}</SectionTitle>
       <Card className="space-y-3 p-3.5">
-        <Field label="Preferred language">
+        <Field label={t("Preferred language")}>
           <CustomDropdown value={language} onChange={(event) => setLanguage(event.target.value)}>
-            <option value="en">English</option>
-            <option value="ur">Urdu</option>
+            <option value="en">{t("English")}</option>
+            <option value="ur">{t("Urdu")}</option>
           </CustomDropdown>
         </Field>
 
         {canChooseSession ? (
-          <Field label="Academic session">
+          <Field label={t("Academic session")}>
             <CustomDropdown
               value={selectedSessionId}
               onChange={(event) => setSelectedSessionId(event.target.value)}
             >
-              <option value="">Follow active madrasa session</option>
+              <option value="">{t("Follow active madrasa session")}</option>
               {(sessions.data ?? []).map((session) => (
                 <option key={session.id} value={session.id}>
                   {session.name}
@@ -148,27 +150,26 @@ function MePage() {
           className="w-full"
         >
           <Languages className="h-4 w-4" />
-          Save preferences
-        </ActionButton>
+          {t("Save preferences")}</ActionButton>
       </Card>
 
-      <SectionTitle>Security</SectionTitle>
+      <SectionTitle>{t("Security")}</SectionTitle>
       <Card className="space-y-3 p-3.5">
-        <Field label="Current password">
+        <Field label={t("Current password")}>
           <TextInput
             type="password"
             value={currentPassword}
             onChange={(event) => setCurrentPassword(event.target.value)}
           />
         </Field>
-        <Field label="New password">
+        <Field label={t("New password")}>
           <TextInput
             type="password"
             value={newPassword}
             onChange={(event) => setNewPassword(event.target.value)}
           />
         </Field>
-        <Field label="Confirm new password">
+        <Field label={t("Confirm new password")}>
           <TextInput
             type="password"
             value={confirmPassword}
@@ -181,11 +182,10 @@ function MePage() {
           className="w-full"
         >
           <KeyRound className="h-4 w-4" />
-          Change password
-        </ActionButton>
+          {t("Change password")}</ActionButton>
       </Card>
 
-      <SectionTitle>Session</SectionTitle>
+      <SectionTitle>{t("Session")}</SectionTitle>
       <ActionButton
         variant="danger"
         className="w-full"
@@ -195,20 +195,20 @@ function MePage() {
         }}
       >
         <LogOut className="h-4 w-4" />
-        Sign out
-      </ActionButton>
+        {t("Sign out")}</ActionButton>
     </AppShell>
   );
 }
 
 function Row({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+    const { t } = useTranslation();
   return (
     <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
         {icon}
       </span>
-      <span className="truncate text-sm font-semibold text-muted-foreground">{label}</span>
-      <span className="truncate text-right text-sm font-bold">{value}</span>
+      <span className="truncate text-sm font-semibold text-muted-foreground ltr:text-left rtl:text-right">{label}</span>
+      <span className="truncate text-sm font-bold ltr:text-right rtl:text-left">{value}</span>
     </Card>
   );
 }

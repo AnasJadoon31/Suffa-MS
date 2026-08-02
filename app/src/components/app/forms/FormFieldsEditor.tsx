@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 
 import { Field, CustomDropdown, TextInput } from "@/components/app/Primitives";
 import type { FormFieldDefinition } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 const FIELD_TYPES: FormFieldDefinition["type"][] = [
   "label",
@@ -47,6 +48,7 @@ export function FormFieldsEditor({
   fields: FormFieldDefinition[];
   onChange: (fields: FormFieldDefinition[]) => void;
 }) {
+    const { t } = useTranslation();
   const update = (index: number, patch: Partial<FormFieldDefinition>) => {
     onChange(fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
   };
@@ -65,27 +67,24 @@ export function FormFieldsEditor({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">
-          Fields
-        </span>
+          {t("Fields")}</span>
         <button
           type="button"
           onClick={() => onChange([...fields, emptyFormField()])}
           className="inline-flex items-center gap-1 rounded-xl bg-primary-soft px-2.5 py-1.5 text-xs font-bold text-primary"
         >
-          <Plus className="h-3.5 w-3.5" /> Add field
-        </button>
+          <Plus className="h-3.5 w-3.5" /> {t("Add field")}</button>
       </div>
 
       {fields.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-          No fields yet.
-        </p>
+          {t("No fields yet.")}</p>
       ) : null}
 
       {fields.map((field, index) => (
         <div key={index} className="space-y-2.5 rounded-2xl border border-border bg-card p-3.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-bold text-muted-foreground">Field {index + 1}</span>
+            <span className="text-xs font-bold text-muted-foreground">{t("Field")}{index + 1}</span>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -116,7 +115,7 @@ export function FormFieldsEditor({
             </div>
           </div>
 
-          <Field label="Label">
+          <Field label={t("Label")}>
             <TextInput
               required
               value={field.label}
@@ -124,7 +123,7 @@ export function FormFieldsEditor({
             />
           </Field>
 
-          <Field label="Type">
+          <Field label={t("Type")}>
             <CustomDropdown
               value={field.type}
               onChange={(e) => {
@@ -147,8 +146,7 @@ export function FormFieldsEditor({
           {OPTION_TYPES.has(field.type) ? (
             <div className="space-y-1.5">
               <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">
-                Options
-              </span>
+                {t("Options")}</span>
               {field.options.map((option, optionIndex) => (
                 <div key={optionIndex} className="flex items-center gap-1.5">
                   <TextInput
@@ -179,8 +177,7 @@ export function FormFieldsEditor({
                 onClick={() => update(index, { options: [...field.options, ""] })}
                 className="text-xs font-bold text-primary"
               >
-                + Add option
-              </button>
+                {t("+ Add option")}</button>
             </div>
           ) : null}
 
@@ -191,8 +188,7 @@ export function FormFieldsEditor({
               onChange={(e) => update(index, { required: e.target.checked })}
               className="h-4 w-4 rounded border-border accent-primary"
             />
-            Required
-          </label>
+            {t("Required")}</label>
         </div>
       ))}
     </div>

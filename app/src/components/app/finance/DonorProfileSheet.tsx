@@ -3,12 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Card, EmptyState, SkeletonList, ManagedSheet } from "@/components/app/Primitives";
 import { financeApi, financeMutations } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 function money(amount: number, currency?: string) {
   return `${currency ?? "PKR"} ${Number(amount ?? 0).toLocaleString()}`;
 }
 
 export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClose: () => void }) {
+    const { t } = useTranslation();
   const profile = useQuery({
     queryKey: ["donor-profile", donorId],
     queryFn: () => financeApi.donorProfile(donorId),
@@ -32,19 +34,17 @@ export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClo
             <Card className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Contact
-                </p>
+                  {t("Contact")}</p>
                 <p className="font-semibold">{profile.data.contact || "—"}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total donated
-                </p>
+                  {t("Total donated")}</p>
                 <p className="font-display font-extrabold">{money(total)}</p>
               </div>
             </Card>
             {profile.data.donations.length === 0 ? (
-              <EmptyState title="No donations yet" />
+              <EmptyState title={t("No donations yet")} />
             ) : (
               <div className="space-y-2">
                 {profile.data.donations.map((d) => (
@@ -74,7 +74,7 @@ export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClo
             )}
           </div>
         ) : (
-          <EmptyState title="Couldn't load donor" />
+          <EmptyState title={t("Couldn't load donor")} />
         )}
     </ManagedSheet>
   );

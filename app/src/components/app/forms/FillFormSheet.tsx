@@ -7,6 +7,7 @@ import { Field, CustomDropdown, TextArea, TextInput } from "@/components/app/Pri
 import { useAuth } from "@/lib/mms/auth";
 import { reportingApi } from "@/lib/mms/endpoints";
 import { formsApi, type FormDef } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 interface Ward {
   id: string;
@@ -24,6 +25,7 @@ export function FillFormSheet({
   onOpenChange: (next: boolean) => void;
   onSubmitted: () => void;
 }) {
+    const { t } = useTranslation();
   const { user } = useAuth();
   const isGuardian = user?.role === "parent" || user?.role === "guardian";
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
@@ -83,7 +85,7 @@ export function FillFormSheet({
       ) : null}
 
       {isGuardian && wards.length > 0 ? (
-        <Field label="Ward">
+        <Field label={t("Ward")}>
           <CustomDropdown value={wardId} onChange={(e) => setWardId(e.target.value)}>
             {wards.map((w) => (
               <option key={w.id} value={w.id}>
@@ -134,7 +136,7 @@ export function FillFormSheet({
                 value={(answers[field.key] as string) ?? ""}
                 onChange={(e) => setAnswers((a) => ({ ...a, [field.key]: e.target.value }))}
               >
-                <option value="">Select…</option>
+                <option value="">{t("Select…")}</option>
                 {field.options.map((option) => (
                   <option key={option} value={option}>
                     {option}

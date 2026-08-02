@@ -36,7 +36,7 @@ export function AppShell({
       <DesktopSidebar />
       <div className="lg:ml-[16rem]">
         <TopBar title={title} subtitle={subtitle} right={right} />
-        <main className="mb-safe-nav mx-auto max-w-lg px-4 pt-5 lg:mb-0 lg:max-w-5xl lg:px-8 lg:pb-12 lg:pt-8">
+        <main className="pb-safe-nav mx-auto max-w-lg px-4 pt-5 lg:mb-0 lg:max-w-5xl lg:px-8 lg:pb-12 lg:pt-8">
           {children}
         </main>
       </div>

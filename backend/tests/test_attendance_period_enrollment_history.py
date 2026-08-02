@@ -14,6 +14,14 @@ async def _seed_slot(client):
 
 async def test_roster_infers_single_current_day_period_from_course(client, seed):
     today_day = datetime.now(UTC).date().weekday()
+    # If today is Sunday (6), the seed data already has a slot, which causes a 409 conflict
+    # We must delete any existing slots for this course first
+    slots_resp = await client.get("/api/v1/operations/timetable")
+    if slots_resp.status_code == 200:
+        for slot in slots_resp.json():
+            if slot["course_id"] == str(seed.course.id) and slot["day_of_week"] == today_day:
+                await client.delete(f"/api/v1/operations/timetable/{slot['id']}")
+
     slot_response = await client.post(
         "/api/v1/operations/timetable",
         json={

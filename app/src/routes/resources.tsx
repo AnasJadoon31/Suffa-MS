@@ -28,6 +28,7 @@ import {
   uploadFile,
   type ResourceItem,
 } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/resources")({
   head: () => ({
@@ -47,6 +48,7 @@ export const Route = createFileRoute("/resources")({
 const emptyExtra = { classId: "", sectionId: "", mineOnly: false };
 
 function ResourcesPage() {
+    const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
   const canManage =
@@ -137,12 +139,12 @@ function ResourcesPage() {
 
   return (
     <AppShell
-      title="Resources"
+      title={t("Resources")}
       subtitle={`${items.length} items`}
       right={
         canManage ? (
           <FormSheet
-            title="Share a resource"
+            title={t("Share a resource")}
             triggerLabel="Share"
             submitLabel="Share"
             onSubmit={() => createResource.mutateAsync()}
@@ -153,11 +155,11 @@ function ResourcesPage() {
               onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
               categoryComposer={
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
-                  <Field label="New category">
+                  <Field label={t("New category")}>
                     <TextInput
                       value={newCategory}
                       onChange={(e) => setNewCategory(e.target.value)}
-                      placeholder="e.g. Tajweed notes"
+                      placeholder={t("e.g. Tajweed notes")}
                     />
                   </Field>
                   <button
@@ -166,8 +168,7 @@ function ResourcesPage() {
                     onClick={() => createCategory.mutate()}
                     className="rounded-2xl bg-muted px-3.5 py-2.5 text-sm font-bold disabled:opacity-50"
                   >
-                    Add
-                  </button>
+                    {t("Add")}</button>
                 </div>
               }
             />
@@ -176,7 +177,7 @@ function ResourcesPage() {
       }
     >
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-        <Chip active={categoryId === ""} onClick={() => setCategoryId("")} label="All" />
+        <Chip active={categoryId === ""} onClick={() => setCategoryId("")} label={t("All")} />
         {(categories.data ?? []).map((category) => (
           <Chip
             key={category.id}
@@ -194,12 +195,12 @@ function ResourcesPage() {
         }}
       >
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Class">
+          <Field label={t("Class")}>
             <CustomDropdown
               value={extra.classId}
               onChange={(e) => setExtra((f) => ({ ...f, classId: e.target.value, sectionId: "" }))}
             >
-              <option value="">All classes</option>
+              <option value="">{t("All classes")}</option>
               {(classes.data ?? []).map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
@@ -207,13 +208,13 @@ function ResourcesPage() {
               ))}
             </CustomDropdown>
           </Field>
-          <Field label="Section">
+          <Field label={t("Section")}>
             <CustomDropdown
               value={extra.sectionId}
               disabled={!extra.classId}
               onChange={(e) => setExtra((f) => ({ ...f, sectionId: e.target.value }))}
             >
-              <option value="">All sections</option>
+              <option value="">{t("All sections")}</option>
               {(sections.data ?? []).map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
@@ -229,13 +230,12 @@ function ResourcesPage() {
             onChange={(e) => setExtra((f) => ({ ...f, mineOnly: e.target.checked }))}
             className="h-4 w-4 rounded border-border"
           />
-          Mine only
-        </label>
+          {t("Mine only")}</label>
       </FilterBar>
 
       {resources.isLoading ? <SkeletonList rows={5} /> : null}
       {!resources.isLoading && items.length === 0 ? (
-        <EmptyState title="No resources yet" hint="Teachers can share notes and videos here." />
+        <EmptyState title={t("No resources yet")} hint="Teachers can share notes and videos here." />
       ) : null}
 
       <div className="space-y-2.5">
@@ -262,8 +262,7 @@ function ResourcesPage() {
                   rel="noreferrer"
                   className="mt-1 inline-block text-sm font-bold text-primary underline underline-offset-4"
                 >
-                  Watch
-                </a>
+                  {t("Watch")}</a>
               ) : null}
               {item.file_key ? (
                 <button
@@ -275,8 +274,7 @@ function ResourcesPage() {
                   className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-primary underline underline-offset-4"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Open file
-                </button>
+                  {t("Open file")}</button>
               ) : null}
             </div>
             {canManage ? (
@@ -323,6 +321,7 @@ function EditResourceSheet({
   categories: { id: string; name: string }[];
   onClose: () => void;
 }) {
+    const { t } = useTranslation();
   const client = useQueryClient();
   const [form, setForm] = useState<ResourceFormValues>({
     title: resource.title,
@@ -352,7 +351,7 @@ function EditResourceSheet({
 
   return (
     <FormSheet
-      title="Edit resource"
+      title={t("Edit resource")}
       submitLabel="Save changes"
       open
       onOpenChange={(next) => !next && onClose()}
@@ -369,6 +368,7 @@ function EditResourceSheet({
 }
 
 function Chip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+    const { t } = useTranslation();
   return (
     <button
       onClick={onClick}

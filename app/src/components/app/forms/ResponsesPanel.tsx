@@ -11,6 +11,7 @@ import {
   TextInput,
 } from "@/components/app/Primitives";
 import { formsApi, type FormDef, type FormResponse } from "@/lib/mms/more-endpoints";
+import { useTranslation } from "react-i18next";
 
 function toCsv(rows: FormResponse[], forms: FormDef[]): string {
   const columns = ["Form", "Respondent", "Role", "Ward", "Submitted at", "Answers"];
@@ -32,6 +33,7 @@ function toCsv(rows: FormResponse[], forms: FormDef[]): string {
 }
 
 export function ResponsesPanel({ forms }: { forms: FormDef[] }) {
+    const { t } = useTranslation();
   const [formId, setFormId] = useState("");
   const [role, setRole] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -59,9 +61,9 @@ export function ResponsesPanel({ forms }: { forms: FormDef[] }) {
   return (
     <div className="space-y-3">
       <Card className="grid grid-cols-2 gap-2.5 p-3.5">
-        <Field label="Form">
+        <Field label={t("Form")}>
           <CustomDropdown value={formId} onChange={(e) => setFormId(e.target.value)}>
-            <option value="">All forms</option>
+            <option value="">{t("All forms")}</option>
             {forms.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.title}
@@ -69,38 +71,37 @@ export function ResponsesPanel({ forms }: { forms: FormDef[] }) {
             ))}
           </CustomDropdown>
         </Field>
-        <Field label="Role">
+        <Field label={t("Role")}>
           <CustomDropdown value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="">All roles</option>
-            <option value="teacher">Teacher</option>
-            <option value="student">Student</option>
-            <option value="parent">Guardian</option>
+            <option value="">{t("All roles")}</option>
+            <option value="teacher">{t("Teacher")}</option>
+            <option value="student">{t("Student")}</option>
+            <option value="parent">{t("Guardian")}</option>
           </CustomDropdown>
         </Field>
-        <Field label="From">
+        <Field label={t("From")}>
           <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         </Field>
-        <Field label="To">
+        <Field label={t("To")}>
           <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </Field>
       </Card>
 
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold text-muted-foreground">{responses.length} responses</p>
+        <p className="text-xs font-bold text-muted-foreground">{responses.length} {t("responses")}</p>
         {csvHref ? (
           <a
             href={csvHref}
             download="form-responses.csv"
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
           >
-            <Download className="h-3.5 w-3.5" /> Export CSV
-          </a>
+            <Download className="h-3.5 w-3.5" /> {t("Export CSV")}</a>
         ) : null}
       </div>
 
       {query.isLoading ? <SkeletonList rows={3} /> : null}
       {!query.isLoading && responses.length === 0 ? (
-        <EmptyState title="No responses" hint="Submissions will appear here." />
+        <EmptyState title={t("No responses")} hint="Submissions will appear here." />
       ) : null}
 
       <div className="space-y-2.5">

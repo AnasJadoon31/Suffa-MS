@@ -11,7 +11,7 @@ export function Card({ className, children }: { className?: string; children: Re
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="mb-3 mt-6 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 first:mt-0">
-      <h2 className="truncate font-display text-sm font-extrabold uppercase tracking-[0.14em] text-muted-foreground">
+      <h2 className="truncate font-display text-sm font-extrabold uppercase tracking-[0.14em] text-muted-foreground rtl:font-bold rtl:tracking-normal rtl:leading-relaxed">
         {children}
       </h2>
       {action ? <div className="shrink-0">{action}</div> : null}
@@ -140,7 +140,7 @@ export function ActionButton({
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">
+      <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.14em] text-muted-foreground rtl:text-xs rtl:font-bold rtl:tracking-normal rtl:leading-relaxed">
         {label}
       </span>
       {children}
@@ -168,7 +168,7 @@ export function CustomDropdown(props: React.SelectHTMLAttributes<HTMLSelectEleme
         disabled={disabled}
         className={cn(
           controlClass,
-          "appearance-none pr-10",
+          "appearance-none ltr:pr-10 ltr:pl-3.5 rtl:pl-10 rtl:pr-3.5",
           disabled && "cursor-not-allowed opacity-60",
           className,
         )}
@@ -178,7 +178,7 @@ export function CustomDropdown(props: React.SelectHTMLAttributes<HTMLSelectEleme
       <ChevronDown
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors",
+          "pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors ltr:right-3.5 rtl:left-3.5",
           disabled && "opacity-60",
         )}
       />

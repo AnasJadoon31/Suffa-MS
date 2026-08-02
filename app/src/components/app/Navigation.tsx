@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/mms/auth";
 import { navGroups } from "@/lib/mms/nav";
+import { useTranslation } from "react-i18next";
 
 const tabs = [
   { to: "/dashboard", label: "Home", icon: Home },
@@ -19,6 +20,7 @@ function useActive() {
 }
 
 export function BottomNav() {
+    const { t } = useTranslation();
   const isActive = useActive();
 
   return (
@@ -41,7 +43,7 @@ export function BottomNav() {
                 >
                   <Icon className="h-[1.15rem] w-[1.15rem]" />
                 </span>
-                <span className={active ? "text-primary" : "text-muted-foreground"}>{label}</span>
+                <span className={active ? "text-primary" : "text-muted-foreground"}>{t(label)}</span>
               </Link>
             </li>
           );
@@ -52,6 +54,7 @@ export function BottomNav() {
 }
 
 function BrandBlock() {
+    const { t } = useTranslation();
   const { madrasa, user } = useAuth();
   return (
     <div className="flex min-w-0 items-center gap-3 px-2">
@@ -72,13 +75,14 @@ function BrandBlock() {
 }
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+    const { t } = useTranslation();
   const isActive = useActive();
   return (
     <div className="space-y-5">
       {navGroups.map((group) => (
         <div key={group.title}>
           <p className="px-3.5 pb-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.16em] text-muted-foreground/70">
-            {group.title}
+            {t(group.title)}
           </p>
           <ul className="space-y-1">
             {group.items.map(({ to, label, icon: Icon }) => {
@@ -95,7 +99,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                     }
                   >
                     <Icon className="h-[1.05rem] w-[1.05rem] shrink-0" />
-                    <span className="truncate">{label}</span>
+                    <span className="truncate">{t(label)}</span>
                   </Link>
                 </li>
               );
@@ -108,6 +112,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function SignOutButton({ onDone }: { onDone?: () => void }) {
+    const { t } = useTranslation();
   const { logout } = useAuth();
   const navigate = useNavigate();
   return (
@@ -120,12 +125,12 @@ function SignOutButton({ onDone }: { onDone?: () => void }) {
       className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 font-display text-sm font-bold text-destructive transition-colors hover:bg-destructive/10"
     >
       <LogOut className="h-[1.15rem] w-[1.15rem] shrink-0" />
-      Sign out
-    </button>
+      {t("Sign out")}</button>
   );
 }
 
 export function DesktopSidebar() {
+    const { t } = useTranslation();
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[16rem] flex-col border-r border-border bg-card px-3 py-5 lg:flex">
       <BrandBlock />
@@ -138,6 +143,7 @@ export function DesktopSidebar() {
 }
 
 export function MobileDrawer() {
+    const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -148,7 +154,7 @@ export function MobileDrawer() {
         <Menu className="h-5 w-5" />
       </SheetTrigger>
       <SheetContent side="left" className="flex w-[17rem] flex-col bg-card px-3 py-5">
-        <SheetTitle className="sr-only">Navigation</SheetTitle>
+        <SheetTitle className="sr-only">{t("Navigation")}</SheetTitle>
         <BrandBlock />
         <nav className="mt-6 flex-1 overflow-y-auto pb-4">
           <NavLinks onNavigate={() => setOpen(false)} />
@@ -168,6 +174,7 @@ export function TopBar({
   subtitle?: string | undefined;
   right?: ReactNode | undefined;
 }) {
+    const { t } = useTranslation();
   return (
     <header className="pt-safe gradient-emerald sticky top-0 z-30 rounded-b-3xl px-4 pb-5 text-primary-foreground shadow-[var(--shadow-raised)] lg:rounded-none">
       <div className="mx-auto grid max-w-lg grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 pt-4 lg:max-w-5xl">
