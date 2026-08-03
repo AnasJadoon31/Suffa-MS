@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return <div className={cn("card-surface p-4", className)}>{children}</div>;
@@ -168,7 +169,7 @@ export function CustomDropdown(props: React.SelectHTMLAttributes<HTMLSelectEleme
         disabled={disabled}
         className={cn(
           controlClass,
-          "appearance-none ltr:pr-10 ltr:pl-3.5 rtl:pl-10 rtl:pr-3.5",
+          "min-h-[48px] py-2.5 appearance-none ltr:pr-8 ltr:pl-3 rtl:pl-8 rtl:pr-3",
           disabled && "cursor-not-allowed opacity-60",
           className,
         )}
@@ -178,7 +179,7 @@ export function CustomDropdown(props: React.SelectHTMLAttributes<HTMLSelectEleme
       <ChevronDown
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors ltr:right-3.5 rtl:left-3.5",
+          "pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors ltr:right-2.5 rtl:left-2.5",
           disabled && "opacity-60",
         )}
       />
@@ -197,6 +198,7 @@ export function Segmented<T extends string>({
   options: { key: T; label: string }[];
   onChange: (next: T) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="mb-3 flex gap-1.5 rounded-2xl bg-muted p-1">
       {options.map((option) => (
@@ -210,7 +212,7 @@ export function Segmented<T extends string>({
               : "text-muted-foreground",
           )}
         >
-          {option.label}
+          {t(option.label)}
         </button>
       ))}
     </div>

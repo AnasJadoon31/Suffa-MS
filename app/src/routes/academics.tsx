@@ -160,7 +160,7 @@ function AcademicsPage() {
                 : "text-muted-foreground",
             )}
           >
-            {key}
+            {t(key === "sessions" ? "Sessions" : key === "programs" ? "Programs" : key === "classes" ? "Classes" : "Courses")}
           </button>
         ))}
       </div>

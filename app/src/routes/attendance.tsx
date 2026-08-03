@@ -482,7 +482,7 @@ function AttendanceBoard() {
                     : "text-muted-foreground",
                 )}
               >
-                {key === "calendar" ? "Calendar" : "Student history"}
+                {key === "calendar" ? t("Calendar") : t("Student history")}
               </button>
             ))}
           </div>
@@ -725,7 +725,7 @@ function ModeToggle({
               : "text-muted-foreground",
           )}
         >
-          {key}
+          {key === "students" ? t("Students") : t("Teachers")}
         </button>
       ))}
     </div>

@@ -93,7 +93,7 @@ function TimetablePage() {
             <button
               key={item.key}
               onClick={() => setTab(item.key)}
-              title={item.label}
+              title={t(item.label)}
               className={cn(
                 "flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 py-2 text-[0.7rem] font-bold transition-colors",
                 tab === item.key
@@ -102,7 +102,7 @@ function TimetablePage() {
               )}
             >
               <item.icon className="h-4 w-4 shrink-0" />
-              <span className="hidden truncate sm:inline">{item.label}</span>
+              <span className="hidden truncate sm:inline">{t(item.label)}</span>
             </button>
           ))}
         </div>

@@ -453,7 +453,7 @@ function FinancePage() {
                 : "text-muted-foreground",
             )}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>
