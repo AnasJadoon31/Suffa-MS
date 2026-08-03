@@ -66,13 +66,13 @@ function DashboardPage() {
 
   return (
     <AppShell
-      title={`Assalamu alaikum, ${user?.username ?? ""}`}
+      title={`${t("Assalamu alaikum")}, ${user?.username ?? ""}`}
       subtitle={
         today.data ? `${today.data.hijri} · ${today.data.gregorian}` : (madrasa?.name ?? "Suffa MS")
       }
       right={
         <span className="rounded-full bg-primary-foreground/15 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wider">
-          {user?.role?.replace("_", " ")}
+          {t(user?.role?.replace("_", " ") ?? "")}
         </span>
       }
     >

@@ -180,7 +180,7 @@ export function TopBar({
       <div className="mx-auto grid max-w-lg grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 pt-4 lg:max-w-5xl">
         <MobileDrawer />
         <div className="min-w-0">
-          <h1 className="truncate font-display text-xl font-extrabold lg:text-2xl">{title}</h1>
+          <h1 className="truncate font-display text-base font-extrabold sm:text-lg lg:text-2xl">{title}</h1>
           {subtitle ? (
             <p className="truncate text-xs text-primary-foreground/70">{subtitle}</p>
           ) : null}
