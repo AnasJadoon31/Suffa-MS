@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { Download, HandCoins, Plus, Receipt, Search, User, Wallet } from "lucide-react";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { Download, HandCoins, Plus, Receipt, Wallet } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
-import { DonorProfileSheet } from "@/components/app/finance/DonorProfileSheet";
 import {
   ActionButton,
   Card,
@@ -23,8 +23,11 @@ import { useAuth } from "@/lib/mms/auth";
 import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
 import { financeApi, financeMutations } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
-
 export const Route = createFileRoute("/finance")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || undefined,
+    donor_id: (search.donor_id as string) || undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Finance — Suffa MS" },
@@ -39,7 +42,7 @@ export const Route = createFileRoute("/finance")({
   component: FinancePage,
 });
 
-type Tab = "overview" | "payments" | "donations" | "donors" | "salary";
+type Tab = "overview" | "payments" | "donations" | "salary";
 
 function money(amount: number, currency?: string) {
   return `${currency ?? "PKR"} ${Number(amount ?? 0).toLocaleString()}`;
@@ -49,9 +52,10 @@ function FinancePage() {
     const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
+  const search = useSearch({ from: "/finance" });
   const canManage = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
   const isTeacher = user?.role === "teacher";
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>((search.tab as Tab) || "overview");
   const today = new Date().toISOString().slice(0, 10);
 
   // shared date range filter
@@ -64,18 +68,13 @@ function FinancePage() {
   const [paymentStudentId, setPaymentStudentId] = useState("");
 
   // donations filters
-  const [donationDonorId, setDonationDonorId] = useState("");
+  const [donationDonorId, setDonationDonorId] = useState(search.donor_id || "");
   const [donationCategoryId, setDonationCategoryId] = useState("");
-
-  // donors search
-  const [donorQuery, setDonorQuery] = useState("");
-  const [donorProfileId, setDonorProfileId] = useState<string | null>(null);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "payments", label: "Payments" },
     { key: "donations", label: "Donations" },
-    { key: "donors", label: "Donors" },
     ...(isTeacher ? [{ key: "salary" as Tab, label: "My Salary" }] : []),
   ];
 
@@ -124,8 +123,8 @@ function FinancePage() {
   });
 
   const donors = useQuery({
-    queryKey: ["donors", donorQuery],
-    queryFn: () => financeMutations.listDonors(donorQuery ? { q: donorQuery } : {}),
+    queryKey: ["donors"],
+    queryFn: () => financeMutations.listDonors(),
     retry: false,
   });
 
@@ -242,25 +241,6 @@ function FinancePage() {
       toast.success("Category added");
       setNewCategoryName("");
       void client.invalidateQueries({ queryKey: ["finance-categories"] });
-    },
-    onError: (err: unknown) => {
-      if (err instanceof Error) toast.error(err.message);
-    },
-  });
-
-  // create donor
-  const [donorName, setDonorName] = useState("");
-  const [donorContact, setDonorContact] = useState("");
-  const createDonor = useMutation({
-    mutationFn: () => {
-      if (!donorName.trim()) throw new Error("Donor name is required");
-      return financeMutations.createDonor({ name: donorName.trim(), contact: donorContact.trim() });
-    },
-    onSuccess: () => {
-      toast.success("Donor added");
-      setDonorName("");
-      setDonorContact("");
-      void client.invalidateQueries({ queryKey: ["donors"] });
     },
     onError: (err: unknown) => {
       if (err instanceof Error) toast.error(err.message);
@@ -393,24 +373,10 @@ function FinancePage() {
           <TextInput value={donNote} onChange={(e) => setDonNote(e.target.value)} />
         </Field>
       </FormSheet>
-    ) : canManage && tab === "donors" ? (
-      <FormSheet
-        title={t("Add donor")}
-        triggerLabel="Add"
-        submitLabel="Save"
-        onSubmit={() => createDonor.mutateAsync()}
-      >
-        <Field label={t("Name")}>
-          <TextInput required value={donorName} onChange={(e) => setDonorName(e.target.value)} />
-        </Field>
-        <Field label={t("Contact")}>
-          <TextInput value={donorContact} onChange={(e) => setDonorContact(e.target.value)} />
-        </Field>
-      </FormSheet>
     ) : undefined;
 
   return (
-    <AppShell title={t("Finance")} subtitle={t("Contributions, donations and salary")} right={action}>
+    <AppShell title={t("Finance")} subtitle={t("Contributions, donations and salary")}>
       <div className="grid grid-cols-2 gap-2.5">
         <StatCard
           label={t("Contributions")}
@@ -425,21 +391,10 @@ function FinancePage() {
         />
       </div>
 
-      {tab !== "salary" ? (
-        <Card className="mt-3 grid grid-cols-2 gap-3 p-3.5">
-          <Field label={t("From")}>
-            <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          </Field>
-          <Field label={t("To")}>
-            <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          </Field>
-        </Card>
-      ) : null}
-
       <div
         className={cn(
           "mt-4 grid gap-1.5 rounded-2xl bg-muted p-1",
-          tabs.length === 5 ? "grid-cols-5" : "grid-cols-4",
+          tabs.length === 4 ? "grid-cols-4" : "grid-cols-3",
         )}
       >
         {tabs.map(({ key, label }) => (
@@ -457,6 +412,73 @@ function FinancePage() {
           </button>
         ))}
       </div>
+
+      {tab !== "salary" ? (
+        <div className="mt-3">
+        <FilterBar
+          activeCount={[dateFrom, dateTo, donationDonorId, donationCategoryId, paymentClassId, paymentCategoryId, paymentStudentId].filter(Boolean).length}
+          onClear={() => {
+            setDateFrom("");
+            setDateTo("");
+            setDonationDonorId("");
+            setDonationCategoryId("");
+            setPaymentClassId("");
+            setPaymentCategoryId("");
+            setPaymentStudentId("");
+          }}
+          action={action}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label={t("From")}>
+              <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </Field>
+            <Field label={t("To")}>
+              <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </Field>
+            {tab === "payments" ? (
+              <>
+                <Field label={t("Class")}>
+                  <CustomDropdown value={paymentClassId} onChange={(e) => setPaymentClassId(e.target.value)}>
+                    <option value="">{t("All classes")}</option>
+                    {(classes.data ?? []).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                  </CustomDropdown>
+                </Field>
+                <Field label={t("Category")}>
+                  <CustomDropdown value={paymentCategoryId} onChange={(e) => setPaymentCategoryId(e.target.value)}>
+                    <option value="">{t("All categories")}</option>
+                    {(categories.data ?? []).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                  </CustomDropdown>
+                </Field>
+                {canManage ? (
+                  <Field label={t("Student")} className="sm:col-span-2">
+                    <CustomDropdown value={paymentStudentId} onChange={(e) => setPaymentStudentId(e.target.value)}>
+                      <option value="">{t("All students")}</option>
+                      {(students.data?.items ?? []).map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                    </CustomDropdown>
+                  </Field>
+                ) : null}
+              </>
+            ) : null}
+            {tab === "donations" ? (
+              <>
+                <Field label={t("Donor")}>
+                  <CustomDropdown value={donationDonorId} onChange={(e) => setDonationDonorId(e.target.value)}>
+                    <option value="">{t("All donors")}</option>
+                    {(donors.data ?? []).map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
+                  </CustomDropdown>
+                </Field>
+                <Field label={t("Category")}>
+                  <CustomDropdown value={donationCategoryId} onChange={(e) => setDonationCategoryId(e.target.value)}>
+                    <option value="">{t("All categories")}</option>
+                    {(categories.data ?? []).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                  </CustomDropdown>
+                </Field>
+              </>
+            ) : null}
+          </div>
+        </FilterBar>
+        </div>
+      ) : null}
 
       {tab === "overview" ? (
         <>
@@ -477,7 +499,23 @@ function FinancePage() {
               ))}
             </div>
           )}
-          <SectionTitle>{t("Total")}</SectionTitle>
+          {canManage ? (
+            <Card className="mt-3 space-y-3 p-3.5">
+              <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground">
+                {t("Add category")}</p>
+              <div className="flex gap-2">
+                <TextInput
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder={t("Category name")}
+                />
+                <ActionButton variant="soft" onClick={() => createCategory.mutate()}>
+                  <Plus className="h-4 w-4" />
+                </ActionButton>
+              </div>
+            </Card>
+          ) : null}
+          <SectionTitle className="mt-4">{t("Total")}</SectionTitle>
           <Card className="flex items-center justify-between p-3.5">
             <p className="font-semibold text-muted-foreground">{t("Overall total")}</p>
             <span className="font-display text-base font-extrabold">
@@ -489,50 +527,6 @@ function FinancePage() {
 
       {tab === "payments" ? (
         <>
-          <Card className="mt-4 grid grid-cols-2 gap-3 p-3.5">
-            <Field label={t("Class")}>
-              <CustomDropdown
-                value={paymentClassId}
-                onChange={(e) => setPaymentClassId(e.target.value)}
-              >
-                <option value="">{t("All classes")}</option>
-                {(classes.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </CustomDropdown>
-            </Field>
-            <Field label={t("Category")}>
-              <CustomDropdown
-                value={paymentCategoryId}
-                onChange={(e) => setPaymentCategoryId(e.target.value)}
-              >
-                <option value="">{t("All categories")}</option>
-                {(categories.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </CustomDropdown>
-            </Field>
-            {canManage ? (
-              <Field label={t("Student")}>
-                <CustomDropdown
-                  value={paymentStudentId}
-                  onChange={(e) => setPaymentStudentId(e.target.value)}
-                  className="col-span-2"
-                >
-                  <option value="">{t("All students")}</option>
-                  {(students.data?.items ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </CustomDropdown>
-              </Field>
-            ) : null}
-          </Card>
           <SectionTitle
             action={
               <span className="font-display text-sm font-extrabold text-primary">
@@ -561,34 +555,6 @@ function FinancePage() {
 
       {tab === "donations" ? (
         <>
-          <Card className="mt-4 grid grid-cols-2 gap-3 p-3.5">
-            <Field label={t("Donor")}>
-              <CustomDropdown
-                value={donationDonorId}
-                onChange={(e) => setDonationDonorId(e.target.value)}
-              >
-                <option value="">{t("All donors")}</option>
-                {(donors.data ?? []).map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </CustomDropdown>
-            </Field>
-            <Field label={t("Category")}>
-              <CustomDropdown
-                value={donationCategoryId}
-                onChange={(e) => setDonationCategoryId(e.target.value)}
-              >
-                <option value="">{t("All categories")}</option>
-                {(categories.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </CustomDropdown>
-            </Field>
-          </Card>
           <SectionTitle
             action={
               <span className="font-display text-sm font-extrabold text-primary">
@@ -610,60 +576,6 @@ function FinancePage() {
                 value={money(item.amount, item.currency)}
                 onReceipt={() => void financeMutations.donationReceipt(item.id)}
               />
-            ))}
-          </List>
-        </>
-      ) : null}
-
-      {tab === "donors" ? (
-        <>
-          <div className="relative mt-4">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <TextInput
-              value={donorQuery}
-              onChange={(e) => setDonorQuery(e.target.value)}
-              placeholder={t("Search donors")}
-              className="pl-10"
-            />
-          </div>
-          {canManage ? (
-            <Card className="mt-3 space-y-3 p-3.5">
-              <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground">
-                {t("Add category")}</p>
-              <div className="flex gap-2">
-                <TextInput
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder={t("Category name")}
-                />
-                <ActionButton variant="soft" onClick={() => createCategory.mutate()}>
-                  <Plus className="h-4 w-4" />
-                </ActionButton>
-              </div>
-            </Card>
-          ) : null}
-          <SectionTitle>{t("Donors")}</SectionTitle>
-          <List
-            loading={donors.isLoading}
-            empty={(donors.data ?? []).length === 0}
-            emptyTitle="No donors found"
-          >
-            {(donors.data ?? []).map((donor) => (
-              <button
-                key={donor.id}
-                onClick={() => setDonorProfileId(donor.id)}
-                className="block w-full text-left"
-              >
-                <Card className="flex items-center gap-3 p-3.5">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-                    <User className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{donor.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{donor.contact || "—"}</p>
-                  </div>
-                </Card>
-              </button>
             ))}
           </List>
         </>
@@ -696,9 +608,6 @@ function FinancePage() {
         )
       ) : null}
 
-      {donorProfileId ? (
-        <DonorProfileSheet donorId={donorProfileId} onClose={() => setDonorProfileId(null)} />
-      ) : null}
     </AppShell>
   );
 }

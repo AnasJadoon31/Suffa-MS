@@ -1,7 +1,8 @@
-import { Copy, ShieldOff } from "lucide-react";
+import { Copy, ShieldOff, ArrowRight } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useNavigate } from "@tanstack/react-router";
 
 import { ActionButton, Pill, ManagedSheet, ActionBar } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
@@ -11,9 +12,12 @@ import { GuardianForm } from "./GuardianForm";
 import { peopleApi } from "@/lib/mms/endpoints";
 import {
   peopleMutations,
+  financeMutations,
   type GuardianDetail,
   type StudentDetail,
   type TeacherDetail,
+  type DonorFinanceProfile,
+  type Donor,
 } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
@@ -307,6 +311,66 @@ export function GuardianDetailSheet({
             <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
         </ActionBar>
         <GuardianForm guardian={guardian} open={editOpen} onOpenChange={setEditOpen} />
+    </ManagedSheet>
+  );
+}
+
+export function DonorDetailSheet({
+  donor,
+  open,
+  onOpenChange,
+}: {
+  donor: Donor | null;
+  open: boolean;
+  onOpenChange: (next: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  const profile = useQuery({
+    queryKey: ["donor-profile", donor?.id],
+    queryFn: () => (donor ? financeMutations.donorProfile(donor.id) : Promise.reject()),
+    enabled: Boolean(donor),
+  });
+
+  if (!donor) return null;
+
+  return (
+    <ManagedSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={donor.name}
+      subtitle={
+        <div className="flex items-center gap-2">
+          <Pill tone="success">{t("Active")}</Pill>
+          {donor.username ? (
+            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent-foreground">
+              {donor.username}
+            </span>
+          ) : null}
+        </div>
+      }
+    >
+      <div className="mb-4">
+        <Row label={t("Contact")} value={donor.contact} />
+        <Row
+          label={t("Donations")}
+          value={profile.data ? String(profile.data.donations.length) : "…"}
+        />
+      </div>
+
+      <ActionBar>
+        <ActionButton
+          className="flex-1"
+          variant="soft"
+          onClick={() => {
+            onOpenChange(false);
+            navigate({ to: "/finance", search: { tab: "donations", donor_id: donor.id } });
+          }}
+        >
+          <ArrowRight className="h-4 w-4" /> {t("View donation history")}
+        </ActionButton>
+      </ActionBar>
     </ManagedSheet>
   );
 }

@@ -1,6 +1,8 @@
-import { ChevronDown, type LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import React, { type ReactNode, useState } from "react";
+import { Check, ChevronDown, ChevronsUpDown, type LucideIcon } from "lucide-react";
 
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
@@ -160,30 +162,132 @@ export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   return <textarea rows={4} {...props} className={cn(controlClass, "resize-y", props.className)} />;
 }
 
+export function SearchableSelect({
+  value,
+  onChange,
+  options,
+  placeholder = "Select...",
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string; disabled?: boolean }[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedOption = options.find((o) => o.value === value);
+  const { t } = useTranslation();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          className={cn(
+            controlClass,
+            "min-h-[48px] py-2.5 flex select-none items-center justify-between ltr:pl-3 ltr:pr-2 rtl:pr-3 rtl:pl-2 w-full text-sm",
+            !selectedOption && "text-muted-foreground",
+            className,
+          )}
+        >
+          <span className="truncate">{selectedOption?.label ?? placeholder}</span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={t("Search") + "..."} />
+          <CommandList>
+            <CommandEmpty>{t("No results")}</CommandEmpty>
+            {options.map((option) => (
+              <CommandItem
+                key={option.value}
+                value={option.label}
+                disabled={option.disabled}
+                onSelect={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+              >
+                <Check
+                  className={cn(
+                    "h-4 w-4 shrink-0",
+                    option.value === value ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                <span className="truncate">{option.label}</span>
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function extractSelectOptions(children: ReactNode): { value: string; label: string; disabled?: boolean }[] {
+  const opts: { value: string; label: string; disabled?: boolean }[] = [];
+  if (!children) return opts;
+  React.Children.forEach(children, (child) => {
+    if (!React.isValidElement(child) || child.type !== "option") return;
+    const props = child.props as Record<string, unknown>;
+    if (props.value && typeof props.value === "string") {
+      opts.push({
+        value: props.value as string,
+        label: String(props.children ?? props.value),
+        disabled: Boolean(props.disabled),
+      });
+    }
+  });
+  return opts;
+}
+
 export function CustomDropdown(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   const { className, children, disabled, ...rest } = props;
+  if (disabled || !children) {
+    return (
+      <div className="relative">
+        <select
+          {...rest}
+          disabled={disabled}
+          className={cn(
+            controlClass,
+            "min-h-[48px] py-2.5 appearance-none ltr:pr-8 ltr:pl-3 rtl:pl-8 rtl:pr-3",
+            disabled && "cursor-not-allowed opacity-60",
+            className,
+          )}
+        >
+          {children}
+        </select>
+        <ChevronDown
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors ltr:right-2.5 rtl:left-2.5",
+            disabled && "opacity-60",
+          )}
+        />
+      </div>
+    );
+  }
+
+  const options = extractSelectOptions(children);
+
   return (
-    <div className="relative">
-      <select
-        {...rest}
-        disabled={disabled}
-        className={cn(
-          controlClass,
-          "min-h-[48px] py-2.5 appearance-none ltr:pr-8 ltr:pl-3 rtl:pl-8 rtl:pr-3",
-          disabled && "cursor-not-allowed opacity-60",
-          className,
-        )}
-      >
-        {children}
-      </select>
-      <ChevronDown
-        aria-hidden="true"
-        className={cn(
-          "pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors ltr:right-2.5 rtl:left-2.5",
-          disabled && "opacity-60",
-        )}
-      />
-    </div>
+    <SearchableSelect
+      value={rest.value as string}
+      onChange={(v) => {
+        const syntheticEvent = {
+          target: { value: v },
+        } as React.ChangeEvent<HTMLSelectElement>;
+        rest.onChange?.(syntheticEvent);
+      }}
+      options={options}
+      placeholder={rest.placeholder || rest["aria-label"] || undefined}
+      className={className}
+    />
   );
 }
 

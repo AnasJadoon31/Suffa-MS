@@ -20,6 +20,7 @@ import {
   GuardianDetailSheet,
   StudentDetailSheet,
   TeacherDetailSheet,
+  DonorDetailSheet,
 } from "@/components/app/people/PersonDetail";
 import { StudentForm } from "@/components/app/people/StudentForm";
 import { TeacherForm } from "@/components/app/people/TeacherForm";
@@ -78,6 +79,7 @@ function PeoplePage() {
   const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
   const [detailTeacherId, setDetailTeacherId] = useState<string | null>(null);
   const [detailGuardianId, setDetailGuardianId] = useState<string | null>(null);
+  const [detailDonorId, setDetailDonorId] = useState<string | null>(null);
 
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
@@ -265,6 +267,7 @@ function PeoplePage() {
                   if (tab === "students") setDetailStudentId(id);
                   else if (tab === "teachers") setDetailTeacherId(id);
                   else if (tab === "guardians") setDetailGuardianId(id);
+                  else if (tab === "donors") setDetailDonorId(id);
                 }}
               >
                 {name.slice(0, 1).toUpperCase()}
@@ -276,6 +279,7 @@ function PeoplePage() {
                   if (tab === "students") setDetailStudentId(id);
                   else if (tab === "teachers") setDetailTeacherId(id);
                   else if (tab === "guardians") setDetailGuardianId(id);
+                  else if (tab === "donors") setDetailDonorId(id);
                 }}
               >
                 <p className="truncate font-semibold">{name}</p>
@@ -343,6 +347,11 @@ function PeoplePage() {
         guardian={(rawItems as Guardian[]).find((g) => g.id === detailGuardianId) as never}
         open={Boolean(detailGuardianId)}
         onOpenChange={(next) => !next && setDetailGuardianId(null)}
+      />
+      <DonorDetailSheet
+        donor={(rawItems as Donor[]).find((d) => d.id === detailDonorId) ?? null}
+        open={Boolean(detailDonorId)}
+        onOpenChange={(next) => !next && setDetailDonorId(null)}
       />
     </AppShell>
   );
