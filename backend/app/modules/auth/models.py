@@ -16,6 +16,7 @@ class UserRole(StrEnum):
     # Guardian login — issued when a student's class has portal access off
     # (B7-k); sees only their wards' data.
     parent = "parent"
+    donor = "donor"
 
 
 class UserStatus(StrEnum):

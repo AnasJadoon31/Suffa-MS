@@ -511,6 +511,8 @@ export interface PaymentCategory {
 }
 export interface Donor {
   id: string;
+  user_id: string | null;
+  username: string | null;
   name: string;
   contact: string;
 }

@@ -13,7 +13,8 @@ from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.core.pdf import load_report_branding, render_receipt_pdf
 from app.db.session import get_session
 from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
-from app.modules.auth.models import User
+from app.modules.auth.models import User, UserRole
+from app.modules.auth.service import UsernameTakenError, provision_login
 from app.modules.finance.models import Donation, Donor, Payment, PaymentCategory, SalaryPayment, SalaryRecord
 from app.modules.finance.schemas import (
     DonationCreate,
@@ -341,6 +342,24 @@ async def share_payment_receipt(
 
 # --------------------------------------------------------------- Donors/Donations
 
+async def _next_donor_code(session: AsyncSession, madrasa_id: UUID) -> str:
+    existing = (
+        await session.execute(
+            select(User.username).where(
+                User.madrasa_id == madrasa_id,
+                User.role == UserRole.donor,
+                User.username.like("DN-%"),
+            )
+        )
+    ).scalars().all()
+    max_suffix = 0
+    for code in existing:
+        suffix = str(code).removeprefix("DN-")
+        if suffix.isdigit():
+            max_suffix = max(max_suffix, int(suffix))
+    return f"DN-{max_suffix + 1:04d}"
+
+
 @router.post("/donors", response_model=DonorRead)
 async def create_donor(
     payload: DonorCreate,
@@ -350,6 +369,22 @@ async def create_donor(
 ) -> DonorRead:
     donor = Donor(madrasa_id=madrasa.id, name=payload.name, contact=payload.contact)
     session.add(donor)
+    await session.flush()
+
+    donor_username = await _next_donor_code(session, madrasa.id)
+    try:
+        user, _ = await provision_login(
+            session,
+            madrasa_id=madrasa.id,
+            actor_id=current_user.id,
+            username=donor_username,
+            role=UserRole.donor,
+            preferred_language="en",
+        )
+    except UsernameTakenError:
+        raise HTTPException(status_code=500, detail="Failed to generate unique donor username")
+    donor.user_id = user.id
+
     await session.commit()
     await session.refresh(donor)
     return DonorRead.model_validate(donor)

@@ -2,10 +2,11 @@ from typing import Optional
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, ForeignKey, Numeric, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Date, ForeignKey, Numeric, String, Text, select
+from sqlalchemy.orm import Mapped, column_property, mapped_column
 
 from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
+from app.modules.auth.models import User
 
 
 class PaymentCategory(Base, IdMixin, TenantMixin, TimestampMixin):
@@ -31,6 +32,11 @@ class Donor(Base, IdMixin, TenantMixin, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(160))
     contact: Mapped[str] = mapped_column(String(80))
+    user_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    username: Mapped[Optional[str]] = column_property(
+        select(User.username).where(User.id == user_id).correlate_except(User).scalar_subquery()
+    )
 
 
 class Donation(Base, IdMixin, TenantMixin, TimestampMixin):

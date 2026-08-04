@@ -49,6 +49,8 @@ class DonorUpdate(BaseModel):
 class DonorRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    user_id: UUID | None = None
+    username: str | None = None
     name: str
     contact: str
 

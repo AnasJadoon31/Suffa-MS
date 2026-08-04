@@ -291,6 +291,11 @@ function PeoplePage() {
                       {String(record["username"])}
                     </span>
                   ) : null}
+                  {tab === "donors" && record["username"] ? (
+                    <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.65rem] font-medium text-accent-foreground">
+                      {String(record["username"])}
+                    </span>
+                  ) : null}
                   {record["current_class"] ? ` · ${String(record["current_class"])}` : ""}
                 </p>
               </button>
