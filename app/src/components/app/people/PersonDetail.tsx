@@ -4,12 +4,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 
-import { ActionButton, Pill, ManagedSheet, ActionBar } from "@/components/app/Primitives";
+import { ActionButton, Pill, ManagedSheet, ActionBar, CustomDropdown, SearchableSelect, Field } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
 import { StudentForm } from "./StudentForm";
 import { TeacherForm } from "./TeacherForm";
 import { GuardianForm } from "./GuardianForm";
-import { peopleApi } from "@/lib/mms/endpoints";
+import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
+import { academicsExtraApi } from "@/lib/mms/more-endpoints";
+import { api } from "@/lib/mms/api";
 import {
   peopleMutations,
   financeMutations,
@@ -63,6 +65,45 @@ export function StudentDetailSheet({
     enabled: Boolean(student && open),
   });
 
+  const [editEnrollment, setEditEnrollment] = useState(false);
+  const [enrollClassId, setEnrollClassId] = useState(student?.active_enrollment?.class_id ?? "");
+  const [enrollSectionId, setEnrollSectionId] = useState(student?.active_enrollment?.section_id ?? "");
+
+  const classesQuery = useQuery({
+    queryKey: ["classes"],
+    queryFn: () => academicsApi.listClasses(),
+    enabled: editEnrollment,
+  });
+
+  const sectionsQuery = useQuery({
+    queryKey: ["sections", enrollClassId],
+    queryFn: () => (enrollClassId ? academicsExtraApi.listSections(enrollClassId) : Promise.resolve([])),
+    enabled: editEnrollment && Boolean(enrollClassId),
+  });
+
+  async function submitEnrollment() {
+    if (!enrollClassId || !enrollSectionId || !student) return;
+    const activeSession = (await academicsApi.listSessions()).find((s) => s.is_active);
+    if (!activeSession) { toast.error("No active session"); return; }
+    const cls = classesQuery.data?.find((c) => c.id === enrollClassId);
+    if (!cls) { toast.error("Class not found"); return; }
+    try {
+      await api.post("/api/v1/academics/students/enroll", {
+        student_id: student.id,
+        session_id: activeSession.id,
+        program_id: cls.program_id,
+        class_id: enrollClassId,
+        section_id: enrollSectionId,
+      });
+      toast.success("Enrollment updated");
+      setEditEnrollment(false);
+      void client.invalidateQueries({ queryKey: ["people"] });
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Failed to enroll");
+    }
+  }
+
   if (!student) return null;
 
   async function deactivate() {
@@ -102,6 +143,44 @@ export function StudentDetailSheet({
             </>
           ) : (
             <Row label={t("Enrollment")} value="No active enrollment" />
+          )}
+
+          {editEnrollment ? (
+            <div className="space-y-3 border-t border-border px-2 pt-3">
+              <Field label={t("Class")}>
+                <CustomDropdown
+                  value={enrollClassId}
+                  onChange={(e) => { setEnrollClassId(e.target.value); setEnrollSectionId(""); }}
+                >
+                  <option value="">{t("Select class")}</option>
+                  {(classesQuery.data ?? []).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                </CustomDropdown>
+              </Field>
+              {enrollClassId ? (
+                <Field label={t("Section")}>
+                  <CustomDropdown value={enrollSectionId} onChange={(e) => setEnrollSectionId(e.target.value)}>
+                    <option value="">{t("Select section")}</option>
+                    {(sectionsQuery.data ?? []).map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                  </CustomDropdown>
+                </Field>
+              ) : null}
+              <div className="flex gap-2">
+                <ActionButton variant="soft" className="flex-1" onClick={submitEnrollment}>
+                  {t("Save")}</ActionButton>
+                <ActionButton variant="ghost" onClick={() => setEditEnrollment(false)}>
+                  {t("Cancel")}</ActionButton>
+              </div>
+            </div>
+          ) : (
+            <ActionBar>
+              <ActionButton
+                className="flex-1"
+                variant="soft"
+                onClick={() => setEditEnrollment(true)}
+              >
+                {student.active_enrollment ? t("Change class / section") : t("Enroll in class")}
+              </ActionButton>
+            </ActionBar>
           )}
         </div>
 
