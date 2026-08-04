@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(user),
       isLoading,
       hasPermission: (code: string) =>
-        user?.role === "principal" || user?.role === "super_admin" || permissions.includes(code),
+        user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate || permissions.includes(code),
       hasFeature: (key: string) => features[key] !== false,
       login,
       logout,

@@ -111,6 +111,16 @@ async def seed_all():
         db.add_all([principal, teacher_user])
         await db.flush()
 
+        # TeacherProfile for principal (admin IS a teacher)
+        admin_profile = TeacherProfile(
+            madrasa_id=mid, user_id=principal.id, name="Admin",
+            employee_code="ADMIN", status="active",
+            whatsapp_number="+920000000000", join_date=date(2020, 1, 1),
+            is_principal_delegate=True,
+        )
+        db.add(admin_profile)
+        await db.flush()
+
         db.add(
             UserPermission(
                 user_id=teacher_user.id,

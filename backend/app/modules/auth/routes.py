@@ -15,6 +15,7 @@ from app.core.security import ALGORITHM, hash_password, verify_password, issue_t
 from app.core.settings_catalog import CATALOG_BY_KEY
 from app.core.tenancy import TenantContext, get_tenant
 from app.core.dependencies import (
+    _user_is_admin,
     get_current_user,
     get_current_madrasa,
     get_enabled_features,
@@ -119,7 +120,7 @@ async def get_me(
     session: AsyncSession = Depends(get_session)
 ) -> CurrentUserResponse:
     is_delegate = False
-    if current_user.role == UserRole.teacher:
+    if current_user.role == UserRole.teacher or current_user.role == UserRole.principal:
         is_delegate = await session.scalar(
             select(TeacherProfile.is_principal_delegate).where(TeacherProfile.user_id == current_user.id)
         ) or False
@@ -145,7 +146,7 @@ async def get_me(
         )
     ).all()
     has_teaching_assignment = False
-    if current_user.role == UserRole.teacher:
+    if current_user.role == UserRole.teacher or current_user.role == UserRole.principal:
         has_teaching_assignment = await session.scalar(
             select(TimetableSlot.id)
             .join(TeacherProfile, TeacherProfile.id == TimetableSlot.teacher_id)
@@ -323,7 +324,7 @@ async def grant_permissions(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, object]:
-    if current_user.role != UserRole.principal:
+    if not await _user_is_admin(current_user, session):
         raise HTTPException(status_code=403, detail="Only the Principal can grant permissions")
 
     # Normalise both request forms into (code, scope_type, scope_id) tuples.
@@ -409,7 +410,7 @@ async def list_user_permissions(
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[PermissionGrantRead]:
-    if current_user.role != UserRole.principal and current_user.id != user_id:
+    if not await _user_is_admin(current_user, session) and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Only the Principal can view another user's permissions")
 
     target = await session.get(User, user_id)

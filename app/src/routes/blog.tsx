@@ -29,7 +29,7 @@ function BlogPage() {
     const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
-  const canManage = user?.role === "principal" || user?.role === "super_admin";
+  const canManage = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
 
   const [view, setView] = useState<"published" | "all">("published");
   const publishedOnly = view === "published" || !canManage;

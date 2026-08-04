@@ -82,7 +82,8 @@ function DashboardPage() {
       ) : null}
 
       {data?.role === "principal" ? <PrincipalView data={data as PrincipalDashboard} /> : null}
-      {data?.role === "teacher" ? <TeacherView data={data as TeacherDashboard} /> : null}
+      {data?.role === "teacher" && !user?.is_principal_delegate ? <TeacherView data={data as TeacherDashboard} /> : null}
+      {data?.role === "teacher" && user?.is_principal_delegate ? <PrincipalView data={data as PrincipalDashboard} /> : null}
       {data?.role === "student" ? <StudentView data={data as StudentDashboard} /> : null}
       {data && !["principal", "teacher", "student"].includes(data.role) ? <FallbackView /> : null}
     </AppShell>

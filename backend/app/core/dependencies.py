@@ -15,6 +15,7 @@ from app.core.permissions import registry
 from app.db.session import get_session
 from app.modules.auth.models import User, UserPermission, UserRole
 from app.modules.academics.models import Madrasa, AcademicSession
+from app.modules.people.models import TeacherProfile
 from app.modules.platform.models import MadrasaFeature
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
@@ -283,12 +284,27 @@ async def ensure_writable_session(
     return academic_session
 
 
-async def user_has_permission(user: User, code: str, session: AsyncSession) -> bool:
-    """The Principal is an implicit superuser (FR-RBAC-01); every other role
-    must hold an explicit, persisted, madrasa-wide grant for the exact
-    permission code. Scoped (class/section) grants do NOT satisfy this check —
-    use user_has_permission_scoped where a scope is known."""
+async def _user_is_admin(user: User, session: AsyncSession) -> bool:
+    """True if user is a principal OR a teacher marked as principal delegate."""
     if user.role == UserRole.principal:
+        return True
+    if user.role == UserRole.teacher:
+        result = await session.execute(
+            select(TeacherProfile.is_principal_delegate).where(
+                TeacherProfile.user_id == user.id,
+            )
+        )
+        return result.scalar() or False
+    return False
+
+
+async def user_has_permission(user: User, code: str, session: AsyncSession) -> bool:
+    """The admin (principal or teacher with is_principal_delegate) is an
+    implicit superuser (FR-RBAC-01); every other role must hold an explicit,
+    persisted, madrasa-wide grant for the exact permission code. Scoped
+    (class/section) grants do NOT satisfy this check — use
+    user_has_permission_scoped where a scope is known."""
+    if await _user_is_admin(user, session):
         return True
     stmt = select(UserPermission).where(
         UserPermission.user_id == user.id,
@@ -309,7 +325,7 @@ async def user_has_permission_scoped(
 ) -> bool:
     """Scope-aware check: a madrasa-wide grant always passes; a scoped grant
     passes only when it targets the class/section being acted on."""
-    if user.role == UserRole.principal:
+    if await _user_is_admin(user, session):
         return True
     stmt = select(UserPermission).where(
         UserPermission.user_id == user.id,
@@ -333,7 +349,7 @@ async def user_has_permission_grant(user: User, code: str, session: AsyncSession
     class/section later from their payload. Using the madrasa-wide-only check
     there made correctly delegated, scoped permissions impossible to use.
     """
-    if user.role == UserRole.principal:
+    if await _user_is_admin(user, session):
         return True
     stmt = select(UserPermission.id).where(
         UserPermission.user_id == user.id,

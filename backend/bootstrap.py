@@ -13,9 +13,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import settings
 from app.core.security import hash_password
+from app.db import core_models  # ensure FileObject table is imported for FK resolution
 from app.modules.academics.models import Madrasa
 from app.modules.auth.models import User, UserRole, UserStatus
 from app.modules.messaging.models import MessageTemplate
+from app.modules.people.models import TeacherProfile
 
 # Wording per SRS Appendix C — Sample WhatsApp Templates.
 DEFAULT_TEMPLATES = [
@@ -112,18 +114,53 @@ async def bootstrap() -> None:
                     "No Principal exists yet and BOOTSTRAP_ADMIN_PASSWORD is not set — "
                     "set it in the environment for the first deploy so an initial login can be created."
                 )
+            admin_user = User(
+                madrasa_id=madrasa.id,
+                username=admin_username,
+                password_hash=await hash_password(admin_password),
+                role=UserRole.principal,
+                status=UserStatus.active,
+            )
+            session.add(admin_user)
+            await session.flush()
             session.add(
-                User(
+                TeacherProfile(
                     madrasa_id=madrasa.id,
-                    username=admin_username,
-                    password_hash=await hash_password(admin_password),
-                    role=UserRole.principal,
-                    status=UserStatus.active,
+                    user_id=admin_user.id,
+                    employee_code="ADMIN",
+                    name="Admin",
+                    whatsapp_number="+920000000000",
+                    is_principal_delegate=True,
+                    status="active",
                 )
             )
             print(f"[bootstrap] created Principal login '{admin_username}' for tenant '{tenant_slug}'")
         else:
             print(f"[bootstrap] tenant '{tenant_slug}' already has a Principal login, skipping")
+            # Backfill: ensure existing principals have a TeacherProfile.
+            admin_user = existing_admin
+            existing_profile = (
+                await session.execute(
+                    select(TeacherProfile).where(
+                        TeacherProfile.user_id == admin_user.id,
+                        TeacherProfile.madrasa_id == madrasa.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing_profile is None:
+                session.add(
+                    TeacherProfile(
+                        madrasa_id=madrasa.id,
+                        user_id=admin_user.id,
+                        employee_code="ADMIN",
+                        name="Admin",
+                        whatsapp_number="+920000000000",
+                        is_principal_delegate=True,
+                        status="active",
+                    )
+                )
+                await session.flush()
+                print(f"[bootstrap] created TeacherProfile for existing Principal '{admin_user.username}'")
 
         existing_super_admin = (
             await session.execute(

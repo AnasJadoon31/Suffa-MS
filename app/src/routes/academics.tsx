@@ -39,7 +39,7 @@ function AcademicsPage() {
     const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
-  const canManage = user?.role === "principal" || user?.role === "super_admin";
+  const canManage = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
   const [tab, setTab] = useState<Tab>("sessions");
   const today = new Date().toISOString().slice(0, 10);
 

@@ -53,7 +53,7 @@ function FormsPage() {
   const { user, hasPermission } = useAuth();
   const client = useQueryClient();
   const canCreate =
-    user?.role === "principal" || user?.role === "super_admin" || hasPermission("forms.create");
+    user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate || hasPermission("forms.create");
   const canViewResponses = hasPermission("forms.responses.view") || canCreate;
 
   const [tab, setTab] = useState<"forms" | "responses">("forms");

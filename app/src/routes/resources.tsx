@@ -52,7 +52,7 @@ function ResourcesPage() {
   const { user } = useAuth();
   const client = useQueryClient();
   const canManage =
-    user?.role === "principal" || user?.role === "super_admin" || user?.role === "teacher";
+    user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate || user?.role === "teacher";
 
   const [categoryId, setCategoryId] = useState<string>("");
   const [extra, setExtra] = useState(emptyExtra);

@@ -22,26 +22,39 @@ def get_redis() -> redis.Redis:
 
 
 async def assert_not_locked_out(key: str, max_attempts: int) -> None:
-    """Raises 429 if `key` has already recorded `max_attempts` failures within its window."""
-    client = get_redis()
-    attempts = await client.get(key)
-    if attempts is not None and int(attempts) >= max_attempts:
-        ttl = await client.ttl(key)
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many failed attempts. Try again in {max(ttl, 1)} seconds.",
-        )
+    """Raises 429 if `key` has already recorded `max_attempts` failures within
+    its window. Fails open when Redis is unreachable — login availability
+    wins over rate-limiting strictness in dev/test environments."""
+    try:
+        client = get_redis()
+        attempts = await client.get(key)
+        if attempts is not None and int(attempts) >= max_attempts:
+            ttl = await client.ttl(key)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Too many failed attempts. Try again in {max(ttl, 1)} seconds.",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        return
 
 
 async def record_failure(key: str, window_seconds: int) -> None:
-    client = get_redis()
-    current = await client.incr(key)
-    if current == 1:
-        await client.expire(key, window_seconds)
+    try:
+        client = get_redis()
+        current = await client.incr(key)
+        if current == 1:
+            await client.expire(key, window_seconds)
+    except Exception:
+        return
 
 
 async def clear_failures(key: str) -> None:
-    await get_redis().delete(key)
+    try:
+        await get_redis().delete(key)
+    except Exception:
+        return
 
 
 async def enforce_rate_limit(key: str, *, limit: int, window_seconds: int) -> None:

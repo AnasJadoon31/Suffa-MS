@@ -67,7 +67,7 @@ function renderAddButton(tab: Tab, label?: string) {
 function PeoplePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const canManage = user?.role === "principal" || user?.role === "super_admin";
+  const canManage = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
 
   const [tab, setTab] = useState<Tab>("students");
   const [search, setSearch] = useState("");

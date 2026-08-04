@@ -11,8 +11,10 @@ load_dotenv()
 
 from app.core.config import settings
 from app.core.security import hash_password
+from app.db import core_models  # type: ignore
 from app.modules.academics.models import Madrasa
 from app.modules.auth.models import User, UserRole, UserStatus
+from app.modules.people.models import TeacherProfile
 
 async def seed():
     engine = create_async_engine(settings.database_url)
@@ -41,6 +43,19 @@ async def seed():
             portal_enabled=True
         )
         session.add(user)
+        
+        # 2b. TeacherProfile for the admin (admin IS a teacher)
+        await session.flush()
+        teacher_profile = TeacherProfile(
+            madrasa_id=madrasa_id,
+            user_id=user.id,
+            employee_code="ADMIN",
+            name="Admin",
+            whatsapp_number="+920000000000",
+            is_principal_delegate=True,
+            status="active",
+        )
+        session.add(teacher_profile)
         
         await session.commit()
         print(f"Successfully seeded database!")

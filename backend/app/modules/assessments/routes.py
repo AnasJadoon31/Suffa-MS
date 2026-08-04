@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
 from app.core.dependencies import (
+    _user_is_admin,
     ensure_writable_session,
     get_current_madrasa,
     get_current_user,
@@ -148,7 +149,7 @@ async def _require_class_course_scope(
     Generic delegated permissions deliberately do not widen teaching scope;
     only the principal role is an explicit supervisory bypass.
     """
-    if current_user.role == UserRole.principal:
+    if await _user_is_admin(current_user, session):
         return
 
     teacher = await _teacher_profile(session, current_user)
@@ -186,7 +187,7 @@ async def _require_course_scope(
     course = await session.get(Course, course_id)
     if course is None or course.madrasa_id != madrasa_id:
         raise HTTPException(status_code=404, detail="Course not found")
-    if current_user.role == UserRole.principal:
+    if await _user_is_admin(current_user, session):
         return
     teacher = await _teacher_profile(session, current_user)
     if teacher is None:
@@ -318,7 +319,7 @@ async def create_assignment(
     session: AsyncSession = Depends(get_session),
 ) -> list[AssignmentRead]:
     teacher = await _teacher_profile(session, current_user)
-    if teacher is None and current_user.role != UserRole.principal:
+    if teacher is None and not await _user_is_admin(current_user, session):
         raise HTTPException(status_code=403, detail="Only teachers or the Principal can create assignments")
 
     # B8-j: publish to every class the course is mapped to, in one action —
@@ -642,7 +643,7 @@ async def get_assignment(
         await _require_student_assignment_access(session, current_user, madrasa.id, assignment)
     else:
         if (
-            current_user.role != UserRole.principal
+            not await _user_is_admin(current_user, session)
             and current_user.role != UserRole.teacher
             and not await user_has_permission(current_user, "assignments.create", session)
         ):
@@ -1966,7 +1967,7 @@ async def _matrix_sections(
     course_scope: dict[UUID, set[UUID]] | None = None
     # Authorization: principal (implicit) or global marks permission. A
     # timetable-scoped teacher sees just the sections/courses they teach.
-    if current_user.role != UserRole.principal and not await user_has_permission(
+    if not await _user_is_admin(current_user, session) and not await user_has_permission(
         current_user, "assessments.marks.enter", session
     ):
         teacher = await _teacher_profile(session, current_user)

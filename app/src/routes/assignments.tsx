@@ -72,7 +72,7 @@ function AssignmentsPage() {
   const client = useQueryClient();
   const isStudent = user?.role === "student";
   const canManage =
-    user?.role === "principal" || user?.role === "super_admin" || user?.role === "teacher";
+    user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate || user?.role === "teacher";
 
   const [filters, setFilters] = useState(emptyFilters);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);

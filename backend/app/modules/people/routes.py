@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select, exc, or_ as sqlalchemy_or, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_madrasa, get_current_user, require_permission
+from app.core.dependencies import _user_is_admin, get_current_madrasa, get_current_user, require_permission
 from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.db.session import get_session
@@ -289,7 +289,7 @@ async def list_teacher_taught_classes(
 
     # The principal can view any teacher's assigned classes.
     # A teacher can view their own assigned classes.
-    if current_user.role != UserRole.principal and current_user.id != user_id:
+    if not await _user_is_admin(current_user, session) and current_user.id != user_id:
         from app.core.dependencies import user_has_permission
         if not await user_has_permission(current_user, "teachers.view", session):
             raise HTTPException(status_code=403, detail="Not authorized")

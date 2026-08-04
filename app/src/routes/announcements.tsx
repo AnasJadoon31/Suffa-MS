@@ -37,6 +37,7 @@ function AnnouncementsPage() {
   const client = useQueryClient();
   const canManage =
     user?.role === "principal" ||
+    user?.is_principal_delegate ||
     user?.role === "super_admin" ||
     hasPermission("announcements.manage");
 

@@ -7,6 +7,7 @@ from sqlalchemy import and_, delete, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
+    _user_is_admin,
     ensure_writable_session,
     get_context_session,
     get_current_madrasa,
@@ -932,7 +933,7 @@ async def set_leave_status(
 # --------------------------------------------------------------- Resources
 
 async def _resource_admin(current_user: User, session: AsyncSession) -> bool:
-    return current_user.role == UserRole.principal or await user_has_permission(current_user, "resources.manage_all", session)
+    return await _user_is_admin(current_user, session) or await user_has_permission(current_user, "resources.manage_all", session)
 
 
 async def _require_teachable_scope(
@@ -946,7 +947,7 @@ async def _require_teachable_scope(
     courses they actually teach, unless they hold the module's admin-override
     permission. Broadcasting to everyone/a whole role/specific people always
     needs the override — only genuine teaching scope is self-service."""
-    if current_user.role == UserRole.principal:
+    if await _user_is_admin(current_user, session):
         return
     if await user_has_permission(current_user, bypass_permission, session):
         return
@@ -1203,7 +1204,7 @@ async def list_resources(
 # ------------------------------------------------------------------ Forms
 
 async def _form_admin(current_user: User, session: AsyncSession) -> bool:
-    return current_user.role == UserRole.principal or await user_has_permission(current_user, "forms.manage_all", session)
+    return await _user_is_admin(current_user, session) or await user_has_permission(current_user, "forms.manage_all", session)
 
 
 @router.post("/forms", response_model=FormRead)

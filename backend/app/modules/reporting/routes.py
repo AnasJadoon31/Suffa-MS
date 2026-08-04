@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_context_session, get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.dependencies import _user_is_admin, get_context_session, get_current_madrasa, get_current_user, require_permission, user_has_permission
 from app.core.error_codes import ErrorCode
 from app.core.pdf import load_report_branding, render_table_pdf
 from app.core.teaching_scope import taught_pairs, teacher_teaches
@@ -43,7 +43,14 @@ async def dashboard(
 ) -> dict[str, object]:
     dashboard_session_id = current_user.selected_session_id or context_session.id
     if current_user.role == UserRole.teacher:
-        return await _teacher_dashboard(session, madrasa, current_user)
+        is_delegate = await session.scalar(
+            select(TeacherProfile.is_principal_delegate).where(
+                TeacherProfile.user_id == current_user.id,
+            )
+        ) or False
+        if not is_delegate:
+            return await _teacher_dashboard(session, madrasa, current_user)
+        # Delegate teacher gets the admin dashboard
     if current_user.role == UserRole.student:
         return await _student_dashboard(session, madrasa, current_user, dashboard_session_id)
     if current_user.role == UserRole.parent:
@@ -702,7 +709,7 @@ async def _require_teacher_report_scope(
     session_id: UUID,
     course_id: UUID | None = None,
 ) -> None:
-    if current_user.role == UserRole.principal:
+    if await _user_is_admin(current_user, session):
         return
     # A teacher's report scope must match the timetable-backed scope used by
     # attendance and grading. The base scoped permission opens the feature;

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.core.audit import record_audit
-from app.core.dependencies import get_context_session, get_current_madrasa, get_current_user, require_permission, user_has_permission
+from app.core.dependencies import _user_is_admin, get_context_session, get_current_madrasa, get_current_user, require_permission, user_has_permission
 from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars, paginate_sequence
 from app.core.teaching_scope import taught_class_ids, taught_pairs
@@ -153,7 +153,7 @@ async def _require_student_attendance_access(current_user: User, session: AsyncS
 
 
 async def _has_global_student_attendance_access(current_user: User, session: AsyncSession) -> bool:
-    if current_user.role == UserRole.principal:
+    if await _user_is_admin(current_user, session):
         return True
     return await user_has_permission(current_user, "students.attendance.manage", session)
 
