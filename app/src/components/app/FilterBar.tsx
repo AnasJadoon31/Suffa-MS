@@ -15,12 +15,14 @@ export function FilterBar({
   search,
   activeCount,
   onClear,
+  action,
   children,
 }: {
   chips?: FilterChip[];
   search?: { value: string; onChange: (value: string) => void; placeholder?: string };
   activeCount: number;
   onClear: () => void;
+  action?: ReactNode;
   children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -80,6 +82,7 @@ export function FilterBar({
             ) : null}
           </button>
         ) : null}
+        {action}
         {activeCount > 0 ? (
           <button
             onClick={onClear}

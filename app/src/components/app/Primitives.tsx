@@ -232,16 +232,19 @@ export function ManagedSheet({
   onOpenChange,
   title,
   subtitle,
+  trigger,
   children,
 }: {
   open?: boolean;
   onOpenChange?: (next: boolean) => void;
   title: ReactNode;
   subtitle?: ReactNode;
+  trigger?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
+      {trigger}
       <SheetContent
         side="bottom"
         className="max-h-[88vh] overflow-y-auto rounded-t-3xl border-border bg-card px-4 pb-8 pt-5"

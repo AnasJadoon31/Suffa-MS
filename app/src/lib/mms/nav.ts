@@ -11,9 +11,12 @@ import {
   Layers,
   Library,
   Megaphone,
+  Monitor,
   Newspaper,
   Settings,
+  Table2,
   Trophy,
+  UserCheck,
   UserPlus,
   UserRound,
   Users,
@@ -71,15 +74,38 @@ export const operationsNav: NavItem[] = [
   { to: "/forms", label: "Forms", icon: FileText, description: "Custom forms and responses" },
 ];
 
+export const myNav: NavItem[] = [
+  {
+    to: "/my-attendance",
+    label: "My Attendance",
+    icon: UserCheck,
+    description: "Your attendance history and check-in",
+  },
+  {
+    to: "/my-assessments",
+    label: "My Assessments",
+    icon: ClipboardList,
+    description: "Your assignments and results",
+  },
+  {
+    to: "/my-timetable",
+    label: "My Timetable",
+    icon: Table2,
+    description: "Your weekly class schedule",
+  },
+];
+
 export const adminNav: NavItem[] = [
   { to: "/finance", label: "Finance", icon: Wallet, description: "Fees, donations, salary" },
   { to: "/reports", label: "Reports", icon: FileBarChart2, description: "Export CSV and PDF" },
   { to: "/settings", label: "Settings", icon: Settings, description: "Madrasa configuration" },
+  { to: "/platform", label: "Platform", icon: Monitor, description: "Super admin console" },
   { to: "/me", label: "My Profile", icon: UserRound, description: "Account and session" },
 ];
 
 export const navGroups: { title: string; items: NavItem[] }[] = [
   { title: "Daily", items: primaryNav },
+  { title: "My", items: myNav },
   { title: "Academics", items: academicNav },
   { title: "Operations", items: operationsNav },
   { title: "Admin", items: adminNav },
@@ -87,6 +113,7 @@ export const navGroups: { title: string; items: NavItem[] }[] = [
 
 export const allNavItems: NavItem[] = [
   ...primaryNav,
+  ...myNav,
   ...academicNav,
   ...operationsNav,
   ...adminNav,

@@ -1,4 +1,4 @@
-import { Loader2, Plus } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { ActionButton, ManagedSheet } from "./Primitives";
@@ -40,13 +40,18 @@ export function FormSheet({
   }
 
   return (
-    <ManagedSheet open={isOpen} onOpenChange={setOpen} title={title}>
-      {triggerLabel ? (
-        <SheetTrigger className="gradient-emerald inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground shadow-[var(--shadow-raised)]">
-          <Plus className="h-3.5 w-3.5" />
-          {triggerLabel}
-        </SheetTrigger>
-      ) : null}
+    <ManagedSheet
+      open={isOpen}
+      onOpenChange={setOpen}
+      title={title}
+      trigger={
+        triggerLabel ? (
+          <SheetTrigger className="gradient-emerald inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground shadow-[var(--shadow-raised)]">
+            {triggerLabel}
+          </SheetTrigger>
+        ) : undefined
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-3.5">
         {children}
         <ActionButton type="submit" disabled={busy} className="w-full">

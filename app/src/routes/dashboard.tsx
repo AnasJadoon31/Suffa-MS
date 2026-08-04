@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/app/AppShell";
+import { ActivityFeed, type ActivityEvent } from "@/components/app/ActivityFeed";
 import {
   Card,
   EmptyState,
@@ -79,6 +80,25 @@ function DashboardPage() {
       {dashboard.isLoading ? <SkeletonList rows={4} /> : null}
       {dashboard.isError ? (
         <EmptyState title={t("Couldn't load your dashboard")} hint="Pull down or retry in a moment." />
+      ) : null}
+
+      {data?.activity?.length ? (
+        <ActivityFeed
+          events={data.activity.map(
+            (entry: string, index: number): ActivityEvent => ({
+              id: String(index),
+              type: (entry.includes("attendance")
+                ? "attendance"
+                : entry.includes("payment")
+                  ? "payment"
+                  : entry.includes("enrollment")
+                    ? "enrollment"
+                    : "announcement") as ActivityEvent["type"],
+              title: entry,
+              timestamp: new Date().toISOString(),
+            }),
+          )}
+        />
       ) : null}
 
       {data?.role === "principal" ? <PrincipalView data={data as PrincipalDashboard} /> : null}

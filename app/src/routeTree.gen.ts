@@ -23,8 +23,12 @@ import { Route as HolidaysRouteImport } from './routes/holidays'
 import { Route as LeaveRouteImport } from './routes/leave'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as MoreRouteImport } from './routes/more'
+import { Route as MyAssessmentsRouteImport } from './routes/my-assessments'
+import { Route as MyAttendanceRouteImport } from './routes/my-attendance'
 import { Route as MyProfileRouteImport } from './routes/my-profile'
+import { Route as MyTimetableRouteImport } from './routes/my-timetable'
 import { Route as PeopleRouteImport } from './routes/people'
+import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ResourcesRouteImport } from './routes/resources'
@@ -104,14 +108,34 @@ const MoreRoute = MoreRouteImport.update({
   path: '/more',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MyAssessmentsRoute = MyAssessmentsRouteImport.update({
+  id: '/my-assessments',
+  path: '/my-assessments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyAttendanceRoute = MyAttendanceRouteImport.update({
+  id: '/my-attendance',
+  path: '/my-attendance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MyProfileRoute = MyProfileRouteImport.update({
   id: '/my-profile',
   path: '/my-profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MyTimetableRoute = MyTimetableRouteImport.update({
+  id: '/my-timetable',
+  path: '/my-timetable',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PeopleRoute = PeopleRouteImport.update({
   id: '/people',
   path: '/people',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlatformRoute = PlatformRouteImport.update({
+  id: '/platform',
+  path: '/platform',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -170,8 +194,12 @@ export interface FileRoutesByFullPath {
   '/leave': typeof LeaveRoute
   '/me': typeof MeRoute
   '/more': typeof MoreRoute
+  '/my-assessments': typeof MyAssessmentsRoute
+  '/my-attendance': typeof MyAttendanceRoute
   '/my-profile': typeof MyProfileRoute
+  '/my-timetable': typeof MyTimetableRoute
   '/people': typeof PeopleRoute
+  '/platform': typeof PlatformRoute
   '/profile': typeof ProfileRoute
   '/reports': typeof ReportsRoute
   '/resources': typeof ResourcesRoute
@@ -196,8 +224,12 @@ export interface FileRoutesByTo {
   '/leave': typeof LeaveRoute
   '/me': typeof MeRoute
   '/more': typeof MoreRoute
+  '/my-assessments': typeof MyAssessmentsRoute
+  '/my-attendance': typeof MyAttendanceRoute
   '/my-profile': typeof MyProfileRoute
+  '/my-timetable': typeof MyTimetableRoute
   '/people': typeof PeopleRoute
+  '/platform': typeof PlatformRoute
   '/profile': typeof ProfileRoute
   '/reports': typeof ReportsRoute
   '/resources': typeof ResourcesRoute
@@ -223,8 +255,12 @@ export interface FileRoutesById {
   '/leave': typeof LeaveRoute
   '/me': typeof MeRoute
   '/more': typeof MoreRoute
+  '/my-assessments': typeof MyAssessmentsRoute
+  '/my-attendance': typeof MyAttendanceRoute
   '/my-profile': typeof MyProfileRoute
+  '/my-timetable': typeof MyTimetableRoute
   '/people': typeof PeopleRoute
+  '/platform': typeof PlatformRoute
   '/profile': typeof ProfileRoute
   '/reports': typeof ReportsRoute
   '/resources': typeof ResourcesRoute
@@ -251,8 +287,12 @@ export interface FileRouteTypes {
     | '/leave'
     | '/me'
     | '/more'
+    | '/my-assessments'
+    | '/my-attendance'
     | '/my-profile'
+    | '/my-timetable'
     | '/people'
+    | '/platform'
     | '/profile'
     | '/reports'
     | '/resources'
@@ -277,8 +317,12 @@ export interface FileRouteTypes {
     | '/leave'
     | '/me'
     | '/more'
+    | '/my-assessments'
+    | '/my-attendance'
     | '/my-profile'
+    | '/my-timetable'
     | '/people'
+    | '/platform'
     | '/profile'
     | '/reports'
     | '/resources'
@@ -303,8 +347,12 @@ export interface FileRouteTypes {
     | '/leave'
     | '/me'
     | '/more'
+    | '/my-assessments'
+    | '/my-attendance'
     | '/my-profile'
+    | '/my-timetable'
     | '/people'
+    | '/platform'
     | '/profile'
     | '/reports'
     | '/resources'
@@ -330,8 +378,12 @@ export interface RootRouteChildren {
   LeaveRoute: typeof LeaveRoute
   MeRoute: typeof MeRoute
   MoreRoute: typeof MoreRoute
+  MyAssessmentsRoute: typeof MyAssessmentsRoute
+  MyAttendanceRoute: typeof MyAttendanceRoute
   MyProfileRoute: typeof MyProfileRoute
+  MyTimetableRoute: typeof MyTimetableRoute
   PeopleRoute: typeof PeopleRoute
+  PlatformRoute: typeof PlatformRoute
   ProfileRoute: typeof ProfileRoute
   ReportsRoute: typeof ReportsRoute
   ResourcesRoute: typeof ResourcesRoute
@@ -442,6 +494,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MoreRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/my-assessments': {
+      id: '/my-assessments'
+      path: '/my-assessments'
+      fullPath: '/my-assessments'
+      preLoaderRoute: typeof MyAssessmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-attendance': {
+      id: '/my-attendance'
+      path: '/my-attendance'
+      fullPath: '/my-attendance'
+      preLoaderRoute: typeof MyAttendanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/my-profile': {
       id: '/my-profile'
       path: '/my-profile'
@@ -449,11 +515,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MyProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/my-timetable': {
+      id: '/my-timetable'
+      path: '/my-timetable'
+      fullPath: '/my-timetable'
+      preLoaderRoute: typeof MyTimetableRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/people': {
       id: '/people'
       path: '/people'
       fullPath: '/people'
       preLoaderRoute: typeof PeopleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/platform': {
+      id: '/platform'
+      path: '/platform'
+      fullPath: '/platform'
+      preLoaderRoute: typeof PlatformRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -530,8 +610,12 @@ const rootRouteChildren: RootRouteChildren = {
   LeaveRoute: LeaveRoute,
   MeRoute: MeRoute,
   MoreRoute: MoreRoute,
+  MyAssessmentsRoute: MyAssessmentsRoute,
+  MyAttendanceRoute: MyAttendanceRoute,
   MyProfileRoute: MyProfileRoute,
+  MyTimetableRoute: MyTimetableRoute,
   PeopleRoute: PeopleRoute,
+  PlatformRoute: PlatformRoute,
   ProfileRoute: ProfileRoute,
   ReportsRoute: ReportsRoute,
   ResourcesRoute: ResourcesRoute,

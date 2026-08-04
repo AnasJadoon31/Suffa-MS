@@ -170,18 +170,11 @@ function PeoplePage() {
     }
   };
 
-  const getAddLabel = () => {
-    if (tab === "students") return `+ ${t("Add Student")}`;
-    if (tab === "teachers") return `+ ${t("Add Teacher")}`;
-    if (tab === "guardians") return `+ ${t("Add Guardian")}`;
-    return `+ ${t("Add Donor")}`;
-  };
-
   return (
     <AppShell
       title={t("People")}
       subtitle={query.data ? `${total} ${t("records")}` : t("Directory")}
-      right={canManage ? renderAddButton(tab, t("Add")) : undefined}
+      right={undefined}
     >
       {/* Top Header & Tab Controls */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -195,11 +188,6 @@ function PeoplePage() {
             options={TABS.map((tItem) => ({ key: tItem.key, label: tItem.label }))}
           />
         </div>
-        {canManage ? (
-          <div className="shrink-0 sm:self-center">
-            {renderAddButton(tab, getAddLabel())}
-          </div>
-        ) : null}
       </div>
 
       {/* FilterBar with Filter Icon Button & Expandable Filters */}
@@ -211,6 +199,7 @@ function PeoplePage() {
         }}
         activeCount={activeCount}
         onClear={handleClearFilters}
+        action={canManage ? renderAddButton(tab, `+ ${t("Add")}`) : undefined}
       >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label={t("Status")}>
@@ -248,11 +237,6 @@ function PeoplePage() {
       {!query.isLoading && items.length === 0 ? (
         <div className="space-y-3 py-6 text-center">
           <EmptyState title={`${t("No")} ${t(tab)} ${t("found")}`} />
-          {canManage ? (
-            <div className="flex justify-center">
-              {renderAddButton(tab, getAddLabel())}
-            </div>
-          ) : null}
         </div>
       ) : null}
 
