@@ -436,6 +436,7 @@ async def list_students(
     session: AsyncSession = Depends(get_session),
     search: str | None = Query(default=None, description="Match against name or admission number"),
     status_filter: str | None = Query(default=None, alias="status"),
+    section_id: UUID | None = Query(default=None),
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[StudentRead]:
@@ -445,6 +446,15 @@ async def list_students(
         stmt = stmt.where((StudentProfile.name.ilike(like)) | (StudentProfile.admission_number.ilike(like)))
     if status_filter:
         stmt = stmt.where(StudentProfile.status == status_filter)
+    if section_id:
+        stmt = stmt.where(
+            StudentProfile.id.in_(
+                select(Enrollment.student_id).where(
+                    Enrollment.madrasa_id == madrasa.id,
+                    Enrollment.section_id == section_id,
+                )
+            )
+        )
     rows = await paginate_scalars(
         session, stmt.order_by(StudentProfile.name), limit=limit, offset=offset, response=response
     )

@@ -24,6 +24,7 @@ export interface Section {
   id: string;
   class_id: string;
   name: string;
+  student_count: number;
 }
 
 export interface Announcement {
@@ -221,6 +222,8 @@ export const academicsExtraApi = {
   listCourses: () => getAllPages<Course>("/api/v1/academics/courses"),
   listSections: (classId: string) =>
     getAllPages<Section>(`/api/v1/academics/classes/${classId}/sections`),
+  listProgramCourses: (programId: string) =>
+    getAllPages<Course>(`/api/v1/academics/programs/${programId}/courses`),
 };
 
 export interface FormFieldDefinition {
@@ -707,11 +710,17 @@ export const academicsMutations = {
     api
       .post<Section>(`/api/v1/academics/classes/${classId}/sections`, { name })
       .then((r) => r.data),
+  deleteSection: (classId: string, sectionId: string) =>
+    api.delete(`/api/v1/academics/classes/${classId}/sections/${sectionId}`).then((r) => r.data),
   createCourse: (name: string) =>
     api.post<Course>("/api/v1/academics/courses", { name }).then((r) => r.data),
   assignCourse: (classId: string, courseId: string) =>
     api
       .post(`/api/v1/academics/classes/${classId}/courses/assign`, { course_id: courseId })
+      .then((r) => r.data),
+  assignCourseToProgram: (programId: string, courseId: string) =>
+    api
+      .post(`/api/v1/academics/programs/${programId}/courses/assign`, { course_id: courseId })
       .then((r) => r.data),
   activateSession: (id: string) =>
     api.post(`/api/v1/academics/sessions/${id}/activate`).then((r) => r.data),

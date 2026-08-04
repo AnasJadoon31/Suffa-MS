@@ -1,14 +1,13 @@
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { FormSheet } from "@/components/app/FormSheet";
-import { Field, CustomDropdown, TextInput } from "@/components/app/Primitives";
-import { MultiPicker } from "./MultiPicker";
-import { peopleApi } from "@/lib/mms/endpoints";
-import { peopleMutations, type StudentDetail } from "@/lib/mms/more-endpoints";
-import { apiErrorMessage } from "@/lib/mms/api";
+import { Field, CustomDropdown, SearchableSelect, TextInput } from "@/components/app/Primitives";
+import { academicsApi, peopleApi, type AcademicClass } from "@/lib/mms/endpoints";
+import { academicsExtraApi, peopleMutations, type Section, type StudentDetail } from "@/lib/mms/more-endpoints";
+import { api, apiErrorMessage } from "@/lib/mms/api";
 import { useTranslation } from "react-i18next";
 
 export function StudentForm({
@@ -16,11 +15,13 @@ export function StudentForm({
   open,
   onOpenChange,
   triggerLabel,
+  sectionId,
 }: {
   student?: StudentDetail;
   open?: boolean;
   onOpenChange?: (next: boolean) => void;
   triggerLabel?: string;
+  sectionId?: string;
 }) {
     const { t } = useTranslation();
   const isEdit = Boolean(student);
@@ -34,12 +35,50 @@ export function StudentForm({
   const [portal, setPortal] = useState(student?.portal_enabled ?? true);
   const [lang, setLang] = useState(student?.preferred_language ?? "en");
   const [guardians, setGuardians] = useState<{ id: string; name: string }[]>([]);
+  const [guardianSearch, setGuardianSearch] = useState("");
+
+  const guardiansQuery = useQuery({
+    queryKey: ["guardians-search", guardianSearch],
+    queryFn: () => peopleApi.listGuardiansPage({ search: guardianSearch, limit: 50, offset: 0 }),
+    enabled: guardianSearch.length >= 0,
+  });
+
+  const guardianOptions = (guardiansQuery.data?.items ?? [])
+    .filter((g) => !guardians.some((selected) => selected.id === g.id))
+    .map((g) => ({ value: g.id, label: g.name }));
+
 
   const [showNewGuardian, setShowNewGuardian] = useState(false);
   const [newGuardianName, setNewGuardianName] = useState("");
   const [newGuardianPhone, setNewGuardianPhone] = useState("");
   const [newGuardianRel, setNewGuardianRel] = useState("father");
   const [creatingGuardian, setCreatingGuardian] = useState(false);
+
+  const [enrollClassId, setEnrollClassId] = useState("");
+  const [enrollSectionId, setEnrollSectionId] = useState(sectionId ?? "");
+
+  const classesQuery = useQuery({
+    queryKey: ["classes"],
+    queryFn: () => academicsApi.listClasses(),
+  });
+
+  const sectionsQuery = useQuery({
+    queryKey: ["sections", enrollClassId],
+    queryFn: () => (enrollClassId ? academicsExtraApi.listSections(enrollClassId) : Promise.resolve([])),
+    enabled: Boolean(enrollClassId),
+  });
+
+  const selectedSection = useMemo(() => {
+    if (!sectionId || !sectionsQuery.data) return null;
+    return sectionsQuery.data.find((s) => s.id === sectionId);
+  }, [sectionId, sectionsQuery.data]);
+
+  useEffect(() => {
+    if (sectionId && sectionsQuery.data) {
+      const sec = sectionsQuery.data.find((s) => s.id === sectionId);
+      if (sec) setEnrollClassId(sec.class_id);
+    }
+  }, [sectionId, sectionsQuery.data]);
 
   async function createGuardianInline() {
     const trimmedName = newGuardianName.trim();
@@ -89,7 +128,7 @@ export function StudentForm({
       });
       toast.success("Student updated");
     } else {
-      await peopleMutations.createStudent({
+      const created = await peopleMutations.createStudent({
         name: trimmedName,
         date_of_birth: dob || undefined,
         phone: phone.trim() || undefined,
@@ -107,6 +146,26 @@ export function StudentForm({
       setBForm("");
       setAddress("");
       setGuardians([]);
+      setEnrollClassId("");
+      setEnrollSectionId("");
+
+      if (enrollClassId && enrollSectionId) {
+        const activeSession = (await academicsApi.listSessions()).find((s) => s.is_active);
+        if (activeSession) {
+          try {
+            await api.post("/api/v1/academics/students/enroll", {
+              student_id: created.id,
+              session_id: activeSession.id,
+              program_id: classesQuery.data?.find((c) => c.id === enrollClassId)?.program_id,
+              class_id: enrollClassId,
+              section_id: enrollSectionId,
+            });
+            toast.success("Student enrolled");
+          } catch {
+            toast.warning("Student created but enrollment failed");
+          }
+        }
+      }
     }
     void client.invalidateQueries({ queryKey: ["people"] });
   }
@@ -152,6 +211,28 @@ export function StudentForm({
           </CustomDropdown>
         </Field>
       ) : null}
+      {!isEdit ? (
+        <>
+          <Field label={t("Class")}>
+            <CustomDropdown value={enrollClassId} onChange={(e) => { setEnrollClassId(e.target.value); setEnrollSectionId(""); }}>
+              <option value="">{t("Optional")}</option>
+              {(classesQuery.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </CustomDropdown>
+          </Field>
+          {enrollClassId ? (
+            <Field label={t("Section")}>
+              <CustomDropdown value={enrollSectionId} onChange={(e) => setEnrollSectionId(e.target.value)}>
+                <option value="">{t("Optional")}</option>
+                {(sectionsQuery.data ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.student_count} students)</option>
+                ))}
+              </CustomDropdown>
+            </Field>
+          ) : null}
+        </>
+      ) : null}
       <label className="flex items-center gap-2 text-sm font-semibold">
         <input
           type="checkbox"
@@ -164,16 +245,36 @@ export function StudentForm({
         {t("Portal access enabled")}</label>
       {!isEdit && !independent ? (
         <>
-          <MultiPicker
-            label={t("Guardians")}
-            selected={guardians}
-            onChange={setGuardians}
-            queryKey="student-form-guardians"
-            fetchOptions={async (search) => {
-              const result = await peopleApi.listGuardiansPage({ search, limit: 20, offset: 0 });
-              return result.items.map((g) => ({ id: g.id, name: g.name }));
-            }}
-          />
+          <Field label={t("Guardians")}>
+            {guardians.length > 0 ? (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {guardians.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setGuardians((prev) => prev.filter((x) => x.id !== g.id))}
+                    className="rounded-full bg-primary-soft px-2.5 py-1 text-[0.68rem] font-bold text-primary"
+                  >
+                    {g.name} ×
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <SearchableSelect
+              value=""
+              onChange={(id) => {
+                const match = guardiansQuery.data?.items?.find((g) => g.id === id);
+                if (match) {
+                  setGuardians((prev) => [...prev, { id: match.id, name: match.name }]);
+                  setGuardianSearch("");
+                }
+              }}
+              options={guardianOptions}
+              placeholder={t("Search guardians...")}
+              searchValue={guardianSearch}
+              onSearchChange={setGuardianSearch}
+            />
+          </Field>
           <button
             type="button"
             onClick={() => setShowNewGuardian((v) => !v)}

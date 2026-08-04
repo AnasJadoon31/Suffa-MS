@@ -63,6 +63,16 @@ class ClassCourse(Base, IdMixin, TenantMixin, TimestampMixin):
     course_id: Mapped[UUID] = mapped_column(ForeignKey("courses.id"), index=True)
 
 
+class ProgramCourse(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "program_courses"
+    __table_args__ = (
+        UniqueConstraint("program_id", "course_id", name="uq_program_course"),
+    )
+
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id"), index=True)
+    course_id: Mapped[UUID] = mapped_column(ForeignKey("courses.id"), index=True)
+
+
 class AcademicSession(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "academic_sessions"
 

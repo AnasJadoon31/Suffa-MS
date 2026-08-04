@@ -168,12 +168,16 @@ export function SearchableSelect({
   options,
   placeholder = "Select...",
   className,
+  searchValue,
+  onSearchChange,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string; disabled?: boolean }[];
   placeholder?: string;
   className?: string;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const selectedOption = options.find((o) => o.value === value);
@@ -199,7 +203,11 @@ export function SearchableSelect({
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command>
-          <CommandInput placeholder={t("Search") + "..."} />
+          <CommandInput
+            placeholder={t("Search") + "..."}
+            value={searchValue}
+            onValueChange={onSearchChange}
+          />
           <CommandList>
             <CommandEmpty>{t("No results")}</CommandEmpty>
             {options.map((option) => (

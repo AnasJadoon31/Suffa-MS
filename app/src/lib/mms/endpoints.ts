@@ -65,7 +65,7 @@ export interface Guardian {
 }
 
 export const peopleApi = {
-  listStudentsPage: (params: { search?: string; limit: number; offset: number }) =>
+  listStudentsPage: (params: { search?: string; limit: number; offset: number; section_id?: string }) =>
     getPage<Student>("/api/v1/people/students", params),
   listTeachers: () => getAllPages<Teacher>("/api/v1/people/teachers"),
   listTeachersPage: (params: { search?: string; limit: number; offset: number }) =>

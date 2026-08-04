@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { GraduationCap, HeartHandshake, KeyRound, ShieldCheck, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -31,6 +31,10 @@ import { academicsApi, peopleApi, type Guardian, type Student, type Teacher } fr
 import { financeMutations, peopleMutations, type Donor } from "@/lib/mms/more-endpoints";
 
 export const Route = createFileRoute("/people")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || undefined,
+    section_id: (search.section_id as string) || undefined,
+  }),
   head: () => ({
     meta: [
       { title: "People — Suffa MS" },
@@ -57,9 +61,9 @@ const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
 
 const PAGE_SIZE = 20;
 
-function renderAddButton(tab: Tab, label?: string) {
+function renderAddButton(tab: Tab, sectionId?: string, label?: string) {
   const defaultLabel = label ?? "Add";
-  if (tab === "students") return <StudentForm triggerLabel={defaultLabel} />;
+  if (tab === "students") return <StudentForm triggerLabel={defaultLabel} sectionId={sectionId} />;
   if (tab === "teachers") return <TeacherForm triggerLabel={defaultLabel} />;
   if (tab === "guardians") return <GuardianForm triggerLabel={defaultLabel} />;
   return <DonorForm triggerLabel={defaultLabel} />;
@@ -69,8 +73,10 @@ function PeoplePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const canManage = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
+  const routeSearch = useSearch({ from: "/people" });
+  const sectionId = routeSearch.section_id || undefined;
 
-  const [tab, setTab] = useState<Tab>("students");
+  const [tab, setTab] = useState<Tab>((routeSearch.tab as Tab) || "students");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [classFilter, setClassFilter] = useState("");
@@ -90,11 +96,12 @@ function PeoplePage() {
     queryKey: ["people", tab, search],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
-      const params = {
+      const params: Record<string, unknown> = {
         search: search.trim() || undefined,
         limit: PAGE_SIZE,
         offset: pageParam as number,
       };
+      if (sectionId && tab === "students") params.section_id = sectionId;
       if (tab === "students")
         return { kind: "students" as const, page: await peopleApi.listStudentsPage(params) };
       if (tab === "teachers")
@@ -201,7 +208,7 @@ function PeoplePage() {
         }}
         activeCount={activeCount}
         onClear={handleClearFilters}
-        action={canManage ? renderAddButton(tab, `+ ${t("Add")}`) : undefined}
+        action={canManage ? renderAddButton(tab, sectionId, `+ ${t("Add")}`) : undefined}
       >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label={t("Status")}>

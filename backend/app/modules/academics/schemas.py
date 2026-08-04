@@ -39,6 +39,7 @@ class SectionRead(BaseModel):
     id: UUID
     class_id: UUID
     name: str
+    student_count: int = 0
 
 
 class SectionUpdate(BaseModel):
@@ -54,6 +55,17 @@ class CourseUpdate(BaseModel):
     name: str | None = None
 
 class ClassCourseAssignRequest(BaseModel):
+    course_id: UUID
+
+
+class ProgramCourseAssignRequest(BaseModel):
+    course_id: UUID
+
+
+class ProgramCourseRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    program_id: UUID
     course_id: UUID
 
 
