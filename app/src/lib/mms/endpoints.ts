@@ -57,6 +57,7 @@ export interface Teacher {
 export interface Guardian {
   id: string;
   user_id: string | null;
+  username: string | null;
   name: string;
   relationship: string;
   phone_numbers: string;

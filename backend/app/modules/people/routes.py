@@ -139,6 +139,25 @@ async def _next_code(session: AsyncSession, madrasa_id: UUID, model, prefix: str
     return f"{prefix}-{max_suffix + 1:04d}"
 
 
+async def _next_guardian_code(session: AsyncSession, madrasa_id: UUID) -> str:
+    """Generate the next GR-XXXX username for a guardian login."""
+    existing = (
+        await session.execute(
+            select(User.username).where(
+                User.madrasa_id == madrasa_id,
+                User.role == UserRole.parent,
+                User.username.like("GR-%"),
+            )
+        )
+    ).scalars().all()
+    max_suffix = 0
+    for code in existing:
+        suffix = str(code).removeprefix("GR-")
+        if suffix.isdigit():
+            max_suffix = max(max_suffix, int(suffix))
+    return f"GR-{max_suffix + 1:04d}"
+
+
 # ---------------------------------------------------------------- Teachers
 
 @router.post("/teachers", response_model=TeacherProvisionedRead)
@@ -342,24 +361,22 @@ async def create_student(
     if payload.is_independent and student_portal_enabled and not student_phone:
         raise HTTPException(status_code=422, detail="An independent student with portal access requires a phone")
 
+    # Always generate admission_number first — it becomes the username
+    admission_number = await _next_code(session, madrasa.id, StudentProfile, "ADM")
+    student_username = payload.username or admission_number
+
     try:
         user, set_password_url = await provision_login(
             session,
             madrasa_id=madrasa.id,
             actor_id=current_user.id,
-            username=payload.username,
+            username=student_username,
             role=UserRole.student,
             preferred_language=payload.preferred_language,
-            # Class-level portal defaults apply at enrolment time, once a
-            # class is known; before that, default to enabled (FR-STU-03).
             portal_enabled=student_portal_enabled,
         )
     except UsernameTakenError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    # ISS3-008: Admission numbers are server-generated, tenant-unique, immutable
-    # Remove client-supplied admission_number - always generate server-side
-    admission_number = await _next_code(session, madrasa.id, StudentProfile, "ADM")
 
     profile = StudentProfile(
         madrasa_id=madrasa.id,
@@ -568,6 +585,20 @@ async def create_guardian(
     session.add(guardian)
     await session.flush()
 
+    guardian_username = await _next_guardian_code(session, madrasa.id)
+    try:
+        user, _ = await provision_login(
+            session,
+            madrasa_id=madrasa.id,
+            actor_id=current_user.id,
+            username=guardian_username,
+            role=UserRole.parent,
+            preferred_language=payload.preferred_language,
+        )
+    except UsernameTakenError:
+        raise HTTPException(status_code=500, detail="Failed to generate unique guardian username")
+    guardian.user_id = user.id
+
     for student_id in payload.student_ids:
         student = await session.get(StudentProfile, student_id)
         if student is None or student.madrasa_id != madrasa.id:
@@ -626,8 +657,7 @@ async def guardian_credentials_link(
         await session.commit()
         return {"username": user.username, "set_password_url": url}
 
-    if not payload.username:
-        raise HTTPException(status_code=400, detail="username is required to provision a new guardian login")
+    guardian_username = payload.username or await _next_guardian_code(session, madrasa.id)
     try:
         user, url = await provision_login(
             session,

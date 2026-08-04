@@ -279,9 +279,18 @@ function PeoplePage() {
                 }}
               >
                 <p className="truncate font-semibold">{name}</p>
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                   {subtitle}
-                  {record["relationship"] ? ` · ${String(record["relationship"])}` : ""}
+                  {record["relationship"] ? (
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[0.65rem] font-medium">
+                      {String(record["relationship"])}
+                    </span>
+                  ) : null}
+                  {tab === "guardians" && record["username"] ? (
+                    <span className="rounded-full bg-primary-soft px-1.5 py-0.5 text-[0.65rem] font-medium text-primary">
+                      {String(record["username"])}
+                    </span>
+                  ) : null}
                   {record["current_class"] ? ` · ${String(record["current_class"])}` : ""}
                 </p>
               </button>

@@ -84,6 +84,10 @@ class Guardian(Base, IdMixin, TenantMixin, TimestampMixin):
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     preferred_language: Mapped[str] = mapped_column(String(8), default="ur")
 
+    username: Mapped[Optional[str]] = column_property(
+        select(User.username).where(User.id == user_id).correlate_except(User).scalar_subquery()
+    )
+
 
 class StudentGuardian(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "student_guardians"

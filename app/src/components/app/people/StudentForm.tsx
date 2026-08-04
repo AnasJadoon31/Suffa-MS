@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { FormSheet } from "@/components/app/FormSheet";
 import { Field, CustomDropdown, TextInput } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
-import { useUsernameProposal } from "./useUsernameProposal";
 import { peopleApi } from "@/lib/mms/endpoints";
 import { peopleMutations, type StudentDetail } from "@/lib/mms/more-endpoints";
+import { apiErrorMessage } from "@/lib/mms/api";
 import { useTranslation } from "react-i18next";
 
 export function StudentForm({
@@ -33,13 +34,47 @@ export function StudentForm({
   const [portal, setPortal] = useState(student?.portal_enabled ?? true);
   const [lang, setLang] = useState(student?.preferred_language ?? "en");
   const [guardians, setGuardians] = useState<{ id: string; name: string }[]>([]);
-  const usernameField = useUsernameProposal(name);
+
+  const [showNewGuardian, setShowNewGuardian] = useState(false);
+  const [newGuardianName, setNewGuardianName] = useState("");
+  const [newGuardianPhone, setNewGuardianPhone] = useState("");
+  const [newGuardianRel, setNewGuardianRel] = useState("father");
+  const [creatingGuardian, setCreatingGuardian] = useState(false);
+
+  async function createGuardianInline() {
+    const trimmedName = newGuardianName.trim();
+    if (!trimmedName) {
+      toast.error("Guardian name is required");
+      return;
+    }
+    if (!newGuardianPhone.trim()) {
+      toast.error("Phone number is required");
+      return;
+    }
+    setCreatingGuardian(true);
+    try {
+      const created = await peopleMutations.createGuardian({
+        name: trimmedName,
+        relationship: newGuardianRel,
+        phone_numbers: newGuardianPhone.trim(),
+      });
+      setGuardians((prev) => [...prev, { id: created.id, name: created.name }]);
+      setNewGuardianName("");
+      setNewGuardianPhone("");
+      setNewGuardianRel("father");
+      setShowNewGuardian(false);
+      toast.success("Guardian created");
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Failed to create guardian"));
+    } finally {
+      setCreatingGuardian(false);
+    }
+  }
 
   async function handleSubmit() {
     const trimmedName = name.trim();
     if (!trimmedName || trimmedName.length > 120)
       throw toast.error("Enter a valid name (max 120 chars)");
-    if (!isEdit && !usernameField.username.trim()) throw toast.error("Username is required");
     if (bForm && bForm.length > 20) throw toast.error("B-Form number is too long");
 
     if (isEdit && student) {
@@ -55,7 +90,6 @@ export function StudentForm({
       toast.success("Student updated");
     } else {
       await peopleMutations.createStudent({
-        username: usernameField.username.trim(),
         name: trimmedName,
         date_of_birth: dob || undefined,
         phone: phone.trim() || undefined,
@@ -73,7 +107,6 @@ export function StudentForm({
       setBForm("");
       setAddress("");
       setGuardians([]);
-      usernameField.reset();
     }
     void client.invalidateQueries({ queryKey: ["people"] });
   }
@@ -87,16 +120,6 @@ export function StudentForm({
       open={open}
       onOpenChange={onOpenChange}
     >
-      {!isEdit ? (
-        <Field label={t("Username *")}>
-          <TextInput
-            required
-            maxLength={40}
-            value={usernameField.username}
-            onChange={(e) => usernameField.setUsername(e.target.value)}
-          />
-        </Field>
-      ) : null}
       <Field label={t("Full name *")}>
         <TextInput
           required
@@ -133,23 +156,75 @@ export function StudentForm({
         <input
           type="checkbox"
           checked={independent}
-          onChange={(e) => setIndependent(e.target.checked)}
+          onChange={(e) => { setIndependent(e.target.checked); if (e.target.checked) setGuardians([]); }}
         />
         {t("Independent student")}</label>
       <label className="flex items-center gap-2 text-sm font-semibold">
         <input type="checkbox" checked={portal} onChange={(e) => setPortal(e.target.checked)} />
         {t("Portal access enabled")}</label>
-      {!isEdit ? (
-        <MultiPicker
-          label={t("Guardians")}
-          selected={guardians}
-          onChange={setGuardians}
-          queryKey="student-form-guardians"
-          fetchOptions={async (search) => {
-            const result = await peopleApi.listGuardiansPage({ search, limit: 20, offset: 0 });
-            return result.items.map((g) => ({ id: g.id, name: g.name }));
-          }}
-        />
+      {!isEdit && !independent ? (
+        <>
+          <MultiPicker
+            label={t("Guardians")}
+            selected={guardians}
+            onChange={setGuardians}
+            queryKey="student-form-guardians"
+            fetchOptions={async (search) => {
+              const result = await peopleApi.listGuardiansPage({ search, limit: 20, offset: 0 });
+              return result.items.map((g) => ({ id: g.id, name: g.name }));
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowNewGuardian((v) => !v)}
+            className="mt-1 flex items-center gap-1 text-xs font-semibold text-primary"
+          >
+            {showNewGuardian ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            {t("Create new guardian")}
+          </button>
+          {showNewGuardian ? (
+            <div className="space-y-2 rounded-2xl border border-border bg-muted/50 p-3">
+              <Field label={t("Name *")}>
+                <TextInput
+                  required
+                  maxLength={120}
+                  value={newGuardianName}
+                  onChange={(e) => setNewGuardianName(e.target.value)}
+                />
+              </Field>
+              <Field label={t("Phone *")}>
+                <TextInput
+                  required
+                  maxLength={50}
+                  value={newGuardianPhone}
+                  onChange={(e) => setNewGuardianPhone(e.target.value)}
+                />
+              </Field>
+              <Field label={t("Relationship")}>
+                <CustomDropdown value={newGuardianRel} onChange={(e) => setNewGuardianRel(e.target.value)}>
+                  <option value="father">{t("Father")}</option>
+                  <option value="mother">{t("Mother")}</option>
+                  <option value="brother">{t("Brother")}</option>
+                  <option value="sister">{t("Sister")}</option>
+                  <option value="uncle">{t("Uncle")}</option>
+                  <option value="aunt">{t("Aunt")}</option>
+                  <option value="grandfather">{t("Grandfather")}</option>
+                  <option value="grandmother">{t("Grandmother")}</option>
+                  <option value="other">{t("Other")}</option>
+                </CustomDropdown>
+              </Field>
+              <button
+                type="button"
+                disabled={creatingGuardian}
+                onClick={createGuardianInline}
+                className="gradient-emerald flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {creatingGuardian ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                {t("Add guardian")}
+              </button>
+            </div>
+          ) : null}
+        </>
       ) : null}
     </FormSheet>
   );

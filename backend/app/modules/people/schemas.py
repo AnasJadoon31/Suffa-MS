@@ -60,7 +60,7 @@ class TeacherProvisionedRead(TeacherRead):
 class StudentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    username: str = Field(min_length=3, max_length=80)
+    username: str | None = Field(default=None, min_length=3, max_length=80)
     name: str | None = None
     date_of_birth: date | None = None
     portal_enabled: bool | None = None
@@ -168,6 +168,7 @@ class GuardianRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     user_id: UUID | None = None
+    username: str | None = None
     name: str
     relationship: str
     phone_numbers: str

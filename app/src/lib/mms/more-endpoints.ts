@@ -775,7 +775,7 @@ export const peopleMutations = {
       .then((r) => r.data.username),
 
   createStudent: (payload: {
-    username: string;
+    username?: string;
     name?: string;
     date_of_birth?: string;
     portal_enabled?: boolean;
