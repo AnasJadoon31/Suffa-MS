@@ -7,7 +7,19 @@ import { Field, CustomDropdown, TextInput } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
 import { peopleApi } from "@/lib/mms/endpoints";
 import { peopleMutations, type GuardianDetail } from "@/lib/mms/more-endpoints";
+import { maskPhone, maskBForm } from "@/lib/masks";
 import { useTranslation } from "react-i18next";
+
+function maskGuardianPhones(value: string): string {
+  return value
+    .split(",")
+    .map((part) => {
+      const trimmed = part.trim();
+      if (!trimmed) return trimmed;
+      return maskPhone(trimmed);
+    })
+    .join(", ");
+}
 
 export function GuardianForm({
   guardian,
@@ -104,14 +116,14 @@ export function GuardianForm({
       <Field label={t("Phone number(s) *")}>
         <TextInput
           required
-          maxLength={100}
+          maxLength={200}
           placeholder={t("Separate multiple with commas")}
-          value={phones ?? ""}
-          onChange={(e) => setPhones(e.target.value)}
+          value={phones ?? "+92"}
+          onChange={(e) => setPhones(maskGuardianPhones(e.target.value))}
         />
       </Field>
       <Field label={t("CNIC")}>
-        <TextInput maxLength={20} value={cnic ?? ""} onChange={(e) => setCnic(e.target.value)} />
+          <TextInput maxLength={15} value={cnic ?? ""} onChange={(e) => setCnic(maskBForm(e.target.value))} />
       </Field>
       <Field label={t("Address")}>
         <TextInput

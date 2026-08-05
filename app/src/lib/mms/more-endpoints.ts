@@ -1041,3 +1041,30 @@ export const timetableApi = {
       "timetable",
     ),
 };
+
+export interface PermissionRole {
+  id: string;
+  name: string;
+  permission_codes: string[];
+  user_count: number;
+}
+
+export const rolesApi = {
+  list: () => getAllPages<PermissionRole>("/api/v1/auth/roles"),
+  create: (payload: { name: string; permission_codes: string[] }) =>
+    api.post<PermissionRole>("/api/v1/auth/roles", payload).then((r) => r.data),
+  update: (id: string, payload: { name?: string; permission_codes?: string[] }) =>
+    api.put<PermissionRole>(`/api/v1/auth/roles/${id}`, payload).then((r) => r.data),
+  delete: (id: string) => api.delete(`/api/v1/auth/roles/${id}`).then((r) => r.data),
+  assign: (userId: string, roleId: string) =>
+    api.post("/api/v1/auth/roles/assign", { user_id: userId, role_id: roleId }).then((r) => r.data),
+  unassign: (userId: string, roleId: string) =>
+    api.post("/api/v1/auth/roles/unassign", { user_id: userId, role_id: roleId }).then((r) => r.data),
+  listUserRoles: (userId: string) =>
+    api.get<PermissionRole[]>(`/api/v1/auth/users/${userId}/roles`).then((r) => r.data),
+};
+
+export const permissionsApi = {
+  list: () =>
+    api.get<{ code: string; label: string; module: string; scoped: boolean }[]>("/api/v1/auth/permissions").then((r) => r.data),
+};

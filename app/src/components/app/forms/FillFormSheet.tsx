@@ -7,6 +7,7 @@ import { Field, CustomDropdown, TextArea, TextInput } from "@/components/app/Pri
 import { useAuth } from "@/lib/mms/auth";
 import { reportingApi } from "@/lib/mms/endpoints";
 import { formsApi, type FormDef } from "@/lib/mms/more-endpoints";
+import { maskPhone } from "@/lib/masks";
 import { useTranslation } from "react-i18next";
 
 interface Ward {
@@ -204,8 +205,8 @@ export function FillFormSheet({
           <Field key={field.key} label={label}>
             <TextInput
               required={field.required}
-              value={(answers[field.key] as string) ?? ""}
-              onChange={(e) => setAnswers((a) => ({ ...a, [field.key]: e.target.value }))}
+                value={(answers[field.key] as string) ?? "+92"}
+                onChange={(e) => setAnswers((a) => ({ ...a, [field.key]: maskPhone(e.target.value) }))}
             />
           </Field>
         );

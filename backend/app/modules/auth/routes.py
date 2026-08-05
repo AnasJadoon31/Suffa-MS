@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from jose import JWTError, jwt
-from sqlalchemy import or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -23,7 +23,7 @@ from app.core.dependencies import (
     set_rls_context,
 )
 from app.db.session import get_session
-from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
+from app.modules.auth.models import User, UserPermission, UserRole, UserStatus, PermissionRole, PermissionRoleGrant, UserRoleAssignment
 from app.modules.auth.service import UsernameTakenError, provision_login, set_password_token_version
 from app.modules.academics.models import AcademicClass, AcademicSession, Madrasa, Section
 from app.modules.operations.models import MadrasaSetting, TimetableSlot
@@ -34,9 +34,13 @@ from app.modules.auth.schemas import (
     PermissionGrant,
     PermissionGrantRead,
     PermissionGrantRequest,
+    PermissionRoleCreate,
+    PermissionRoleRead,
+    PermissionRoleUpdate,
     ProvisionUserRequest,
     ProvisionUserResponse,
     Role,
+    RoleAssignRequest,
     SetPasswordRequest,
     TokenResponse,
     CurrentUserResponse,
@@ -423,3 +427,198 @@ async def list_user_permissions(
         limit=limit, offset=offset, response=response,
     )
     return [PermissionGrantRead.model_validate(row) for row in rows]
+
+
+# ---------------------------------------------------------------- Roles
+
+@router.get("/roles", response_model=list[PermissionRoleRead])
+async def list_roles(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> list[PermissionRoleRead]:
+    rows = await paginate_scalars(
+        session,
+        select(PermissionRole).where(PermissionRole.madrasa_id == madrasa.id).order_by(PermissionRole.name),
+        limit=limit, offset=offset, response=response,
+    )
+    result = []
+    for role in rows:
+        grants = await session.execute(
+            select(PermissionRoleGrant.permission_code).where(PermissionRoleGrant.role_id == role.id)
+        )
+        codes = grants.scalars().all()
+        user_count = await session.scalar(
+            select(func.count(UserRoleAssignment.id)).where(UserRoleAssignment.role_id == role.id)
+        )
+        d = PermissionRoleRead.model_validate(role)
+        d.permission_codes = list(codes)
+        d.user_count = user_count or 0
+        result.append(d)
+    return result
+
+
+@router.post("/roles", response_model=PermissionRoleRead)
+async def create_role(
+    payload: PermissionRoleCreate,
+    current_user: User = Depends(require_permission("settings.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> PermissionRoleRead:
+    role = PermissionRole(madrasa_id=madrasa.id, name=payload.name)
+    session.add(role)
+    await session.flush()
+    for code in payload.permission_codes:
+        session.add(PermissionRoleGrant(role_id=role.id, permission_code=code))
+    await session.commit()
+    await session.refresh(role)
+    d = PermissionRoleRead.model_validate(role)
+    d.permission_codes = payload.permission_codes
+    return d
+
+
+@router.put("/roles/{role_id}", response_model=PermissionRoleRead)
+async def update_role(
+    role_id: UUID,
+    payload: PermissionRoleUpdate,
+    current_user: User = Depends(require_permission("settings.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> PermissionRoleRead:
+    role = await session.get(PermissionRole, role_id)
+    if not role or role.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Role not found")
+    if payload.name is not None:
+        role.name = payload.name
+    if payload.permission_codes is not None:
+        await session.execute(
+            delete(PermissionRoleGrant).where(PermissionRoleGrant.role_id == role_id)
+        )
+        for code in payload.permission_codes:
+            session.add(PermissionRoleGrant(role_id=role_id, permission_code=code))
+    await session.commit()
+    await session.refresh(role)
+    d = PermissionRoleRead.model_validate(role)
+    d.permission_codes = payload.permission_codes if payload.permission_codes is not None else []
+    return d
+
+
+@router.delete("/roles/{role_id}")
+async def delete_role(
+    role_id: UUID,
+    current_user: User = Depends(require_permission("settings.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    role = await session.get(PermissionRole, role_id)
+    if not role or role.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Role not found")
+    await session.execute(delete(UserRoleAssignment).where(UserRoleAssignment.role_id == role_id))
+    await session.execute(delete(PermissionRoleGrant).where(PermissionRoleGrant.role_id == role_id))
+    await session.delete(role)
+    await session.commit()
+    return {"status": "deleted"}
+
+
+@router.post("/roles/assign")
+async def assign_role(
+    payload: RoleAssignRequest,
+    current_user: User = Depends(require_permission("settings.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    user = await session.get(User, payload.user_id)
+    if not user or user.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="User not found")
+    role = await session.get(PermissionRole, payload.role_id)
+    if not role or role.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Role not found")
+
+    existing = await session.scalar(
+        select(UserRoleAssignment).where(
+            UserRoleAssignment.user_id == payload.user_id,
+            UserRoleAssignment.role_id == payload.role_id,
+        )
+    )
+    if existing:
+        return {"status": "already_assigned"}
+
+    assign = UserRoleAssignment(user_id=payload.user_id, role_id=payload.role_id)
+    session.add(assign)
+
+    grants = await session.execute(
+        select(PermissionRoleGrant.permission_code).where(PermissionRoleGrant.role_id == payload.role_id)
+    )
+    for code in grants.scalars().all():
+        session.add(UserPermission(user_id=payload.user_id, permission_code=code, granted_by_id=current_user.id))
+
+    await session.commit()
+    return {"status": "assigned"}
+
+
+@router.post("/roles/unassign")
+async def unassign_role(
+    payload: RoleAssignRequest,
+    current_user: User = Depends(require_permission("settings.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    user = await session.get(User, payload.user_id)
+    if not user or user.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="User not found")
+    role = await session.get(PermissionRole, payload.role_id)
+    if not role or role.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Role not found")
+
+    await session.execute(
+        delete(UserRoleAssignment).where(
+            UserRoleAssignment.user_id == payload.user_id,
+            UserRoleAssignment.role_id == payload.role_id,
+        )
+    )
+
+    grants = await session.execute(
+        select(PermissionRoleGrant.permission_code).where(PermissionRoleGrant.role_id == payload.role_id)
+    )
+    for code in grants.scalars().all():
+        await session.execute(
+            delete(UserPermission).where(
+                UserPermission.user_id == payload.user_id,
+                UserPermission.permission_code == code,
+            )
+        )
+
+    await session.commit()
+    return {"status": "unassigned"}
+
+
+@router.get("/users/{user_id}/roles", response_model=list[PermissionRoleRead])
+async def list_user_roles(
+    user_id: UUID,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[PermissionRoleRead]:
+    user = await session.get(User, user_id)
+    if not user or user.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    stmt = (
+        select(PermissionRole)
+        .join(UserRoleAssignment, PermissionRole.id == UserRoleAssignment.role_id)
+        .where(UserRoleAssignment.user_id == user_id)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    result = []
+    for role in rows:
+        grants = await session.execute(
+            select(PermissionRoleGrant.permission_code).where(PermissionRoleGrant.role_id == role.id)
+        )
+        codes = grants.scalars().all()
+        d = PermissionRoleRead.model_validate(role)
+        d.permission_codes = list(codes)
+        result.append(d)
+    return result

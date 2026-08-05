@@ -33,6 +33,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as ResultsRouteImport } from './routes/results'
+import { Route as RolesRouteImport } from './routes/roles'
 import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TimetableRouteImport } from './routes/timetable'
@@ -158,6 +159,11 @@ const ResultsRoute = ResultsRouteImport.update({
   path: '/results',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RolesRoute = RolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetPasswordRoute = SetPasswordRouteImport.update({
   id: '/set-password',
   path: '/set-password',
@@ -204,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof ReportsRoute
   '/resources': typeof ResourcesRoute
   '/results': typeof ResultsRoute
+  '/roles': typeof RolesRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/timetable': typeof TimetableRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsRoute
   '/resources': typeof ResourcesRoute
   '/results': typeof ResultsRoute
+  '/roles': typeof RolesRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/timetable': typeof TimetableRoute
@@ -265,6 +273,7 @@ export interface FileRoutesById {
   '/reports': typeof ReportsRoute
   '/resources': typeof ResourcesRoute
   '/results': typeof ResultsRoute
+  '/roles': typeof RolesRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/timetable': typeof TimetableRoute
@@ -297,6 +306,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/resources'
     | '/results'
+    | '/roles'
     | '/set-password'
     | '/settings'
     | '/timetable'
@@ -327,6 +337,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/resources'
     | '/results'
+    | '/roles'
     | '/set-password'
     | '/settings'
     | '/timetable'
@@ -357,6 +368,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/resources'
     | '/results'
+    | '/roles'
     | '/set-password'
     | '/settings'
     | '/timetable'
@@ -388,6 +400,7 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   ResourcesRoute: typeof ResourcesRoute
   ResultsRoute: typeof ResultsRoute
+  RolesRoute: typeof RolesRoute
   SetPasswordRoute: typeof SetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   TimetableRoute: typeof TimetableRoute
@@ -564,6 +577,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResultsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/roles': {
+      id: '/roles'
+      path: '/roles'
+      fullPath: '/roles'
+      preLoaderRoute: typeof RolesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/set-password': {
       id: '/set-password'
       path: '/set-password'
@@ -620,6 +640,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   ResourcesRoute: ResourcesRoute,
   ResultsRoute: ResultsRoute,
+  RolesRoute: RolesRoute,
   SetPasswordRoute: SetPasswordRoute,
   SettingsRoute: SettingsRoute,
   TimetableRoute: TimetableRoute,

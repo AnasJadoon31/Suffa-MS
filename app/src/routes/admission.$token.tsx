@@ -5,6 +5,7 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import { CustomDropdown } from "@/components/app/Primitives";
 import { apiErrorMessage } from "@/lib/mms/api";
+import { maskPhone } from "@/lib/masks";
 import { publicApi, type FormFieldDefinition } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
@@ -257,8 +258,11 @@ function AdmissionField({
         <input
           type={field.type === "phone" ? "tel" : "text"}
           className={commonClass}
-          value={typeof value === "string" ? value : ""}
-          onChange={(event) => onChange(event.target.value)}
+          value={typeof value === "string" ? value : "+92"}
+          onChange={(event) => {
+            const v = field.type === "phone" ? maskPhone(event.target.value) : event.target.value;
+            onChange(v);
+          }}
           required={field.required}
         />
       )}

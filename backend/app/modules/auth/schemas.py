@@ -111,3 +111,27 @@ class SetPasswordRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8)
+
+
+# ------------------------------------------------------------------- Roles
+class PermissionRoleCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    permission_codes: list[str] = []
+
+
+class PermissionRoleUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    permission_codes: list[str] | None = None
+
+
+class PermissionRoleRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    name: str
+    permission_codes: list[str] = []
+    user_count: int = 0
+
+
+class RoleAssignRequest(BaseModel):
+    user_id: UUID
+    role_id: UUID

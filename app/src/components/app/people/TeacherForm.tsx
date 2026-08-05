@@ -8,6 +8,8 @@ import { useUsernameProposal } from "./useUsernameProposal";
 import { peopleMutations, type TeacherDetail } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
+import { maskBForm, maskPhone } from "@/lib/masks";
+
 export function TeacherForm({
   teacher,
   open,
@@ -115,9 +117,9 @@ export function TeacherForm({
       <Field label={t("WhatsApp number *")}>
         <TextInput
           required
-          maxLength={20}
-          value={whatsapp ?? ""}
-          onChange={(e) => setWhatsapp(e.target.value)}
+          maxLength={15}
+          value={whatsapp ?? "+92"}
+          onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
         />
       </Field>
       <Field label={t("Qualifications")}>
@@ -135,7 +137,7 @@ export function TeacherForm({
         />
       </Field>
       <Field label={t("CNIC")}>
-        <TextInput maxLength={20} value={cnic ?? ""} onChange={(e) => setCnic(e.target.value)} />
+          <TextInput maxLength={15} value={cnic ?? ""} onChange={(e) => setCnic(maskBForm(e.target.value))} />
       </Field>
       <Field label={t("Address")}>
         <TextInput
@@ -146,9 +148,9 @@ export function TeacherForm({
       </Field>
       <Field label={t("Emergency contact")}>
         <TextInput
-          maxLength={40}
-          value={emergency ?? ""}
-          onChange={(e) => setEmergency(e.target.value)}
+          maxLength={15}
+          value={emergency ?? "+92"}
+          onChange={(e) => setEmergency(maskPhone(e.target.value))}
         />
       </Field>
       <label className="flex items-center gap-2 text-sm font-semibold">

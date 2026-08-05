@@ -5,7 +5,7 @@ from app.db.core_models import FileObject, AuditLog
 from app.modules.academics.models import Madrasa, Program, AcademicClass, Section, Course, AcademicSession, Enrollment, TeacherAssignment
 from app.modules.assessments.models import Assignment, Submission, GradingScheme, ExamType, Mark, ResultPublication
 from app.modules.attendance.models import StudentAttendance, TeacherAttendance, AttendanceCorrection
-from app.modules.auth.models import User, UserPermission
+from app.modules.auth.models import User, UserPermission, PermissionRole, PermissionRoleGrant, UserRoleAssignment
 from app.modules.finance.models import PaymentCategory, Payment, Donor, Donation, SalaryRecord, SalaryPayment
 from app.modules.messaging.models import MessageTemplate, MessageLog
 from app.modules.operations.models import TimetableSlot, Holiday, Leave, ResourceCategory, Resource, Form, FormResponse, Announcement, AdmissionForm, AdmissionApplication, AdminNotification, BlogPost, ContactEnquiry, MadrasaSetting

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Building2, Globe, IdCard, KeyRound, Languages, LogOut, ShieldCheck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Building2, Globe, IdCard, KeyRound, Languages, LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
@@ -35,6 +35,20 @@ function MePage() {
   const { user, madrasa, permissions, logout, refresh } = useAuth();
   const navigate = useNavigate();
   const client = useQueryClient();
+
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("mms_theme") === "dark";
+    setDark(stored);
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !dark;
+    setDark(next);
+    window.localStorage.setItem("mms_theme", next ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", next);
+  };
 
   const sessions = useQuery({
     queryKey: ["sessions"],
@@ -150,7 +164,35 @@ function MePage() {
           className="w-full"
         >
           <Languages className="h-4 w-4" />
-          {t("Save preferences")}</ActionButton>
+          {t("Save preferences")}        </ActionButton>
+      </Card>
+
+      <SectionTitle>{t("Appearance")}</SectionTitle>
+      <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+          {dark ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate font-semibold">{t("Dark mode")}</p>
+          <p className="truncate text-xs text-muted-foreground">{t("Easier on the eyes at night")}</p>
+        </div>
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle dark mode"
+          className={
+            dark
+              ? "gradient-emerald h-7 w-12 rounded-full p-1 text-left"
+              : "h-7 w-12 rounded-full bg-muted p-1 text-left"
+          }
+        >
+          <span
+            className={
+              dark
+                ? "block h-5 w-5 translate-x-5 rounded-full bg-primary-foreground transition-transform"
+                : "block h-5 w-5 rounded-full bg-card transition-transform"
+            }
+          />
+        </button>
       </Card>
 
       <SectionTitle>{t("Security")}</SectionTitle>

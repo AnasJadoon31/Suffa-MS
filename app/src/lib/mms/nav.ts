@@ -14,6 +14,7 @@ import {
   Monitor,
   Newspaper,
   Settings,
+  ShieldCheck,
   Table2,
   Trophy,
   UserCheck,
@@ -99,6 +100,7 @@ export const adminNav: NavItem[] = [
   { to: "/finance", label: "Finance", icon: Wallet, description: "Fees, donations, salary" },
   { to: "/reports", label: "Reports", icon: FileBarChart2, description: "Export CSV and PDF" },
   { to: "/settings", label: "Settings", icon: Settings, description: "Madrasa configuration" },
+  { to: "/roles", label: "Roles", icon: ShieldCheck, description: "Permission roles" },
   { to: "/platform", label: "Platform", icon: Monitor, description: "Super admin console" },
   { to: "/me", label: "My Profile", icon: UserRound, description: "Account and session" },
 ];

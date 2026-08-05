@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import Boolean, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, IdMixin, TimestampMixin
+from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
 
 
 class UserRole(StrEnum):
@@ -56,3 +56,29 @@ class UserPermission(Base, IdMixin, TimestampMixin):
     # delegation). Both NULL = the grant applies madrasa-wide.
     scope_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     scope_id: Mapped[Optional[UUID]] = mapped_column(nullable=True)
+
+
+class PermissionRole(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "permission_roles"
+
+    name: Mapped[str] = mapped_column(String(120))
+
+
+class PermissionRoleGrant(Base, IdMixin, TimestampMixin):
+    __tablename__ = "permission_role_grants"
+    __table_args__ = (
+        UniqueConstraint("role_id", "permission_code", name="uq_role_grant"),
+    )
+
+    role_id: Mapped[UUID] = mapped_column(ForeignKey("permission_roles.id"), index=True)
+    permission_code: Mapped[str] = mapped_column(String(120))
+
+
+class UserRoleAssignment(Base, IdMixin, TimestampMixin):
+    __tablename__ = "user_role_assignments"
+    __table_args__ = (
+        UniqueConstraint("user_id", "role_id", name="uq_user_role"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    role_id: Mapped[UUID] = mapped_column(ForeignKey("permission_roles.id"), index=True)

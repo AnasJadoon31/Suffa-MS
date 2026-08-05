@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { FormSheet } from "@/components/app/FormSheet";
 import { Field, TextInput } from "@/components/app/Primitives";
+import { maskPhone } from "@/lib/masks";
 import { financeMutations, type Donor } from "@/lib/mms/more-endpoints";
 
 export function DonorForm({
@@ -64,8 +65,8 @@ export function DonorForm({
       </Field>
       <Field label={t("Contact / Phone Number")}>
         <TextInput
-          value={contact}
-          onChange={(e) => setContact(e.target.value)}
+          value={contact || "+92"}
+          onChange={(e) => setContact(maskPhone(e.target.value))}
           placeholder={t("e.g. +92 300 1234567")}
         />
       </Field>

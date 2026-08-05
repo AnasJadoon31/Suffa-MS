@@ -242,9 +242,9 @@ function extractSelectOptions(children: ReactNode): { value: string; label: stri
   React.Children.forEach(children, (child) => {
     if (!React.isValidElement(child) || child.type !== "option") return;
     const props = child.props as Record<string, unknown>;
-    if (props.value && typeof props.value === "string") {
+    if (props.value !== undefined && props.value !== null && props.value !== "") {
       opts.push({
-        value: props.value as string,
+        value: String(props.value),
         label: String(props.children ?? props.value),
         disabled: Boolean(props.disabled),
       });

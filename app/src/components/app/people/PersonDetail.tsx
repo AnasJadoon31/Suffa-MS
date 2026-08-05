@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 
-import { ActionButton, Pill, ManagedSheet, ActionBar, CustomDropdown, SearchableSelect, Field } from "@/components/app/Primitives";
+import { ActionButton, Pill, ManagedSheet, ActionBar, CustomDropdown, SearchableSelect, Field, SectionTitle } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
 import { StudentForm } from "./StudentForm";
 import { TeacherForm } from "./TeacherForm";
@@ -15,11 +15,13 @@ import { api } from "@/lib/mms/api";
 import {
   peopleMutations,
   financeMutations,
+  rolesApi,
   type GuardianDetail,
   type StudentDetail,
   type TeacherDetail,
   type DonorFinanceProfile,
   type Donor,
+  type PermissionRole,
 } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
@@ -253,6 +255,19 @@ export function TeacherDetailSheet({
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+
+  const roles = useQuery({
+    queryKey: ["roles"],
+    queryFn: () => rolesApi.list(),
+    enabled: Boolean(teacher && open),
+  });
+
+  const teacherRoles = useQuery({
+    queryKey: ["user-roles", teacher?.user_id],
+    queryFn: () => (teacher?.user_id ? rolesApi.listUserRoles(teacher.user_id) : Promise.resolve([])),
+    enabled: Boolean(teacher?.user_id && open),
+  });
+
   if (!teacher) return null;
 
   async function deactivate() {
@@ -283,6 +298,53 @@ export function TeacherDetailSheet({
           <Row label={t("Emergency contact")} value={teacher.emergency_contact} />
           <Row label={t("Principal delegate")} value={teacher.is_principal_delegate ? "Yes" : "No"} />
         </div>
+
+        {!teacher.is_principal_delegate ? (
+          <>
+        <SectionTitle>{t("Roles")}</SectionTitle>
+        <div className="mb-3">
+          {teacherRoles.data?.map((role: PermissionRole) => (
+            <div key={role.id} className="flex items-center justify-between rounded-lg px-2 py-1.5">
+              <span className="text-sm">{role.name}</span>
+              <button
+                onClick={() => {
+                  rolesApi.unassign(teacher.user_id!, role.id).then(() => {
+                    toast.success("Role removed");
+                    void client.invalidateQueries({ queryKey: ["user-roles", teacher.user_id] });
+                  });
+                }}
+                className="text-xs text-muted-foreground hover:text-destructive"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {teacherRoles.data?.length === 0 ? (
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("No roles assigned")}</p>
+          ) : null}
+          {teacher.user_id ? (
+            <div className="mt-1 px-2">
+              <SearchableSelect
+                value=""
+                onChange={(roleId) => {
+                  if (roleId) {
+                    rolesApi.assign(teacher.user_id!, roleId).then(() => {
+                      toast.success("Role assigned");
+                      void client.invalidateQueries({ queryKey: ["user-roles", teacher.user_id] });
+                    });
+                  }
+                }}
+                options={(roles.data ?? [])
+                  .filter((r) => !teacherRoles.data?.some((tr) => tr.id === r.id))
+                  .map((r) => ({ value: r.id, label: r.name }))}
+                placeholder={t("Assign role...")}
+              />
+            </div>
+          ) : null}
+        </div>
+          </>
+        ) : null}
+
         <ActionBar>
           <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
             {t("Edit")}</ActionButton>

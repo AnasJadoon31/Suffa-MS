@@ -4,6 +4,9 @@ import { CheckCircle2, History, Phone, UserPlus, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { api } from "@/lib/mms/api";
+import { maskPhone } from "@/lib/masks";
+
 import { AppShell } from "@/components/app/AppShell";
 import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
@@ -156,7 +159,7 @@ function AdmissionsPage() {
               <TextInput required value={applicant} onChange={(e) => setApplicant(e.target.value)} />
             </Field>
             <Field label={t("Guardian contact")}>
-              <TextInput required value={contact} onChange={(e) => setContact(e.target.value)} />
+              <TextInput required value={contact || "+92"} onChange={(e) => setContact(maskPhone(e.target.value))} />
             </Field>
             <Field label={t("Program")}>
               <CustomDropdown value={programId} onChange={(e) => setProgramId(e.target.value)}>
@@ -362,7 +365,7 @@ function AdmissionDetailSheet({
               <TextInput value={applicantName} onChange={(e) => setApplicantName(e.target.value)} />
             </Field>
             <Field label={t("Guardian contact")}>
-              <TextInput value={guardianContact} onChange={(e) => setGuardianContact(e.target.value)} />
+              <TextInput value={guardianContact || "+92"} onChange={(e) => setGuardianContact(maskPhone(e.target.value))} />
             </Field>
             <Field label={t("Date of birth")}>
               <TextInput type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />

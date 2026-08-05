@@ -8,6 +8,7 @@ import { Field, CustomDropdown, SearchableSelect, TextInput } from "@/components
 import { academicsApi, peopleApi, type AcademicClass } from "@/lib/mms/endpoints";
 import { academicsExtraApi, peopleMutations, type Section, type StudentDetail } from "@/lib/mms/more-endpoints";
 import { api, apiErrorMessage } from "@/lib/mms/api";
+import { maskBForm, maskPhone } from "@/lib/masks";
 import { useTranslation } from "react-i18next";
 
 export function StudentForm({
@@ -191,10 +192,10 @@ export function StudentForm({
         <TextInput type="date" value={dob ?? ""} onChange={(e) => setDob(e.target.value)} />
       </Field>
       <Field label={t("Phone")}>
-        <TextInput maxLength={20} value={phone ?? ""} onChange={(e) => setPhone(e.target.value)} />
+          <TextInput maxLength={15} value={phone ?? "+92"} onChange={(e) => setPhone(maskPhone(e.target.value))} />
       </Field>
       <Field label={t("B-Form number")}>
-        <TextInput maxLength={20} value={bForm ?? ""} onChange={(e) => setBForm(e.target.value)} />
+          <TextInput maxLength={15} value={bForm ?? ""} onChange={(e) => setBForm(maskBForm(e.target.value))} />
       </Field>
       <Field label={t("Address")}>
         <TextInput
@@ -296,9 +297,9 @@ export function StudentForm({
               <Field label={t("Phone *")}>
                 <TextInput
                   required
-                  maxLength={50}
-                  value={newGuardianPhone}
-                  onChange={(e) => setNewGuardianPhone(e.target.value)}
+                  maxLength={15}
+                  value={newGuardianPhone || "+92"}
+                  onChange={(e) => setNewGuardianPhone(maskPhone(e.target.value))}
                 />
               </Field>
               <Field label={t("Relationship")}>
