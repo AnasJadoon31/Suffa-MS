@@ -8,11 +8,23 @@ elsewhere (madrasa_features, super-admin only).
 from dataclasses import dataclass
 
 
+DEFAULT_EVOLUTION_WEBHOOK_EVENTS = (
+    "QRCODE_UPDATED",
+    "CONNECTION_UPDATE",
+    "MESSAGES_UPSERT",
+    "MESSAGES_UPDATE",
+    "MESSAGES_DELETE",
+    "SEND_MESSAGE",
+    "GROUPS_UPSERT",
+    "GROUP_UPDATE",
+)
+
+
 @dataclass(frozen=True)
 class SettingDef:
     key: str
     category: str
-    type: str  # string | int | bool | file
+    type: str  # string | int | bool | file | secret
     default: str
     label: str
 
@@ -40,6 +52,19 @@ CATALOG: tuple[SettingDef, ...] = (
     SettingDef("finance.receipt_footer", "finance", "string", "", "Receipt footer text"),
     # Portal.
     SettingDef("portal.default_language", "portal", "string", "ur", "Default language"),
+    # WhatsApp / Evolution API v2.
+    SettingDef("whatsapp.evolution_api_url", "whatsapp", "string", "", "Evolution API URL"),
+    SettingDef("whatsapp.evolution_api_key", "whatsapp", "secret", "", "Evolution API key"),
+    SettingDef("whatsapp.evolution_instance", "whatsapp", "string", "", "Evolution instance name"),
+    SettingDef("whatsapp.evolution_webhook_url", "whatsapp", "string", "", "Evolution webhook URL"),
+    SettingDef("whatsapp.evolution_webhook_base64", "whatsapp", "bool", "true", "Receive media as base64"),
+    SettingDef(
+        "whatsapp.evolution_webhook_events",
+        "whatsapp",
+        "string",
+        ",".join(DEFAULT_EVOLUTION_WEBHOOK_EVENTS),
+        "Webhook events",
+    ),
 )
 
 CATALOG_BY_KEY: dict[str, SettingDef] = {item.key: item for item in CATALOG}
@@ -58,3 +83,6 @@ def validate_setting(key: str, value: str) -> None:
     elif definition.type == "bool":
         if value not in ("true", "false"):
             raise ValueError(f"Setting {key} must be 'true' or 'false'")
+    elif definition.type == "secret":
+        if "\n" in value or "\r" in value:
+            raise ValueError(f"Setting {key} must be a single line")

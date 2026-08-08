@@ -1,4 +1,4 @@
-import { Copy, ShieldOff, ArrowRight } from "lucide-react";
+import { Copy, MessageCircle, ShieldOff, ArrowRight } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -8,9 +8,10 @@ import { ActionButton, Pill, ManagedSheet, ActionBar, CustomDropdown, Searchable
 import { StudentForm } from "./StudentForm";
 import { TeacherForm } from "./TeacherForm";
 import { GuardianForm } from "./GuardianForm";
+import { DonorForm } from "./DonorForm";
 import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
 import { academicsExtraApi } from "@/lib/mms/more-endpoints";
-import { api } from "@/lib/mms/api";
+import { api, apiErrorMessage } from "@/lib/mms/api";
 import {
   peopleMutations,
   financeMutations,
@@ -34,16 +35,59 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function money(amount: number, currency = "PKR") {
+  return `${currency} ${Number(amount ?? 0).toLocaleString()}`;
+}
+
 async function copyCredentialsLink(
   fetcher: () => Promise<{ username: string; set_password_url: string }>,
+  t: (key: string) => string,
 ) {
   try {
     const data = await fetcher();
     await navigator.clipboard.writeText(data.set_password_url);
-    toast.success(`Link copied for ${data.username}`);
+    toast.success(`${t("Link copied for")} ${data.username}`);
   } catch {
-    toast.error("Failed to generate credentials link");
+    toast.error(t("Failed to generate credentials link"));
   }
+}
+
+type CredentialSubjectType = "student" | "teacher" | "guardian";
+
+async function sendCredentialsToWhatsApp({
+  subjectType,
+  subjectId,
+  phoneNumber,
+  fetcher,
+  t,
+}: {
+  subjectType: CredentialSubjectType;
+  subjectId: string;
+  phoneNumber?: string;
+  fetcher: () => Promise<{ username: string; set_password_url: string }>;
+  t: (key: string) => string;
+}) {
+  try {
+    const credentials = await fetcher();
+    const result = await peopleMutations.sendCredentialsToWhatsApp({
+      subject_type: subjectType,
+      subject_id: subjectId,
+      set_password_url: credentials.set_password_url,
+      phone_number: phoneNumber || undefined,
+    });
+    toast.success(`${t("Credentials sent on WhatsApp")} +${result.normalised_number}`);
+  } catch (error) {
+    toast.error(apiErrorMessage(error, t("Failed to send credentials on WhatsApp")));
+  }
+}
+
+function phoneOptions(value: string | null | undefined, label: string) {
+  return (value ?? "")
+    .replace(/;/g, ",")
+    .split(",")
+    .map((phone) => phone.trim())
+    .filter(Boolean)
+    .map((phone) => ({ value: phone, label: `${label}: ${phone}` }));
 }
 
 export function StudentDetailSheet({
@@ -59,6 +103,7 @@ export function StudentDetailSheet({
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [credentialPhone, setCredentialPhone] = useState("");
 
   const guardiansQuery = useQuery({
     queryKey: ["student-guardians", student?.id],
@@ -107,6 +152,13 @@ export function StudentDetailSheet({
 
   if (!student) return null;
 
+  const credentialPhoneOptions = [
+    ...(student.is_independent ? phoneOptions(student.phone, t("Student")) : []),
+    ...(guardiansQuery.data ?? []).flatMap((guardian) => phoneOptions(guardian.phone_numbers, guardian.name)),
+  ];
+  const missingRequiredGuardian =
+    !student.is_independent && !guardiansQuery.isLoading && (guardiansQuery.data ?? []).length === 0;
+
   async function deactivate() {
     await peopleMutations.deactivateStudent(student!.id);
     toast.success("Student deactivated");
@@ -128,7 +180,7 @@ export function StudentDetailSheet({
     >
       <div className="mb-4">
           <Row label={t("Date of birth")} value={student.date_of_birth} />
-          <Row label={t("Phone")} value={student.phone} />
+          {student.is_independent ? <Row label={t("Phone")} value={student.phone} /> : null}
           <Row label={t("B-Form #")} value={student.b_form_number} />
           <Row label={t("Address")} value={student.address} />
           <Row label={t("Independent")} value={student.is_independent ? "Yes" : "No"} />
@@ -187,6 +239,11 @@ export function StudentDetailSheet({
 
         <div className="mb-4">
           <p className="mb-1 text-xs font-semibold text-muted-foreground">{t("Guardians")}</p>
+          {missingRequiredGuardian ? (
+            <p className="mb-2 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {t("A dependent student requires at least one guardian")}
+            </p>
+          ) : null}
           <div className="mb-2 flex flex-wrap gap-1.5">
             {(guardiansQuery.data ?? []).map((g) => (
               <button key={g.id} type="button" onClick={() => { peopleMutations.unlinkStudentFromGuardian(g.id, student.id).then(() => { void client.invalidateQueries({ queryKey: ["student-guardians", student.id] }); }); }} className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary">{g.name} ×</button>
@@ -209,11 +266,48 @@ export function StudentDetailSheet({
             className="flex-1"
             variant="soft"
             onClick={() =>
-              copyCredentialsLink(() => peopleMutations.studentCredentialsLink(student.id))
+              copyCredentialsLink(() => peopleMutations.studentCredentialsLink(student.id), t)
             }
           >
             <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
         </ActionBar>
+        {credentialPhoneOptions.length > 1 ? (
+          <div className="mt-2">
+            <Field label={t("Credential recipient")}>
+              <CustomDropdown value={credentialPhone} onChange={(event) => setCredentialPhone(event.target.value)}>
+                <option value="">{t("Default recipient")}</option>
+                {credentialPhoneOptions.map((option) => (
+                  <option key={`${option.label}-${option.value}`} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </CustomDropdown>
+            </Field>
+          </div>
+        ) : null}
+        <ActionBar className="mt-2">
+          <ActionButton
+            className="w-full"
+            variant="soft"
+            disabled={credentialPhoneOptions.length === 0}
+            onClick={() =>
+              sendCredentialsToWhatsApp({
+                subjectType: "student",
+                subjectId: student.id,
+                phoneNumber: credentialPhone || credentialPhoneOptions[0]?.value,
+                fetcher: () => peopleMutations.studentCredentialsLink(student.id),
+                t,
+              })
+            }
+          >
+            <MessageCircle className="h-4 w-4" /> {t("Send via WhatsApp")}
+          </ActionButton>
+        </ActionBar>
+        {credentialPhoneOptions.length === 0 ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("Link a guardian with a WhatsApp number before sending credentials.")}
+          </p>
+        ) : null}
         {student.status === "active" ? (
           confirmDeactivate ? (
             <ActionBar className="mt-2">
@@ -252,6 +346,7 @@ export function TeacherDetailSheet({
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [credentialPhone, setCredentialPhone] = useState("");
 
   const roles = useQuery({
     queryKey: ["roles"],
@@ -266,6 +361,8 @@ export function TeacherDetailSheet({
   });
 
   if (!teacher) return null;
+
+  const credentialPhoneOptions = phoneOptions(teacher.whatsapp_number, t("Teacher"));
 
   async function deactivate() {
     await peopleMutations.deactivateTeacher(teacher!.id);
@@ -349,10 +446,27 @@ export function TeacherDetailSheet({
             className="flex-1"
             variant="soft"
             onClick={() =>
-              copyCredentialsLink(() => peopleMutations.teacherCredentialsLink(teacher.id))
+              copyCredentialsLink(() => peopleMutations.teacherCredentialsLink(teacher.id), t)
             }
           >
             <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
+        </ActionBar>
+        <ActionBar className="mt-2">
+          <ActionButton
+            className="w-full"
+            variant="soft"
+            onClick={() =>
+              sendCredentialsToWhatsApp({
+                subjectType: "teacher",
+                subjectId: teacher.id,
+                phoneNumber: credentialPhone || credentialPhoneOptions[0]?.value,
+                fetcher: () => peopleMutations.teacherCredentialsLink(teacher.id),
+                t,
+              })
+            }
+          >
+            <MessageCircle className="h-4 w-4" /> {t("Send via WhatsApp")}
+          </ActionButton>
         </ActionBar>
         {teacher.status === "active" ? (
           confirmDeactivate ? (
@@ -387,9 +501,10 @@ export function GuardianDetailSheet({
   open: boolean;
   onOpenChange: (next: boolean) => void;
 }) {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [credentialPhone, setCredentialPhone] = useState("");
 
   const studentsQuery = useQuery({
     queryKey: ["guardian-students", guardian?.id],
@@ -398,6 +513,8 @@ export function GuardianDetailSheet({
   });
 
   if (!guardian) return null;
+
+  const credentialPhoneOptions = phoneOptions(guardian.phone_numbers, t("Guardian"));
 
   return (
     <ManagedSheet
@@ -441,10 +558,41 @@ export function GuardianDetailSheet({
             className="flex-1"
             variant="soft"
             onClick={() =>
-              copyCredentialsLink(() => peopleMutations.guardianCredentialsLink(guardian.id))
+              copyCredentialsLink(() => peopleMutations.guardianCredentialsLink(guardian.id), t)
             }
           >
             <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
+        </ActionBar>
+        {credentialPhoneOptions.length > 1 ? (
+          <div className="mt-2">
+            <Field label={t("Credential recipient")}>
+              <CustomDropdown value={credentialPhone} onChange={(event) => setCredentialPhone(event.target.value)}>
+                <option value="">{t("Default recipient")}</option>
+                {credentialPhoneOptions.map((option) => (
+                  <option key={`${option.label}-${option.value}`} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </CustomDropdown>
+            </Field>
+          </div>
+        ) : null}
+        <ActionBar className="mt-2">
+          <ActionButton
+            className="w-full"
+            variant="soft"
+            onClick={() =>
+              sendCredentialsToWhatsApp({
+                subjectType: "guardian",
+                subjectId: guardian.id,
+                phoneNumber: credentialPhone || credentialPhoneOptions[0]?.value,
+                fetcher: () => peopleMutations.guardianCredentialsLink(guardian.id),
+                t,
+              })
+            }
+          >
+            <MessageCircle className="h-4 w-4" /> {t("Send via WhatsApp")}
+          </ActionButton>
         </ActionBar>
         <GuardianForm guardian={guardian} open={editOpen} onOpenChange={setEditOpen} />
     </ManagedSheet>
@@ -462,12 +610,17 @@ export function DonorDetailSheet({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [editOpen, setEditOpen] = useState(false);
 
   const profile = useQuery({
     queryKey: ["donor-profile", donor?.id],
     queryFn: () => (donor ? financeMutations.donorProfile(donor.id) : Promise.reject()),
     enabled: Boolean(donor),
   });
+  const donationTotal = (profile.data?.donations ?? []).reduce(
+    (sum, donation) => sum + Number(donation.amount ?? 0),
+    0,
+  );
 
   if (!donor) return null;
 
@@ -491,11 +644,14 @@ export function DonorDetailSheet({
         <Row label={t("Contact")} value={donor.contact} />
         <Row
           label={t("Donations")}
-          value={profile.data ? String(profile.data.donations.length) : "…"}
+          value={profile.data ? money(donationTotal) : "—"}
         />
       </div>
 
       <ActionBar>
+        <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
+          {t("Edit")}
+        </ActionButton>
         <ActionButton
           className="flex-1"
           variant="soft"
@@ -507,6 +663,7 @@ export function DonorDetailSheet({
           <ArrowRight className="h-4 w-4" /> {t("View donation history")}
         </ActionButton>
       </ActionBar>
+      <DonorForm donor={donor} open={editOpen} onOpenChange={setEditOpen} />
     </ManagedSheet>
   );
 }

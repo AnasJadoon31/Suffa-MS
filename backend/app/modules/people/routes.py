@@ -158,6 +158,17 @@ async def _next_guardian_code(session: AsyncSession, madrasa_id: UUID) -> str:
     return f"GR-{max_suffix + 1:04d}"
 
 
+async def _student_guardian_count(session: AsyncSession, student_id: UUID, madrasa_id: UUID) -> int:
+    return await session.scalar(
+        select(func.count())
+        .select_from(StudentGuardian)
+        .where(
+            StudentGuardian.madrasa_id == madrasa_id,
+            StudentGuardian.student_id == student_id,
+        )
+    ) or 0
+
+
 # ---------------------------------------------------------------- Teachers
 
 @router.post("/teachers", response_model=TeacherProvisionedRead)
@@ -360,6 +371,8 @@ async def create_student(
         student_portal_enabled = admission_answer_enabled(payload.admission_answers, "student_portal_enabled", default=True)
     if payload.is_independent and student_portal_enabled and not student_phone:
         raise HTTPException(status_code=422, detail="An independent student with portal access requires a phone")
+    if not payload.is_independent and not payload.guardian_ids:
+        raise HTTPException(status_code=422, detail="A dependent student requires at least one guardian")
 
     # Always generate admission_number first — it becomes the username
     admission_number = await _next_code(session, madrasa.id, StudentProfile, "ADM")
@@ -503,6 +516,8 @@ async def update_student(
                 status_code=422,
                 detail="Unlink guardians before marking the student independent",
             )
+    elif "is_independent" in updates and await _student_guardian_count(session, student.id, madrasa.id) == 0:
+        raise HTTPException(status_code=422, detail="A dependent student requires at least one guardian")
     for field, value in updates.items():
         setattr(student, field, value)
     if admission_answers is not None:
@@ -667,7 +682,8 @@ async def guardian_credentials_link(
         await session.commit()
         return {"username": user.username, "set_password_url": url}
 
-    guardian_username = payload.username or await _next_guardian_code(session, madrasa.id)
+    if not payload.username:
+        raise HTTPException(status_code=400, detail="username is required")
     try:
         user, url = await provision_login(
             session,
@@ -821,6 +837,8 @@ async def unlink_student_guardian(
         .limit(1)
     )
     if link:
+        if not student.is_independent and await _student_guardian_count(session, student.id, madrasa.id) <= 1:
+            raise HTTPException(status_code=422, detail="A dependent student requires at least one guardian")
         await session.delete(link)
         await session.commit()
     return {"status": "success"}

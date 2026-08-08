@@ -1,7 +1,9 @@
-import { Download } from "lucide-react";
+import { Download, MessageCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { Card, EmptyState, SkeletonList, ManagedSheet } from "@/components/app/Primitives";
+import { apiErrorMessage } from "@/lib/mms/api";
 import { financeApi, financeMutations } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +20,15 @@ export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClo
   });
 
   const total = (profile.data?.donations ?? []).reduce((sum, d) => sum + Number(d.amount ?? 0), 0);
+
+  async function sendReceipt(donationId: string) {
+    try {
+      const result = await financeMutations.sendDonationReceipt(donationId);
+      toast.success(`${t("Receipt sent on WhatsApp")} +${result.normalised_number}`);
+    } catch (error) {
+      toast.error(apiErrorMessage(error, t("Failed to send receipt on WhatsApp")));
+    }
+  }
 
   return (
     <ManagedSheet
@@ -50,7 +61,7 @@ export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClo
                 {profile.data.donations.map((d) => (
                   <Card
                     key={d.id}
-                    className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 p-3.5"
+                    className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 p-3.5"
                   >
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{d.category_name ?? "Donation"}</p>
@@ -67,6 +78,13 @@ export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClo
                       className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary"
                     >
                       <Download className="h-4 w-4" />
+                    </button>
+                    <button
+                      aria-label={t("Send receipt via WhatsApp")}
+                      onClick={() => void sendReceipt(d.id)}
+                      className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent-foreground"
+                    >
+                      <MessageCircle className="h-4 w-4" />
                     </button>
                   </Card>
                 ))}

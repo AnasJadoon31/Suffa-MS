@@ -3,6 +3,7 @@ import json
 import httpx
 
 from app.core.config import settings
+from app.modules.operations.models import MadrasaSetting
 
 
 def _use_evolution_transport(monkeypatch, handler) -> None:
@@ -39,7 +40,222 @@ async def test_principal_can_read_whatsapp_connection_status(client, monkeypatch
         "instance_name": "suffa-ms",
         "state": "connecting",
         "connected": False,
+        "connected_jid": None,
+        "connected_phone_number": None,
     }
+
+
+async def test_whatsapp_connection_uses_madrasa_evolution_settings(
+    client, db_sessionmaker, seed, monkeypatch,
+):
+    async with db_sessionmaker() as db:
+        db.add_all(
+            [
+                MadrasaSetting(
+                    madrasa_id=seed.madrasa.id,
+                    key="whatsapp.evolution_api_url",
+                    value="https://tenant-evolution.test/",
+                ),
+                MadrasaSetting(
+                    madrasa_id=seed.madrasa.id,
+                    key="whatsapp.evolution_api_key",
+                    value="tenant-secret",
+                ),
+                MadrasaSetting(
+                    madrasa_id=seed.madrasa.id,
+                    key="whatsapp.evolution_instance",
+                    value="tenant-instance",
+                ),
+            ]
+        )
+        await db.commit()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url).startswith("https://tenant-evolution.test/")
+        assert request.headers["apikey"] == "tenant-secret"
+        if request.url.path == "/instance/fetchInstances":
+            return httpx.Response(200, request=request, json=[])
+        assert request.url.path == "/instance/connectionState/tenant-instance"
+        return httpx.Response(
+            200,
+            request=request,
+            json={"instance": {"instanceName": "tenant-instance", "state": "open"}},
+        )
+
+    transport = httpx.MockTransport(handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=transport, **kwargs))
+    monkeypatch.setattr(settings, "evolution_api_url", "https://env-evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "env-secret")
+    monkeypatch.setattr(settings, "evolution_instance", "env-instance")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "another-madrasa")
+
+    response = await client.get("/api/v1/messaging/whatsapp/connection")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "instance_name": "tenant-instance",
+        "state": "open",
+        "connected": True,
+        "connected_jid": None,
+        "connected_phone_number": None,
+    }
+
+
+async def test_whatsapp_connection_status_includes_owner_phone(client, monkeypatch):
+    requests: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(
+                200,
+                request=request,
+                json={"instance": {"instanceName": "suffa-ms", "state": "open"}},
+            )
+        assert request.url.path == "/instance/fetchInstances"
+        return httpx.Response(
+            200,
+            request=request,
+            json=[
+                {
+                    "instance": {
+                        "instanceName": "suffa-ms",
+                        "connectionStatus": "open",
+                        "ownerJid": "923001234567@s.whatsapp.net",
+                    }
+                }
+            ],
+        )
+
+    _use_evolution_transport(monkeypatch, handler)
+
+    response = await client.get("/api/v1/messaging/whatsapp/connection")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "instance_name": "suffa-ms",
+        "state": "open",
+        "connected": True,
+        "connected_jid": "923001234567@s.whatsapp.net",
+        "connected_phone_number": "+923001234567",
+    }
+    assert requests == [
+        ("GET", "/instance/connectionState/suffa-ms"),
+        ("GET", "/instance/fetchInstances"),
+    ]
+
+
+async def test_principal_can_disconnect_whatsapp_instance(client, monkeypatch):
+    requests: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        assert request.method == "DELETE"
+        assert request.url.path == "/instance/delete/suffa-ms"
+        return httpx.Response(200, request=request, json={"status": "SUCCESS"})
+
+    _use_evolution_transport(monkeypatch, handler)
+
+    response = await client.delete("/api/v1/messaging/whatsapp/connection")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "instance_name": "suffa-ms",
+        "state": "not_created",
+        "connected": False,
+        "connected_jid": None,
+        "connected_phone_number": None,
+    }
+    assert requests == [("DELETE", "/instance/delete/suffa-ms")]
+
+
+async def test_qr_pairing_registers_configured_nested_v2_webhook(
+    client, db_sessionmaker, seed, monkeypatch,
+):
+    async with db_sessionmaker() as db:
+        db.add_all(
+            [
+                MadrasaSetting(
+                    madrasa_id=seed.madrasa.id,
+                    key="whatsapp.evolution_api_url",
+                    value="https://evolution.test",
+                ),
+                MadrasaSetting(
+                    madrasa_id=seed.madrasa.id,
+                    key="whatsapp.evolution_api_key",
+                    value="tenant-secret",
+                ),
+                MadrasaSetting(
+                    madrasa_id=seed.madrasa.id,
+                    key="whatsapp.evolution_instance",
+                    value="suffa-ms",
+                ),
+                MadrasaSetting(
+                    madrasa_id=seed.madrasa.id,
+                    key="whatsapp.evolution_webhook_url",
+                    value="https://api.suffa.test/api/webhooks/evolution/secret",
+                ),
+                MadrasaSetting(
+                    madrasa_id=seed.madrasa.id,
+                    key="whatsapp.evolution_webhook_base64",
+                    value="true",
+                ),
+            ]
+        )
+        await db.commit()
+
+    requests: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        assert request.headers["apikey"] == "tenant-secret"
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(404, request=request, json={"message": "missing"})
+        if request.url.path == "/instance/create":
+            return httpx.Response(
+                201,
+                request=request,
+                json={
+                    "instance": {"instanceName": "suffa-ms", "connectionStatus": "connecting"},
+                    "qrcode": {"base64": "data:image/png;base64,QRDATA"},
+                },
+            )
+        assert request.url.path == "/webhook/set/suffa-ms"
+        body = json.loads(request.content)
+        assert body == {
+            "webhook": {
+                "enabled": True,
+                "url": "https://api.suffa.test/api/webhooks/evolution/secret",
+                "headers": {},
+                "base64": True,
+                "byEvents": False,
+                "events": [
+                    "QRCODE_UPDATED",
+                    "CONNECTION_UPDATE",
+                    "MESSAGES_UPSERT",
+                    "MESSAGES_UPDATE",
+                    "MESSAGES_DELETE",
+                    "SEND_MESSAGE",
+                    "GROUPS_UPSERT",
+                    "GROUP_UPDATE",
+                ],
+            }
+        }
+        return httpx.Response(200, request=request, json={"status": "success"})
+
+    transport = httpx.MockTransport(handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=transport, **kwargs))
+
+    response = await client.post("/api/v1/messaging/whatsapp/connection/qr-code")
+
+    assert response.status_code == 200, response.text
+    assert requests == [
+        ("GET", "/instance/connectionState/suffa-ms"),
+        ("POST", "/instance/create"),
+        ("POST", "/webhook/set/suffa-ms"),
+    ]
 
 
 async def test_principal_can_replace_disconnected_instance_with_phone_pairing(
@@ -365,6 +581,9 @@ async def test_whatsapp_pairing_rejects_invalid_phone_number(client, monkeypatch
 
 
 async def test_other_tenant_cannot_control_configured_whatsapp_instance(client, monkeypatch):
+    monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "secret-test-key")
+    monkeypatch.setattr(settings, "evolution_instance", "suffa-ms")
     monkeypatch.setattr(settings, "evolution_tenant_slug", "another-madrasa")
     response = await client.get("/api/v1/messaging/whatsapp/connection")
 
@@ -376,5 +595,11 @@ async def test_teacher_cannot_start_whatsapp_phone_pairing(teacher_client):
         "/api/v1/messaging/whatsapp/connection/pairing-code",
         json={"phone_number": "923001234567"},
     )
+
+    assert response.status_code == 403
+
+
+async def test_teacher_cannot_disconnect_whatsapp_connection(teacher_client):
+    response = await teacher_client.delete("/api/v1/messaging/whatsapp/connection")
 
     assert response.status_code == 403

@@ -116,12 +116,15 @@ export function StudentForm({
     if (!trimmedName || trimmedName.length > 120)
       throw toast.error("Enter a valid name (max 120 chars)");
     if (bForm && bForm.length > 20) throw toast.error("B-Form number is too long");
+    if (!isEdit && !independent && guardians.length === 0) {
+      throw toast.error(t("A dependent student requires at least one guardian"));
+    }
 
     if (isEdit && student) {
       await peopleMutations.updateStudent(student.id, {
         name: trimmedName,
         date_of_birth: dob || undefined,
-        phone: phone.trim() || undefined,
+        phone: independent ? phone.trim() || undefined : null,
         b_form_number: bForm.trim() || undefined,
         address: address.trim() || undefined,
         is_independent: independent,
@@ -132,7 +135,7 @@ export function StudentForm({
       const created = await peopleMutations.createStudent({
         name: trimmedName,
         date_of_birth: dob || undefined,
-        phone: phone.trim() || undefined,
+        phone: independent ? phone.trim() || undefined : undefined,
         b_form_number: bForm.trim() || undefined,
         address: address.trim() || undefined,
         is_independent: independent,
@@ -191,9 +194,11 @@ export function StudentForm({
       <Field label={t("Date of birth")}>
         <TextInput type="date" value={dob ?? ""} onChange={(e) => setDob(e.target.value)} />
       </Field>
-      <Field label={t("Phone")}>
+      {independent ? (
+        <Field label={t("Phone")}>
           <TextInput maxLength={15} value={phone ?? "+92"} onChange={(e) => setPhone(maskPhone(e.target.value))} />
-      </Field>
+        </Field>
+      ) : null}
       <Field label={t("B-Form number")}>
           <TextInput maxLength={15} value={bForm ?? ""} onChange={(e) => setBForm(maskBForm(e.target.value))} />
       </Field>
@@ -238,7 +243,11 @@ export function StudentForm({
         <input
           type="checkbox"
           checked={independent}
-          onChange={(e) => { setIndependent(e.target.checked); if (e.target.checked) setGuardians([]); }}
+          onChange={(e) => {
+            setIndependent(e.target.checked);
+            if (e.target.checked) setGuardians([]);
+            else setPhone("");
+          }}
         />
         {t("Independent student")}</label>
       <label className="flex items-center gap-2 text-sm font-semibold">

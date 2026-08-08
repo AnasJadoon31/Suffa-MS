@@ -256,9 +256,37 @@ export interface MadrasaSetting {
 export interface TypedMadrasaSetting {
   key: string;
   category: string;
-  type: "string" | "int" | "bool" | "file";
+  type: "string" | "int" | "bool" | "file" | "secret";
   label: string;
   value: string;
+}
+
+export type WhatsAppConnectionState = "open" | "close" | "connecting" | "refused" | "not_created" | "unknown";
+
+export interface WhatsAppConnectionStatus {
+  instance_name: string;
+  state: WhatsAppConnectionState;
+  connected: boolean;
+  connected_jid: string | null;
+  connected_phone_number: string | null;
+}
+
+export interface WhatsAppQrResponse {
+  instance_name: string;
+  state: WhatsAppConnectionState;
+  qr_code_base64: string;
+}
+
+export interface WhatsAppPairingResponse {
+  instance_name: string;
+  state: WhatsAppConnectionState;
+  pairing_code: string;
+}
+
+export interface WhatsAppLinkResponse {
+  normalised_number: string;
+  url: string;
+  direct_sent: boolean;
 }
 
 export interface BlogPost {
@@ -406,6 +434,23 @@ export const opsApi = {
       .then((r) => r.data),
   listSettings: () => getAllPages<MadrasaSetting>("/api/v1/operations/settings"),
   listSettingsCatalog: () => getAllPages<TypedMadrasaSetting>("/api/v1/operations/settings/catalog"),
+  whatsappConnection: () =>
+    api.get<WhatsAppConnectionStatus>("/api/v1/messaging/whatsapp/connection").then((r) => r.data),
+  whatsappQrCode: (replaceExisting = false) =>
+    api
+      .post<WhatsAppQrResponse>("/api/v1/messaging/whatsapp/connection/qr-code", null, {
+        params: { replace_existing: replaceExisting },
+      })
+      .then((r) => r.data),
+  whatsappPairingCode: (phoneNumber: string, replaceExisting = false) =>
+    api
+      .post<WhatsAppPairingResponse>("/api/v1/messaging/whatsapp/connection/pairing-code", {
+        phone_number: phoneNumber,
+        replace_existing: replaceExisting,
+      })
+      .then((r) => r.data),
+  whatsappDisconnect: () =>
+    api.delete<WhatsAppConnectionStatus>("/api/v1/messaging/whatsapp/connection").then((r) => r.data),
   listBlog: (publishedOnly = true) =>
     getAllPages<BlogPost>("/api/v1/operations/blog", { published_only: publishedOnly }),
   listAdmissionForms: (params?: { category?: string; program_id?: string }) =>
@@ -757,6 +802,8 @@ export const financeMutations = {
   listDonors: (params?: { q?: string }) => getAllPages<Donor>("/api/v1/finance/donors", params),
   createDonor: (payload: { name: string; contact: string }) =>
     api.post<Donor>("/api/v1/finance/donors", payload).then((r) => r.data),
+  updateDonor: (id: string, payload: { name?: string; contact?: string }) =>
+    api.put<Donor>(`/api/v1/finance/donors/${id}`, payload).then((r) => r.data),
   createPayment: (payload: {
     student_id: string;
     category_id: string;
@@ -775,8 +822,12 @@ export const financeMutations = {
   }) => api.post<Donation>("/api/v1/finance/donations", payload).then((r) => r.data),
   paymentReceipt: (paymentId: string) =>
     downloadReport(`/api/v1/finance/payments/${paymentId}/receipt`, {}, "pdf", "receipt"),
+  sendPaymentReceipt: (paymentId: string) =>
+    api.post<WhatsAppLinkResponse>(`/api/v1/finance/payments/${paymentId}/receipt-share`).then((r) => r.data),
   donationReceipt: (donationId: string) =>
     downloadReport(`/api/v1/finance/donations/${donationId}/receipt`, {}, "pdf", "receipt"),
+  sendDonationReceipt: (donationId: string) =>
+    api.post<WhatsAppLinkResponse>(`/api/v1/finance/donations/${donationId}/receipt-share`).then((r) => r.data),
 };
 
 export const academicsMutations = {
@@ -883,7 +934,7 @@ export const peopleMutations = {
       portal_enabled?: boolean;
       b_form_number?: string;
       address?: string;
-      phone?: string;
+      phone?: string | null;
       is_independent?: boolean;
       notes?: string;
       status?: string;
@@ -970,6 +1021,12 @@ export const peopleMutations = {
         { username },
       )
       .then((r) => r.data),
+  sendCredentialsToWhatsApp: (payload: {
+    subject_type: "student" | "teacher" | "guardian";
+    subject_id: string;
+    set_password_url: string;
+    phone_number?: string;
+  }) => api.post<WhatsAppLinkResponse>("/api/v1/messaging/send-credentials", payload).then((r) => r.data),
 };
 
 export const admissionsMutations = {

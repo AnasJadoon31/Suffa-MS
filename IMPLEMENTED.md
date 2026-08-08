@@ -3,6 +3,111 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-09 — Dependent Student Phone Visibility
+
+**Fix:**
+- Hid the Phone row on opened student cards when the student is dependent.
+- Hid the Phone input in the student form unless `Independent student` is enabled.
+- Clear dependent-student phone values on save by sending `phone: null` when a student is marked dependent.
+
+**Files:**
+- `app/src/components/app/people/PersonDetail.tsx`
+- `app/src/components/app/people/StudentForm.tsx`
+- `app/src/lib/mms/more-endpoints.ts`
+
+**Verification:**
+- Not run; this was a focused UI/code change and verification was intentionally skipped per request.
+
+## 2026-08-08 — Donor Editing
+
+**Fix:**
+- Connected donor edit mode to the existing `PUT /api/v1/finance/donors/{donor_id}` endpoint.
+- Added an Edit action to opened donor cards in People.
+- Removed the unintended secondary green Edit trigger from opened donor cards; the card now shows only the intended action-row Edit button.
+- Changed opened donor cards to show the donor's total donated amount instead of a donation count/loading ellipsis.
+- Kept donor edit state fresh when switching between donors and refreshed donor/people lists after saving.
+- Added English and Urdu labels/toasts for donor editing.
+
+**Files:**
+- `app/src/components/app/people/DonorForm.tsx`
+- `app/src/components/app/people/PersonDetail.tsx`
+- `app/src/lib/mms/more-endpoints.ts`
+- `app/src/i18n/locales/en.json`
+- `app/src/i18n/locales/ur.json`
+- `backend/tests/test_current_portal_issues.py`
+
+**Verification:**
+- `cd backend && .venv/bin/python -m pytest tests/test_current_portal_issues.py -q` (`2 passed`)
+- `cd backend && .venv/bin/python -m pytest tests/ -q` (`284 passed, 2 skipped`)
+- `cd app && npm run build`
+- Browser smoke against live backend/frontend at `http://127.0.0.1:8080/people?tab=donors` opened `Chaudhry Aslam`, clicked Edit, and confirmed the donor form was prefilled; screenshot saved to `app/artifacts/donor-edit-sheet-390.png`.
+
+## 2026-08-08 — WhatsApp Evolution API Madrasa Settings
+
+**Fix:**
+- Added a `whatsapp` Madrasa Settings category for Evolution API v2 configuration: API URL, API key, instance name, webhook URL, webhook media-base64 flag, and webhook event list.
+- Added an operational WhatsApp connection panel to Madrasa Settings with status refresh, QR-code pairing, phone-number pairing code, and an explicit stale-pairing replacement toggle.
+- Updated messaging delivery, connection status, QR pairing, and phone pairing to prefer complete per-madrasa Evolution settings while preserving the existing env-var fallback for single-tenant deployments.
+- Registered configured webhooks after instance creation using Evolution v2's required nested `{"webhook": ...}` payload, with the verified event names including `GROUP_UPDATE`.
+- Hardened Evolution error extraction so nested `response.message` arrays surface useful validation details.
+- Redacted saved secret settings from settings-list and settings-catalog reads while still allowing admins to overwrite the API key.
+- Rendered Evolution API key as a password field and translated the new Settings labels/category in English and Urdu.
+- Prefilled the phone-number pairing input with Pakistan's `+92` prefix and kept the local `suffa` madrasa configured with the Evolution API URL, redacted API key, and `suffa-ms` instance.
+- Added connected-phone visibility from Evolution `ownerJid`/`fetchInstances` and an admin-only close-connection action that deletes the Evolution instance while preserving Madrasa Settings.
+- Added `Send via WhatsApp` credential delivery inside opened student, teacher, and guardian person cards. The action reissues a fresh setup link, sends it through the existing Evolution credentials template, supports multiple available recipient numbers, and does not display the setup token in the card.
+- Expanded student credential delivery so independent students can receive credentials on their own registered phone while linked-student credentials can still go to guardian phones.
+- Enforced the dependent-student guardian rule on student creation, dependent-status updates, and guardian unlinking so a dependent student cannot be left without at least one guardian link.
+- Updated student credential delivery so dependent students never use their own phone as the WhatsApp recipient; they must have a linked guardian phone, while independent students can still use their own registered phone.
+- Added a person-card warning for existing dependent students that are already missing guardians and disabled WhatsApp credential sending until a guardian with a WhatsApp number is linked.
+- Added WhatsApp PDF receipt sending for student payments and donor donations. Payment receipts follow the same dependent/independent recipient rules as credentials; donation receipts go to the donor contact.
+- Added Finance row actions and donor-profile donation actions for sending receipts via WhatsApp beside the existing PDF download buttons.
+- Tightened nearby backend contracts found during the verification run: guardian credential provisioning now rejects first-time requests without a username, user-role list responses declare pagination, and `/operations/timetable/me` is limited to student/teacher self-service.
+
+**Files:**
+- `backend/app/core/settings_catalog.py`
+- `backend/app/modules/messaging/routes.py`
+- `backend/app/modules/operations/routes.py`
+- `backend/app/modules/auth/routes.py`
+- `backend/app/modules/finance/routes.py`
+- `backend/app/modules/people/routes.py`
+- `backend/tests/test_backend_sweep.py`
+- `backend/tests/test_admission_conversion.py`
+- `backend/tests/test_frontend_endpoint_contract.py`
+- `backend/tests/test_reported_portal_issues.py`
+- `backend/tests/test_self_service.py`
+- `backend/tests/test_whatsapp_connection.py`
+- `app/src/components/app/people/PersonDetail.tsx`
+- `app/src/components/app/finance/DonorProfileSheet.tsx`
+- `app/src/components/app/people/StudentForm.tsx`
+- `app/src/routes/finance.tsx`
+- `app/src/routes/settings.tsx`
+- `app/src/lib/mms/more-endpoints.ts`
+- `app/src/i18n/locales/en.json`
+- `app/src/i18n/locales/ur.json`
+
+**Verification:**
+- `cd backend && .venv/bin/python -m pytest tests/test_whatsapp_connection.py tests/test_backend_sweep.py::test_settings_catalog_and_typed_validation tests/test_reported_portal_issues.py -k whatsapp -q` (`19 passed`)
+- `cd app && npm run build`
+- Browser smoke on existing frontend `http://127.0.0.1:8080/settings` with mocked Settings catalog responses at 390px English and 920px Urdu; screenshots saved to `app/artifacts/settings-evolution-en-390.png` and `app/artifacts/settings-evolution-ur-920.png`.
+- Browser smoke clicked `Show QR code` and requested a phone pairing code at 390px English and 920px Urdu; screenshots saved to `app/artifacts/settings-whatsapp-pairing-en-390.png` and `app/artifacts/settings-whatsapp-pairing-ur-920.png`.
+- Rebuilt/recreated the running backend container on port `8001`; verified live `/api/v1/operations/settings/catalog` exposes WhatsApp settings with the API key redacted and live `/api/v1/messaging/whatsapp/connection` returns `suffa-ms` as `open`.
+- Browser smoke against live backend/frontend at `http://127.0.0.1:8080/settings` confirmed the WhatsApp panel, QR button, phone pairing button, and `+92` phone prefix; screenshot saved to `app/artifacts/settings-whatsapp-live-prefix-390.png`.
+- `cd backend && .venv/bin/python -m pytest tests/test_whatsapp_connection.py -q` (`19 passed`)
+- Rebuilt/recreated the running backend container on port `8001`; verified live `/api/v1/messaging/whatsapp/connection` returns `connected_phone_number`/`connected_jid` for `suffa-ms` without disconnecting the session.
+- Browser smoke against live backend/frontend at `http://127.0.0.1:8080/settings` confirmed connected phone visibility and the `Close WhatsApp connection` control; screenshot saved to `app/artifacts/settings-whatsapp-connected-close-390.png`.
+- `cd backend && .venv/bin/python -m pytest tests/test_reported_portal_issues.py -k 'credentials' -q` (`4 passed`)
+- Browser smoke against live backend/frontend at `http://127.0.0.1:8080/people` opened a student card and confirmed `Credentials link` plus `Send via WhatsApp` are visible without sending a real WhatsApp message; screenshot saved to `app/artifacts/person-card-whatsapp-credentials-390.png`.
+- `cd backend && .venv/bin/python -m pytest tests/test_backend_sweep.py::test_dependent_student_requires_guardian_on_create tests/test_backend_sweep.py::test_cannot_unlink_last_guardian_from_dependent_student tests/test_reported_portal_issues.py -k 'credentials' -q` (`5 passed`)
+- `cd backend && .venv/bin/python -m pytest tests/ -q` (`281 passed, 2 skipped`)
+- `cd app && npm run build`
+- Rebuilt/recreated the running backend container on port `8001`; verified `/healthz` and `/readyz`.
+- Browser smoke against live backend/frontend at `http://127.0.0.1:8080/people` opened dependent student `Abdullah Khan`, confirmed the missing-guardian warning, and confirmed `Send via WhatsApp` is disabled; screenshot saved to `app/artifacts/person-card-dependent-missing-guardian-390.png`.
+- `cd backend && .venv/bin/python -m pytest tests/test_reported_portal_issues.py -k 'receipt or credentials' -q` (`7 passed`)
+- `cd backend && .venv/bin/python -m pytest tests/ -q` (`283 passed, 2 skipped`)
+- `cd app && npm run build`
+- Rebuilt/recreated the running backend container on port `8001`; verified `/healthz` and `/readyz`.
+- Browser smoke against live backend/frontend at `http://127.0.0.1:8080/finance` confirmed payment and donation rows expose `Send receipt via WhatsApp` without sending a message; screenshots saved to `app/artifacts/finance-receipt-whatsapp-payments-390.png` and `app/artifacts/finance-receipt-whatsapp-donations-390.png`.
+
 ## 2026-08-08 — Admin Student Attendance History Corrections
 
 **Fix:**

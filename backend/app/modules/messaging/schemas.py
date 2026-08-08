@@ -28,6 +28,8 @@ class WhatsAppConnectionStatus(BaseModel):
     instance_name: str
     state: WhatsAppConnectionState
     connected: bool
+    connected_jid: str | None = None
+    connected_phone_number: str | None = None
 
 
 class WhatsAppPairingRequest(BaseModel):

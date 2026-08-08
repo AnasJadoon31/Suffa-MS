@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
@@ -25,6 +25,11 @@ export function DonorForm({
   const [name, setName] = useState(donor?.name ?? "");
   const [contact, setContact] = useState(donor?.contact ?? "");
 
+  useEffect(() => {
+    setName(donor?.name ?? "");
+    setContact(donor?.contact ?? "");
+  }, [donor?.contact, donor?.name]);
+
   async function handleSubmit() {
     const trimmedName = name.trim();
     if (!trimmedName || trimmedName.length > 120) {
@@ -33,18 +38,22 @@ export function DonorForm({
     }
 
     if (isEdit && donor) {
-      // update if backend supports, otherwise toast error
-      toast.success("Donor saved");
+      await financeMutations.updateDonor(donor.id, {
+        name: trimmedName,
+        contact: contact.trim(),
+      });
+      toast.success(t("Donor saved"));
     } else {
       await financeMutations.createDonor({
         name: trimmedName,
         contact: contact.trim(),
       });
-      toast.success(t("Donor recorded") ?? "Donor added");
+      toast.success(t("Donor recorded"));
     }
 
     void client.invalidateQueries({ queryKey: ["people"] });
     void client.invalidateQueries({ queryKey: ["donors"] });
+    onOpenChange?.(false);
   }
 
   return (
@@ -52,7 +61,7 @@ export function DonorForm({
       title={isEdit ? t("Edit donor") : t("Add donor")}
       open={open}
       onOpenChange={onOpenChange}
-      triggerLabel={triggerLabel ?? (isEdit ? t("Edit") : t("Add donor"))}
+      triggerLabel={triggerLabel}
       onSubmit={handleSubmit}
     >
       <Field label={t("Full Name *")}>

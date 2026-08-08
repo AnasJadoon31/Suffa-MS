@@ -1,6 +1,7 @@
 """Regression checks for the teacher/admin issues reported in Issues.pdf."""
 
 import json
+from datetime import date
 
 import pytest
 import httpx
@@ -13,7 +14,8 @@ from app.core.pdf import render_result_card_pdf
 from app.modules.messaging.models import MessageLog, MessageTemplate
 from app.modules.messaging.routes import render_and_dispatch
 from app.modules.auth.models import User, UserPermission, UserRole, UserStatus
-from app.modules.people.models import Guardian
+from app.modules.finance.models import Donation, Donor, Payment, PaymentCategory
+from app.modules.people.models import Guardian, StudentProfile
 
 
 async def _grant_scoped(db_sessionmaker, seed, code: str, class_id) -> None:
@@ -344,6 +346,148 @@ async def test_whatsapp_pdf_cannot_use_another_tenants_instance(
         assert await db.scalar(select(func.count()).select_from(MessageLog)) == 0
 
 
+async def test_independent_student_payment_receipt_sends_pdf_to_student_phone(
+    client, seed, db_sessionmaker, monkeypatch,
+):
+    calls: list[tuple[str, str, dict]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content or b"{}") if request.content else {}
+        calls.append((request.method, request.url.path, body))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(200, request=request, json={"instance": {"instanceName": "suffa-ms", "state": "open"}})
+        if request.url.path == "/message/sendMedia/suffa-ms":
+            return httpx.Response(201, request=request, json={"status": "success"})
+        return httpx.Response(404, request=request, json={"message": "unexpected endpoint"})
+
+    transport = httpx.MockTransport(handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=transport, **kwargs))
+    monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "test-key")
+    monkeypatch.setattr(settings, "evolution_instance", "suffa-ms")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
+
+    async with db_sessionmaker() as db:
+        student = await db.get(StudentProfile, seed.students[0].id)
+        student.phone = "+923009876543"
+        student.is_independent = True
+        category = PaymentCategory(madrasa_id=seed.madrasa.id, name="Monthly fee")
+        db.add(category)
+        await db.flush()
+        payment = Payment(
+            madrasa_id=seed.madrasa.id,
+            student_id=student.id,
+            category_id=category.id,
+            amount=1500,
+            currency="PKR",
+            payment_date=date(2026, 8, 8),
+            note="August fee",
+            recorded_by_id=seed.principal.id,
+        )
+        db.add(payment)
+        db.add(
+            MessageTemplate(
+                madrasa_id=seed.madrasa.id,
+                code="receipt",
+                name="Receipt",
+                content={"ur": "Receipt {receipt_no} for {payer_name}: {amount}"},
+            )
+        )
+        await db.commit()
+        payment_id = payment.id
+        student_id = student.id
+
+    response = await client.post(f"/api/v1/finance/payments/{payment_id}/receipt-share")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["normalised_number"] == "923009876543"
+    assert response.json()["direct_sent"] is True
+    assert calls[0] == ("GET", "/instance/connectionState/suffa-ms", {})
+    method, path, payload = calls[1]
+    assert (method, path) == ("POST", "/message/sendMedia/suffa-ms")
+    assert payload["number"] == "923009876543"
+    assert payload["mediatype"] == "document"
+    assert payload["mimetype"] == "application/pdf"
+    assert payload["fileName"].startswith("receipt-")
+    assert payload["media"]
+    assert "Receipt" in payload["caption"]
+
+    async with db_sessionmaker() as db:
+        log = (await db.execute(select(MessageLog).where(MessageLog.recipient_id == student_id))).scalar_one()
+        assert log.template_code == "receipt"
+        assert log.recipient_type == "student"
+        assert log.recipient_number == "923009876543"
+
+
+async def test_donor_donation_receipt_sends_pdf_to_donor_contact(
+    client, seed, db_sessionmaker, monkeypatch,
+):
+    calls: list[tuple[str, str, dict]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content or b"{}") if request.content else {}
+        calls.append((request.method, request.url.path, body))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(200, request=request, json={"instance": {"instanceName": "suffa-ms", "state": "open"}})
+        if request.url.path == "/message/sendMedia/suffa-ms":
+            return httpx.Response(201, request=request, json={"status": "success"})
+        return httpx.Response(404, request=request, json={"message": "unexpected endpoint"})
+
+    transport = httpx.MockTransport(handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=transport, **kwargs))
+    monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "test-key")
+    monkeypatch.setattr(settings, "evolution_instance", "suffa-ms")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
+
+    async with db_sessionmaker() as db:
+        category = PaymentCategory(madrasa_id=seed.madrasa.id, name="Sadaqah")
+        donor = Donor(madrasa_id=seed.madrasa.id, name="Receipt Donor", contact="+923001234999")
+        db.add_all([category, donor])
+        await db.flush()
+        donation = Donation(
+            madrasa_id=seed.madrasa.id,
+            donor_id=donor.id,
+            category_id=category.id,
+            amount=5000,
+            currency="PKR",
+            donation_date=date(2026, 8, 8),
+            note="Donation",
+            recorded_by_id=seed.principal.id,
+        )
+        db.add(donation)
+        db.add(
+            MessageTemplate(
+                madrasa_id=seed.madrasa.id,
+                code="receipt",
+                name="Receipt",
+                content={"ur": "Receipt {receipt_no} for {payer_name}: {amount}"},
+            )
+        )
+        await db.commit()
+        donation_id = donation.id
+        donor_id = donor.id
+
+    response = await client.post(f"/api/v1/finance/donations/{donation_id}/receipt-share")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["normalised_number"] == "923001234999"
+    assert response.json()["direct_sent"] is True
+    method, path, payload = calls[1]
+    assert (method, path) == ("POST", "/message/sendMedia/suffa-ms")
+    assert payload["number"] == "923001234999"
+    assert payload["mediatype"] == "document"
+    assert payload["fileName"].startswith("receipt-")
+
+    async with db_sessionmaker() as db:
+        log = (await db.execute(select(MessageLog).where(MessageLog.recipient_id == donor_id))).scalar_one()
+        assert log.template_code == "receipt"
+        assert log.recipient_type == "donor"
+        assert log.recipient_number == "923001234999"
+
+
 async def test_guardian_credentials_can_be_sent_to_selected_registered_phone(
     client, seed, db_sessionmaker, monkeypatch,
 ):
@@ -426,6 +570,111 @@ async def test_guardian_credentials_can_be_sent_to_selected_registered_phone(
         assert "guardian-credentials" in log.content_sent
         assert "SECRET-GUARDIAN" not in log.content_sent
         assert "[setup-link-redacted]" in log.content_sent
+
+
+async def test_student_credentials_can_be_sent_to_own_registered_phone(
+    client, seed, db_sessionmaker, monkeypatch,
+):
+    calls: list[tuple[str, str, dict]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content or b"{}") if request.content else {}
+        calls.append((request.method, request.url.path, body))
+        if request.url.path == "/instance/connectionState/suffa-ms":
+            return httpx.Response(200, request=request, json={"instance": {"instanceName": "suffa-ms", "state": "open"}})
+        if request.url.path == "/message/sendText/suffa-ms":
+            return httpx.Response(201, request=request, json={"status": "success"})
+        return httpx.Response(404, request=request, json={"message": "unexpected endpoint"})
+
+    transport = httpx.MockTransport(handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=transport, **kwargs))
+    monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "test-key")
+    monkeypatch.setattr(settings, "evolution_instance", "suffa-ms")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
+
+    async with db_sessionmaker() as db:
+        student = await db.get(StudentProfile, seed.students[0].id)
+        student.phone = "+923009876543"
+        student.is_independent = True
+        db.add(
+            MessageTemplate(
+                madrasa_id=seed.madrasa.id,
+                code="credentials",
+                name="Credentials",
+                content={"ur": "Login {username} at {setup_link}"},
+            )
+        )
+        await db.commit()
+        student_id = student.id
+
+    response = await client.post(
+        "/api/v1/messaging/send-credentials",
+        json={
+            "subject_type": "student",
+            "subject_id": str(student_id),
+            "set_password_url": "https://suffa.test/set-password?token=SECRET-STUDENT",
+            "phone_number": "+923009876543",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["normalised_number"] == "923009876543"
+    assert body["direct_sent"] is True
+    assert calls == [
+        ("GET", "/instance/connectionState/suffa-ms", {}),
+        (
+            "POST",
+            "/message/sendText/suffa-ms",
+            {"number": "923009876543", "text": "Login student1 at https://suffa.test/set-password?token=SECRET-STUDENT"},
+        ),
+    ]
+    async with db_sessionmaker() as db:
+        log = (await db.execute(select(MessageLog).where(MessageLog.recipient_id == student_id))).scalar_one()
+        assert log.recipient_type == "student"
+        assert log.recipient_number == "923009876543"
+        assert "student1" in log.content_sent
+        assert "SECRET-STUDENT" not in log.content_sent
+        assert "[setup-link-redacted]" in log.content_sent
+
+
+async def test_dependent_student_credentials_require_guardian_phone(
+    client, seed, db_sessionmaker, monkeypatch,
+):
+    monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "test-key")
+    monkeypatch.setattr(settings, "evolution_instance", "suffa-ms")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
+
+    async with db_sessionmaker() as db:
+        student = await db.get(StudentProfile, seed.students[0].id)
+        student.phone = "+923009876543"
+        student.is_independent = False
+        db.add(
+            MessageTemplate(
+                madrasa_id=seed.madrasa.id,
+                code="credentials",
+                name="Credentials",
+                content={"ur": "Login {username} at {setup_link}"},
+            )
+        )
+        await db.commit()
+        student_id = student.id
+
+    response = await client.post(
+        "/api/v1/messaging/send-credentials",
+        json={
+            "subject_type": "student",
+            "subject_id": str(student_id),
+            "set_password_url": "https://suffa.test/set-password?token=SECRET-STUDENT",
+            "phone_number": "+923009876543",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Dependent student has no guardian on file to message"
 
 
 async def test_guardian_credentials_fail_when_direct_delivery_is_not_configured(

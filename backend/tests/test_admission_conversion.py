@@ -126,8 +126,19 @@ async def test_student_creators_can_list_both_open_and_closed_admission_template
     }
 
 
-async def test_people_student_creation_saves_an_immutable_admission_form_snapshot(client, seed):
+async def test_people_student_creation_saves_an_immutable_admission_form_snapshot(client, seed, db_sessionmaker):
     form = await _create_form(client, seed)
+    async with db_sessionmaker() as db:
+        guardian = Guardian(
+            madrasa_id=seed.madrasa.id,
+            name="Snapshot Guardian",
+            relationship="father",
+            phone_numbers="+923001111111",
+            preferred_language="ur",
+        )
+        db.add(guardian)
+        await db.commit()
+        guardian_id = guardian.id
 
     created = await client.post(
         "/api/v1/people/students",
@@ -136,6 +147,7 @@ async def test_people_student_creation_saves_an_immutable_admission_form_snapsho
             "name": "New Student",
             "date_of_birth": "2017-02-03",
             "admission_form_id": form["id"],
+            "guardian_ids": [str(guardian_id)],
             "admission_answers": _built_in_answers(student_name="New Student", dob="2017-02-03", previous_school="Al Noor School"),
         },
     )
@@ -156,13 +168,26 @@ async def test_people_student_creation_saves_an_immutable_admission_form_snapsho
     assert fetched.json()["admission_record"] == record
 
 
-async def test_student_edit_updates_and_validates_admission_answers(client, seed):
+async def test_student_edit_updates_and_validates_admission_answers(client, seed, db_sessionmaker):
     form = await _create_form(client, seed)
+    async with db_sessionmaker() as db:
+        guardian = Guardian(
+            madrasa_id=seed.madrasa.id,
+            name="Edit Guardian",
+            relationship="father",
+            phone_numbers="+923001111112",
+            preferred_language="ur",
+        )
+        db.add(guardian)
+        await db.commit()
+        guardian_id = guardian.id
+
     created = await client.post(
         "/api/v1/people/students",
         json={
             "username": "edit.admission",
             "admission_form_id": form["id"],
+            "guardian_ids": [str(guardian_id)],
             "admission_answers": _built_in_answers(
                 student_name="Before Edit",
                 dob="2017-02-03",

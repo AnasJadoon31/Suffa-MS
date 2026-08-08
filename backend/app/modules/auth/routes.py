@@ -598,9 +598,12 @@ async def unassign_role(
 @router.get("/users/{user_id}/roles", response_model=list[PermissionRoleRead])
 async def list_user_roles(
     user_id: UUID,
+    response: Response,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> list[PermissionRoleRead]:
     user = await session.get(User, user_id)
     if not user or user.madrasa_id != madrasa.id:
@@ -611,7 +614,13 @@ async def list_user_roles(
         .join(UserRoleAssignment, PermissionRole.id == UserRoleAssignment.role_id)
         .where(UserRoleAssignment.user_id == user_id)
     )
-    rows = (await session.execute(stmt)).scalars().all()
+    rows = await paginate_scalars(
+        session,
+        stmt.order_by(PermissionRole.name),
+        limit=limit,
+        offset=offset,
+        response=response,
+    )
     result = []
     for role in rows:
         grants = await session.execute(

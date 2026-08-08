@@ -12,7 +12,7 @@ from app.core.security import hash_password, verify_password
 from app.modules.auth.models import User, UserRole
 from app.modules.finance.models import PaymentCategory
 from app.modules.operations.models import Holiday, Leave, TimetableSlot
-from app.modules.people.models import Guardian
+from app.modules.people.models import Guardian, StudentGuardian
 
 
 # --------------------------------------------------------- production posture
@@ -134,6 +134,51 @@ async def test_guardian_login_provision_and_reissue(client, seed, db_sessionmake
         user = await db.get(User, stored.user_id)
         assert await verify_password("replacement-password", user.password_hash)
         assert not await verify_password("replayed-password", user.password_hash)
+
+
+async def test_dependent_student_requires_guardian_on_create(client):
+    response = await client.post(
+        "/api/v1/people/students",
+        json={
+            "name": "Dependent Without Guardian",
+            "date_of_birth": "2015-01-01",
+            "is_independent": False,
+            "portal_enabled": True,
+            "guardian_ids": [],
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "A dependent student requires at least one guardian"
+
+
+async def test_cannot_unlink_last_guardian_from_dependent_student(client, seed, db_sessionmaker):
+    async with db_sessionmaker() as db:
+        guardian = Guardian(
+            madrasa_id=seed.madrasa.id,
+            name="Required Guardian",
+            relationship="father",
+            phone_numbers="+923001111111",
+            preferred_language="ur",
+        )
+        db.add(guardian)
+        await db.flush()
+        db.add(
+            StudentGuardian(
+                madrasa_id=seed.madrasa.id,
+                student_id=seed.students[0].id,
+                guardian_id=guardian.id,
+                relationship=guardian.relationship,
+            )
+        )
+        await db.commit()
+        guardian_id = guardian.id
+        student_id = seed.students[0].id
+
+    response = await client.delete(f"/api/v1/people/guardians/{guardian_id}/students/{student_id}")
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "A dependent student requires at least one guardian"
 
 
 # -------------------------------------------------------------- holidays
@@ -451,6 +496,12 @@ async def test_settings_catalog_and_typed_validation(client):
     by_key = {item["key"]: item for item in catalog.json()}
     assert by_key["finance.currency"]["value"] == "PKR"  # default
     assert by_key["madrasa.address"]["category"] == "profile"
+    assert by_key["whatsapp.evolution_api_url"]["category"] == "whatsapp"
+    assert by_key["whatsapp.evolution_api_key"]["type"] == "secret"
+    assert by_key["whatsapp.evolution_webhook_events"]["value"] == (
+        "QRCODE_UPDATED,CONNECTION_UPDATE,MESSAGES_UPSERT,MESSAGES_UPDATE,"
+        "MESSAGES_DELETE,SEND_MESSAGE,GROUPS_UPSERT,GROUP_UPDATE"
+    )
 
     unknown = await client.put("/api/v1/operations/settings", json={"key": "no.such.key", "value": "x"})
     assert unknown.status_code == 400
@@ -461,6 +512,19 @@ async def test_settings_catalog_and_typed_validation(client):
     )
     assert bad_type.status_code == 400
 
+    bad_secret = await client.put(
+        "/api/v1/operations/settings",
+        json={"key": "whatsapp.evolution_api_key", "value": "line-one\nline-two"},
+    )
+    assert bad_secret.status_code == 400
+
+    secret_ok = await client.put(
+        "/api/v1/operations/settings",
+        json={"key": "whatsapp.evolution_api_key", "value": "super-secret-key"},
+    )
+    assert secret_ok.status_code == 200
+    assert secret_ok.json()["value"] == "super-secret-key"
+
     ok = await client.put(
         "/api/v1/operations/settings",
         json={"key": "security.idle_timeout_minutes_student", "value": "15"},
@@ -470,6 +534,7 @@ async def test_settings_catalog_and_typed_validation(client):
     catalog2 = await client.get("/api/v1/operations/settings/catalog")
     by_key2 = {item["key"]: item for item in catalog2.json()}
     assert by_key2["security.idle_timeout_minutes_student"]["value"] == "15"
+    assert by_key2["whatsapp.evolution_api_key"]["value"] == ""
 
 
 # ----------------------------------------------------------------- reports

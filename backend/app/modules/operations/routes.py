@@ -682,20 +682,6 @@ async def my_timetable(
             (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
             TimetableSlot.teacher_id == profile.id,
         )
-    elif await _user_is_admin(current_user, session):
-        profile = (
-            await session.execute(select(TeacherProfile).where(
-                TeacherProfile.user_id == current_user.id,
-                TeacherProfile.madrasa_id == madrasa.id,
-            ))
-        ).scalar_one_or_none()
-        if profile is None:
-            return []
-        stmt = select(TimetableSlot).where(
-            TimetableSlot.madrasa_id == madrasa.id,
-            (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
-            TimetableSlot.teacher_id == profile.id,
-        )
     else:
         raise HTTPException(status_code=403, detail=ErrorCode.TIMETABLE_SELF_SERVICE_ONLY)
 
@@ -2521,12 +2507,22 @@ async def list_settings(
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[SettingRead]:
+    from app.core.settings_catalog import CATALOG_BY_KEY
+
     rows = await paginate_scalars(
         session,
         select(MadrasaSetting).where(MadrasaSetting.madrasa_id == madrasa.id).order_by(MadrasaSetting.key),
         limit=limit, offset=offset, response=response,
     )
-    return [SettingRead.model_validate(row) for row in rows]
+    return [
+        SettingRead(
+            id=row.id,
+            key=row.key,
+            value="" if CATALOG_BY_KEY.get(row.key) and CATALOG_BY_KEY[row.key].type == "secret" else row.value,
+            updated_at=row.updated_at,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/settings/catalog", response_model=list[TypedSettingRead])
@@ -2554,7 +2550,7 @@ async def list_settings_catalog(
             category=item.category,
             type=item.type,
             label=item.label,
-            value=stored.get(item.key, item.default),
+            value="" if item.type == "secret" and stored.get(item.key) else stored.get(item.key, item.default),
         )
         for item in CATALOG
     ], limit=limit, offset=offset, response=response)

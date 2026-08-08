@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
-import { Download, HandCoins, Plus, Receipt, Wallet } from "lucide-react";
+import { Download, HandCoins, MessageCircle, Plus, Receipt, Wallet } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
+import { apiErrorMessage } from "@/lib/mms/api";
 import { financeApi, financeMutations } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 export const Route = createFileRoute("/finance")({
@@ -246,6 +247,15 @@ function FinancePage() {
       if (err instanceof Error) toast.error(err.message);
     },
   });
+
+  async function sendReceipt(send: () => Promise<{ normalised_number: string }>) {
+    try {
+      const result = await send();
+      toast.success(`${t("Receipt sent on WhatsApp")} +${result.normalised_number}`);
+    } catch (error) {
+      toast.error(apiErrorMessage(error, t("Failed to send receipt on WhatsApp")));
+    }
+  }
 
   const paymentsTotal = useMemo(
     () => (payments.data ?? []).reduce((sum, p) => sum + Number(p.amount ?? 0), 0),
@@ -547,6 +557,7 @@ function FinancePage() {
                 subtitle={`${item.category_name ?? "Fee"} · ${new Date(item.payment_date).toLocaleDateString()}`}
                 value={money(item.amount, item.currency)}
                 onReceipt={() => void financeMutations.paymentReceipt(item.id)}
+                onSendReceipt={() => void sendReceipt(() => financeMutations.sendPaymentReceipt(item.id))}
               />
             ))}
           </List>
@@ -575,6 +586,7 @@ function FinancePage() {
                 subtitle={`${item.category_name ?? "Donation"} · ${new Date(item.donation_date).toLocaleDateString()}`}
                 value={money(item.amount, item.currency)}
                 onReceipt={() => void financeMutations.donationReceipt(item.id)}
+                onSendReceipt={() => void sendReceipt(() => financeMutations.sendDonationReceipt(item.id))}
               />
             ))}
           </List>
@@ -634,15 +646,17 @@ function Row({
   subtitle,
   value,
   onReceipt,
+  onSendReceipt,
 }: {
   title: string;
   subtitle: string;
   value: string;
   onReceipt?: () => void;
+  onSendReceipt?: () => void;
 }) {
     const { t } = useTranslation();
   return (
-    <Card className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 p-3.5">
+    <Card className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 p-3.5">
       <div className="min-w-0">
         <p className="truncate font-semibold">{title}</p>
         <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
@@ -655,6 +669,17 @@ function Row({
           className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary"
         >
           <Download className="h-4 w-4" />
+        </button>
+      ) : (
+        <span />
+      )}
+      {onSendReceipt ? (
+        <button
+          aria-label={t("Send receipt via WhatsApp")}
+          onClick={onSendReceipt}
+          className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent-foreground"
+        >
+          <MessageCircle className="h-4 w-4" />
         </button>
       ) : (
         <span />

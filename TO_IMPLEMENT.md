@@ -5,6 +5,32 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-09 — Dependent Student Phone Follow-Up
+
+- Status: Dependent student cards no longer show a separate Phone row, and the student form only exposes Phone for independent students.
+- Remaining release work:
+  - Existing dependent students with stored phone values are cleared when next saved; add a one-time data cleanup if historical phone values must be removed immediately.
+
+## 2026-08-08 — Donor Editing Follow-Up
+
+- Status: Opened donor cards now include a single action-row Edit button, show the donor's total donated amount, and the donor form saves name/contact changes through the finance API.
+- Remaining release work:
+  - Add donor edit coverage to the future authenticated browser regression pack once the route harness is restored.
+
+## 2026-08-08 — WhatsApp Evolution Settings Follow-Up
+
+- Status: Madrasa Settings now exposes Evolution API v2 connection/webhook settings, and messaging uses complete per-madrasa settings before falling back to env vars.
+- Status: Local `suffa` settings are configured for the provided Evolution URL/API key (secret redacted in reads) and the `suffa-ms` instance currently reports `open` on the rebuilt local backend.
+- Status: Connected sessions now show the Evolution owner phone/JID when reported, and admins can close the current Evolution instance before pairing another phone.
+- Status: Opened student, teacher, and guardian person cards now expose WhatsApp credential sending; independent students can use their own registered phone and linked students can use guardian phones.
+- Status: Dependent students are now blocked from being created or updated without a guardian, the last guardian link cannot be removed, and existing invalid dependent records show a person-card warning with WhatsApp credential sending disabled until a guardian phone is linked.
+- Status: Finance payment and donation rows can now send PDF receipts through WhatsApp; student payments use dependent/independent recipient rules and donations use the donor contact.
+- Remaining release work:
+  - Backfill existing legacy/local dependent students that already have no guardian by linking the correct guardians; the UI now surfaces these records but does not infer relationships automatically.
+  - Configure production tenant values and run `~/.agents/skills/evolution-api/evolution-check.sh <instance>` with the live URL/key before claiming live WhatsApp health.
+  - Keep Evolution server env hardened separately: `DATABASE_ENABLED=true`, persistent Postgres, and `DEL_INSTANCE=false`.
+  - Delivery success for credentials, reports, and receipts still requires Evolution `MessageUpdate` ACK verification, not only HTTP 201.
+
 ## 2026-08-08 — Attendance History Correction Follow-Up
 
 - Status: Principals/admins with `attendance.edit_locked` can now correct manual student attendance history from `/attendance`; focused backend tests, frontend build, and mocked EN/UR browser smoke passed.

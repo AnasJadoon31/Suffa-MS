@@ -37,7 +37,7 @@ from app.modules.finance.schemas import (
     SalaryRecordRead,
     SalaryRecordSet,
 )
-from app.modules.messaging.routes import _primary_guardian, render_and_dispatch
+from app.modules.messaging.routes import _student_credentials_recipient, render_and_dispatch
 from app.modules.messaging.schemas import WhatsAppLinkResponse
 from app.modules.people.models import StudentProfile, TeacherProfile
 
@@ -313,9 +313,11 @@ async def share_payment_receipt(
     if payment is None or payment.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Payment not found")
     student = await session.get(StudentProfile, payment.student_id)
-    guardian = await _primary_guardian(session, payment.student_id)
+    if student is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    phone, recipient_type, recipient_id, language = await _student_credentials_recipient(session, student)
     context = await _receipt_context(
-        session, madrasa, kind="Contribution", row=payment, payer_name=student.name if student else "—"
+        session, madrasa, kind="Contribution", row=payment, payer_name=student.name
     )
     receipt_pdf = await _receipt_pdf_bytes(session, madrasa, context, payment.note)
     return await render_and_dispatch(
@@ -323,7 +325,7 @@ async def share_payment_receipt(
         madrasa=madrasa,
         current_user=current_user,
         template_code="receipt",
-        language=guardian.preferred_language,
+        language=language,
         variables={
             "payer_name": context["payer_name"],
             "amount": f"{context['amount']} {context['currency']}",
@@ -332,9 +334,9 @@ async def share_payment_receipt(
             "receipt_no": context["receipt_number"],
             "madrasa_name": madrasa.name,
         },
-        recipient_type="guardian",
-        recipient_id=guardian.id,
-        phone_number=guardian.phone_numbers.split(",")[0].strip(),
+        recipient_type=recipient_type,
+        recipient_id=recipient_id,
+        phone_number=phone,
         attachment_bytes=receipt_pdf,
         attachment_name=f"receipt-{context['receipt_number'].lower()}.pdf",
     )
