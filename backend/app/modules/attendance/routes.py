@@ -121,7 +121,7 @@ def build_record(entry: AttendanceEntry, madrasa_id: UUID, marked_by_id: UUID, o
         session_id=entry.session_id,
         attendance_date=entry.attendance_date,
         status=entry.status,
-        marked_at=entry.captured_at,
+        marked_at=entry.captured_at or datetime.now(UTC),
         marked_by_id=marked_by_id,
         idempotency_key=entry.idempotency_key,
         synced_late=overridden,

@@ -53,10 +53,16 @@ export const academicNav: NavItem[] = [
   },
   { to: "/results", label: "Results", icon: Trophy, description: "Marks and grade bands" },
   {
+    to: "/examination",
+    label: "Examination",
+    icon: ClipboardList,
+    description: "Grading, exams and results",
+  },
+  {
     to: "/academics",
     label: "Academics",
-    icon: Layers,
-    description: "Sessions, programs, classes",
+    icon: BookOpen,
+    description: "Classes, courses and sessions",
   },
   { to: "/resources", label: "Resources", icon: Library, description: "Shared study material" },
 ];

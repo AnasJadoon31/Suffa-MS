@@ -17,6 +17,7 @@ import { Route as AssignmentsRouteImport } from './routes/assignments'
 import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ExaminationRouteImport } from './routes/examination'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as FormsRouteImport } from './routes/forms'
 import { Route as HolidaysRouteImport } from './routes/holidays'
@@ -77,6 +78,11 @@ const BlogRoute = BlogRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExaminationRoute = ExaminationRouteImport.update({
+  id: '/examination',
+  path: '/examination',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceRoute = FinanceRouteImport.update({
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/attendance': typeof AttendanceRoute
   '/blog': typeof BlogRoute
   '/dashboard': typeof DashboardRoute
+  '/examination': typeof ExaminationRoute
   '/finance': typeof FinanceRoute
   '/forms': typeof FormsRoute
   '/holidays': typeof HolidaysRoute
@@ -225,6 +232,7 @@ export interface FileRoutesByTo {
   '/attendance': typeof AttendanceRoute
   '/blog': typeof BlogRoute
   '/dashboard': typeof DashboardRoute
+  '/examination': typeof ExaminationRoute
   '/finance': typeof FinanceRoute
   '/forms': typeof FormsRoute
   '/holidays': typeof HolidaysRoute
@@ -257,6 +265,7 @@ export interface FileRoutesById {
   '/attendance': typeof AttendanceRoute
   '/blog': typeof BlogRoute
   '/dashboard': typeof DashboardRoute
+  '/examination': typeof ExaminationRoute
   '/finance': typeof FinanceRoute
   '/forms': typeof FormsRoute
   '/holidays': typeof HolidaysRoute
@@ -290,6 +299,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/blog'
     | '/dashboard'
+    | '/examination'
     | '/finance'
     | '/forms'
     | '/holidays'
@@ -321,6 +331,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/blog'
     | '/dashboard'
+    | '/examination'
     | '/finance'
     | '/forms'
     | '/holidays'
@@ -352,6 +363,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/blog'
     | '/dashboard'
+    | '/examination'
     | '/finance'
     | '/forms'
     | '/holidays'
@@ -384,6 +396,7 @@ export interface RootRouteChildren {
   AttendanceRoute: typeof AttendanceRoute
   BlogRoute: typeof BlogRoute
   DashboardRoute: typeof DashboardRoute
+  ExaminationRoute: typeof ExaminationRoute
   FinanceRoute: typeof FinanceRoute
   FormsRoute: typeof FormsRoute
   HolidaysRoute: typeof HolidaysRoute
@@ -463,6 +476,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/examination': {
+      id: '/examination'
+      path: '/examination'
+      fullPath: '/examination'
+      preLoaderRoute: typeof ExaminationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/finance': {
@@ -624,6 +644,7 @@ const rootRouteChildren: RootRouteChildren = {
   AttendanceRoute: AttendanceRoute,
   BlogRoute: BlogRoute,
   DashboardRoute: DashboardRoute,
+  ExaminationRoute: ExaminationRoute,
   FinanceRoute: FinanceRoute,
   FormsRoute: FormsRoute,
   HolidaysRoute: HolidaysRoute,

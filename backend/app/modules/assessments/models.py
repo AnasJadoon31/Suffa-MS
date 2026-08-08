@@ -70,8 +70,9 @@ class GradingScheme(Base, IdMixin, TenantMixin, TimestampMixin):
 class ExamType(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "exam_types"
 
-    course_id: Mapped[UUID] = mapped_column(ForeignKey("courses.id"), index=True)
+    course_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("courses.id"), nullable=True, index=True)
     class_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("classes.id"), nullable=True, index=True)
+    parent_exam_type_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("exam_types.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(160))
     weightage: Mapped[float] = mapped_column(Float)
     grading_scheme_id: Mapped[UUID] = mapped_column(ForeignKey("grading_schemes.id"))

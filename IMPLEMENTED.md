@@ -3,6 +3,27 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-08 — Admin Student Attendance History Corrections
+
+**Fix:**
+- Exposed the existing audited locked-attendance override path in the Attendance history UI for principals/admins with `attendance.edit_locked`.
+- Added compact status controls to manual student attendance history rows, including class-day history and selected-student history.
+- Kept approved-leave generated attendance read-only from Attendance; leave-day changes still belong in the leave approval workflow.
+- Typed the frontend override endpoint response and added English/Urdu strings for the new controls.
+- Added focused backend regression coverage proving a principal can create/correct historical student attendance and a teacher cannot call the override path.
+
+**Files:**
+- `app/src/routes/attendance.tsx`
+- `app/src/lib/mms/endpoints.ts`
+- `app/src/i18n/locales/en.json`
+- `app/src/i18n/locales/ur.json`
+- `backend/tests/test_attendance.py`
+
+**Verification:**
+- `cd backend && .venv/bin/python -m pytest tests/test_attendance.py -q` (`6 passed`)
+- `cd app && npm run build`
+- Browser smoke on existing frontend `http://127.0.0.1:8080/attendance` with mocked principal API responses at 390px English and 920px Urdu; screenshots saved to `app/artifacts/attendance-history-edit-en-390.png` and `app/artifacts/attendance-history-edit-ur-920.png`.
+
 ## 2026-08-03 — Parent Attendance View & Comprehensive Urdu i18n
 
 **Issue:** 

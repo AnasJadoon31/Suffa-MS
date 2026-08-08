@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 
 import { ActionButton, Pill, ManagedSheet, ActionBar, CustomDropdown, SearchableSelect, Field, SectionTitle } from "@/components/app/Primitives";
-import { MultiPicker } from "./MultiPicker";
 import { StudentForm } from "./StudentForm";
 import { TeacherForm } from "./TeacherForm";
 import { GuardianForm } from "./GuardianForm";
@@ -186,24 +185,22 @@ export function StudentDetailSheet({
           )}
         </div>
 
-        <MultiPicker
-          label={t("Guardians")}
-          selected={(guardiansQuery.data ?? []).map((g) => ({ id: g.id, name: g.name }))}
-          onChange={async (next) => {
-            const previous = new Set((guardiansQuery.data ?? []).map((g) => g.id));
-            const nextIds = new Set(next.map((n) => n.id));
-            const added = next.find((n) => !previous.has(n.id));
-            const removedId = [...previous].find((id) => !nextIds.has(id));
-            if (added) await peopleMutations.linkStudentToGuardian(added.id, student.id);
-            if (removedId) await peopleMutations.unlinkStudentFromGuardian(removedId, student.id);
-            void client.invalidateQueries({ queryKey: ["student-guardians", student.id] });
-          }}
-          queryKey="detail-guardians"
-          fetchOptions={async (search) => {
-            const result = await peopleApi.listGuardiansPage({ search, limit: 20, offset: 0 });
-            return result.items.map((g) => ({ id: g.id, name: g.name }));
-          }}
-        />
+        <div className="mb-4">
+          <p className="mb-1 text-xs font-semibold text-muted-foreground">{t("Guardians")}</p>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {(guardiansQuery.data ?? []).map((g) => (
+              <button key={g.id} type="button" onClick={() => { peopleMutations.unlinkStudentFromGuardian(g.id, student.id).then(() => { void client.invalidateQueries({ queryKey: ["student-guardians", student.id] }); }); }} className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary">{g.name} ×</button>
+            ))}
+          </div>
+          <GuardianSearchSelect
+            excludeIds={(guardiansQuery.data ?? []).map((g) => g.id)}
+            onSelect={(guardianId) => {
+              peopleMutations.linkStudentToGuardian(guardianId, student.id).then(() => {
+                void client.invalidateQueries({ queryKey: ["student-guardians", student.id] });
+              });
+            }}
+          />
+        </div>
 
         <ActionBar>
           <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
@@ -420,24 +417,22 @@ export function GuardianDetailSheet({
           <Row label={t("Preferred language")} value={guardian.preferred_language} />
         </div>
 
-        <MultiPicker
-          label={t("Linked students")}
-          selected={(studentsQuery.data ?? []).map((s) => ({ id: s.id, name: s.name }))}
-          onChange={async (next) => {
-            const previous = new Set((studentsQuery.data ?? []).map((s) => s.id));
-            const nextIds = new Set(next.map((n) => n.id));
-            const added = next.find((n) => !previous.has(n.id));
-            const removedId = [...previous].find((id) => !nextIds.has(id));
-            if (added) await peopleMutations.linkStudentToGuardian(guardian.id, added.id);
-            if (removedId) await peopleMutations.unlinkStudentFromGuardian(guardian.id, removedId);
-            void client.invalidateQueries({ queryKey: ["guardian-students", guardian.id] });
-          }}
-          queryKey="detail-students"
-          fetchOptions={async (search) => {
-            const result = await peopleApi.listStudentsPage({ search, limit: 20, offset: 0 });
-            return result.items.map((s) => ({ id: s.id, name: s.name }));
-          }}
-        />
+        <div className="mb-4">
+          <p className="mb-1 text-xs font-semibold text-muted-foreground">{t("Students")}</p>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {(studentsQuery.data ?? []).map((s) => (
+              <button key={s.id} type="button" onClick={() => { peopleMutations.unlinkStudentFromGuardian(guardian.id, s.id).then(() => { void client.invalidateQueries({ queryKey: ["guardian-students", guardian.id] }); }); }} className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary">{s.name} ×</button>
+            ))}
+          </div>
+          <StudentSearchSelect
+            excludeIds={(studentsQuery.data ?? []).map((s) => s.id)}
+            onSelect={(studentId) => {
+              peopleMutations.linkStudentToGuardian(guardian.id, studentId).then(() => {
+                void client.invalidateQueries({ queryKey: ["guardian-students", guardian.id] });
+              });
+            }}
+          />
+        </div>
 
         <ActionBar>
           <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
@@ -513,5 +508,55 @@ export function DonorDetailSheet({
         </ActionButton>
       </ActionBar>
     </ManagedSheet>
+  );
+}
+
+function GuardianSearchSelect({ excludeIds, onSelect }: { excludeIds: string[]; onSelect: (id: string) => void }) {
+  const { t } = useTranslation();
+  const [search, setSearch] = useState("");
+  const guardians = useQuery({
+    queryKey: ["guardians-search", search],
+    queryFn: () => peopleApi.listGuardiansPage({ search, limit: 50, offset: 0 }),
+    enabled: true,
+  });
+
+  const options = (guardians.data?.items ?? [])
+    .filter((g) => !excludeIds.includes(g.id))
+    .map((g) => ({ value: g.id, label: g.name }));
+
+  return (
+    <SearchableSelect
+      value=""
+      onChange={(id) => { if (id) { onSelect(id); setSearch(""); } }}
+      options={options}
+      placeholder={t("Search guardians...")}
+      searchValue={search}
+      onSearchChange={setSearch}
+    />
+  );
+}
+
+function StudentSearchSelect({ excludeIds, onSelect }: { excludeIds: string[]; onSelect: (id: string) => void }) {
+  const { t } = useTranslation();
+  const [search, setSearch] = useState("");
+  const students = useQuery({
+    queryKey: ["students-search", search],
+    queryFn: () => peopleApi.listStudentsPage({ search, limit: 50, offset: 0 }),
+    enabled: true,
+  });
+
+  const options = (students.data?.items ?? [])
+    .filter((s) => !excludeIds.includes(s.id))
+    .map((s) => ({ value: s.id, label: s.name }));
+
+  return (
+    <SearchableSelect
+      value=""
+      onChange={(id) => { if (id) { onSelect(id); setSearch(""); } }}
+      options={options}
+      placeholder={t("Search students...")}
+      searchValue={search}
+      onSearchChange={setSearch}
+    />
   );
 }

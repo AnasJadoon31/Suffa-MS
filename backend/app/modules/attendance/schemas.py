@@ -18,7 +18,7 @@ class AttendanceEntry(BaseModel):
     session_id: UUID
     attendance_date: date
     status: AttendanceStatus
-    captured_at: datetime
+    captured_at: datetime | None = None
     idempotency_key: str
     check_in: Optional[time] = None
     check_out: Optional[time] = None

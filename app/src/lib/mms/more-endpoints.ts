@@ -110,6 +110,59 @@ export interface SessionResult {
   published: boolean;
 }
 
+interface ResultsMatrixCourse {
+  course_id: string;
+  course_name: string;
+  teacher_name: string | null;
+  exam_types: { id: string; name: string; weightage: number }[];
+}
+
+export interface GradingScheme {
+  id: string;
+  name: string;
+  bands: { label: string; min_score: number; max_score: number }[];
+  include_assignments: boolean;
+}
+
+export interface ExamType {
+  id: string;
+  course_id: string | null;
+  class_id: string | null;
+  parent_exam_type_id: string | null;
+  name: string;
+  weightage: number;
+  grading_scheme_id: string;
+  course_name?: string;
+  class_name?: string;
+  scheme_name?: string;
+  children: ExamType[];
+}
+
+export interface MarkEntry {
+  id: string;
+  exam_type_id: string;
+  student_id: string;
+  score: number;
+  entered_by_id?: string | null;
+  student_name?: string;
+}
+
+export interface GradingPlanComponent {
+  id?: string | null;
+  name: string;
+  weightage: number;
+}
+
+export interface GradingPlan {
+  id: string;
+  course_id: string;
+  class_id: string | null;
+  name: string;
+  bands: { label: string; min_score: number; max_score: number }[];
+  assignment_weightage: number;
+  components: GradingPlanComponent[];
+}
+
 export interface ResultsMatrix {
   session_id: string;
   sections: {
@@ -413,13 +466,20 @@ export const assessmentsApi = {
     mine_only?: boolean;
     date_from?: string;
     date_to?: string;
-  }) => getAllPages<Assignment>("/api/v1/assessments/assignments", params),
+  }) => getAllPages<Assignment>("/api/v1/assessments/assignments", params as Record<string, unknown>),
   myResult: (sessionId: string) =>
-    api
-      .get<SessionResult>("/api/v1/assessments/results/me", { params: { session_id: sessionId } })
-      .then((r) => r.data),
-  resultsMatrix: (params: { class_id?: string; section_id?: string; session_id: string }) =>
+    api.get<SessionResult>("/api/v1/assessments/results/me", { params: { session_id: sessionId } }).then((r) => r.data),
+  resultsMatrix: (params: { class_id?: string; section_id?: string; session_id?: string }) =>
     api.get<ResultsMatrix>("/api/v1/assessments/results/matrix", { params }).then((r) => r.data),
+
+  listGradingSchemes: () =>
+    api.get<GradingScheme[]>("/api/v1/assessments/grading-schemes").then((r) => r.data),
+  listExamTypes: (params?: { class_id?: string; course_id?: string }) =>
+    api.get<ExamType[]>("/api/v1/assessments/exam-types", { params }).then((r) => r.data),
+  listMarks: (params: { exam_type_id: string; class_id?: string; section_id?: string }) =>
+    api.get<MarkEntry[]>("/api/v1/assessments/marks", { params }).then((r) => r.data),
+  getGradingPlan: (params: { course_id: string; class_id?: string }) =>
+    api.get<GradingPlan>("/api/v1/assessments/grading-plan", { params }).then((r) => r.data),
 };
 
 export interface StudentFinanceProfile {
@@ -670,6 +730,24 @@ export const assessmentsMutations = {
       "pdf",
       "result-card",
     ),
+  createGradingScheme: (payload: { name: string; bands: { label: string; min_score: number; max_score: number }[]; include_assignments?: boolean }) =>
+    api.post<GradingScheme>("/api/v1/assessments/grading-schemes", payload).then((r) => r.data),
+  updateGradingScheme: (id: string, payload: { name?: string; bands?: { label: string; min_score: number; max_score: number }[]; include_assignments?: boolean }) =>
+    api.put<GradingScheme>(`/api/v1/assessments/grading-schemes/${id}`, payload).then((r) => r.data),
+  deleteGradingScheme: (id: string) =>
+    api.delete(`/api/v1/assessments/grading-schemes/${id}`).then((r) => r.data),
+  createExamType: (payload: { course_id: string; class_id?: string; name: string; weightage: number; grading_scheme_id: string }) =>
+    api.post<ExamType>("/api/v1/assessments/exam-types", payload).then((r) => r.data),
+  updateExamType: (id: string, payload: { course_id?: string; class_id?: string; name?: string; weightage?: number; grading_scheme_id?: string }) =>
+    api.put<ExamType>(`/api/v1/assessments/exam-types/${id}`, payload).then((r) => r.data),
+  deleteExamType: (id: string) =>
+    api.delete(`/api/v1/assessments/exam-types/${id}`).then((r) => r.data),
+  enterMark: (payload: { exam_type_id: string; student_id: string; score: number }) =>
+    api.put<MarkEntry>("/api/v1/assessments/marks", payload).then((r) => r.data),
+  putGradingPlan: (payload: { course_id: string; class_id?: string; name: string; bands: { label: string; min_score: number; max_score: number }[]; assignment_weightage?: number; components: { id?: string; name: string; weightage: number }[] }) =>
+    api.put<GradingPlan>("/api/v1/assessments/grading-plan", payload).then((r) => r.data),
+  downloadResultCard: (params: { student_id: string; session_id: string }) =>
+    downloadReport("/api/v1/assessments/results/card", params, "pdf", "result-card"),
 };
 
 export const financeMutations = {

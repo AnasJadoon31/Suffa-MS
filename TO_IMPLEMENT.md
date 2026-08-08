@@ -5,6 +5,13 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-08 — Attendance History Correction Follow-Up
+
+- Status: Principals/admins with `attendance.edit_locked` can now correct manual student attendance history from `/attendance`; focused backend tests, frontend build, and mocked EN/UR browser smoke passed.
+- Remaining release work:
+  - Add this journey to the rebuilt authenticated route/browser regression pack once the current TanStack test harness is restored.
+  - Keep approved-leave generated rows read-only in Attendance. To change those days, reject or update the linked leave request so the leave audit trail remains authoritative.
+
 ## 2026-08-02 — Frontend Completion Recovery Follow-Up
 
 - Status: Core completion work landed for `/me`, assignments, admissions review/conversion, staff/student results, typed settings, resource uploads/edits, announcement/blog/holiday edits, linked-people refresh consistency, and the unsupported-role dashboard fallback.

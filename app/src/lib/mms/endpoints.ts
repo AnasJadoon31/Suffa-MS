@@ -183,11 +183,11 @@ export interface AttendanceSyncEntry {
   subject_type: "student";
   subject_id: string;
   session_id: string;
-  course_id: string;
-  timetable_slot_id: string;
+  course_id?: string;
+  timetable_slot_id?: string;
   attendance_date: string;
   status: AttendanceStatus;
-  captured_at: string;
+  captured_at?: string;
   idempotency_key: string;
 }
 
@@ -223,7 +223,12 @@ export const attendanceApi = {
       })
       .then((r) => r.data),
   override: (entry: AttendanceSyncEntry, reason: string) =>
-    api.post("/api/v1/attendance/override", { entry, reason }).then((r) => r.data),
+    api
+      .post<{ idempotency_key: string; subject_id: string }>("/api/v1/attendance/override", {
+        entry,
+        reason,
+      })
+      .then((r) => r.data),
   myStudentHistory: (range?: AttendanceDateRange) =>
     api
       .get<StudentAttendanceHistory>("/api/v1/attendance/students/me/history", { params: range })

@@ -84,8 +84,7 @@ export function apiErrorMessage(error: unknown, fallback = "Something went wrong
       .filter(Boolean);
     if (messages.length) return messages.join("; ");
   }
-  if (axiosError?.message === "Network Error")
-    return "Can't reach the server. Check your connection.";
+  if (error instanceof Error && error.message) return error.message;
   return fallback;
 }
 

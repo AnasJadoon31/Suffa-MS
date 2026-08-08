@@ -123,11 +123,14 @@ class GradingSchemeRead(BaseModel):
 
 
 class ExamTypeCreate(BaseModel):
-    course_id: UUID
+    course_id: UUID | None = None
     class_id: UUID | None = None
-    name: str
+    name: str = Field(min_length=1, max_length=160)
     weightage: float = Field(gt=0)
     grading_scheme_id: UUID
+    parent_exam_type_id: UUID | None = None
+    # When > 0, auto-create `units` child exams each with weightage / units
+    units: int = 0
 
 
 class ExamTypeUpdate(BaseModel):
@@ -141,11 +144,15 @@ class ExamTypeUpdate(BaseModel):
 class ExamTypeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
-    course_id: UUID
-    class_id: UUID | None
+    course_id: UUID | None = None
+    class_id: UUID | None = None
+    parent_exam_type_id: UUID | None = None
     name: str
     weightage: float
     grading_scheme_id: UUID
+    children: list["ExamTypeRead"] = []
+    course_name: str | None = None
+    class_name: str | None = None
 
 
 class GradingPlanComponent(BaseModel):

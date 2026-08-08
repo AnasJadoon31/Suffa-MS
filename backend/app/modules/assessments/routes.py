@@ -180,10 +180,12 @@ async def _require_course_scope(
     session: AsyncSession,
     current_user: User,
     madrasa_id: UUID,
-    course_id: UUID,
+    course_id: UUID | None,
 ) -> None:
     """Courses are shared across classes (via ClassCourse), so a teacher is in
     scope when assigned to this course for any class in the active session."""
+    if course_id is None:
+        return
     course = await session.get(Course, course_id)
     if course is None or course.madrasa_id != madrasa_id:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -1181,14 +1183,36 @@ async def create_exam_type(
         madrasa_id=madrasa.id,
         course_id=payload.course_id,
         class_id=payload.class_id,
+        parent_exam_type_id=payload.parent_exam_type_id,
         name=payload.name,
         weightage=payload.weightage,
         grading_scheme_id=payload.grading_scheme_id,
     )
     session.add(exam_type)
+    await session.flush()
+
+    if payload.units > 0:
+        unit_weightage = payload.weightage / payload.units
+        for i in range(1, payload.units + 1):
+            session.add(ExamType(
+                madrasa_id=madrasa.id,
+                course_id=payload.course_id,
+                class_id=payload.class_id,
+                parent_exam_type_id=exam_type.id,
+                name=f"{payload.name} {i}",
+                weightage=unit_weightage,
+                grading_scheme_id=payload.grading_scheme_id,
+            ))
+
     await session.commit()
     await session.refresh(exam_type)
-    return ExamTypeRead.model_validate(exam_type)
+    d = ExamTypeRead.model_validate(exam_type)
+    if payload.units > 0:
+        children = (await session.execute(
+            select(ExamType).where(ExamType.parent_exam_type_id == exam_type.id)
+        )).scalars().all()
+        d.children = [ExamTypeRead.model_validate(c) for c in children]
+    return d
 
 
 @router.get("/exam-types", response_model=list[ExamTypeRead])
@@ -1255,6 +1279,16 @@ async def delete_exam_type(
     await _require_course_scope(session, current_user, madrasa.id, exam_type.course_id)
     if await session.scalar(select(Mark.id).where(Mark.exam_type_id == exam_type_id).limit(1)):
         raise HTTPException(status_code=409, detail=ErrorCode.EXAM_TYPE_HAS_MARKS)
+
+    children = (await session.execute(
+        select(ExamType).where(ExamType.parent_exam_type_id == exam_type_id)
+    )).scalars().all()
+    for child in children:
+        if await session.scalar(select(Mark.id).where(Mark.exam_type_id == child.id).limit(1)):
+            raise HTTPException(status_code=409, detail="Sub-exam has marks; clear them first")
+        await session.delete(child)
+    await session.flush()
+
     await session.delete(exam_type)
     await session.commit()
     return {"status": "deleted"}

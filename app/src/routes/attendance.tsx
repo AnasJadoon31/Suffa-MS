@@ -132,6 +132,7 @@ function AttendanceBoard() {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManageTeachers = hasPermission("teachers.attendance.manage");
+  const canEditStudentHistory = hasPermission("attendance.edit_locked");
 
   const [mode, setMode] = useState<"students" | "teachers">("students");
   const [classId, setClassId] = useState<string | null>(null);
@@ -308,14 +309,12 @@ function AttendanceBoard() {
     );
   }, [roster.data, search]);
 
-  const effectiveSlotId = slotId || roster.data?.timetable_slot?.id || "";
+  const effectiveSlotId = slotId || roster.data?.timetable_slot?.id || undefined;
 
   const save = useMutation({
     mutationFn: async () => {
       const data = roster.data;
       if (!data) throw new Error("Roster not loaded");
-      if (!effectiveSlotId)
-        throw new Error("This course is not scheduled today — pick a period first");
       const capturedAt = new Date().toISOString();
       const attendanceDate = capturedAt.slice(0, 10);
       const entries: AttendanceSyncEntry[] = Object.entries(marks).map(([subjectId, status]) => ({
@@ -327,7 +326,7 @@ function AttendanceBoard() {
         attendance_date: attendanceDate,
         status,
         captured_at: capturedAt,
-        idempotency_key: `${subjectId}:${data.session_id}:${attendanceDate}:${effectiveSlotId}`,
+        idempotency_key: `${subjectId}:${data.session_id}:${attendanceDate}:${effectiveSlotId ?? "general"}`,
       }));
       if (!entries.length) throw new Error("Nothing to submit");
       return attendanceApi.sync(entries);
@@ -343,6 +342,40 @@ function AttendanceBoard() {
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: (error) => toast.error(apiErrorMessage(error, "Couldn't save attendance")),
+  });
+
+  const correctHistory = useMutation({
+    mutationFn: ({ entry, status, sessionId }: {
+      entry: AttendanceLogEntry;
+      status: AttendanceStatus;
+      sessionId: string;
+    }) =>
+      attendanceApi.override(
+        {
+          subject_type: "student",
+          subject_id: entry.student_id,
+          session_id: sessionId,
+          course_id: entry.course?.id ?? undefined,
+          timetable_slot_id: entry.timetable_slot?.id ?? undefined,
+          attendance_date: entry.attendance_date,
+          status,
+          captured_at: new Date().toISOString(),
+          idempotency_key: `${entry.student_id}:${sessionId}:${entry.attendance_date}:${entry.timetable_slot?.id ?? "general"}`,
+        },
+        "Admin corrected student attendance history",
+      ),
+    onSuccess: () =>
+      applyMutationSuccess({
+        client: queryClient,
+        message: t("Attendance updated"),
+        queryKeys: [
+          ["attendance-class-history"],
+          ["attendance-student-history"],
+          ["dashboard"],
+          ["my-attendance"],
+        ],
+      }),
+    onError: (error) => toast.error(apiErrorMessage(error, t("Couldn't update attendance"))),
   });
 
   const resetSelection = () => {
@@ -564,7 +597,16 @@ function AttendanceBoard() {
                     <EmptyState title={t("Could not load roster")} hint="You may not be assigned to this class." />
                   </div>
                 ) : (
-                  <DayEntries entries={dayEntries} />
+                  <DayEntries
+                    entries={dayEntries}
+                    sessionId={history.data?.session_id}
+                    canEdit={canEditStudentHistory}
+                    correctingEntryId={correctHistory.variables?.entry.id}
+                    isCorrecting={correctHistory.isPending}
+                    onCorrect={(entry, status, sessionId) =>
+                      correctHistory.mutate({ entry, status, sessionId })
+                    }
+                  />
                 )
               ) : (
                 <>
@@ -686,6 +728,13 @@ function AttendanceBoard() {
                     entries={(studentHistory.data?.entries ?? []).filter(
                       (entry) => entry.attendance_date === selectedDate,
                     )}
+                    sessionId={studentHistory.data?.session_id}
+                    canEdit={canEditStudentHistory}
+                    correctingEntryId={correctHistory.variables?.entry.id}
+                    isCorrecting={correctHistory.isPending}
+                    onCorrect={(entry, status, sessionId) =>
+                      correctHistory.mutate({ entry, status, sessionId })
+                    }
                   />
                 </>
               ) : (
@@ -732,27 +781,81 @@ function ModeToggle({
   );
 }
 
-function DayEntries({ entries }: { entries: AttendanceLogEntry[] }) {
-    const { t } = useTranslation();
+function DayEntries({
+  entries,
+  sessionId,
+  canEdit = false,
+  correctingEntryId,
+  isCorrecting = false,
+  onCorrect,
+}: {
+  entries: AttendanceLogEntry[];
+  sessionId?: string;
+  canEdit?: boolean;
+  correctingEntryId?: string;
+  isCorrecting?: boolean;
+  onCorrect?: (entry: AttendanceLogEntry, status: AttendanceStatus, sessionId: string) => void;
+}) {
+  const { t } = useTranslation();
   if (entries.length === 0) return <EmptyState title={t("No attendance recorded")} />;
   return (
     <div className="space-y-2">
-      {entries.map((entry) => (
-        <Card
-          key={entry.id}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5"
-        >
-          <div className="min-w-0">
-            <p className="truncate font-semibold">{entry.student_name}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {entry.legacy_general ? "General attendance" : (entry.course?.name ?? "—")}
-              {entry.timetable_slot ? ` · Period ${entry.timetable_slot.period}` : ""}
-              {entry.marked_by?.display_name ? ` · ${entry.marked_by.display_name}` : ""}
-            </p>
-          </div>
-          <Pill tone={statusTone(entry.status)}>{entry.status}</Pill>
-        </Card>
-      ))}
+      {entries.map((entry) => {
+        const editable = canEdit && entry.source === "manual" && Boolean(sessionId && onCorrect);
+        const isRowSaving = isCorrecting && correctingEntryId === entry.id;
+        return (
+          <Card key={entry.id} className="space-y-3 p-3.5">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{entry.student_name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {entry.legacy_general ? t("General attendance") : (entry.course?.name ?? "—")}
+                  {entry.timetable_slot ? ` · ${t("Period")} ${entry.timetable_slot.period}` : ""}
+                  {entry.marked_by?.display_name ? ` · ${entry.marked_by.display_name}` : ""}
+                </p>
+              </div>
+              <Pill tone={statusTone(entry.status)}>{entry.status}</Pill>
+            </div>
+            {editable ? (
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <span className="me-auto text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
+                  {t("Change status")}
+                </span>
+                {STATUSES.map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={entry.status === value || isCorrecting}
+                    aria-label={`${t("Set")} ${entry.student_name} ${t(value)}`}
+                    onClick={() => sessionId && onCorrect?.(entry, value, sessionId)}
+                    className={cn(
+                      "grid h-9 w-9 place-items-center rounded-xl border text-xs font-extrabold transition-colors disabled:opacity-40",
+                      entry.status === value &&
+                        value === "present" &&
+                        "border-transparent bg-success text-success-foreground",
+                      entry.status === value &&
+                        value === "absent" &&
+                        "border-transparent bg-destructive text-destructive-foreground",
+                      entry.status === value &&
+                        value === "leave" &&
+                        "border-transparent bg-accent text-accent-foreground",
+                      entry.status !== value && "border-border bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {isRowSaving && entry.status !== value ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : entry.status === value ? (
+                      <Icon className="h-4 w-4" />
+                    ) : (
+                      label
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </Card>
+        );
+      })}
     </div>
   );
 }
