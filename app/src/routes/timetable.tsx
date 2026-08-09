@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
 import {
   ActionButton,
@@ -205,6 +206,7 @@ function MineView() {
   ];
   const visible = classId ? slots.filter((slot) => slot.class_id === classId) : slots;
   const todayIndex = (new Date().getDay() + 6) % 7;
+  const clearFilters = () => setClassId("");
 
   const byDay = DAYS.map((day, index) => ({
     day,
@@ -217,7 +219,7 @@ function MineView() {
   return (
     <>
       {classOptions.length > 1 ? (
-        <div className="mb-3">
+        <FilterBar activeCount={classId ? 1 : 0} onClear={clearFilters}>
           <Field label={t("Class")}>
             <CustomDropdown value={classId} onChange={(e) => setClassId(e.target.value)}>
               <option value="">{t("All classes")}</option>
@@ -228,7 +230,7 @@ function MineView() {
               ))}
             </CustomDropdown>
           </Field>
-        </div>
+        </FilterBar>
       ) : null}
 
       {query.isLoading ? <SkeletonList rows={6} /> : null}
@@ -279,41 +281,48 @@ function GridView({ lockToOwn }: { lockToOwn: boolean }) {
     (slot) => slot.class_id === classId && slot.section_id === sectionId,
   );
   const periods = [...new Set(gridSlots.map((slot) => slot.period))].sort((a, b) => a - b);
+  const activeCount = [classId, sectionId].filter(Boolean).length;
+  const clearFilters = () => {
+    setClassId("");
+    setSectionId("");
+  };
 
   return (
     <>
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <Field label={t("Class")}>
-          <CustomDropdown
-            value={classId}
-            onChange={(e) => {
-              setClassId(e.target.value);
-              setSectionId("");
-            }}
-          >
-            <option value="">{t("Choose class…")}</option>
-            {(classes.data ?? []).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </CustomDropdown>
-        </Field>
-        <Field label={t("Section")}>
-          <CustomDropdown
-            value={sectionId}
-            disabled={!classId}
-            onChange={(e) => setSectionId(e.target.value)}
-          >
-            <option value="">{t("Choose section…")}</option>
-            {(sections.data ?? []).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </CustomDropdown>
-        </Field>
-      </div>
+      <FilterBar activeCount={activeCount} onClear={clearFilters}>
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <Field label={t("Class")}>
+            <CustomDropdown
+              value={classId}
+              onChange={(e) => {
+                setClassId(e.target.value);
+                setSectionId("");
+              }}
+            >
+              <option value="">{t("Choose class…")}</option>
+              {(classes.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
+          <Field label={t("Section")}>
+            <CustomDropdown
+              value={sectionId}
+              disabled={!classId}
+              onChange={(e) => setSectionId(e.target.value)}
+            >
+              <option value="">{t("Choose section…")}</option>
+              {(sections.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
+        </div>
+      </FilterBar>
 
       {!classId || !sectionId ? (
         <EmptyState title={t("Pick a class and section")} hint="The weekly grid loads after both." />
@@ -405,6 +414,21 @@ function ListView({ canManage }: { canManage: boolean }) {
       (!filters.teacher_id || slot.teacher_id === filters.teacher_id) &&
       (filters.day === "" || slot.day_of_week === Number(filters.day)),
   );
+  const activeCount = [
+    filters.class_id,
+    filters.section_id,
+    filters.course_id,
+    filters.teacher_id,
+    filters.day,
+  ].filter(Boolean).length;
+  const clearFilters = () =>
+    setFilters({
+      class_id: "",
+      section_id: "",
+      course_id: "",
+      teacher_id: "",
+      day: "",
+    });
 
   const remove = useMutation({
     mutationFn: (id: string) => timetableApi.deleteSlot(id),
@@ -416,80 +440,80 @@ function ListView({ canManage }: { canManage: boolean }) {
 
   return (
     <>
-      {canManage ? (
-        <div className="mb-3">
-          <AddSlotSheet />
+      <FilterBar
+        activeCount={activeCount}
+        onClear={clearFilters}
+        action={canManage ? <AddSlotSheet /> : undefined}
+      >
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <Field label={t("Class")}>
+            <CustomDropdown
+              value={filters.class_id}
+              onChange={(e) => setFilters({ ...filters, class_id: e.target.value, section_id: "" })}
+            >
+              <option value="">{t("All classes")}</option>
+              {(classes.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
+          <Field label={t("Section")}>
+            <CustomDropdown
+              value={filters.section_id}
+              disabled={!filters.class_id}
+              onChange={(e) => setFilters({ ...filters, section_id: e.target.value })}
+            >
+              <option value="">{t("All sections")}</option>
+              {(sections.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
+          <Field label={t("Course")}>
+            <CustomDropdown
+              value={filters.course_id}
+              onChange={(e) => setFilters({ ...filters, course_id: e.target.value })}
+            >
+              <option value="">{t("All courses")}</option>
+              {(allCourses.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
+          <Field label={t("Teacher")}>
+            <CustomDropdown
+              value={filters.teacher_id}
+              onChange={(e) => setFilters({ ...filters, teacher_id: e.target.value })}
+            >
+              <option value="">{t("All teachers")}</option>
+              {(teachers.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
+          <Field label={t("Day")}>
+            <CustomDropdown
+              value={filters.day}
+              onChange={(e) => setFilters({ ...filters, day: e.target.value })}
+            >
+              <option value="">{t("All days")}</option>
+              {DAYS.map((day, index) => (
+                <option key={day} value={index}>
+                  {day}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
         </div>
-      ) : null}
-
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <Field label={t("Class")}>
-          <CustomDropdown
-            value={filters.class_id}
-            onChange={(e) => setFilters({ ...filters, class_id: e.target.value, section_id: "" })}
-          >
-            <option value="">{t("All classes")}</option>
-            {(classes.data ?? []).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </CustomDropdown>
-        </Field>
-        <Field label={t("Section")}>
-          <CustomDropdown
-            value={filters.section_id}
-            disabled={!filters.class_id}
-            onChange={(e) => setFilters({ ...filters, section_id: e.target.value })}
-          >
-            <option value="">{t("All sections")}</option>
-            {(sections.data ?? []).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </CustomDropdown>
-        </Field>
-        <Field label={t("Course")}>
-          <CustomDropdown
-            value={filters.course_id}
-            onChange={(e) => setFilters({ ...filters, course_id: e.target.value })}
-          >
-            <option value="">{t("All courses")}</option>
-            {(allCourses.data ?? []).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </CustomDropdown>
-        </Field>
-        <Field label={t("Teacher")}>
-          <CustomDropdown
-            value={filters.teacher_id}
-            onChange={(e) => setFilters({ ...filters, teacher_id: e.target.value })}
-          >
-            <option value="">{t("All teachers")}</option>
-            {(teachers.data ?? []).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </CustomDropdown>
-        </Field>
-        <Field label={t("Day")}>
-          <CustomDropdown
-            value={filters.day}
-            onChange={(e) => setFilters({ ...filters, day: e.target.value })}
-          >
-            <option value="">{t("All days")}</option>
-            {DAYS.map((day, index) => (
-              <option key={day} value={index}>
-                {day}
-              </option>
-            ))}
-          </CustomDropdown>
-        </Field>
-      </div>
+      </FilterBar>
 
       {slots.isLoading ? <SkeletonList rows={6} /> : null}
       {!slots.isLoading && filtered.length === 0 ? (

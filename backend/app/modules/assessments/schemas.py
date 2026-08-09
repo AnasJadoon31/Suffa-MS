@@ -15,6 +15,8 @@ class AssignmentCreate(BaseModel):
     # Publish to every class the course is mapped to (whole-class rows,
     # sharing one batch_id) — requires assignments.manage_all. B8-j.
     all_classes: bool = False
+    # Teacher-self creation, used by /my-assessments even when the user is also admin.
+    mine_only: bool = False
     title: str
     category: str | None = Field(default=None, max_length=60)
     instructions: str

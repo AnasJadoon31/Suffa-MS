@@ -3,6 +3,206 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-09 — Shared Filter Button Rollout
+
+**Fix:**
+- Replaced exposed filter rows with the shared `FilterBar` filter-button pattern on Announcements, Forms, Blog, Reports, and Timetable.
+- Covered Timetable Mine, Grid, and List views so class/section/course/teacher/day filters collapse behind the same filter control.
+- Kept existing FilterBar screens unchanged where they already used the shared filter button, including People, Assignments, My Assessments, Admissions, Finance, Holidays, Leave, Resources, and Examination Marking/Results.
+
+**Files:**
+- `app/src/routes/announcements.tsx`
+- `app/src/routes/forms.tsx`
+- `app/src/routes/blog.tsx`
+- `app/src/routes/reports.tsx`
+- `app/src/routes/timetable.tsx`
+
+**Verification:**
+- Focused TypeScript check for touched route files reported no errors: `npm exec tsc -- --noEmit --pretty false 2>&1 | rg 'src/routes/(announcements|forms|timetable|blog|reports)\\.tsx|src/components/app/FilterBar'`.
+- Full TypeScript check still reports unrelated pre-existing errors in other routes/components.
+
+## 2026-08-09 — Full-Year Madrasa Fixture Seed
+
+**Fix:**
+- Expanded `seed_full.py` from a short sample fixture into a full active-session fixture for `1448 / 2026-27`.
+- Seeded a complete Monday-Saturday weekly timetable grid for every class section, including admin-teacher timetable rows.
+- Seeded monthly assignments across the academic year, including admin-created assignments visible in global/admin assessment views.
+- Seeded quarterly exam types, marks, submissions, and published results for every student.
+- Seeded full-session student and teacher attendance, monthly student payments, recurring donor donations, and monthly salary payments.
+- Rebuilt the backend container and reloaded the local Docker database from the new seed.
+
+**Files:**
+- `backend/seed_full.py`
+
+**Verification:**
+- `python -m py_compile backend/seed_full.py`
+- `docker compose up -d --build backend`
+- `docker compose exec -T backend python seed_full.py`
+- Live DB counts: 432 timetable slots, 528 assignments, 204 admin-created assignments, 888 submissions, 296 marks, 20 result publications, 6260 student attendance rows, 1878 teacher attendance rows, 260 payments, 42 donations, 72 salary payments.
+- Live date ranges: attendance `2026-06-01` to `2027-05-31`, assignments due `2026-06-20` to `2027-05-25`, finance through May 2027.
+- Live API checks confirmed admin sees Admin Sahib assignments, admin `/timetable/me` rows, marks, and populated result matrix data.
+
+## 2026-08-09 — Settings Logo Upload and Language Dropdown
+
+**Fix:**
+- Rendered the Madrasa logo setting as an image upload control backed by the existing presigned file upload API.
+- Added logo preview, replace, and remove controls for `madrasa.logo_file_id`.
+- Changed `portal.default_language` from a free text setting to a typed English/Urdu dropdown with backend validation.
+
+**Files:**
+- `backend/app/core/settings_catalog.py`
+- `backend/tests/test_backend_sweep.py`
+- `app/src/routes/settings.tsx`
+- `app/src/lib/mms/more-endpoints.ts`
+- `app/src/i18n/locales/en.json`
+- `app/src/i18n/locales/ur.json`
+
+**Verification:**
+- `python -m py_compile backend/app/core/settings_catalog.py backend/tests/test_backend_sweep.py`
+- Rebuilt/recreated the backend container.
+- Live API check confirmed `madrasa.logo_file_id` is type `file` and `portal.default_language` is type `language`.
+
+## 2026-08-09 — Env-Only WhatsApp Evolution Configuration
+
+**Fix:**
+- Removed Evolution API URL, API key, instance, webhook URL, webhook media, and webhook event rows from the Madrasa Settings catalog.
+- Changed messaging connection setup to read Evolution config from environment settings only.
+- Added env passthroughs for Evolution webhook and tenant values in Docker Compose and `.env.example`.
+- Removed seeded WhatsApp config rows and deleted stale live `whatsapp.evolution*` settings from the database.
+- Kept the WhatsApp connection panel in Settings for QR/pairing/disconnect actions.
+
+**Files:**
+- `backend/app/core/settings_catalog.py`
+- `backend/app/core/config.py`
+- `backend/app/modules/messaging/routes.py`
+- `backend/seed_full.py`
+- `docker-compose.yml`
+- `.env.example`
+- `.env`
+- `app/src/i18n/locales/en.json`
+- `app/src/i18n/locales/ur.json`
+- `backend/tests/test_backend_sweep.py`
+- `backend/tests/test_whatsapp_connection.py`
+
+**Verification:**
+- `python -m py_compile backend/app/core/settings_catalog.py backend/app/core/config.py backend/app/modules/messaging/routes.py backend/seed_full.py`
+- `python -m py_compile backend/tests/test_backend_sweep.py backend/tests/test_whatsapp_connection.py`
+- Rebuilt/recreated the backend container.
+- Live API check confirmed `/api/v1/operations/settings/catalog` exposes no `whatsapp.*` settings.
+- Live backend env check confirmed Evolution URL/key are configured and instance is `suffa-ms` without printing secrets.
+
+## 2026-08-09 — Configurable School Days Setting
+
+**Fix:**
+- Added `attendance.school_days` to Madrasa Settings as a typed weekday multi-select setting.
+- Rendered the setting as day toggle buttons in the Settings screen instead of a raw text field.
+- Made attendance summary and generated approved-leave history respect the configured school days.
+- Updated the full seed and the live database default to Monday-Saturday (`[0,1,2,3,4,5]`).
+
+**Files:**
+- `backend/app/core/settings_catalog.py`
+- `backend/app/modules/attendance/routes.py`
+- `backend/seed_full.py`
+- `app/src/routes/settings.tsx`
+- `app/src/lib/mms/more-endpoints.ts`
+- `app/src/i18n/locales/en.json`
+- `app/src/i18n/locales/ur.json`
+
+**Verification:**
+- `python -m py_compile backend/app/core/settings_catalog.py backend/app/modules/attendance/routes.py backend/seed_full.py`
+- Rebuilt/recreated the backend container.
+- Live API check confirmed `/api/v1/operations/settings/catalog` returns `attendance.school_days` as `weekday_multi` with value `[0,1,2,3,4,5]`.
+
+## 2026-08-09 — Attendance History Seed Visibility
+
+**Fix:**
+- Fixed attendance history filtering so general daily attendance rows are still shown when a course filter is selected.
+- Updated the attendance UI to move the selected calendar date to the latest available history entry when today has no recorded attendance.
+- Corrected seeded enrollment start dates to the active session start so seeded July/August attendance rows are inside each student's enrollment window.
+- Updated the live seeded database enrollment `started_on` values to `2026-06-01`.
+- Updated the seed to use a Monday-Saturday madrasa week and inserted live August 8, 2026 attendance rows for all seeded students and teachers.
+
+**Files:**
+- `backend/app/modules/attendance/routes.py`
+- `app/src/routes/attendance.tsx`
+- `backend/seed_full.py`
+
+**Verification:**
+- Rebuilt/recreated the backend container.
+- Live API check for `Hifz A-A` attendance history returned 15 entries for August, both with and without a selected course filter.
+- Live API check after adding Saturday rows returned 18 entries for `Hifz A-A` August history, with `2026-08-08` as the latest date.
+
+## 2026-08-09 — Results Publish Fix and Full Madrasa Seed
+
+**Fix:**
+- Fixed the Publish Results UUID error by sending the `session_id` returned by the results matrix instead of an empty string.
+- Expanded `seed_full.py` into a richer madrasa fixture covering linked guardians, dependent/independent students, teacher timetables, attendance, assignments, submissions, marks, published results, finance, donors, salary, settings, resources, forms, admissions, announcements, blog, leave, holidays, and messaging fixtures.
+- Reset the Docker Postgres database, ran Alembic migrations from scratch, and seeded the new fixture data.
+
+**Files:**
+- `app/src/routes/examination.tsx`
+- `backend/seed_full.py`
+
+**Verification:**
+- `python -m py_compile backend/seed_full.py backend/app/modules/assessments/routes.py backend/app/modules/assessments/schemas.py`
+- `docker compose exec -T backend python reset_db.py`
+- `docker compose exec -T backend alembic upgrade head`
+- `docker compose exec -T backend python seed_full.py`
+- `curl http://127.0.0.1:8001/healthz`
+- Live DB count check: 20 students, 18 student-guardian links, 44 timetable slots, 44 assignments, 74 submissions, 222 marks, 12 result publications, 300 student attendance rows, 75 teacher attendance rows, 20 payments, and 6 donations.
+- Admin token check: `admin / abcd1234` returned an access token.
+- No frontend build or test suite run per request.
+
+## 2026-08-09 — Teacher-Scoped My Assessments
+
+**Fix:**
+- Added teacher-profile scoping for `mine_only=true` assignment reads so admin/principal users with linked teacher profiles can request only their taught assignments.
+- Added a New assignment action to `/my-assessments` Assignments tab. Its class, section, and course options are sourced only from the teacher's own timetable.
+- Added `mine_only` assignment creation enforcement so admin/principal teachers using `/my-assessments` cannot create assignments outside their own teaching scope.
+- Changed `/my-assessments` into tabs for Assignments, Marking, and Results.
+- Added filter-button based class/section/course filters to `/my-assessments` assignments, sourced from the user's own timetable.
+- Reused Marking and Results views in teacher-scoped mode so admin/principal teachers only see classes, sections, and courses from their own timetable on `/my-assessments`.
+- Renamed the global `/assignments` navigation/title to Assessments and added Assignments, Marking, and Results tabs for the madrasa-wide surface.
+
+**Files:**
+- `backend/app/modules/assessments/routes.py`
+- `backend/app/modules/assessments/schemas.py`
+- `app/src/routes/my-assessments.tsx`
+- `app/src/routes/examination.tsx`
+- `app/src/routes/assignments.tsx`
+- `app/src/lib/mms/nav.ts`
+- `app/src/i18n/locales/en.json`
+- `app/src/i18n/locales/ur.json`
+
+**Verification:**
+- Rebuilt/recreated the backend container and confirmed `http://127.0.0.1:8001/healthz` returns healthy. No test suite/frontend build run per request.
+
+## 2026-08-09 — Admin Teacher Timetable Access
+
+**Fix:**
+- Updated `/api/v1/operations/timetable/me` so non-student users with a linked teacher profile can see their teacher timetable even when their account role is admin/principal.
+- Kept teacher accounts without a profile returning an empty timetable, and kept non-teacher-profile users blocked from the self-service route.
+
+**Files:**
+- `backend/app/modules/operations/routes.py`
+
+**Verification:**
+- Not run; focused backend rule fix and verification was intentionally skipped per request.
+
+## 2026-08-09 — My Timetable Error Text
+
+**Fix:**
+- Translated the `timetable_self_service_only` backend error code on `/my-timetable`.
+- Added English and Urdu copy so non-student/non-teacher users see a readable message.
+
+**Files:**
+- `app/src/routes/my-timetable.tsx`
+- `app/src/i18n/locales/en.json`
+- `app/src/i18n/locales/ur.json`
+
+**Verification:**
+- Not run; focused copy/UI fix and verification was intentionally skipped per request.
+
 ## 2026-08-09 — Dependent Student Phone Visibility
 
 **Fix:**

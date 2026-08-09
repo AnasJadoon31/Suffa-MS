@@ -47,9 +47,9 @@ export const primaryNav: NavItem[] = [
 export const academicNav: NavItem[] = [
   {
     to: "/assignments",
-    label: "Assignments",
+    label: "Assessments",
     icon: ClipboardList,
-    description: "Tasks and submissions",
+    description: "Madrasa assessments and submissions",
   },
   { to: "/results", label: "Results", icon: Trophy, description: "Marks and grade bands" },
   {

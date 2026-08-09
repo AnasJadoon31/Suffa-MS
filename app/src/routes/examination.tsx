@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { FilterBar } from "@/components/app/FilterBar";
 import {
   Card,
   EmptyState,
@@ -333,21 +334,36 @@ function AssignView({ canManage }: { canManage: boolean }) {
 
 /* ================================================ Marking ===== */
 
-function MarkingView({ canManage }: { canManage: boolean }) {
+export function MarkingView({
+  canManage,
+  teacherScoped = false,
+}: {
+  canManage: boolean;
+  teacherScoped?: boolean;
+}) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const isAdmin = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
+  const isAdmin = !teacherScoped && (
+    user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate
+  );
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [selectedExamId, setSelectedExamId] = useState("");
   const [step, setStep] = useState<"sections" | "courses" | "exams" | "subExams" | "students">("sections");
 
-  const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses() });
+  const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses(), enabled: !teacherScoped });
   const sections = useQuery({ queryKey: ["sections", selectedClassId], queryFn: () => selectedClassId ? academicsExtraApi.listSections(selectedClassId) : Promise.resolve([]), enabled: !!selectedClassId });
-  const myTimetable = useQuery({ queryKey: ["my-timetable"], queryFn: () => operationsApi.listMyTimetable(), enabled: !isAdmin });
+  const myTimetable = useQuery({ queryKey: ["my-timetable"], queryFn: () => operationsApi.listMyTimetable(), enabled: teacherScoped || !isAdmin });
   const classCourses = useQuery({ queryKey: ["class-courses", selectedClassId], queryFn: () => selectedClassId ? api.get(`/api/v1/academics/classes/${selectedClassId}/courses`).then((r) => r.data) : Promise.resolve([]), enabled: !!selectedClassId && (step === "courses" || step === "exams" || step === "subExams") });
   const allExamTypes = useQuery({ queryKey: ["exam-types"], queryFn: () => assessmentsApi.listExamTypes() });
+  const teacherClassOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const slot of myTimetable.data ?? []) {
+      if (slot.class_id) map.set(slot.class_id, slot.class_name ?? "—");
+    }
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [myTimetable.data]);
 
   const courseExams = useMemo(() => {
     if (!selectedCourseId || !selectedClassId) return [];
@@ -374,15 +390,31 @@ function MarkingView({ canManage }: { canManage: boolean }) {
     if (isAdmin || !teacherSectionIds) return sections.data ?? [];
     return (sections.data ?? []).filter((s) => teacherSectionIds.has(s.id));
   }, [sections.data, teacherSectionIds, isAdmin]);
+  const courseOptions = useMemo(() => {
+    if (!teacherScoped) return (classCourses.data ?? []) as any[];
+    const map = new Map<string, { id: string; name: string }>();
+    for (const slot of myTimetable.data ?? []) {
+      if (
+        slot.class_id === selectedClassId &&
+        (!selectedSectionId || slot.section_id === selectedSectionId) &&
+        slot.course_id
+      ) {
+        map.set(slot.course_id, { id: slot.course_id, name: slot.course_name ?? "—" });
+      }
+    }
+    return Array.from(map.values());
+  }, [classCourses.data, myTimetable.data, selectedClassId, selectedSectionId, teacherScoped]);
 
   return (
     <div className="space-y-3">
-      <Field label={t("Class")}>
-        <CustomDropdown value={selectedClassId} onChange={(e) => { setSelectedClassId(e.target.value); setSelectedSectionId(""); setSelectedCourseId(""); setStep("sections"); }}>
-          <option value="">{t("Select class")}</option>
-          {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </CustomDropdown>
-      </Field>
+      <FilterBar activeCount={selectedClassId ? 1 : 0} onClear={() => { setSelectedClassId(""); setSelectedSectionId(""); setSelectedCourseId(""); setSelectedExamId(""); setStep("sections"); }}>
+        <Field label={t("Class")}>
+          <CustomDropdown value={selectedClassId} onChange={(e) => { setSelectedClassId(e.target.value); setSelectedSectionId(""); setSelectedCourseId(""); setStep("sections"); }}>
+            <option value="">{t("Select class")}</option>
+            {(teacherScoped ? teacherClassOptions : classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </CustomDropdown>
+        </Field>
+      </FilterBar>
 
       {step === "sections" && selectedClassId ? (
         <>
@@ -409,7 +441,7 @@ function MarkingView({ canManage }: { canManage: boolean }) {
           </div>
           <SectionTitle>{t("Courses")}</SectionTitle>
           <div className="space-y-2">
-            {((classCourses.data ?? []) as any[]).map((course: any) => (
+            {courseOptions.map((course: any) => (
               <button key={course.id} onClick={() => { setSelectedCourseId(course.id); setStep("exams"); }} className="w-full">
                 <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><GraduationCap className="h-5 w-5" /></span>
@@ -417,7 +449,7 @@ function MarkingView({ canManage }: { canManage: boolean }) {
                 </Card>
               </button>
             ))}
-            {((classCourses.data ?? []) as any[]).length === 0 ? <EmptyState title={t("No courses assigned")} /> : null}
+            {courseOptions.length === 0 ? <EmptyState title={t("No courses assigned")} /> : null}
           </div>
         </>
       ) : null}
@@ -519,31 +551,57 @@ function ExamMarkEntry({ examId, classId, sectionId, onBack }: { examId: string;
 
 /* ================================================ Results ===== */
 
-function ResultsView({ canManage }: { canManage: boolean }) {
+export function ResultsView({
+  canManage,
+  teacherScoped = false,
+}: {
+  canManage: boolean;
+  teacherScoped?: boolean;
+}) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const client = useQueryClient();
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
-  const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses() });
+  const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses(), enabled: !teacherScoped });
+  const myTimetable = useQuery({ queryKey: ["my-timetable"], queryFn: () => operationsApi.listMyTimetable(), enabled: teacherScoped });
   const sections = useQuery({ queryKey: ["sections", classId], queryFn: () => classId ? academicsExtraApi.listSections(classId) : Promise.resolve([]), enabled: !!classId });
   const matrix = useQuery({ queryKey: ["results-matrix", classId, sectionId], queryFn: () => assessmentsApi.resultsMatrix({ class_id: classId || undefined, section_id: sectionId || undefined }), enabled: !!classId });
+  const teacherClassOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const slot of myTimetable.data ?? []) {
+      if (slot.class_id) map.set(slot.class_id, slot.class_name ?? "—");
+    }
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [myTimetable.data]);
+  const teacherSectionOptions = useMemo(() => {
+    if (!teacherScoped) return sections.data ?? [];
+    const map = new Map<string, string>();
+    for (const slot of myTimetable.data ?? []) {
+      if (slot.class_id === classId && slot.section_id) map.set(slot.section_id, slot.section_name ?? "—");
+    }
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [classId, myTimetable.data, sections.data, teacherScoped]);
 
   const publish = useMutation({
     mutationFn: async () => {
       const allStudentIds: string[] = [];
       for (const sec of (matrix.data?.sections ?? []))
         for (const s of sec.students) allStudentIds.push(s.student_id);
-      return assessmentsMutations.publishResults("", allStudentIds);
+      if (!matrix.data?.session_id) throw new Error("No active session selected");
+      return assessmentsMutations.publishResults(matrix.data.session_id, allStudentIds);
     },
     onSuccess: () => { toast.success(t("Results published")); void client.invalidateQueries({ queryKey: ["results-matrix"] }); },
   });
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <Field label={t("Class")}><CustomDropdown value={classId} onChange={(e) => { setClassId(e.target.value); setSectionId(""); }}><option value="">{t("Select class")}</option>{(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</CustomDropdown></Field>
-        <Field label={t("Section")}><CustomDropdown value={sectionId} onChange={(e) => setSectionId(e.target.value)}><option value="">{t("All sections")}</option>{(sections.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</CustomDropdown></Field>
-      </div>
+      <FilterBar activeCount={(classId ? 1 : 0) + (sectionId ? 1 : 0)} onClear={() => { setClassId(""); setSectionId(""); }}>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label={t("Class")}><CustomDropdown value={classId} onChange={(e) => { setClassId(e.target.value); setSectionId(""); }}><option value="">{t("Select class")}</option>{(teacherScoped ? teacherClassOptions : classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</CustomDropdown></Field>
+          <Field label={t("Section")}><CustomDropdown value={sectionId} onChange={(e) => setSectionId(e.target.value)}><option value="">{t("All sections")}</option>{teacherSectionOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</CustomDropdown></Field>
+        </div>
+      </FilterBar>
       {canManage && matrix.data ? (
         <button onClick={() => publish.mutate()} className="gradient-emerald w-full rounded-xl py-2 text-xs font-bold text-primary-foreground">{t("Publish results")}</button>
       ) : null}

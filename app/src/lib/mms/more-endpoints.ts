@@ -256,7 +256,7 @@ export interface MadrasaSetting {
 export interface TypedMadrasaSetting {
   key: string;
   category: string;
-  type: "string" | "int" | "bool" | "file" | "secret";
+  type: "string" | "int" | "bool" | "file" | "secret" | "weekday_multi" | "language";
   label: string;
   value: string;
 }
@@ -727,6 +727,7 @@ export const assessmentsMutations = {
     class_id?: string;
     section_ids?: string[];
     course_id: string;
+    mine_only?: boolean;
     title: string;
     category?: string;
     instructions: string;

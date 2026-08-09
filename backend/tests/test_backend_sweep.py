@@ -496,12 +496,13 @@ async def test_settings_catalog_and_typed_validation(client):
     by_key = {item["key"]: item for item in catalog.json()}
     assert by_key["finance.currency"]["value"] == "PKR"  # default
     assert by_key["madrasa.address"]["category"] == "profile"
-    assert by_key["whatsapp.evolution_api_url"]["category"] == "whatsapp"
-    assert by_key["whatsapp.evolution_api_key"]["type"] == "secret"
-    assert by_key["whatsapp.evolution_webhook_events"]["value"] == (
-        "QRCODE_UPDATED,CONNECTION_UPDATE,MESSAGES_UPSERT,MESSAGES_UPDATE,"
-        "MESSAGES_DELETE,SEND_MESSAGE,GROUPS_UPSERT,GROUP_UPDATE"
-    )
+    assert by_key["madrasa.logo_file_id"]["type"] == "file"
+    assert by_key["portal.default_language"]["type"] == "language"
+    assert by_key["portal.default_language"]["value"] == "ur"
+    assert by_key["attendance.school_days"]["type"] == "weekday_multi"
+    assert by_key["attendance.school_days"]["value"] == "[0,1,2,3,4,5]"
+    assert "whatsapp.evolution_api_url" not in by_key
+    assert "whatsapp.evolution_api_key" not in by_key
 
     unknown = await client.put("/api/v1/operations/settings", json={"key": "no.such.key", "value": "x"})
     assert unknown.status_code == 400
@@ -512,18 +513,31 @@ async def test_settings_catalog_and_typed_validation(client):
     )
     assert bad_type.status_code == 400
 
-    bad_secret = await client.put(
+    bad_weekdays = await client.put(
         "/api/v1/operations/settings",
-        json={"key": "whatsapp.evolution_api_key", "value": "line-one\nline-two"},
+        json={"key": "attendance.school_days", "value": "[0,0,8]"},
     )
-    assert bad_secret.status_code == 400
+    assert bad_weekdays.status_code == 400
 
-    secret_ok = await client.put(
+    bad_language = await client.put(
         "/api/v1/operations/settings",
-        json={"key": "whatsapp.evolution_api_key", "value": "super-secret-key"},
+        json={"key": "portal.default_language", "value": "fr"},
     )
-    assert secret_ok.status_code == 200
-    assert secret_ok.json()["value"] == "super-secret-key"
+    assert bad_language.status_code == 400
+
+    weekdays_ok = await client.put(
+        "/api/v1/operations/settings",
+        json={"key": "attendance.school_days", "value": "[0,1,2,3,4]"},
+    )
+    assert weekdays_ok.status_code == 200
+    assert weekdays_ok.json()["value"] == "[0,1,2,3,4]"
+
+    language_ok = await client.put(
+        "/api/v1/operations/settings",
+        json={"key": "portal.default_language", "value": "en"},
+    )
+    assert language_ok.status_code == 200
+    assert language_ok.json()["value"] == "en"
 
     ok = await client.put(
         "/api/v1/operations/settings",
@@ -534,7 +548,8 @@ async def test_settings_catalog_and_typed_validation(client):
     catalog2 = await client.get("/api/v1/operations/settings/catalog")
     by_key2 = {item["key"]: item for item in catalog2.json()}
     assert by_key2["security.idle_timeout_minutes_student"]["value"] == "15"
-    assert by_key2["whatsapp.evolution_api_key"]["value"] == ""
+    assert by_key2["attendance.school_days"]["value"] == "[0,1,2,3,4]"
+    assert by_key2["portal.default_language"]["value"] == "en"
 
 
 # ----------------------------------------------------------------- reports

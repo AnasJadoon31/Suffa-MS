@@ -34,7 +34,6 @@ from app.modules.messaging.schemas import (
     WhatsAppQrResponse,
 )
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
-from app.modules.operations.models import MadrasaSetting
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -60,7 +59,6 @@ class EvolutionConfig:
     webhook_url: str = ""
     webhook_base64: bool = True
     webhook_events: list[str] | None = None
-    from_madrasa_settings: bool = False
 
 
 def _evolution_error_message(response: httpx.Response) -> str:
@@ -93,41 +91,18 @@ def _redact_setup_links(message: str) -> str:
     return re.sub(r"(?:https?://\S+)?/set-password\?token=[^\s]+", "[setup-link-redacted]", message)
 
 
-async def _madrasa_settings(session: AsyncSession, madrasa_id: UUID) -> dict[str, str]:
-    rows = (
-        await session.execute(
-            select(MadrasaSetting.key, MadrasaSetting.value).where(MadrasaSetting.madrasa_id == madrasa_id)
-        )
-    ).all()
-    return {key: value for key, value in rows}
-
-
-def _setting_or_env(values: dict[str, str], key: str, env_value: str) -> str:
-    value = values.get(key)
-    return value.strip() if value is not None and value.strip() else env_value.strip()
-
-
 def _split_evolution_events(value: str) -> list[str]:
     events = [item.strip().upper() for item in value.split(",") if item.strip()]
     return events or DEFAULT_EVOLUTION_WEBHOOK_EVENTS
 
 
 async def _evolution_config(session: AsyncSession, madrasa: Madrasa) -> EvolutionConfig:
-    values = await _madrasa_settings(session, madrasa.id)
-    has_madrasa_connection = all(
-        values.get(key, "").strip()
-        for key in (
-            "whatsapp.evolution_api_url",
-            "whatsapp.evolution_api_key",
-            "whatsapp.evolution_instance",
-        )
-    )
-    base_url = _setting_or_env(values, "whatsapp.evolution_api_url", settings.evolution_api_url).rstrip("/")
-    api_key = _setting_or_env(values, "whatsapp.evolution_api_key", settings.evolution_api_key)
-    instance_name = _setting_or_env(values, "whatsapp.evolution_instance", settings.evolution_instance)
-    webhook_url = values.get("whatsapp.evolution_webhook_url", "").strip()
-    webhook_base64 = values.get("whatsapp.evolution_webhook_base64", "true") == "true"
-    webhook_events = _split_evolution_events(values.get("whatsapp.evolution_webhook_events", ""))
+    base_url = settings.evolution_api_url.strip().rstrip("/")
+    api_key = settings.evolution_api_key.strip()
+    instance_name = settings.evolution_instance.strip()
+    webhook_url = settings.evolution_webhook_url.strip()
+    webhook_base64 = settings.evolution_webhook_base64
+    webhook_events = _split_evolution_events(settings.evolution_webhook_events)
     if not (base_url and api_key and instance_name):
         raise HTTPException(status_code=503, detail=ErrorCode.WHATSAPP_DELIVERY_NOT_CONFIGURED)
     return EvolutionConfig(
@@ -138,13 +113,10 @@ async def _evolution_config(session: AsyncSession, madrasa: Madrasa) -> Evolutio
         webhook_url=webhook_url,
         webhook_base64=webhook_base64,
         webhook_events=webhook_events,
-        from_madrasa_settings=has_madrasa_connection,
     )
 
 
 def _require_evolution_tenant(madrasa: Madrasa, config: EvolutionConfig | None = None) -> None:
-    if config is not None and config.from_madrasa_settings:
-        return
     configured_tenant = settings.evolution_tenant_slug or settings.default_tenant
     if madrasa.slug != configured_tenant:
         raise HTTPException(status_code=403, detail=ErrorCode.PERMISSION_REQUIRED)

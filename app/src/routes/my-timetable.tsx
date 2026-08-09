@@ -43,7 +43,7 @@ function MyTimetablePage() {
     <AppShell title={t("My timetable")} subtitle={t("Your weekly class schedule")}>
       {slots.isLoading ? <SkeletonList rows={4} /> : null}
       {slots.isError ? (
-        <EmptyState title={apiErrorMessage(slots.error, t("Could not load timetable"))} />
+        <EmptyState title={t(apiErrorMessage(slots.error, "Could not load timetable"))} />
       ) : null}
 
       {classOptions.length > 1 ? (

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, Check, Loader2, Power, QrCode, RefreshCw, Settings2, Smartphone } from "lucide-react";
+import { Building2, Check, ImageIcon, Loader2, Power, QrCode, RefreshCw, Settings2, Smartphone, Upload, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -14,7 +14,7 @@ import {
   TextInput,
 } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
-import { opsApi, opsMutations, type TypedMadrasaSetting } from "@/lib/mms/more-endpoints";
+import { filesApi, opsApi, opsMutations, type TypedMadrasaSetting, uploadFile } from "@/lib/mms/more-endpoints";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { useTranslation } from "react-i18next";
 
@@ -96,6 +96,139 @@ function SettingsPage() {
 
 function qrImageSource(value: string) {
   return value.startsWith("data:image") ? value : `data:image/png;base64,${value}`;
+}
+
+const WEEKDAY_OPTIONS = [
+  { value: 0, label: "Mon" },
+  { value: 1, label: "Tue" },
+  { value: 2, label: "Wed" },
+  { value: 3, label: "Thu" },
+  { value: 4, label: "Fri" },
+  { value: 5, label: "Sat" },
+  { value: 6, label: "Sun" },
+];
+
+function parseWeekdays(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return new Set([0, 1, 2, 3, 4, 5]);
+    const days = parsed.filter((item) => Number.isInteger(item) && item >= 0 && item <= 6);
+    return new Set(days.length ? days : [0, 1, 2, 3, 4, 5]);
+  } catch {
+    return new Set([0, 1, 2, 3, 4, 5]);
+  }
+}
+
+function stringifyWeekdays(days: Set<number>) {
+  return JSON.stringify(Array.from(days).sort((a, b) => a - b));
+}
+
+function WeekdayPicker({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (nextValue: string) => void;
+}) {
+  const { t } = useTranslation();
+  const selected = parseWeekdays(value);
+
+  return (
+    <div className="grid grid-cols-4 gap-2 pt-2 sm:grid-cols-7">
+      {WEEKDAY_OPTIONS.map((day) => {
+        const active = selected.has(day.value);
+        return (
+          <button
+            key={day.value}
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              const next = new Set(selected);
+              if (active && next.size > 1) next.delete(day.value);
+              if (!active) next.add(day.value);
+              onChange(stringifyWeekdays(next));
+            }}
+            className={[
+              "min-h-10 rounded-xl border px-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+              active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground",
+            ].join(" ")}
+          >
+            {t(day.label)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LogoFilePicker({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (nextValue: string) => void;
+}) {
+  const { t } = useTranslation();
+  const preview = useQuery({
+    queryKey: ["settings-logo-preview", value],
+    queryFn: () => filesApi.presignDownload(value),
+    enabled: Boolean(value),
+    retry: false,
+  });
+
+  const upload = useMutation({
+    mutationFn: (file: File) => uploadFile(file, "logos"),
+    onSuccess: (objectKey) => {
+      onChange(objectKey);
+      toast.success(t("Logo uploaded"));
+    },
+    onError: (error) => toast.error(apiErrorMessage(error, t("Could not upload logo"))),
+  });
+
+  return (
+    <div className="space-y-3 pt-2">
+      {value ? (
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-background p-2">
+          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-primary-soft text-primary">
+            {preview.data ? (
+              <img src={preview.data} alt={t("Logo preview")} className="h-full w-full object-contain" />
+            ) : (
+              <ImageIcon className="h-5 w-5" />
+            )}
+          </div>
+          <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{value.split("/").pop() ?? value}</p>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange("")}
+            className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary disabled:opacity-40"
+            aria-label={t("Remove logo")}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
+      <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary-soft px-3.5 py-2 text-sm font-bold text-primary">
+        {upload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {t(value ? "Replace logo" : "Upload logo")}
+        <input
+          className="sr-only"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          disabled={disabled || upload.isPending}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) upload.mutate(file);
+          }}
+        />
+      </label>
+    </div>
+  );
 }
 
 function WhatsAppConnectionPanel({ canManage }: { canManage: boolean }) {
@@ -361,7 +494,7 @@ function SettingRow({
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
         <Settings2 className="h-4 w-4" />
       </span>
-      <label className="min-w-0">
+      <div className="min-w-0">
         <span className="block truncate text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground">
           {t(setting.label)}
         </span>
@@ -389,6 +522,19 @@ function SettingRow({
             onChange={(event) => setDraft(event.target.value)}
             placeholder={t("Paste API key")}
           />
+        ) : setting.type === "weekday_multi" ? (
+          <WeekdayPicker disabled={!canManage} value={draft} onChange={setDraft} />
+        ) : setting.type === "language" ? (
+          <CustomDropdown
+            disabled={!canManage}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          >
+            <option value="ur">{t("Urdu")}</option>
+            <option value="en">{t("English")}</option>
+          </CustomDropdown>
+        ) : setting.type === "file" ? (
+          <LogoFilePicker disabled={!canManage} value={draft} onChange={setDraft} />
         ) : (
           <TextInput
             disabled={!canManage}
@@ -396,7 +542,7 @@ function SettingRow({
             onChange={(event) => setDraft(event.target.value)}
           />
         )}
-      </label>
+      </div>
       {canManage ? (
         <button
           aria-label="Save setting"

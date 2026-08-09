@@ -143,13 +143,14 @@ async def _require_class_course_scope(
     course_id: UUID,
     section_id: UUID | None = None,
     bypass_permission: str | None = None,
+    force_teacher_scope: bool = False,
 ) -> None:
     """A timetable assignment is mandatory for teachers.
 
     Generic delegated permissions deliberately do not widen teaching scope;
     only the principal role is an explicit supervisory bypass.
     """
-    if await _user_is_admin(current_user, session):
+    if not force_teacher_scope and await _user_is_admin(current_user, session):
         return
 
     teacher = await _teacher_profile(session, current_user)
@@ -370,7 +371,13 @@ async def create_assignment(
         return await _assignment_reads(session, madrasa.id, created)
 
     await _require_class_course_scope(
-        session, current_user, madrasa.id, payload.class_id, payload.course_id, bypass_permission="assignments.create_any"
+        session,
+        current_user,
+        madrasa.id,
+        payload.class_id,
+        payload.course_id,
+        bypass_permission="assignments.create_any",
+        force_teacher_scope=payload.mine_only,
     )
     section_ids: list[UUID | None] = list(dict.fromkeys(payload.section_ids)) or [None]
     for section_id in section_ids:
@@ -381,7 +388,7 @@ async def create_assignment(
             raise HTTPException(status_code=400, detail="Section does not belong to the given class")
         # Multi-section publish: the teacher must actually teach this course
         # in every targeted section (admins/create_any bypass in scope check).
-        if teacher is not None and current_user.role == UserRole.teacher:
+        if teacher is not None and (current_user.role == UserRole.teacher or payload.mine_only):
             if not await user_has_permission(current_user, "assignments.create_any", session):
                 active_session_id = await _active_session_id(session, madrasa.id)
                 if not await teacher_teaches(
@@ -537,6 +544,7 @@ async def list_assignments(
     course_id: UUID | None = None,
     category: str | None = None,
     created_by_id: UUID | None = None,
+    mine_only: bool = False,
     sort: str = "due_date",  # due_date | created_at | title | teacher
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
@@ -554,9 +562,15 @@ async def list_assignments(
         stmt = stmt.where(Assignment.created_by_id == created_by_id)
 
     teacher = await _teacher_profile(session, current_user)
+    should_scope_to_teacher = mine_only and teacher is not None
     if current_user.role == UserRole.teacher and not await user_has_permission(
         current_user, "assignments.view_all", session
     ):
+        should_scope_to_teacher = True
+    if mine_only and teacher is None and current_user.role != UserRole.student:
+        response.headers["X-Total-Count"] = "0"
+        return []
+    if should_scope_to_teacher:
         active_session_id = await _active_session_id(session, madrasa.id)
         pairs = await taught_pairs(
             session,

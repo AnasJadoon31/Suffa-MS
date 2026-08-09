@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, Edit2, Newspaper, Search, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit2, Newspaper, Send, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app/AppShell";
 import { BlogPostFormFields, type BlogPostFormValues } from "@/components/app/content/BlogPostFormFields";
+import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
-import { Card, EmptyState, Pill, Segmented, SkeletonList, TextInput } from "@/components/app/Primitives";
+import { Card, CustomDropdown, EmptyState, Field, Pill, SkeletonList } from "@/components/app/Primitives";
 import { RichText } from "@/components/app/RichText";
 import { useAuth } from "@/lib/mms/auth";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
@@ -49,6 +50,11 @@ function BlogPage() {
       (post) => post.title.toLowerCase().includes(q) || post.body.toLowerCase().includes(q),
     );
   }, [items, search]);
+  const activeCount = [search.trim(), canManage && view !== "published" ? view : ""].filter(Boolean).length;
+  const clearFilters = () => {
+    setSearch("");
+    setView("published");
+  };
 
   const [active, setActive] = useState<BlogPost | null>(null);
   const [editing, setEditing] = useState<BlogPost | null>(null);
@@ -162,26 +168,20 @@ function BlogPage() {
         ) : undefined
       }
     >
-      <div className="relative mb-3">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <TextInput
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t("Search posts…")}
-          className="pl-9"
-        />
-      </div>
-
-      {canManage ? (
-        <Segmented
-          value={view}
-          onChange={setView}
-          options={[
-            { key: "published", label: "Published" },
-            { key: "all", label: "All posts" },
-          ]}
-        />
-      ) : null}
+      <FilterBar
+        search={{ value: search, onChange: setSearch, placeholder: t("Search posts…") }}
+        activeCount={activeCount}
+        onClear={clearFilters}
+      >
+        {canManage ? (
+          <Field label={t("Status")}>
+            <CustomDropdown value={view} onChange={(e) => setView(e.target.value as typeof view)}>
+              <option value="published">{t("Published")}</option>
+              <option value="all">{t("All posts")}</option>
+            </CustomDropdown>
+          </Field>
+        ) : null}
+      </FilterBar>
 
       {query.isLoading ? <SkeletonList rows={4} /> : null}
       {!query.isLoading && filtered.length === 0 ? <EmptyState title={t("No posts yet")} /> : null}

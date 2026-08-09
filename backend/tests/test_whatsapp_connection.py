@@ -3,7 +3,6 @@ import json
 import httpx
 
 from app.core.config import settings
-from app.modules.operations.models import MadrasaSetting
 
 
 def _use_evolution_transport(monkeypatch, handler) -> None:
@@ -17,6 +16,9 @@ def _use_evolution_transport(monkeypatch, handler) -> None:
     monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
     monkeypatch.setattr(settings, "evolution_api_key", "secret-test-key")
     monkeypatch.setattr(settings, "evolution_instance", "suffa-ms")
+    monkeypatch.setattr(settings, "evolution_webhook_url", "")
+    monkeypatch.setattr(settings, "evolution_webhook_base64", True)
+    monkeypatch.setattr(settings, "evolution_webhook_events", "")
     monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
 
 
@@ -45,41 +47,17 @@ async def test_principal_can_read_whatsapp_connection_status(client, monkeypatch
     }
 
 
-async def test_whatsapp_connection_uses_madrasa_evolution_settings(
-    client, db_sessionmaker, seed, monkeypatch,
-):
-    async with db_sessionmaker() as db:
-        db.add_all(
-            [
-                MadrasaSetting(
-                    madrasa_id=seed.madrasa.id,
-                    key="whatsapp.evolution_api_url",
-                    value="https://tenant-evolution.test/",
-                ),
-                MadrasaSetting(
-                    madrasa_id=seed.madrasa.id,
-                    key="whatsapp.evolution_api_key",
-                    value="tenant-secret",
-                ),
-                MadrasaSetting(
-                    madrasa_id=seed.madrasa.id,
-                    key="whatsapp.evolution_instance",
-                    value="tenant-instance",
-                ),
-            ]
-        )
-        await db.commit()
-
+async def test_whatsapp_connection_uses_env_evolution_settings(client, monkeypatch):
     async def handler(request: httpx.Request) -> httpx.Response:
-        assert str(request.url).startswith("https://tenant-evolution.test/")
-        assert request.headers["apikey"] == "tenant-secret"
+        assert str(request.url).startswith("https://env-evolution.test/")
+        assert request.headers["apikey"] == "env-secret"
         if request.url.path == "/instance/fetchInstances":
             return httpx.Response(200, request=request, json=[])
-        assert request.url.path == "/instance/connectionState/tenant-instance"
+        assert request.url.path == "/instance/connectionState/env-instance"
         return httpx.Response(
             200,
             request=request,
-            json={"instance": {"instanceName": "tenant-instance", "state": "open"}},
+            json={"instance": {"instanceName": "env-instance", "state": "open"}},
         )
 
     transport = httpx.MockTransport(handler)
@@ -88,13 +66,13 @@ async def test_whatsapp_connection_uses_madrasa_evolution_settings(
     monkeypatch.setattr(settings, "evolution_api_url", "https://env-evolution.test")
     monkeypatch.setattr(settings, "evolution_api_key", "env-secret")
     monkeypatch.setattr(settings, "evolution_instance", "env-instance")
-    monkeypatch.setattr(settings, "evolution_tenant_slug", "another-madrasa")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
 
     response = await client.get("/api/v1/messaging/whatsapp/connection")
 
     assert response.status_code == 200, response.text
     assert response.json() == {
-        "instance_name": "tenant-instance",
+        "instance_name": "env-instance",
         "state": "open",
         "connected": True,
         "connected_jid": None,
@@ -170,46 +148,19 @@ async def test_principal_can_disconnect_whatsapp_instance(client, monkeypatch):
     assert requests == [("DELETE", "/instance/delete/suffa-ms")]
 
 
-async def test_qr_pairing_registers_configured_nested_v2_webhook(
-    client, db_sessionmaker, seed, monkeypatch,
-):
-    async with db_sessionmaker() as db:
-        db.add_all(
-            [
-                MadrasaSetting(
-                    madrasa_id=seed.madrasa.id,
-                    key="whatsapp.evolution_api_url",
-                    value="https://evolution.test",
-                ),
-                MadrasaSetting(
-                    madrasa_id=seed.madrasa.id,
-                    key="whatsapp.evolution_api_key",
-                    value="tenant-secret",
-                ),
-                MadrasaSetting(
-                    madrasa_id=seed.madrasa.id,
-                    key="whatsapp.evolution_instance",
-                    value="suffa-ms",
-                ),
-                MadrasaSetting(
-                    madrasa_id=seed.madrasa.id,
-                    key="whatsapp.evolution_webhook_url",
-                    value="https://api.suffa.test/api/webhooks/evolution/secret",
-                ),
-                MadrasaSetting(
-                    madrasa_id=seed.madrasa.id,
-                    key="whatsapp.evolution_webhook_base64",
-                    value="true",
-                ),
-            ]
-        )
-        await db.commit()
-
+async def test_qr_pairing_registers_configured_nested_v2_webhook(client, monkeypatch):
+    monkeypatch.setattr(settings, "evolution_api_url", "https://evolution.test")
+    monkeypatch.setattr(settings, "evolution_api_key", "env-secret")
+    monkeypatch.setattr(settings, "evolution_instance", "suffa-ms")
+    monkeypatch.setattr(settings, "evolution_webhook_url", "https://api.suffa.test/api/webhooks/evolution/secret")
+    monkeypatch.setattr(settings, "evolution_webhook_base64", True)
+    monkeypatch.setattr(settings, "evolution_webhook_events", "")
+    monkeypatch.setattr(settings, "evolution_tenant_slug", "test")
     requests: list[tuple[str, str]] = []
 
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append((request.method, request.url.path))
-        assert request.headers["apikey"] == "tenant-secret"
+        assert request.headers["apikey"] == "env-secret"
         if request.url.path == "/instance/connectionState/suffa-ms":
             return httpx.Response(404, request=request, json={"message": "missing"})
         if request.url.path == "/instance/create":

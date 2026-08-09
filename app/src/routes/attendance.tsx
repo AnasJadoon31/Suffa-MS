@@ -272,6 +272,24 @@ function AttendanceBoard() {
     () => (history.data?.entries ?? []).filter((entry) => entry.attendance_date === selectedDate),
     [history.data, selectedDate],
   );
+
+  useEffect(() => {
+    if (tab !== "calendar") return;
+    const entries = history.data?.entries ?? [];
+    if (entries.length === 0) return;
+    if (!entries.some((entry) => entry.attendance_date === selectedDate)) {
+      setSelectedDate(entries[0]!.attendance_date);
+    }
+  }, [history.data, selectedDate, tab]);
+
+  useEffect(() => {
+    if (tab !== "history") return;
+    const entries = studentHistory.data?.entries ?? [];
+    if (entries.length === 0) return;
+    if (!entries.some((entry) => entry.attendance_date === selectedDate)) {
+      setSelectedDate(entries[0]!.attendance_date);
+    }
+  }, [selectedDate, studentHistory.data, tab]);
   const approvedLeaveIds = useMemo(
     () =>
       new Set(

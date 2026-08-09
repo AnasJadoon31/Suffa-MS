@@ -668,7 +668,7 @@ async def my_timetable(
             TimetableSlot.class_id == enrollment.class_id,
             TimetableSlot.section_id == enrollment.section_id,
         )
-    elif current_user.role == UserRole.teacher:
+    else:
         profile = (
             await session.execute(select(TeacherProfile).where(
                 TeacherProfile.user_id == current_user.id,
@@ -676,14 +676,14 @@ async def my_timetable(
             ))
         ).scalar_one_or_none()
         if profile is None:
-            return []
+            if current_user.role == UserRole.teacher:
+                return []
+            raise HTTPException(status_code=403, detail=ErrorCode.TIMETABLE_SELF_SERVICE_ONLY)
         stmt = select(TimetableSlot).where(
             TimetableSlot.madrasa_id == madrasa.id,
             (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
             TimetableSlot.teacher_id == profile.id,
         )
-    else:
-        raise HTTPException(status_code=403, detail=ErrorCode.TIMETABLE_SELF_SERVICE_ONLY)
 
     rows = list(await paginate_scalars(
         session, stmt.order_by(TimetableSlot.day_of_week, TimetableSlot.period), limit=limit, offset=offset, response=response

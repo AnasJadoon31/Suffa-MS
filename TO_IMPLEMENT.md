@@ -5,6 +5,44 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-09 — Attendance History Seed Visibility Follow-Up
+
+- Status: Shared filter buttons are now used on Announcements, Forms, Blog, Reports, and Timetable, in addition to the screens that already had `FilterBar`.
+- Status: Madrasa Settings now renders logo as an upload control and default language as an English/Urdu dropdown.
+- Status: Seeded enrollment dates now cover seeded attendance dates, and attendance history includes general daily rows under course-filtered views. The frontend now moves the selected date to the latest available history entry when today has no rows.
+- Status: School days are now configurable from Madrasa Settings through `attendance.school_days`; the seed and live DB default are Monday-Saturday, and the live DB has August 8, 2026 attendance rows for all seeded students and teachers.
+- Remaining release work:
+  - Run browser smoke on `/settings` to confirm the logo uploader, default-language dropdown, and weekday selector layout in English and Urdu.
+  - Run browser smoke on `/announcements`, `/forms`, `/blog`, `/reports`, and `/timetable` to confirm the filter buttons open cleanly on mobile and desktop.
+  - Run browser smoke on `/attendance` after frontend refresh to confirm the calendar visually lands on the seeded latest date.
+
+## 2026-08-09 — Results Publish and Seed Follow-Up
+
+- Status: Publish Results now sends the active results-matrix session ID instead of an empty UUID. The Docker Postgres DB was reset, migrations were replayed, and the expanded full madrasa seed was loaded.
+- Status: Seeded fixture now covers the full `1448 / 2026-27` academic year: 432 timetable slots, 528 assignments including 204 admin-created assignments, submissions, marks, published results for all students, full-session attendance, monthly fees, recurring donations, and monthly salary payments.
+- Remaining release work:
+  - Run a browser smoke after the frontend refreshes to confirm the new global Assessments and My Assessments flows render cleanly with the new fixture.
+  - Add explicit guardian-profile result visibility coverage if guardians need a dedicated result tab beyond linked ward/report access.
+
+## 2026-08-09 — Teacher-Scoped My Assessments Follow-Up
+
+- Status: `/my-assessments` now has Assignments, Marking, and Results tabs. Assignment reads and assignment creation use `mine_only=true`, and admin/principal teachers are scoped through their linked teacher profile. Assignment create/filter options plus Marking/Results filters are sourced from the user's own timetable. The global `/assignments` surface is now labelled Assessments and has Assignments, Marking, and Results tabs for madrasa-wide work.
+- Status: The backend container on port `8001` was rebuilt/recreated after the route changes and `/healthz` is healthy.
+- Remaining release work:
+  - Add regression coverage for admin/principal users with linked teacher profiles across `/my-timetable` and `/my-assessments`.
+
+## 2026-08-09 — Admin Teacher Timetable Access Follow-Up
+
+- Status: `/api/v1/operations/timetable/me` now serves the teacher timetable for admin/principal users who have a linked teacher profile.
+- Remaining release work:
+  - Add a focused regression later for principal/admin users with teacher profiles once the authenticated browser/API route pack is restored.
+
+## 2026-08-09 — My Timetable Error Text Follow-Up
+
+- Status: `/my-timetable` now translates the `timetable_self_service_only` backend code into readable English and Urdu text.
+- Remaining release work:
+  - Decide whether admin/principal users should be redirected away from self-service timetable routes or shown a role-specific timetable management link.
+
 ## 2026-08-09 — Dependent Student Phone Follow-Up
 
 - Status: Dependent student cards no longer show a separate Phone row, and the student form only exposes Phone for independent students.
@@ -19,8 +57,8 @@ they do not close or weaken the new July 23 requirements.
 
 ## 2026-08-08 — WhatsApp Evolution Settings Follow-Up
 
-- Status: Madrasa Settings now exposes Evolution API v2 connection/webhook settings, and messaging uses complete per-madrasa settings before falling back to env vars.
-- Status: Local `suffa` settings are configured for the provided Evolution URL/API key (secret redacted in reads) and the `suffa-ms` instance currently reports `open` on the rebuilt local backend.
+- Status: Evolution API v2 URL/key/instance/webhook settings are no longer editable from Madrasa Settings; messaging now reads them from env only.
+- Status: Local `.env` is configured for the provided Evolution URL/API key and `suffa-ms` instance; `/settings/catalog` exposes no `whatsapp.*` config rows.
 - Status: Connected sessions now show the Evolution owner phone/JID when reported, and admins can close the current Evolution instance before pairing another phone.
 - Status: Opened student, teacher, and guardian person cards now expose WhatsApp credential sending; independent students can use their own registered phone and linked students can use guardian phones.
 - Status: Dependent students are now blocked from being created or updated without a guardian, the last guardian link cannot be removed, and existing invalid dependent records show a person-card warning with WhatsApp credential sending disabled until a guardian phone is linked.

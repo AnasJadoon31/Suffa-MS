@@ -37,10 +37,12 @@ from app.modules.attendance.schemas import (
     TeacherAttendanceLogEntry,
     TeacherAttendanceTodayResponse,
 )
-from app.modules.operations.models import Holiday, Leave, TimetableSlot
+from app.modules.operations.models import Holiday, Leave, MadrasaSetting, TimetableSlot
 from app.modules.people.models import StudentProfile, TeacherProfile, Guardian, StudentGuardian
 
 router = APIRouter()
+
+DEFAULT_SCHOOL_DAY_INDEXES = frozenset({0, 1, 2, 3, 4, 5})
 
 
 def lock_cutoff(attendance_date: date) -> datetime:
@@ -72,6 +74,31 @@ def _iter_days(start_date: date, end_date: date):
     while current <= end_date:
         yield current
         current = date.fromordinal(current.toordinal() + 1)
+
+
+def _parse_school_day_indexes(value: str | None) -> frozenset[int]:
+    if not value:
+        return DEFAULT_SCHOOL_DAY_INDEXES
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return DEFAULT_SCHOOL_DAY_INDEXES
+    if not isinstance(parsed, list):
+        return DEFAULT_SCHOOL_DAY_INDEXES
+    days = {item for item in parsed if isinstance(item, int) and 0 <= item <= 6}
+    return frozenset(days) if days else DEFAULT_SCHOOL_DAY_INDEXES
+
+
+async def _school_day_indexes(session: AsyncSession, madrasa_id: UUID) -> frozenset[int]:
+    value = (
+        await session.execute(
+            select(MadrasaSetting.value).where(
+                MadrasaSetting.madrasa_id == madrasa_id,
+                MadrasaSetting.key == "attendance.school_days",
+            )
+        )
+    ).scalar_one_or_none()
+    return _parse_school_day_indexes(value)
 
 
 def record_correction(
@@ -678,6 +705,7 @@ async def _approved_leave_history_entries(
             )
         )
     ).all()
+    school_days = await _school_day_indexes(session, madrasa_id)
 
     entries: list[AttendanceLogEntry] = []
     seen_days: set[tuple[UUID, date]] = set()
@@ -695,6 +723,8 @@ async def _approved_leave_history_entries(
         role,
     ) in rows:
         for day in _iter_days(max(leave_start, start_date), min(leave_end, end_date)):
+            if day.weekday() not in school_days:
+                continue
             if enrollment_windows is not None and not any(
                 window_start <= day <= window_end
                 for window_start, window_end in enrollment_windows.get(student_id, [])
@@ -930,7 +960,7 @@ async def _class_history_entries(
     if end_date is not None:
         stmt = stmt.where(StudentAttendance.attendance_date <= end_date)
     if course_id is not None:
-        stmt = stmt.where(StudentAttendance.course_id == course_id)
+        stmt = stmt.where(or_(StudentAttendance.course_id == course_id, StudentAttendance.course_id.is_(None)))
     rows = (
         await session.execute(
             stmt.order_by(StudentAttendance.attendance_date.desc(), StudentProfile.name)
@@ -1728,6 +1758,7 @@ async def compute_attendance_summary(
                 )
             )
         ).all()
+    school_days = await _school_day_indexes(session, madrasa_id)
 
     def is_holiday(day: date) -> bool:
         for h_start, h_end in holidays:
@@ -1747,7 +1778,10 @@ async def compute_attendance_summary(
     current = start_date
     while current <= end_date:
         status_values = by_date.get(current, [])
-        if is_holiday(current):
+        if current.weekday() not in school_days:
+            excluded_days += 1
+            days.append(AttendanceDayBreakdown(attendance_date=current, excluded_reason="non_school_day"))
+        elif is_holiday(current):
             excluded_days += 1
             days.append(AttendanceDayBreakdown(attendance_date=current, excluded_reason="holiday"))
         elif has_approved_leave(current):

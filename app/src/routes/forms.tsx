@@ -5,12 +5,14 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { FilterBar } from "@/components/app/FilterBar";
 import { FormEditorSheet } from "@/components/app/forms/FormEditorSheet";
 import { FillFormSheet } from "@/components/app/forms/FillFormSheet";
 import { ResponsesPanel } from "@/components/app/forms/ResponsesPanel";
 import {
   Card,
   EmptyState,
+  Field,
   Pill,
   Segmented,
   CustomDropdown,
@@ -78,6 +80,11 @@ function FormsPage() {
   const visibleForms = forms.filter((f) =>
     search.trim() ? f.title.toLowerCase().includes(search.trim().toLowerCase()) : true,
   );
+  const activeCount = [search.trim(), category].filter(Boolean).length;
+  const clearFilters = () => {
+    setSearch("");
+    setCategory("");
+  };
 
   const remove = useMutation({
     mutationFn: (id: string) => formsApi.deleteForm(id),
@@ -123,21 +130,22 @@ function FormsPage() {
 
       {tab === "forms" ? (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2.5">
-            <TextInput
-              placeholder={t("Search forms…")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <CustomDropdown value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">{t("All categories")}</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </CustomDropdown>
-          </div>
+          <FilterBar
+            search={{ value: search, onChange: setSearch, placeholder: t("Search forms…") }}
+            activeCount={activeCount}
+            onClear={clearFilters}
+          >
+            <Field label={t("Category")}>
+              <CustomDropdown value={category} onChange={(e) => setCategory(e.target.value)}>
+                <option value="">{t("All categories")}</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </CustomDropdown>
+            </Field>
+          </FilterBar>
 
           {query.isLoading ? <SkeletonList rows={4} /> : null}
           {!query.isLoading && visibleForms.length === 0 ? (

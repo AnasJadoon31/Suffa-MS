@@ -39,17 +39,19 @@ import {
   type Submission,
   uploadFile,
 } from "@/lib/mms/more-endpoints";
+import { cn } from "@/lib/utils";
+import { MarkingView, ResultsView } from "./examination";
 import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/assignments")({
   head: () => ({
     meta: [
-      { title: "Assignments — Suffa MS" },
-      { name: "description", content: "Assignments, due dates, marks and submission status." },
-      { property: "og:title", content: "Assignments — Suffa MS" },
+      { title: "Assessments — Suffa MS" },
+      { name: "description", content: "Assessments, due dates, marks and submission status." },
+      { property: "og:title", content: "Assessments — Suffa MS" },
       {
         property: "og:description",
-        content: "Assignments, due dates, marks and submission status.",
+        content: "Assessments, due dates, marks and submission status.",
       },
     ],
   }),
@@ -73,6 +75,7 @@ function AssignmentsPage() {
   const isStudent = user?.role === "student";
   const canManage =
     user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate || user?.role === "teacher";
+  const [tab, setTab] = useState<"assignments" | "marking" | "results">("assignments");
 
   const [filters, setFilters] = useState(emptyFilters);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
@@ -186,10 +189,10 @@ function AssignmentsPage() {
 
   return (
     <AppShell
-      title={t("Assignments")}
+      title={t("Assessments")}
       subtitle={`${items.length} total`}
       right={
-        canManage ? (
+        canManage && tab === "assignments" ? (
           <FormSheet
             title={t("New assignment")}
             triggerLabel="New"
@@ -248,6 +251,25 @@ function AssignmentsPage() {
         ) : undefined
       }
     >
+      <div className="mb-3 grid grid-cols-3 gap-1.5 rounded-2xl bg-muted p-1">
+        {(["assignments", "marking", "results"] as const).map((key) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={cn(
+              "rounded-xl py-2 text-[0.66rem] font-bold uppercase",
+              tab === key ? "bg-card text-primary shadow-sm" : "text-muted-foreground",
+            )}
+          >
+            {key === "assignments" ? t("Assignments") : key === "marking" ? t("Marking") : t("Results")}
+          </button>
+        ))}
+      </div>
+
+      {tab === "marking" ? <MarkingView canManage={canManage} /> : null}
+      {tab === "results" ? <ResultsView canManage={canManage} /> : null}
+      {tab === "assignments" ? (
+        <>
       <FilterBar activeCount={activeCount} onClear={() => setFilters(emptyFilters)}>
         {canManage ? (
           <>
@@ -453,6 +475,8 @@ function AssignmentsPage() {
           open={Boolean(editingAssignment)}
           onOpenChange={(next) => !next && setEditingAssignment(null)}
         />
+      ) : null}
+        </>
       ) : null}
     </AppShell>
   );

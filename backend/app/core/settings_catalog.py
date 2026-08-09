@@ -5,26 +5,15 @@ are accepted, each with a type and category — this is what turns the raw
 key/value editor into a real settings page. Feature flags deliberately live
 elsewhere (madrasa_features, super-admin only).
 """
+import json
 from dataclasses import dataclass
-
-
-DEFAULT_EVOLUTION_WEBHOOK_EVENTS = (
-    "QRCODE_UPDATED",
-    "CONNECTION_UPDATE",
-    "MESSAGES_UPSERT",
-    "MESSAGES_UPDATE",
-    "MESSAGES_DELETE",
-    "SEND_MESSAGE",
-    "GROUPS_UPSERT",
-    "GROUP_UPDATE",
-)
 
 
 @dataclass(frozen=True)
 class SettingDef:
     key: str
     category: str
-    type: str  # string | int | bool | file | secret
+    type: str  # string | int | bool | file | secret | weekday_multi | language
     default: str
     label: str
 
@@ -47,24 +36,12 @@ CATALOG: tuple[SettingDef, ...] = (
     SettingDef("academics.show_hijri_dates", "academics", "bool", "true", "Show Hijri dates"),
     # Attendance.
     SettingDef("attendance.lock_time", "attendance", "string", "23:59", "Attendance lock time"),
+    SettingDef("attendance.school_days", "attendance", "weekday_multi", "[0,1,2,3,4,5]", "School days"),
     # Finance.
     SettingDef("finance.currency", "finance", "string", "PKR", "Currency"),
     SettingDef("finance.receipt_footer", "finance", "string", "", "Receipt footer text"),
     # Portal.
-    SettingDef("portal.default_language", "portal", "string", "ur", "Default language"),
-    # WhatsApp / Evolution API v2.
-    SettingDef("whatsapp.evolution_api_url", "whatsapp", "string", "", "Evolution API URL"),
-    SettingDef("whatsapp.evolution_api_key", "whatsapp", "secret", "", "Evolution API key"),
-    SettingDef("whatsapp.evolution_instance", "whatsapp", "string", "", "Evolution instance name"),
-    SettingDef("whatsapp.evolution_webhook_url", "whatsapp", "string", "", "Evolution webhook URL"),
-    SettingDef("whatsapp.evolution_webhook_base64", "whatsapp", "bool", "true", "Receive media as base64"),
-    SettingDef(
-        "whatsapp.evolution_webhook_events",
-        "whatsapp",
-        "string",
-        ",".join(DEFAULT_EVOLUTION_WEBHOOK_EVENTS),
-        "Webhook events",
-    ),
+    SettingDef("portal.default_language", "portal", "language", "ur", "Default language"),
 )
 
 CATALOG_BY_KEY: dict[str, SettingDef] = {item.key: item for item in CATALOG}
@@ -86,3 +63,20 @@ def validate_setting(key: str, value: str) -> None:
     elif definition.type == "secret":
         if "\n" in value or "\r" in value:
             raise ValueError(f"Setting {key} must be a single line")
+    elif definition.type == "weekday_multi":
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            raise ValueError(f"Setting {key} must be a JSON list of weekday numbers")
+        if not isinstance(parsed, list) or not parsed:
+            raise ValueError(f"Setting {key} must include at least one school day")
+        days: set[int] = set()
+        for item in parsed:
+            if not isinstance(item, int) or item < 0 or item > 6:
+                raise ValueError(f"Setting {key} must contain weekday numbers from 0 to 6")
+            days.add(item)
+        if len(days) != len(parsed):
+            raise ValueError(f"Setting {key} must not contain duplicate weekdays")
+    elif definition.type == "language":
+        if value not in ("en", "ur"):
+            raise ValueError(f"Setting {key} must be 'en' or 'ur'")

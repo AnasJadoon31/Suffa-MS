@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Edit2, Megaphone, Search, Trash2 } from "lucide-react";
+import { Edit2, Megaphone, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { AppShell } from "@/components/app/AppShell";
+import { FilterBar } from "@/components/app/FilterBar";
 import {
   AnnouncementFormFields,
   type AnnouncementFormValues,
@@ -46,6 +47,20 @@ function AnnouncementsPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const activeCount =
+    (audienceFilter !== "all" ? 1 : 0) +
+    (categoryFilter.trim() ? 1 : 0) +
+    (search.trim() ? 1 : 0) +
+    (dateFrom ? 1 : 0) +
+    (dateTo ? 1 : 0);
+
+  const clearFilters = () => {
+    setAudienceFilter("all");
+    setCategoryFilter("");
+    setSearch("");
+    setDateFrom("");
+    setDateTo("");
+  };
 
   const filterParams = {
     ...(audienceFilter !== "all" ? { audience: audienceFilter } : {}),
@@ -120,17 +135,12 @@ function AnnouncementsPage() {
         ) : undefined
       }
     >
-      <div className="mb-3 space-y-2.5">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <TextInput
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("Search announcements…")}
-            className="pl-9"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2.5">
+      <FilterBar
+        search={{ value: search, onChange: setSearch, placeholder: t("Search announcements…") }}
+        activeCount={activeCount}
+        onClear={clearFilters}
+      >
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <Field label={t("Audience")}>
             <CustomDropdown
               value={audienceFilter}
@@ -155,7 +165,7 @@ function AnnouncementsPage() {
             <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </Field>
         </div>
-      </div>
+      </FilterBar>
 
       {query.isLoading ? <SkeletonList rows={4} /> : null}
       {!query.isLoading && items.length === 0 ? (

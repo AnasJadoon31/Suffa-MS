@@ -5,7 +5,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
-import { Card, CustomDropdown, SectionTitle } from "@/components/app/Primitives";
+import { FilterBar } from "@/components/app/FilterBar";
+import { Card, CustomDropdown, Field, SectionTitle, TextInput } from "@/components/app/Primitives";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { reportsApi } from "@/lib/mms/more-endpoints";
@@ -36,14 +37,28 @@ function firstOfMonth() {
 
 function ReportsPage() {
     const { t } = useTranslation();
-  const [start, setStart] = useState(firstOfMonth());
-  const [end, setEnd] = useState(new Date().toISOString().slice(0, 10));
+  const defaultStart = firstOfMonth();
+  const defaultEnd = new Date().toISOString().slice(0, 10);
+  const [start, setStart] = useState(defaultStart);
+  const [end, setEnd] = useState(defaultEnd);
   const [classId, setClassId] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [busy, setBusy] = useState("");
 
   const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses() });
   const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => academicsApi.listSessions() });
+  const activeCount = [
+    start !== defaultStart ? start : "",
+    end !== defaultEnd ? end : "",
+    classId,
+    sessionId,
+  ].filter(Boolean).length;
+  const clearFilters = () => {
+    setStart(defaultStart);
+    setEnd(defaultEnd);
+    setClassId("");
+    setSessionId("");
+  };
 
   const run = async (key: string, task: () => Promise<void>) => {
     setBusy(key);
@@ -59,39 +74,36 @@ function ReportsPage() {
 
   return (
     <AppShell title={t("Reports")} subtitle={t("Export CSV or PDF")}>
-      <Card className="space-y-3">
-        <p className="font-display text-sm font-extrabold">{t("Filters")}</p>
-        <div className="grid grid-cols-2 gap-2">
-          <input
-            type="date"
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
-            className="rounded-xl bg-muted px-3 py-2.5 text-sm outline-none"
-          />
-          <input
-            type="date"
-            value={end}
-            onChange={(e) => setEnd(e.target.value)}
-            className="rounded-xl bg-muted px-3 py-2.5 text-sm outline-none"
-          />
+      <FilterBar activeCount={activeCount} onClear={clearFilters}>
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <Field label={t("From")}>
+            <TextInput type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+          </Field>
+          <Field label={t("To")}>
+            <TextInput type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+          </Field>
+          <Field label={t("Class")}>
+            <CustomDropdown value={classId} onChange={(e) => setClassId(e.target.value)}>
+              <option value="">{t("Select class")}</option>
+              {(classes.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
+          <Field label={t("Session")}>
+            <CustomDropdown value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
+              <option value="">{t("Select session")}</option>
+              {(sessions.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
         </div>
-        <CustomDropdown value={classId} onChange={(e) => setClassId(e.target.value)}>
-          <option value="">{t("Select class")}</option>
-          {(classes.data ?? []).map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </CustomDropdown>
-        <CustomDropdown value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
-          <option value="">{t("Select session")}</option>
-          {(sessions.data ?? []).map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </CustomDropdown>
-      </Card>
+      </FilterBar>
 
       <SectionTitle>{t("Available reports")}</SectionTitle>
       <div className="space-y-2.5">
