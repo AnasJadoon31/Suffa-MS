@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { ChevronRight, GraduationCap } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppShell } from "@/components/app/AppShell";
@@ -29,9 +30,9 @@ function MyTimetablePage() {
     queryFn: () => operationsApi.listMyTimetable(),
   });
 
-  const classOptions = [...new Map(
+  const classOptions = useMemo(() => [...new Map(
     (slots.data ?? []).map((slot) => [slot.class_id, slot.class_name ?? "—"]),
-  ).entries()];
+  ).entries()], [slots.data]);
 
   const visibleSlots = selectedClassId
     ? (slots.data ?? []).filter((slot) => slot.class_id === selectedClassId)
@@ -46,28 +47,35 @@ function MyTimetablePage() {
         <EmptyState title={t(apiErrorMessage(slots.error, "Could not load timetable"))} />
       ) : null}
 
-      {classOptions.length > 1 ? (
-        <div className="mb-3">
-          <label className="text-xs font-semibold text-muted-foreground">{t("Class")}</label>
-          <select
-            value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
-          >
-            {classOptions.map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
-            ))}
-          </select>
+      {!selectedClassId && classOptions.length > 0 ? (
+        <div className="space-y-2">
+          <SectionTitle>{t("Class")}</SectionTitle>
+          {classOptions.map(([id, name]) => (
+            <button key={id} onClick={() => setSelectedClassId(id)} className="w-full">
+              <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><GraduationCap className="h-5 w-5" /></span>
+                <div className="min-w-0 text-left">
+                  <p className="truncate font-semibold">{name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{t("View timetable")}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </Card>
+            </button>
+          ))}
         </div>
       ) : null}
 
       {selectedClassName ? (
-        <p className="mb-2 text-lg font-bold">{selectedClassName}</p>
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3">
+          <button onClick={() => setSelectedClassId("")} className="rounded-xl border border-border px-3 py-2 text-xs font-bold text-primary">{t("Back")}</button>
+          <span className="text-xs font-bold uppercase text-muted-foreground">{t("Class")}</span>
+          <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-bold text-primary">{selectedClassName}</span>
+        </div>
       ) : null}
 
       {slots.data?.length === 0 ? (
         <EmptyState title={t("No timetable entries")} />
-      ) : (
+      ) : selectedClassId ? (
         DAY_KEYS.map((day, dayIndex) => {
           const daySlots = visibleSlots.filter((slot) => slot.day_of_week === dayIndex);
           if (daySlots.length === 0) return null;
@@ -81,8 +89,8 @@ function MyTimetablePage() {
                   <span>{t("Section")}</span>
                   <span>{t("Teacher")}</span>
                 </div>
-                {daySlots
-                  .sort((a, b) => (a.period ?? 0) - (b.period ?? 0))
+                {[...daySlots]
+                  .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? "") || (a.period ?? 0) - (b.period ?? 0))
                   .map((slot) => (
                     <div key={slot.id} className="grid grid-cols-4 gap-1 border-b border-border py-1.5 text-xs">
                       <span>{slot.start_time?.slice(0, 5)}–{slot.end_time?.slice(0, 5)}</span>
@@ -95,7 +103,7 @@ function MyTimetablePage() {
             </div>
           );
         })
-      )}
+      ) : null}
     </AppShell>
   );
 }

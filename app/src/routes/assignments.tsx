@@ -107,6 +107,7 @@ function AssignmentsPage() {
       date_from: filters.dateFrom || undefined,
       date_to: filters.dateTo || undefined,
       mine_only: filters.mineOnly || undefined,
+      sort: "created_at" as const,
     }),
     [filters],
   );
@@ -116,7 +117,7 @@ function AssignmentsPage() {
     queryFn: () => assessmentsApi.listAssignments(params),
   });
 
-  const items = (query.data ?? []).slice().sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const items = query.data ?? [];
 
   const activeCount = [
     filters.classId,
@@ -132,23 +133,28 @@ function AssignmentsPage() {
   const [courseId, setCourseId] = useState("");
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [maxMarks, setMaxMarks] = useState("");
 
   const create = useMutation({
-    mutationFn: () =>
-      assessmentsMutations.createAssignment({
+    mutationFn: async () => {
+      const attachmentKey = attachmentFile ? await uploadFile(attachmentFile, "assignments") : undefined;
+      return assessmentsMutations.createAssignment({
         class_id: classId,
         course_id: courseId,
         title: title.trim(),
         instructions: instructions.trim(),
+        ...(attachmentKey ? { attachment_key: attachmentKey } : {}),
         due_date: dueDate,
         ...(maxMarks ? { max_marks: Number(maxMarks) } : {}),
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Assignment created");
       setTitle("");
       setInstructions("");
+      setAttachmentFile(null);
       setMaxMarks("");
       void client.invalidateQueries({ queryKey: ["assignments"] });
     },
@@ -186,6 +192,11 @@ function AssignmentsPage() {
       void client.invalidateQueries({ queryKey: ["assignments"] });
     },
   });
+
+  async function openAssignmentAttachment(fileKey: string) {
+    const url = await filesApi.presignDownload(fileKey);
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
 
   return (
     <AppShell
@@ -228,6 +239,17 @@ function AssignmentsPage() {
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
               />
+            </Field>
+            <Field label={t("Attachment")}>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.webp"
+                onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
+                className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-xl file:border file:border-border file:bg-card file:px-3 file:py-2 file:text-xs file:font-bold file:text-foreground"
+              />
+              {attachmentFile ? (
+                <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{attachmentFile.name}</p>
+              ) : null}
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t("Due date")}>
@@ -412,6 +434,11 @@ function AssignmentsPage() {
                 <ActionButton variant="soft" onClick={() => setSelectedAssignment(item)}>
                   <Eye className="h-4 w-4" />
                   {t("Open")}</ActionButton>
+                {item.attachment_key ? (
+                  <ActionButton variant="soft" onClick={() => void openAssignmentAttachment(item.attachment_key!)}>
+                    <Download className="h-4 w-4" />
+                    {t("Attachment")}</ActionButton>
+                ) : null}
                 {isStudent ? (
                   item.submitted_at ? (
                     <ActionButton variant="soft" onClick={() => unsubmit.mutate(item.id)}>
@@ -544,6 +571,14 @@ function AssignmentDetailSheet({
           <span>{t("Due")}{new Date(assignment.due_date).toLocaleString()}</span>
           {assignment.max_marks != null ? <span>{t("Max")}{assignment.max_marks}</span> : null}
         </div>
+        {assignment.attachment_key ? (
+          <div className="mt-3">
+            <ActionButton variant="soft" onClick={() => void openSubmission(assignment.attachment_key!)}>
+              <Download className="h-4 w-4" />
+              {t("Download attachment")}
+            </ActionButton>
+          </div>
+        ) : null}
 
         {canManage ? (
           <>
@@ -627,19 +662,24 @@ function EditAssignmentSheet({
   const client = useQueryClient();
   const [title, setTitle] = useState(assignment.title);
   const [instructions, setInstructions] = useState(assignment.instructions);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [removeAttachment, setRemoveAttachment] = useState(false);
   const [dueDate, setDueDate] = useState(assignment.due_date.slice(0, 10));
   const [maxMarks, setMaxMarks] = useState(
     assignment.max_marks == null ? "" : String(assignment.max_marks),
   );
 
   const update = useMutation({
-    mutationFn: () =>
-      assessmentsMutations.updateAssignment(assignment.id, {
+    mutationFn: async () => {
+      const nextAttachmentKey = attachmentFile ? await uploadFile(attachmentFile, "assignments") : undefined;
+      return assessmentsMutations.updateAssignment(assignment.id, {
         title: title.trim(),
         instructions: instructions.trim(),
+        ...(nextAttachmentKey ? { attachment_key: nextAttachmentKey } : removeAttachment ? { attachment_key: null } : {}),
         due_date: dueDate,
         ...(maxMarks ? { max_marks: Number(maxMarks) } : { max_marks: undefined }),
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Assignment updated");
       void client.invalidateQueries({ queryKey: ["assignments"] });
@@ -660,6 +700,36 @@ function EditAssignmentSheet({
       </Field>
       <Field label={t("Instructions")}>
         <TextArea required value={instructions} onChange={(e) => setInstructions(e.target.value)} />
+      </Field>
+      <Field label={t("Attachment")}>
+        {assignment.attachment_key && !removeAttachment ? (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <ActionButton variant="soft" onClick={async () => {
+              const url = await filesApi.presignDownload(assignment.attachment_key!);
+              window.open(url, "_blank", "noopener,noreferrer");
+            }}>
+              <Download className="h-4 w-4" />
+              {t("Current attachment")}
+            </ActionButton>
+            <button type="button" className="text-xs font-bold text-destructive" onClick={() => setRemoveAttachment(true)}>
+              {t("Remove")}
+            </button>
+          </div>
+        ) : null}
+        <input
+          type="file"
+          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.webp"
+          onChange={(event) => {
+            setAttachmentFile(event.target.files?.[0] ?? null);
+            setRemoveAttachment(false);
+          }}
+          className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-xl file:border file:border-border file:bg-card file:px-3 file:py-2 file:text-xs file:font-bold file:text-foreground"
+        />
+        {attachmentFile ? (
+          <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{attachmentFile.name}</p>
+        ) : removeAttachment ? (
+          <p className="mt-1 text-xs font-medium text-destructive">{t("Attachment will be removed")}</p>
+        ) : null}
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label={t("Due date")}>

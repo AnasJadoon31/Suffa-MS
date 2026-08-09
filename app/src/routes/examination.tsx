@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { GraduationCap, Users } from "lucide-react";
+import { BookOpen, ChevronRight, ClipboardList, GraduationCap, Send, Users } from "lucide-react";
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,7 +18,7 @@ import {
   TextInput,
 } from "@/components/app/Primitives";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/mms/api";
+import { api, apiErrorMessage } from "@/lib/mms/api";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi, operationsApi, peopleApi } from "@/lib/mms/endpoints";
 import { academicsExtraApi, assessmentsApi, assessmentsMutations, timetableApi } from "@/lib/mms/more-endpoints";
@@ -38,7 +39,7 @@ type Tab = "schemes" | "exams" | "assign" | "marking" | "results";
 function ExaminationPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const canManage = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
+  const canManage = Boolean(user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate);
   const [tab, setTab] = useState<Tab>("schemes");
 
   return (
@@ -364,6 +365,22 @@ export function MarkingView({
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [myTimetable.data]);
+  const classOptions = teacherScoped ? teacherClassOptions : classes.data ?? [];
+  const selectedClassName = classOptions.find((item) => item.id === selectedClassId)?.name;
+  const selectMarkingClass = (id: string) => {
+    setSelectedClassId(id);
+    setSelectedSectionId("");
+    setSelectedCourseId("");
+    setSelectedExamId("");
+    setStep("sections");
+  };
+  const clearMarkingClass = () => {
+    setSelectedClassId("");
+    setSelectedSectionId("");
+    setSelectedCourseId("");
+    setSelectedExamId("");
+    setStep("sections");
+  };
 
   const courseExams = useMemo(() => {
     if (!selectedCourseId || !selectedClassId) return [];
@@ -407,14 +424,33 @@ export function MarkingView({
 
   return (
     <div className="space-y-3">
-      <FilterBar activeCount={selectedClassId ? 1 : 0} onClear={() => { setSelectedClassId(""); setSelectedSectionId(""); setSelectedCourseId(""); setSelectedExamId(""); setStep("sections"); }}>
-        <Field label={t("Class")}>
-          <CustomDropdown value={selectedClassId} onChange={(e) => { setSelectedClassId(e.target.value); setSelectedSectionId(""); setSelectedCourseId(""); setStep("sections"); }}>
-            <option value="">{t("Select class")}</option>
-            {(teacherScoped ? teacherClassOptions : classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </CustomDropdown>
-        </Field>
-      </FilterBar>
+      {!selectedClassId ? (
+        <>
+          <SectionTitle>{t("Class")}</SectionTitle>
+          <div className="space-y-2">
+            {classOptions.map((item) => (
+              <button key={item.id} onClick={() => selectMarkingClass(item.id)} className="w-full">
+                <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><GraduationCap className="h-5 w-5" /></span>
+                  <div className="min-w-0 text-left">
+                    <p className="truncate font-semibold">{item.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{t("View sections")}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Card>
+              </button>
+            ))}
+            {(teacherScoped ? myTimetable.isLoading : classes.isLoading) ? <SkeletonList rows={3} /> : null}
+            {!(teacherScoped ? myTimetable.isLoading : classes.isLoading) && classOptions.length === 0 ? <EmptyState title={t("No classes found")} /> : null}
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3">
+          <button onClick={clearMarkingClass} className="rounded-xl border border-border px-3 py-2 text-xs font-bold text-primary">{t("Back")}</button>
+          <span className="text-xs font-bold uppercase text-muted-foreground">{t("Class")}</span>
+          <Pill tone="gold">{selectedClassName ?? t("Selected")}</Pill>
+        </div>
+      )}
 
       {step === "sections" && selectedClassId ? (
         <>
@@ -559,71 +595,295 @@ export function ResultsView({
   teacherScoped?: boolean;
 }) {
   const { t } = useTranslation();
-  const { user } = useAuth();
   const client = useQueryClient();
+  type ResultStep = "classes" | "sections" | "courses" | "marks";
+  type ClassCard = { id: string; name: string; sectionCount?: number; courseCount?: number };
+  type SectionCard = { id: string; name: string; class_id: string; class_name: string; courseCount?: number; studentCount?: number };
+  type CourseCard = { course_id: string; course_name: string; teacher_name: string | null; exam_types: { id: string; name: string; weightage: number }[] };
+  const [step, setStep] = useState<ResultStep>(teacherScoped ? "sections" : "classes");
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
+  const [courseId, setCourseId] = useState("");
   const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses(), enabled: !teacherScoped });
   const myTimetable = useQuery({ queryKey: ["my-timetable"], queryFn: () => operationsApi.listMyTimetable(), enabled: teacherScoped });
   const sections = useQuery({ queryKey: ["sections", classId], queryFn: () => classId ? academicsExtraApi.listSections(classId) : Promise.resolve([]), enabled: !!classId });
-  const matrix = useQuery({ queryKey: ["results-matrix", classId, sectionId], queryFn: () => assessmentsApi.resultsMatrix({ class_id: classId || undefined, section_id: sectionId || undefined }), enabled: !!classId });
-  const teacherClassOptions = useMemo(() => {
-    const map = new Map<string, string>();
+  const classMatrix = useQuery({ queryKey: ["results-matrix", "class", classId], queryFn: () => assessmentsApi.resultsMatrix({ class_id: classId }), enabled: canManage && !teacherScoped && !!classId });
+  const sectionMatrix = useQuery({ queryKey: ["results-matrix", "section", classId, sectionId], queryFn: () => assessmentsApi.resultsMatrix({ class_id: classId || undefined, section_id: sectionId }), enabled: !!classId && !!sectionId });
+  const teacherSections = useMemo(() => {
+    const map = new Map<string, SectionCard & { courseIds: Set<string> }>();
     for (const slot of myTimetable.data ?? []) {
-      if (slot.class_id) map.set(slot.class_id, slot.class_name ?? "—");
+      if (!slot.class_id || !slot.section_id) continue;
+      const key = `${slot.class_id}:${slot.section_id}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.courseIds.add(slot.course_id);
+      } else {
+        map.set(key, {
+          id: slot.section_id,
+          name: slot.section_name ?? t("Section"),
+          class_id: slot.class_id,
+          class_name: slot.class_name ?? t("Class"),
+          courseIds: new Set([slot.course_id]),
+        });
+      }
     }
-    return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [myTimetable.data]);
-  const teacherSectionOptions = useMemo(() => {
-    if (!teacherScoped) return sections.data ?? [];
-    const map = new Map<string, string>();
-    for (const slot of myTimetable.data ?? []) {
-      if (slot.class_id === classId && slot.section_id) map.set(slot.section_id, slot.section_name ?? "—");
+    return Array.from(map.values()).map(({ courseIds, ...item }) => ({
+      ...item,
+      courseCount: courseIds.size,
+    }));
+  }, [myTimetable.data, t]);
+  const classCards = useMemo<ClassCard[]>(() => {
+    if (teacherScoped) return [];
+    return (classes.data ?? []).map((item) => ({ id: item.id, name: item.name }));
+  }, [classes.data, teacherScoped]);
+  const sectionCards = useMemo<SectionCard[]>(() => {
+    if (teacherScoped) return teacherSections;
+    const selectedClass = classCards.find((item) => item.id === classId);
+    return (sections.data ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      class_id: classId,
+      class_name: selectedClass?.name ?? t("Class"),
+    }));
+  }, [classCards, classId, sections.data, t, teacherScoped, teacherSections]);
+  const selectedSection = useMemo(() => {
+    return sectionCards.find((item) => item.id === sectionId);
+  }, [sectionCards, sectionId]);
+  const activeSectionMatrix = useMemo(() => {
+    return sectionMatrix.data?.sections.find((section) => section.section_id === sectionId) ?? sectionMatrix.data?.sections[0];
+  }, [sectionId, sectionMatrix.data]);
+  const courseCards = useMemo<CourseCard[]>(() => {
+    const courses = activeSectionMatrix?.courses ?? [];
+    if (!teacherScoped) return courses;
+    const allowed = new Set(
+      (myTimetable.data ?? [])
+        .filter((slot) => slot.class_id === classId && slot.section_id === sectionId)
+        .map((slot) => slot.course_id),
+    );
+    return courses.filter((course) => allowed.has(course.course_id));
+  }, [activeSectionMatrix?.courses, classId, myTimetable.data, sectionId, teacherScoped]);
+  const selectedCourse = useMemo(() => {
+    return courseCards.find((course) => course.course_id === courseId);
+  }, [courseCards, courseId]);
+  const markRows = useMemo(() => {
+    if (!activeSectionMatrix || !selectedCourse) return [];
+    return activeSectionMatrix.students.map((student) => ({
+      ...student,
+      course: student.courses.find((course) => course.course_id === selectedCourse.course_id),
+    }));
+  }, [activeSectionMatrix, selectedCourse]);
+  const classMissingMarkCount = useMemo(() => {
+    let count = 0;
+    for (const section of classMatrix.data?.sections ?? []) {
+      for (const course of section.courses) {
+        if (course.exam_types.length === 0) {
+          count += 1;
+          continue;
+        }
+        for (const student of section.students) {
+          const cell = student.courses.find((item) => item.course_id === course.course_id);
+          for (const examType of course.exam_types) {
+            const mark = cell?.marks.find((item) => item.exam_type_id === examType.id);
+            if (mark?.score == null) count += 1;
+          }
+        }
+      }
     }
-    return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [classId, myTimetable.data, sections.data, teacherScoped]);
+    return count;
+  }, [classMatrix.data]);
+  const canPublishClassResults = Boolean(
+    canManage &&
+    !teacherScoped &&
+    classId &&
+    classMatrix.data &&
+    classMissingMarkCount === 0,
+  );
+
+  const goToClasses = () => {
+    setStep(teacherScoped ? "sections" : "classes");
+    setClassId("");
+    setSectionId("");
+    setCourseId("");
+  };
+  const selectClass = (id: string) => {
+    setClassId(id);
+    setSectionId("");
+    setCourseId("");
+    setStep("sections");
+  };
+  const selectSection = (section: SectionCard) => {
+    setClassId(section.class_id);
+    setSectionId(section.id);
+    setCourseId("");
+    setStep("courses");
+  };
+  const selectCourse = (id: string) => {
+    setCourseId(id);
+    setStep("marks");
+  };
 
   const publish = useMutation({
     mutationFn: async () => {
-      const allStudentIds: string[] = [];
-      for (const sec of (matrix.data?.sections ?? []))
-        for (const s of sec.students) allStudentIds.push(s.student_id);
-      if (!matrix.data?.session_id) throw new Error("No active session selected");
-      return assessmentsMutations.publishResults(matrix.data.session_id, allStudentIds);
+      const allStudentIds = new Set<string>();
+      for (const sec of (classMatrix.data?.sections ?? [])) {
+        for (const student of sec.students) allStudentIds.add(student.student_id);
+      }
+      if (!classMatrix.data?.session_id) throw new Error("No active session selected");
+      if (allStudentIds.size === 0) throw new Error("No students found for this class");
+      return assessmentsMutations.publishResults(classMatrix.data.session_id, Array.from(allStudentIds));
     },
     onSuccess: () => { toast.success(t("Results published")); void client.invalidateQueries({ queryKey: ["results-matrix"] }); },
+    onError: (error) => toast.error(apiErrorMessage(error, t("Could not publish results"))),
   });
 
+  const submitReview = useMutation({
+    mutationFn: async () => {
+      if (!sectionMatrix.data?.session_id || !classId || !sectionId || !courseId) throw new Error("Select a course first");
+      return assessmentsMutations.submitResultsForReview({
+        session_id: sectionMatrix.data.session_id,
+        class_id: classId,
+        section_id: sectionId,
+        course_id: courseId,
+      });
+    },
+    onSuccess: () => toast.success(t("Result submitted to Principal")),
+  });
+
+  const headerTitle = teacherScoped
+    ? t("My Results")
+    : step === "classes"
+      ? t("Classes")
+      : step === "sections"
+        ? classCards.find((item) => item.id === classId)?.name ?? t("Sections")
+        : step === "courses"
+          ? `${selectedSection?.class_name ?? ""} · ${selectedSection?.name ?? ""}`
+          : selectedCourse?.course_name ?? t("Marks");
+
+  const activeCount = (classId ? 1 : 0) + (sectionId ? 1 : 0) + (courseId ? 1 : 0);
+  const renderDrillCard = (
+    key: string,
+    icon: ReactNode,
+    title: string,
+    meta: string,
+    onClick: () => void,
+  ) => (
+    <button key={key} onClick={onClick} className="w-full rounded-2xl border border-border bg-card p-3.5 text-left shadow-sm transition active:scale-[0.99]">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-bold text-foreground">{title}</span>
+          <span className="mt-0.5 block text-xs font-medium text-muted-foreground">{meta}</span>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </div>
+    </button>
+  );
+
   return (
-    <div className="space-y-2">
-      <FilterBar activeCount={(classId ? 1 : 0) + (sectionId ? 1 : 0)} onClear={() => { setClassId(""); setSectionId(""); }}>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label={t("Class")}><CustomDropdown value={classId} onChange={(e) => { setClassId(e.target.value); setSectionId(""); }}><option value="">{t("Select class")}</option>{(teacherScoped ? teacherClassOptions : classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</CustomDropdown></Field>
-          <Field label={t("Section")}><CustomDropdown value={sectionId} onChange={(e) => setSectionId(e.target.value)}><option value="">{t("All sections")}</option>{teacherSectionOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</CustomDropdown></Field>
+    <div className="space-y-3">
+      <FilterBar activeCount={activeCount} onClear={goToClasses}>
+        <div className="flex flex-wrap items-center gap-2">
+          {step !== (teacherScoped ? "sections" : "classes") ? (
+            <button onClick={() => {
+              if (step === "marks") { setStep("courses"); setCourseId(""); return; }
+              if (step === "courses") { setStep("sections"); setSectionId(""); setCourseId(""); return; }
+              goToClasses();
+            }} className="rounded-xl border border-border px-3 py-2 text-xs font-bold text-primary">
+              {t("Back")}
+            </button>
+          ) : null}
+          <div className="min-w-0">
+            <p className="truncate text-xs font-bold uppercase text-muted-foreground">{headerTitle}</p>
+            <p className="text-[0.65rem] font-medium text-muted-foreground">
+              {teacherScoped ? t("Teacher scoped results") : t("Select class, section, then course")}
+            </p>
+          </div>
         </div>
       </FilterBar>
-      {canManage && matrix.data ? (
-        <button onClick={() => publish.mutate()} className="gradient-emerald w-full rounded-xl py-2 text-xs font-bold text-primary-foreground">{t("Publish results")}</button>
+
+      {!teacherScoped && step === "classes" ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {classCards.map((item) => renderDrillCard(item.id, <GraduationCap className="h-5 w-5" />, item.name, t("View sections"), () => selectClass(item.id)))}
+          {!classes.isLoading && classCards.length === 0 ? <EmptyState title={t("No classes found")} /> : null}
+          {classes.isLoading ? <SkeletonList rows={3} /> : null}
+        </div>
       ) : null}
-      {matrix.data?.sections.map((sec) => (
-        <Card key={sec.section_id} className="p-3.5">
-          <p className="font-semibold">{sec.class_name} · {sec.section_name}</p>
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead><tr><th className="py-1 pr-2 text-left">{t("Student")}</th>{sec.courses.map((c) => <th key={c.course_id} className="px-1 text-right">{c.course_name}</th>)}<th className="pl-1 text-right">{t("Overall")}</th></tr></thead>
-              <tbody>
-                {sec.students.map((student) => (
-                  <tr key={student.student_id} className="border-t border-border">
-                    <td className="py-1 pr-2 font-medium">{student.name}</td>
-                    {sec.courses.map((c) => { const cell = student.courses.find((sc) => sc.course_id === c.course_id); return <td key={c.course_id} className="px-1 text-right">{cell?.raw_score?.toFixed(1) ?? "—"}<br /><span className="text-[0.6rem] text-muted-foreground">{cell?.band ?? ""}</span></td>; })}
-                    <td className="pl-1 text-right font-bold">{student.overall_score?.toFixed(1) ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+      {step === "sections" ? (
+        <div className="space-y-2">
+          {!teacherScoped && canManage && classId ? (
+            <div className="space-y-1">
+              <button disabled={publish.isPending || classMatrix.isLoading || !canPublishClassResults} onClick={() => publish.mutate()} className="gradient-emerald w-full rounded-xl py-2 text-xs font-bold text-primary-foreground disabled:opacity-60">
+                {t("Publish class results")}
+              </button>
+              {!classMatrix.isLoading && classMissingMarkCount > 0 ? (
+                <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+                  {t("Complete all course marks before publishing")} ({classMissingMarkCount})
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {sectionCards.map((section) => renderDrillCard(
+              section.id,
+              <Users className="h-5 w-5" />,
+              teacherScoped ? `${section.class_name} · ${section.name}` : section.name,
+              teacherScoped ? t("View taught courses") : t("View courses"),
+              () => selectSection(section),
+            ))}
+            {((teacherScoped && !myTimetable.isLoading) || (!teacherScoped && !sections.isLoading)) && sectionCards.length === 0 ? <EmptyState title={t("No sections found")} /> : null}
+            {(teacherScoped ? myTimetable.isLoading : sections.isLoading) ? <SkeletonList rows={3} /> : null}
           </div>
-        </Card>
-      ))}
+        </div>
+      ) : null}
+
+      {step === "courses" ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {courseCards.map((course) => renderDrillCard(
+            course.course_id,
+            <BookOpen className="h-5 w-5" />,
+            course.course_name,
+            `${course.exam_types.length} ${t("components")}${course.teacher_name ? ` · ${course.teacher_name}` : ""}`,
+            () => selectCourse(course.course_id),
+          ))}
+          {!sectionMatrix.isLoading && courseCards.length === 0 ? <EmptyState title={t("No courses found")} /> : null}
+          {sectionMatrix.isLoading ? <SkeletonList rows={3} /> : null}
+        </div>
+      ) : null}
+
+      {step === "marks" && selectedCourse ? (
+        <div className="space-y-2">
+          {teacherScoped ? (
+            <button disabled={submitReview.isPending} onClick={() => submitReview.mutate()} className="gradient-emerald flex w-full items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold text-primary-foreground disabled:opacity-60">
+              <Send className="h-4 w-4" /> {t("Submit result to Principal")}
+            </button>
+          ) : null}
+          {markRows.map((student) => (
+            <Card key={student.student_id} className="space-y-2 p-3.5">
+              <div className="flex items-start gap-2">
+                <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{student.name}</p>
+                  <p className="text-[0.65rem] font-medium text-muted-foreground">{student.admission_number}</p>
+                </div>
+                <Pill tone="gold">{student.course?.raw_score?.toFixed(1) ?? "—"} {student.course?.band ?? ""}</Pill>
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {selectedCourse.exam_types.map((exam) => {
+                  const mark = student.course?.marks.find((item) => item.exam_type_id === exam.id);
+                  return (
+                    <div key={exam.id} className="flex items-center justify-between rounded-xl bg-muted px-2.5 py-2 text-xs">
+                      <span className="truncate pr-2 font-semibold">{exam.name}</span>
+                      <span className="shrink-0 font-bold">{mark?.score?.toFixed(1) ?? "—"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
+          {!sectionMatrix.isLoading && markRows.length === 0 ? <EmptyState title={t("No marks found")} /> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

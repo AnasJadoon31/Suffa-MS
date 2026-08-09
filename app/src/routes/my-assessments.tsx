@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Upload, Trash2 } from "lucide-react";
+import { Download } from "lucide-react";
+import type { KeyboardEvent } from "react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,7 +11,7 @@ import { FormSheet } from "@/components/app/FormSheet";
 import { Card, CustomDropdown, EmptyState, Field, Pill, SectionTitle, SkeletonList, TextArea, TextInput } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
 import { operationsApi } from "@/lib/mms/endpoints";
-import { assessmentsApi, assessmentsMutations, filesApi, type Assignment } from "@/lib/mms/more-endpoints";
+import { assessmentsApi, assessmentsMutations, filesApi, type Assignment, uploadFile } from "@/lib/mms/more-endpoints";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { cn } from "@/lib/utils";
 import { MarkingView, ResultsView } from "./examination";
@@ -31,15 +32,14 @@ function MyAssessmentsPage() {
   const client = useQueryClient();
   const [tab, setTab] = useState<"assignments" | "marking" | "results">("assignments");
 
-  const [files, setFiles] = useState<Record<string, File | null>>({});
-  const [submitting, setSubmitting] = useState<Set<string>>(new Set());
-  const [error, setError] = useState("");
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [filters, setFilters] = useState({ classId: "", sectionId: "", courseId: "" });
   const [newClassId, setNewClassId] = useState("");
   const [newSectionId, setNewSectionId] = useState("");
   const [newCourseId, setNewCourseId] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newInstructions, setNewInstructions] = useState("");
+  const [newAttachmentFile, setNewAttachmentFile] = useState<File | null>(null);
   const [newDueDate, setNewDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [newMaxMarks, setNewMaxMarks] = useState("");
 
@@ -57,14 +57,19 @@ function MyAssessmentsPage() {
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [myTimetable.data]);
   const sectionOptions = useMemo(() => {
+    if (!filters.classId) return [];
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
-      if ((!filters.classId || slot.class_id === filters.classId) && slot.section_id) {
+      if (
+        slot.class_id === filters.classId &&
+        (!filters.courseId || slot.course_id === filters.courseId) &&
+        slot.section_id
+      ) {
         map.set(slot.section_id, slot.section_name ?? "—");
       }
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [filters.classId, myTimetable.data]);
+  }, [filters.classId, filters.courseId, myTimetable.data]);
   const courseOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
@@ -106,51 +111,14 @@ function MyAssessmentsPage() {
       class_id: filters.classId || undefined,
       section_id: filters.sectionId || undefined,
       course_id: filters.courseId || undefined,
+      sort: "created_at",
     }),
     enabled: Boolean(user),
   });
   const activeCount = [filters.classId, filters.sectionId, filters.courseId].filter(Boolean).length;
 
-  const handleFileSelect = (assignmentId: string, file: File | null) => {
-    setFiles((prev) => ({ ...prev, [assignmentId]: file }));
-  };
-
-  const handleSubmit = async (assignment: Assignment) => {
-    const file = files[assignment.id];
-    if (!file) return;
-    setError("");
-    setSubmitting((prev) => new Set(prev).add(assignment.id));
-    try {
-      const { object_key, upload_url } = await filesApi.presignUpload({
-        category: "submissions",
-        filename: file.name,
-        content_type: file.type || "application/octet-stream",
-        size_bytes: file.size,
-      });
-      await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
-      await assessmentsApi.submitAssignment(assignment.id, object_key);
-      await client.invalidateQueries({ queryKey: ["assignments"] });
-    } catch (err) {
-      setError(apiErrorMessage(err, t("Failed to submit assignment")));
-    } finally {
-      setSubmitting((prev) => {
-        const next = new Set(prev);
-        next.delete(assignment.id);
-        return next;
-      });
-    }
-  };
-
-  const handleRemove = async (assignmentId: string) => {
-    setError("");
-    try {
-      await assessmentsApi.removeOwnSubmission(assignmentId);
-      await client.invalidateQueries({ queryKey: ["assignments"] });
-    } catch (err) {
-      setError(apiErrorMessage(err, t("Failed to remove submission")));
-    }
-  };
   const handleCreateAssignment = async () => {
+    const attachmentKey = newAttachmentFile ? await uploadFile(newAttachmentFile, "assignments") : undefined;
     await assessmentsMutations.createAssignment({
       mine_only: true,
       class_id: newClassId,
@@ -158,14 +126,21 @@ function MyAssessmentsPage() {
       course_id: newCourseId,
       title: newTitle.trim(),
       instructions: newInstructions.trim(),
+      ...(attachmentKey ? { attachment_key: attachmentKey } : {}),
       due_date: newDueDate,
       ...(newMaxMarks ? { max_marks: Number(newMaxMarks) } : {}),
     });
     setNewTitle("");
     setNewInstructions("");
+    setNewAttachmentFile(null);
     setNewMaxMarks("");
     await client.invalidateQueries({ queryKey: ["my-assignments"] });
     await client.invalidateQueries({ queryKey: ["assignments"] });
+  };
+
+  const openAssignmentAttachment = async (fileKey: string) => {
+    const url = await filesApi.presignDownload(fileKey);
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -203,6 +178,17 @@ function MyAssessmentsPage() {
             </Field>
             <Field label={t("Instructions")}>
               <TextArea required value={newInstructions} onChange={(event) => setNewInstructions(event.target.value)} />
+            </Field>
+            <Field label={t("Attachment")}>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.webp"
+                onChange={(event) => setNewAttachmentFile(event.target.files?.[0] ?? null)}
+                className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-xl file:border file:border-border file:bg-card file:px-3 file:py-2 file:text-xs file:font-bold file:text-foreground"
+              />
+              {newAttachmentFile ? (
+                <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{newAttachmentFile.name}</p>
+              ) : null}
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t("Due date")}>
@@ -251,7 +237,8 @@ function MyAssessmentsPage() {
         <Field label={t("Section")}>
           <CustomDropdown
             value={filters.sectionId}
-            onChange={(event) => setFilters((current) => ({ ...current, sectionId: event.target.value, courseId: "" }))}
+            disabled={!filters.classId}
+            onChange={(event) => setFilters((current) => ({ ...current, sectionId: event.target.value }))}
           >
             <option value="">{t("All sections")}</option>
             {sectionOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -260,7 +247,7 @@ function MyAssessmentsPage() {
         <Field label={t("Course")}>
           <CustomDropdown
             value={filters.courseId}
-            onChange={(event) => setFilters((current) => ({ ...current, courseId: event.target.value }))}
+            onChange={(event) => setFilters((current) => ({ ...current, courseId: event.target.value, sectionId: "" }))}
           >
             <option value="">{t("All courses")}</option>
             {courseOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -271,19 +258,24 @@ function MyAssessmentsPage() {
       {assignments.isError ? (
         <EmptyState title={apiErrorMessage(assignments.error, t("Could not load assignments"))} />
       ) : null}
-      {error ? (
-        <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
-      ) : null}
       <SectionTitle>{t("Assignments")}</SectionTitle>
       {assignments.data?.length === 0 ? (
         <EmptyState title={t("No assignments yet")} />
       ) : (
         <div className="space-y-2.5">
           {assignments.data?.map((assignment) => {
-            const submitted = Boolean(assignment.submission_file_key);
-            const isSubmitting = submitting.has(assignment.id);
             return (
-              <Card key={assignment.id} className="space-y-2">
+              <div
+                key={assignment.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedAssignment(assignment)}
+                onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+                  if (event.key === "Enter" || event.key === " ") setSelectedAssignment(assignment);
+                }}
+                className="cursor-pointer"
+              >
+              <Card className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-semibold">{assignment.title}</p>
@@ -296,36 +288,20 @@ function MyAssessmentsPage() {
                       </p>
                     ) : null}
                   </div>
-                  <Pill tone={submitted ? "success" : "warning"}>
-                    {submitted ? t("Submitted") : t("Pending")}
-                  </Pill>
+                  <Pill tone="muted">{t("Review")}</Pill>
                 </div>
-                {submitted ? (
+                {assignment.attachment_key ? (
                   <button
-                    onClick={() => handleRemove(assignment.id)}
-                    className="flex items-center gap-1 text-xs text-destructive"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void openAssignmentAttachment(assignment.attachment_key!);
+                    }}
+                    className="flex items-center gap-1 text-xs font-bold text-primary"
                   >
-                    <Trash2 className="h-3 w-3" />
-                    {t("Remove submission")}
+                    <Download className="h-3 w-3" />
+                    {t("Attachment")}
                   </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,.txt,.jpg,.png,.webp"
-                      onChange={(e) => handleFileSelect(assignment.id, e.target.files?.[0] ?? null)}
-                      className="text-xs text-muted-foreground file:rounded-lg file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-xs file:font-semibold file:text-foreground"
-                    />
-                    <button
-                      onClick={() => handleSubmit(assignment)}
-                      disabled={!files[assignment.id] || isSubmitting}
-                      className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
-                    >
-                      <Upload className="h-3 w-3" />
-                      {isSubmitting ? t("Uploading...") : t("Submit")}
-                    </button>
-                  </div>
-                )}
+                ) : null}
                 {assignment.submission_mark != null ? (
                   <p className="text-xs">
                     {t("Mark")}: {assignment.submission_mark}{" "}
@@ -333,12 +309,85 @@ function MyAssessmentsPage() {
                   </p>
                 ) : null}
               </Card>
+              </div>
             );
           })}
         </div>
       )}
+      {selectedAssignment ? (
+        <TeacherAssignmentReviewSheet
+          assignment={selectedAssignment}
+          onClose={() => setSelectedAssignment(null)}
+        />
+      ) : null}
         </>
       )}
     </AppShell>
+  );
+}
+
+function TeacherAssignmentReviewSheet({
+  assignment,
+  onClose,
+}: {
+  assignment: Assignment;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const status = useQuery({
+    queryKey: ["assignment-submission-status", assignment.id],
+    queryFn: () => assessmentsMutations.listSubmissionStatus(assignment.id),
+  });
+
+  const openFile = async (fileKey: string) => {
+    const url = await filesApi.presignDownload(fileKey);
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+      <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-card p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate font-display text-lg font-extrabold">{assignment.title}</p>
+            <p className="text-sm text-muted-foreground">
+              {[assignment.course_name, assignment.class_name, assignment.section_name].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-xl px-3 py-2 text-xs font-bold text-primary">{t("Close")}</button>
+        </div>
+
+        <p className="mt-4 whitespace-pre-line text-sm text-muted-foreground">{assignment.instructions}</p>
+        {assignment.attachment_key ? (
+          <button onClick={() => void openFile(assignment.attachment_key!)} className="mt-3 flex items-center gap-1 rounded-xl bg-primary-soft px-3 py-2 text-xs font-bold text-primary">
+            <Download className="h-4 w-4" />
+            {t("Download attachment")}
+          </button>
+        ) : null}
+
+        <SectionTitle>{t("Students")}</SectionTitle>
+        {status.isLoading ? <SkeletonList rows={4} /> : null}
+        {status.isError ? <EmptyState title={apiErrorMessage(status.error, t("Could not load submissions"))} /> : null}
+        <div className="space-y-2">
+          {(status.data ?? []).map((student) => (
+            <Card key={student.student_id} className="flex items-center gap-3 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold">{student.student_name}</p>
+                <p className="text-xs text-muted-foreground">{student.admission_number}</p>
+              </div>
+              {student.file_key ? (
+                <button onClick={() => void openFile(student.file_key!)} className="flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">
+                  <Download className="h-4 w-4" />
+                  {t("Download")}
+                </button>
+              ) : (
+                <Pill tone="warning">{t("Not submitted")}</Pill>
+              )}
+            </Card>
+          ))}
+        </div>
+        {!status.isLoading && !status.isError && (status.data ?? []).length === 0 ? <EmptyState title={t("No students found")} /> : null}
+      </div>
+    </div>
   );
 }

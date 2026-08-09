@@ -26,6 +26,7 @@ from app.modules.assessments.models import Assignment, ExamType, GradingScheme, 
 from app.modules.assessments.schemas import (
     AssignmentCreate,
     AssignmentRead,
+    AssignmentSubmissionStatusRead,
     AssignmentUpdate,
     CourseResult,
     ExamTypeCreate,
@@ -45,6 +46,7 @@ from app.modules.assessments.schemas import (
     MatrixMark,
     MatrixStudentRow,
     PublishRequest,
+    ResultReviewSubmission,
     ResultsMatrixResponse,
     SectionResultMatrix,
     SessionResult,
@@ -545,7 +547,7 @@ async def list_assignments(
     category: str | None = None,
     created_by_id: UUID | None = None,
     mine_only: bool = False,
-    sort: str = "due_date",  # due_date | created_at | title | teacher
+    sort: str = "created_at",  # due_date | created_at | title | teacher
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[AssignmentRead]:
@@ -570,6 +572,8 @@ async def list_assignments(
     if mine_only and teacher is None and current_user.role != UserRole.student:
         response.headers["X-Total-Count"] = "0"
         return []
+    if mine_only and teacher is not None:
+        stmt = stmt.where(Assignment.created_by_id == teacher.id)
     if should_scope_to_teacher:
         active_session_id = await _active_session_id(session, madrasa.id)
         pairs = await taught_pairs(
@@ -622,7 +626,7 @@ async def list_assignments(
         "title": Assignment.title,
         "teacher": TeacherProfile.name,
     }.get(sort, Assignment.due_date)
-    rows = await paginate_scalars(session, stmt.order_by(order_column), limit=limit, offset=offset, response=response)
+    rows = await paginate_scalars(session, stmt.order_by(order_column, Assignment.created_at.desc()), limit=limit, offset=offset, response=response)
 
     if student is not None:
         # target_student_ids is a JSON column; per-row containment can't be
@@ -644,6 +648,86 @@ async def list_assignments(
         student_id=student.id if student is not None else None,
         section_name_overrides=section_name_overrides,
     )
+
+
+async def _assignment_submission_status_rows(
+    session: AsyncSession,
+    madrasa: Madrasa,
+    assignment: Assignment,
+) -> list[AssignmentSubmissionStatusRead]:
+    active_session_id = await _active_session_id(session, madrasa.id)
+    if active_session_id is None:
+        return []
+    roster_stmt = (
+        select(StudentProfile)
+        .join(Enrollment, Enrollment.student_id == StudentProfile.id)
+        .where(
+            StudentProfile.madrasa_id == madrasa.id,
+            Enrollment.madrasa_id == madrasa.id,
+            Enrollment.session_id == active_session_id,
+            Enrollment.class_id == assignment.class_id,
+            Enrollment.ended_on.is_(None),
+        )
+        .order_by(StudentProfile.name)
+    )
+    if assignment.section_id is not None:
+        roster_stmt = roster_stmt.where(Enrollment.section_id == assignment.section_id)
+    students = list((await session.execute(roster_stmt)).scalars().all())
+    if assignment.target_student_ids:
+        targets = {str(student_id) for student_id in assignment.target_student_ids}
+        students = [student for student in students if str(student.id) in targets]
+
+    submissions = {}
+    if students:
+        submission_rows = (
+            await session.execute(
+                select(Submission).where(
+                    Submission.assignment_id == assignment.id,
+                    Submission.student_id.in_([student.id for student in students]),
+                )
+            )
+        ).scalars().all()
+        submissions = {submission.student_id: submission for submission in submission_rows}
+
+    due_date = _aware(assignment.due_date)
+    return [
+        AssignmentSubmissionStatusRead(
+            student_id=student.id,
+            student_name=student.name,
+            admission_number=student.admission_number,
+            submitted_at=submission.submitted_at if (submission := submissions.get(student.id)) else None,
+            file_key=submission.file_key if submission else None,
+            mark=submission.mark if submission else None,
+            feedback=submission.feedback if submission else None,
+            is_late=_aware(submission.submitted_at) > due_date if submission else False,
+        )
+        for student in students
+    ]
+
+
+@router.get("/assignments/{assignment_id}/submission-status", response_model=list[AssignmentSubmissionStatusRead])
+async def list_assignment_submission_status(
+    assignment_id: UUID,
+    current_user: User = Depends(require_assessment_staff("assignments.create")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[AssignmentSubmissionStatusRead]:
+    assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
+    await _require_class_course_scope(
+        session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
+        section_id=assignment.section_id, bypass_permission="assignments.view_all",
+    )
+    return await _assignment_submission_status_rows(session, madrasa, assignment)
+
+
+@router.get("/assignments/submission-status/{assignment_id}", response_model=list[AssignmentSubmissionStatusRead])
+async def list_assignment_submission_status_static(
+    assignment_id: UUID,
+    current_user: User = Depends(require_assessment_staff("assignments.create")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[AssignmentSubmissionStatusRead]:
+    return await list_assignment_submission_status(assignment_id, current_user, madrasa, session)
 
 
 @router.get("/assignments/{assignment_id}", response_model=AssignmentRead)
@@ -1665,6 +1749,92 @@ async def _build_session_result(session: AsyncSession, madrasa_id: UUID, student
     )
 
 
+async def _assert_results_complete_for_publish(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    session_id: UUID,
+    student_ids: list[UUID],
+) -> None:
+    if not student_ids:
+        raise HTTPException(status_code=400, detail="No students selected for publishing")
+
+    enrollments = (
+        await session.execute(
+            select(Enrollment, StudentProfile.name)
+            .join(StudentProfile, StudentProfile.id == Enrollment.student_id)
+            .where(
+                Enrollment.madrasa_id == madrasa_id,
+                Enrollment.session_id == session_id,
+                Enrollment.student_id.in_(student_ids),
+                Enrollment.ended_on.is_(None),
+                StudentProfile.madrasa_id == madrasa_id,
+            )
+        )
+    ).all()
+    enrollment_by_student = {
+        enrollment.student_id: (enrollment, student_name)
+        for enrollment, student_name in enrollments
+    }
+    missing: list[str] = []
+    for student_id in student_ids:
+        if student_id not in enrollment_by_student:
+            missing.append(f"{student_id}: no active enrollment")
+
+    class_ids = {enrollment.class_id for enrollment, _ in enrollment_by_student.values()}
+    if not class_ids:
+        raise HTTPException(status_code=400, detail="No active enrollments found for publishing")
+
+    class_courses = (
+        await session.execute(
+            select(ClassCourse.class_id, Course.id, Course.name)
+            .join(Course, Course.id == ClassCourse.course_id)
+            .where(ClassCourse.class_id.in_(class_ids), Course.madrasa_id == madrasa_id)
+        )
+    ).all()
+    courses_by_class: dict[UUID, list[tuple[UUID, str]]] = {}
+    for class_id, course_id, course_name in class_courses:
+        courses_by_class.setdefault(class_id, []).append((course_id, course_name))
+
+    exam_types_by_class_course: dict[tuple[UUID, UUID], list[ExamType]] = {}
+    for class_id, courses in courses_by_class.items():
+        for course_id, _ in courses:
+            exam_types_by_class_course[(class_id, course_id)] = await _exam_types_for_result_scope(
+                session, madrasa_id, course_id, class_id
+            )
+
+    exam_type_ids = [
+        exam_type.id
+        for exam_types in exam_types_by_class_course.values()
+        for exam_type in exam_types
+    ]
+    marks: set[tuple[UUID, UUID]] = set()
+    if exam_type_ids:
+        mark_rows = (
+            await session.execute(
+                select(Mark.student_id, Mark.exam_type_id).where(
+                    Mark.student_id.in_(student_ids),
+                    Mark.exam_type_id.in_(exam_type_ids),
+                )
+            )
+        ).all()
+        marks = {(student_id, exam_type_id) for student_id, exam_type_id in mark_rows}
+
+    for student_id, (enrollment, student_name) in enrollment_by_student.items():
+        for course_id, course_name in courses_by_class.get(enrollment.class_id, []):
+            exam_types = exam_types_by_class_course.get((enrollment.class_id, course_id), [])
+            if not exam_types:
+                missing.append(f"{student_name}: {course_name} has no result components")
+                continue
+            for exam_type in exam_types:
+                if (student_id, exam_type.id) not in marks:
+                    missing.append(f"{student_name}: {course_name} / {exam_type.name}")
+
+    if missing:
+        preview = "; ".join(missing[:8])
+        suffix = f"; +{len(missing) - 8} more" if len(missing) > 8 else ""
+        raise HTTPException(status_code=400, detail=f"Cannot publish results while marks are missing: {preview}{suffix}")
+
+
 @router.post("/results/publish")
 async def publish_results(
     payload: PublishRequest,
@@ -1673,6 +1843,7 @@ async def publish_results(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, object]:
     await ensure_writable_session(session, madrasa.id, payload.session_id)
+    await _assert_results_complete_for_publish(session, madrasa.id, payload.session_id, payload.student_ids)
     published_count = 0
     for student_id in payload.student_ids:
         existing = (
@@ -1694,6 +1865,42 @@ async def publish_results(
             published_count += 1
     await session.commit()
     return {"published": published_count, "session_id": payload.session_id}
+
+
+@router.post("/results/submit-for-review")
+async def submit_results_for_review(
+    payload: ResultReviewSubmission,
+    current_user: User = Depends(require_assessment_staff("assessments.marks.enter")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, object]:
+    await ensure_writable_session(session, madrasa.id, payload.session_id)
+    is_admin_user = await _user_is_admin(current_user, session)
+    await _require_class_course_scope(
+        session,
+        current_user,
+        madrasa.id,
+        payload.class_id,
+        payload.course_id,
+        payload.section_id,
+        force_teacher_scope=not is_admin_user,
+    )
+    record_audit(
+        session,
+        madrasa_id=madrasa.id,
+        actor_id=current_user.id,
+        action="assessments.results.submit_for_review",
+        entity_name="result_review_submission",
+        entity_id=f"{payload.session_id}:{payload.class_id}:{payload.section_id}:{payload.course_id}",
+        new_values={
+            "session_id": str(payload.session_id),
+            "class_id": str(payload.class_id),
+            "section_id": str(payload.section_id),
+            "course_id": str(payload.course_id),
+        },
+    )
+    await session.commit()
+    return {"status": "submitted", "session_id": payload.session_id}
 
 
 async def _render_result_card(

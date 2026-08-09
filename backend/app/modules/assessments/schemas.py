@@ -98,6 +98,17 @@ class SubmissionRead(BaseModel):
     student_name: str | None = None
 
 
+class AssignmentSubmissionStatusRead(BaseModel):
+    student_id: UUID
+    student_name: str
+    admission_number: str
+    submitted_at: datetime | None = None
+    file_key: str | None = None
+    mark: float | None = None
+    feedback: str | None = None
+    is_late: bool = False
+
+
 class GradeBand(BaseModel):
     label: str
     min_score: float
@@ -284,3 +295,10 @@ class ResultsMatrixResponse(BaseModel):
 class PublishRequest(BaseModel):
     session_id: UUID
     student_ids: list[UUID]
+
+
+class ResultReviewSubmission(BaseModel):
+    session_id: UUID
+    class_id: UUID
+    section_id: UUID
+    course_id: UUID

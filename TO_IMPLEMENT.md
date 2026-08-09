@@ -269,6 +269,27 @@ role/language/screenshot matrix.
 
 | ID | Requirement | U/C | API | E2E | Shot | Done |
 |---|---|---|---|---|---|---|
+## 2026-08-09 - Results Workflow Follow-up
+
+- Add a persistent principal review queue for teacher-submitted course results. Current implementation validates teacher scope and records an audit event, while the principal can publish class-wide results from the admin flow.
+- Clean up existing TypeScript errors unrelated to the results drilldown, including shared primitive prop typing, people finance donor profile typing, my-assessments submission typing, and route search-param typing.
+
+## 2026-08-09 - Assignment Attachments Follow-up
+
+- No deferred backend work from the attachment change: assignments already persist one `attachment_key`, and the UI now supports upload, download, replace, and remove against that field.
+
+## 2026-08-09 - Result Publish Guard Follow-up
+
+- No deferred publish-guard work from this change: publishing is blocked server-side and in the admin UI until every configured course result component has a mark for each enrolled student in the class.
+
+## 2026-08-09 - Single Filter Card Selection Follow-up
+
+- Audit remaining portal routes for any future screens that have exactly one true selector filter; Marking and `/my-timetable` now use card selection instead of dropdown filters.
+
+## 2026-08-09 - Teacher Assignment Review Follow-up
+
+- No deferred submission-status work from this change: `/my-assessments` now opens a teacher review sheet with full roster, download buttons for submitted work, and `Not submitted` status for missing work. My Assignments filters are scoped to teacher timetable class-section-course pairs; sections unlock only after class selection.
+
 | CURRENT-01 | Teacher dashboard loads without an internal-server error | — | ✅ B-DASH | ✅ UI-CURRENT | ✅ `CURRENT-01*` | ✅ V22 |
 | CURRENT-02 | Reusable dynamic filters render inline throughout the portal | — | — | ✅ UI-CURRENT | ✅ `CURRENT-02*` | ✅ V22 |
 | CURRENT-03 | B-Form label is meaningful and translated | ✅ I18N | — | ✅ UI-CURRENT | ✅ `CURRENT-03*` | ✅ V22 |

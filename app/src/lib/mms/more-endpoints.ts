@@ -84,13 +84,17 @@ export interface Assignment {
   course_id: string;
   title: string;
   category: string | null;
+  description?: string | null;
   instructions: string;
+  attachment_key: string | null;
   due_date: string;
   max_marks?: number | null;
+  created_at: string;
   class_name: string | null;
   section_name: string | null;
   course_name: string | null;
   teacher_name: string | null;
+  submission_file_key?: string | null;
   submission_mark?: number | null;
   submission_feedback?: string | null;
   submitted_at?: string | null;
@@ -511,6 +515,7 @@ export const assessmentsApi = {
     mine_only?: boolean;
     date_from?: string;
     date_to?: string;
+    sort?: "due_date" | "created_at" | "title" | "teacher";
   }) => getAllPages<Assignment>("/api/v1/assessments/assignments", params as Record<string, unknown>),
   myResult: (sessionId: string) =>
     api.get<SessionResult>("/api/v1/assessments/results/me", { params: { session_id: sessionId } }).then((r) => r.data),
@@ -636,6 +641,17 @@ export interface Submission {
   is_late: boolean;
 }
 
+export interface AssignmentSubmissionStatus {
+  student_id: string;
+  student_name: string;
+  admission_number: string;
+  submitted_at: string | null;
+  file_key: string | null;
+  mark: number | null;
+  feedback: string | null;
+  is_late: boolean;
+}
+
 export const opsMutations = {
   createAnnouncement: (payload: {
     title: string;
@@ -731,17 +747,20 @@ export const assessmentsMutations = {
     title: string;
     category?: string;
     instructions: string;
+    attachment_key?: string;
     due_date: string;
     max_marks?: number;
   }) => api.post<Assignment[]>("/api/v1/assessments/assignments", payload).then((r) => r.data),
   updateAssignment: (
     id: string,
-    payload: { title?: string; instructions?: string; due_date?: string; max_marks?: number },
+    payload: { title?: string; instructions?: string; attachment_key?: string | null; due_date?: string; max_marks?: number },
   ) => api.put<Assignment>(`/api/v1/assessments/assignments/${id}`, payload).then((r) => r.data),
   deleteAssignment: (id: string) =>
     api.delete(`/api/v1/assessments/assignments/${id}`).then((r) => r.data),
   listSubmissions: (assignmentId: string) =>
     getAllPages<Submission>(`/api/v1/assessments/assignments/${assignmentId}/submissions`),
+  listSubmissionStatus: (assignmentId: string) =>
+    getAllPages<AssignmentSubmissionStatus>(`/api/v1/assessments/assignments/submission-status/${assignmentId}`),
   submitAssignment: (assignmentId: string, fileKey: string) =>
     api
       .post<Submission>(`/api/v1/assessments/assignments/${assignmentId}/submissions`, {
@@ -769,6 +788,13 @@ export const assessmentsMutations = {
         student_ids: studentIds,
       })
       .then((r) => r.data),
+  submitResultsForReview: (payload: {
+    session_id: string;
+    class_id: string;
+    section_id: string;
+    course_id: string;
+  }) =>
+    api.post("/api/v1/assessments/results/submit-for-review", payload).then((r) => r.data),
   downloadMyResultCard: (sessionId: string) =>
     downloadReport(
       "/api/v1/assessments/results/card/me",
@@ -782,7 +808,7 @@ export const assessmentsMutations = {
     api.put<GradingScheme>(`/api/v1/assessments/grading-schemes/${id}`, payload).then((r) => r.data),
   deleteGradingScheme: (id: string) =>
     api.delete(`/api/v1/assessments/grading-schemes/${id}`).then((r) => r.data),
-  createExamType: (payload: { course_id: string; class_id?: string; name: string; weightage: number; grading_scheme_id: string }) =>
+  createExamType: (payload: { course_id: string; class_id?: string; name: string; weightage: number; grading_scheme_id: string; parent_exam_type_id?: string }) =>
     api.post<ExamType>("/api/v1/assessments/exam-types", payload).then((r) => r.data),
   updateExamType: (id: string, payload: { course_id?: string; class_id?: string; name?: string; weightage?: number; grading_scheme_id?: string }) =>
     api.put<ExamType>(`/api/v1/assessments/exam-types/${id}`, payload).then((r) => r.data),

@@ -1853,6 +1853,54 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
   failure and verify the complete merge path plus index creation. Full backend
   suite: 151 tests passing.
 
+## 2026-08-09 - Results Drilldown Flow
+
+- Implemented: Replaced the wide results matrix UI with progressive cards: admin/principal selects class, then section, then course, then sees student marks; teacher-scoped `/my-assessments` starts from taught class-section cards and only shows the courses from the teacher's timetable.
+- Implemented: Principal/admin publishing now acts at the selected class level, gathering students across all sections for that class.
+- Implemented: Added a teacher "Submit result to Principal" action on the course marks screen, backed by a scoped `/api/v1/assessments/results/submit-for-review` endpoint that validates timetable scope and records an audit event.
+- Files: `app/src/routes/examination.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/assessments/routes.py`, `backend/app/modules/assessments/schemas.py`
+- Verified: `cd backend && .venv/bin/python -m py_compile app/modules/assessments/routes.py app/modules/assessments/schemas.py`; `cd app && npm exec tsc -- --noEmit --pretty false` was run and the touched results/assessments files cleared, but existing unrelated TypeScript errors remain in other portal files.
+- Notes: Full browser verification was not run in this pass because the user asked to avoid repeated broad verification work.
+
+## 2026-08-09 - My Timetable Class Filter
+
+- Implemented: Fixed `/my-timetable` so the class dropdown defaults to an actual loaded class instead of visually showing the first class while internally rendering all slots.
+- Implemented: Timetable rows now sort by start time, then period, without mutating the day's slot array during render.
+- Files: `app/src/routes/my-timetable.tsx`
+- Verified: `cd app && npm exec tsc -- --noEmit --pretty false` was run and `src/routes/my-timetable.tsx` cleared; existing unrelated TypeScript errors remain elsewhere.
+
+## 2026-08-09 - Assignment Attachments
+
+- Implemented: Added optional file attachment upload to assignment creation in both `/assignments` and `/my-assessments`, using the existing presigned file upload flow and the backend `assignment.attachment_key` field.
+- Implemented: Assignment cards and detail sheets now expose download actions for attached files; assignment editing can replace or remove the current attachment.
+- Implemented: `/my-assessments` submission actions now invalidate the teacher/student scoped assignment query after submit/remove so attachment and submission state refresh together.
+- Implemented: Assignment lists now request and preserve newest-created-first ordering, and the backend assignment list default is `created_at` descending.
+- Files: `app/src/routes/assignments.tsx`, `app/src/routes/my-assessments.tsx`, `app/src/lib/mms/more-endpoints.ts`
+- Verified: `cd backend && .venv/bin/python -m py_compile app/modules/assessments/routes.py`; `cd app && npm exec tsc -- --noEmit --pretty false` was run and the touched assignment files cleared; existing unrelated TypeScript errors remain elsewhere.
+
+## 2026-08-09 - Result Publish Completeness Guard
+
+- Implemented: Admin/principal result publishing now fails on the backend when any enrolled student's course result component is missing a mark, or when a class course has no result components configured.
+- Implemented: The admin Results screen disables `Publish class results` while marks are incomplete and shows the missing-mark count before publishing.
+- Files: `backend/app/modules/assessments/routes.py`, `app/src/routes/examination.tsx`
+- Verified: `cd backend && .venv/bin/python -m py_compile app/modules/assessments/routes.py`; `cd app && npm exec tsc -- --noEmit --pretty false` was run and `src/routes/examination.tsx` cleared; existing unrelated TypeScript errors remain elsewhere.
+
+## 2026-08-09 - Single Filter Card Selection
+
+- Implemented: Replaced the lone class dropdown in the Marking flow with class cards; clicking a card performs the same selection and continues to sections/courses/exams.
+- Implemented: Replaced the lone class dropdown in `/my-timetable` with class cards; clicking a class opens that class timetable and the Back action returns to the class cards.
+- Files: `app/src/routes/examination.tsx`, `app/src/routes/my-timetable.tsx`
+- Verified: `cd app && npm exec tsc -- --noEmit --pretty false` was run and the touched routes cleared; existing unrelated TypeScript errors remain elsewhere.
+
+## 2026-08-09 - Teacher Assignment Review
+
+- Implemented: Removed student submission controls from `/my-assessments`; teachers now only see assignments they assigned for review.
+- Implemented: Clicking a teacher assignment opens a review sheet listing all expected students, with submitted-file download buttons and `Not submitted` tags for missing submissions.
+- Implemented: Added `/api/v1/assessments/assignments/{assignment_id}/submission-status` so whole-class and section assignments return a complete roster plus submission status.
+- Implemented: Moved the submission-status route before the generic assignment detail route and added the static-prefix `/assignments/submission-status/{assignment_id}` route so it resolves correctly, and scoped My Assignments section/course filters to the teacher's actual timetable pairs. The section dropdown is disabled and empty until a class is selected.
+- Files: `app/src/routes/my-assessments.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/assessments/routes.py`, `backend/app/modules/assessments/schemas.py`
+- Verified: `cd backend && .venv/bin/python -m py_compile app/modules/assessments/routes.py app/modules/assessments/schemas.py`; `cd app && npm exec tsc -- --noEmit --pretty false` was run and the touched assignment files cleared; existing unrelated TypeScript errors remain elsewhere.
+
 ## 2026-07-22 — Finance filters and responsive record layout
 
 - Rebuilt the Finance navigation and record controls as responsive toolbars so
