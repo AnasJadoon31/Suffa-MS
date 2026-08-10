@@ -3,6 +3,139 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-11 — Tenant WhatsApp Instances and Workspace Navigation
+
+**Fix:**
+- Removed the sidebar logo badge background and padding when a madrasa logo is present, allowing the full image to fit its frame.
+- Hid Platform from every tenant workspace; it remains available only in the super-admin Platform context.
+- Replaced the global Evolution instance and single-tenant restriction with one instance per madrasa, named exactly after that madrasa's slug.
+- Aligned backend permission checks with the selected super-admin workspace so it can manage the tenant's own WhatsApp connection.
+
+**Files:**
+- `app/src/components/app/Navigation.tsx`
+- `app/src/routes/more.tsx`
+- `backend/app/modules/messaging/routes.py`
+- `backend/app/core/dependencies.py`
+- `backend/app/core/config.py`
+- `docker-compose.yml`
+- `.env.example`
+
+**Verification:**
+- `python -m py_compile app/modules/messaging/routes.py app/core/config.py`
+- Focused config check: a `dar-e-arqam` madrasa resolves to Evolution instance `dar-e-arqam`.
+- `npm run build`
+- Browser screenshot at `1440px` confirms the logo fills its frame and Platform is absent from the selected tenant navigation.
+
+## 2026-08-11 — Sidebar Madrasa Logo
+
+**Fix:**
+- Exposed the configured Madrasa Settings logo object key through the authenticated madrasa payload.
+- Rendered the logo in the sidebar using the existing tenant-scoped presigned download endpoint, with the madrasa initial as a fallback when no logo exists.
+- Refreshes the authenticated workspace profile after a logo change so the sidebar updates immediately.
+
+**Files:**
+- `backend/app/modules/auth/schemas.py`
+- `backend/app/modules/auth/routes.py`
+- `app/src/lib/mms/auth.tsx`
+- `app/src/components/app/Navigation.tsx`
+- `app/src/routes/settings.tsx`
+
+**Verification:**
+- `python -m py_compile app/modules/auth/routes.py app/modules/auth/schemas.py`
+- `npm run build`
+- Rebuilt backend; live API check confirmed `/auth/me` logo key matches Madrasa Settings and the presigned image endpoint returns `200`.
+- Browser check at `1440px`: selected madrasa workspace renders the sidebar logo with a loaded image (`naturalWidth: 636`).
+
+## 2026-08-11 — Super-Admin Platform Login Boundary
+
+**Fix:**
+- Super-admin sign-in always begins at the platform `default` tenant, avoiding a collision with a same-named tenant administrator account.
+- Successful super-admin authentication resets the workspace to Platform; tenant workspaces are entered only by selecting a madrasa from Platform.
+- The request interceptor now preserves the madrasa explicitly selected on the login form, instead of overwriting it with a previously selected tenant from local storage.
+
+**Files:**
+- `app/src/routes/index.tsx`
+- `app/src/lib/mms/auth.tsx`
+- `app/src/lib/mms/api.ts`
+
+**Verification:**
+- `npm run build`
+- Playwright regression: with stale `suffa` tenant and tenant-workspace state preloaded, signing in through the `default` form lands at `/platform` with the Platform workspace active.
+
+## 2026-08-11 — Canonical Madrasa Name Setting
+
+**Fix:**
+- Made the Madrasa Settings Name field read and update the canonical `Madrasa.name` value used by the authenticated workspace, navigation, dashboards, and exports.
+- Kept the existing `madrasa.name_en` key synchronized for compatibility, while preventing legacy stored values from overriding the canonical name.
+- Refreshes the authenticated profile after saving the name so the workspace header updates immediately.
+
+**Files:**
+- `backend/app/core/settings_catalog.py`
+- `backend/app/modules/operations/routes.py`
+- `backend/app/modules/auth/routes.py`
+- `backend/app/core/pdf.py`
+- `backend/seed_full.py`
+- `app/src/routes/settings.tsx`
+
+**Verification:**
+- `python -m py_compile app/core/settings_catalog.py app/modules/operations/routes.py app/core/pdf.py app/modules/auth/routes.py seed_full.py`
+- `npm run build`
+- Rebuilt backend; live API comparison confirmed Settings Name equals `/api/v1/auth/me` madrasa name.
+
+## 2026-08-11 — Tenant Workspace Feature Enforcement
+
+**Fix:**
+- Connected platform feature switches to navigation, More, mobile navigation, and direct-route protection; disabled screens such as Blog no longer remain visible in the selected madrasa workspace.
+- Enforced the selected madrasa's feature flags for super-admin workspace API calls, including individually mapped Operations modules and Reporting.
+- Keeps selected tenant workspace state during platform navigation, but a fresh sign-in starts from the `default` Platform tenant and clears stale super-admin tenant-workspace state. React Query data is cleared when authentication changes so no prior madrasa data is reused.
+- Restored the frontend default tenant to `default`, matching the configured platform tenant.
+
+**Files:**
+- `app/src/lib/mms/workspace.ts`
+- `app/src/lib/mms/nav.ts`
+- `app/src/lib/mms/api.ts`
+- `app/src/lib/mms/auth.tsx`
+- `app/src/components/app/AppShell.tsx`
+- `app/src/components/app/Navigation.tsx`
+- `app/src/routes/index.tsx`
+- `app/src/routes/dashboard.tsx`
+- `app/src/routes/more.tsx`
+- `app/src/routes/platform.tsx`
+- `backend/app/core/dependencies.py`
+- `backend/app/main.py`
+
+**Verification:**
+- `python -m py_compile app/core/dependencies.py app/main.py`
+- `npm run build`
+- Rebuilt backend and verified `/healthz`.
+- Live super-admin workspace request to Blog for a madrasa with Blog disabled returned `403`.
+
+## 2026-08-10 — Super-Admin Madrasa Workspace Control
+
+**Fix:**
+- Super admins can open a selected madrasa in its full workspace, while retaining a Platform route to return to platform management.
+- Platform cards now let super admins edit each madrasa slug and enable or disable its available screens independently.
+- Added an editable platform-account username in Super Admin My Profile.
+
+**Files:**
+- `backend/app/modules/platform/routes.py`
+- `backend/app/modules/platform/schemas.py`
+- `backend/app/modules/auth/routes.py`
+- `backend/app/modules/auth/schemas.py`
+- `app/src/routes/platform.tsx`
+- `app/src/routes/me.tsx`
+- `app/src/routes/dashboard.tsx`
+- `app/src/components/app/Navigation.tsx`
+- `app/src/lib/mms/endpoints.ts`
+
+**Verification:**
+- `python -m py_compile app/modules/platform/routes.py app/modules/platform/schemas.py app/modules/auth/routes.py app/modules/auth/schemas.py`
+- `npm run build`
+- `docker compose up -d --build backend`; backend `/healthz` reports healthy.
+
+**Notes:**
+- Browser walkthrough of feature switching, slug change, and username update remains recorded as a follow-up.
+
 ## 2026-08-09 — Shared Filter Button Rollout
 
 **Fix:**
@@ -2220,3 +2353,15 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: Madrasa Settings now includes a Portal toggle for donor login access. It defaults to disabled and the authentication endpoint rejects donor sign-ins while it is off, without affecting donation history.
 - Files: `backend/app/core/settings_catalog.py`, `backend/app/modules/auth/routes.py`.
 - Verified: backend `py_compile`, rebuilt backend, `/healthz`, and `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Tenant-Scoped Usernames And Platform Login
+
+- Implemented: Replaced the legacy global username index with tenant-scoped uniqueness and a platform-only unique index for super-admin accounts. Authentication now resolves same-named tenant and platform accounts by their matching password. Bootstrap uses tenant-specific principal employee codes and shared template codes, allowing the `default` tenant and the platform super-admin to initialize together.
+- Files: `backend/alembic/versions/4b13f91953ae_scope_usernames_to_tenants.py`, `backend/app/modules/auth/routes.py`, `backend/bootstrap.py`, `.env`.
+- Verified: backend `py_compile`, rebuilt backend migration/startup, `/healthz`, and successful super-admin token request using the configured default tenant; no full test suite run per request.
+
+## 2026-08-10 - Super-Admin Platform Shell
+
+- Implemented: Super-admin authentication now routes to the Platform console. Platform users see platform branding, platform scope in My Profile, and a platform-only navigation menu instead of a madrasa dashboard or tenant navigation.
+- Files: `app/src/components/app/Navigation.tsx`, `app/src/routes/{dashboard.tsx,index.tsx,me.tsx}`.
+- Verified: source review and `git diff --check`; no full build run for this role-presentation change per request.

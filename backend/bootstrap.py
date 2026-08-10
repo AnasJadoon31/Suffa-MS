@@ -92,6 +92,7 @@ async def bootstrap() -> None:
     admin_password = os.getenv("BOOTSTRAP_ADMIN_PASSWORD")
     super_admin_username = os.getenv("SUPER_ADMIN_USERNAME", "platform-admin")
     super_admin_password = os.getenv("SUPER_ADMIN_PASSWORD")
+    admin_employee_code = f"ADMIN-{tenant_slug.upper()}"
 
     async with SessionLocal() as session:
         madrasa = (
@@ -127,7 +128,7 @@ async def bootstrap() -> None:
                 TeacherProfile(
                     madrasa_id=madrasa.id,
                     user_id=admin_user.id,
-                    employee_code="ADMIN",
+                    employee_code=admin_employee_code,
                     name="Admin",
                     whatsapp_number="+920000000000",
                     is_principal_delegate=True,
@@ -152,7 +153,7 @@ async def bootstrap() -> None:
                     TeacherProfile(
                         madrasa_id=madrasa.id,
                         user_id=admin_user.id,
-                        employee_code="ADMIN",
+                    employee_code=admin_employee_code,
                         name="Admin",
                         whatsapp_number="+920000000000",
                         is_principal_delegate=True,
@@ -190,7 +191,7 @@ async def bootstrap() -> None:
         existing_codes = set(
             (
                 await session.execute(
-                    select(MessageTemplate.code).where(MessageTemplate.madrasa_id == madrasa.id)
+                    select(MessageTemplate.code)
                 )
             ).scalars().all()
         )

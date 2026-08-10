@@ -27,7 +27,7 @@ export const Route = createFileRoute("/")({
 
 function LoginPage() {
   const { t, i18n } = useTranslation();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -36,8 +36,8 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) void navigate({ to: "/dashboard" });
-  }, [isAuthenticated, isLoading, navigate]);
+    if (!isLoading && isAuthenticated) void navigate({ to: user?.role === "super_admin" ? "/platform" : "/dashboard" });
+  }, [isAuthenticated, isLoading, navigate, user?.role]);
 
   const toggleLanguage = () => {
     const currentLang = i18n.language || "en";
@@ -54,8 +54,8 @@ function LoginPage() {
     setSubmitting(true);
     setError("");
     try {
-      await login(username.trim(), password, tenant.trim() || DEFAULT_TENANT);
-      await navigate({ to: "/dashboard" });
+      const loginTenant = tenant.trim() || DEFAULT_TENANT;
+      await login(username.trim(), password, loginTenant);
     } catch (err) {
       setError(apiErrorMessage(err, "Invalid username or password"));
     } finally {

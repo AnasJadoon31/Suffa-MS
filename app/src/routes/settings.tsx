@@ -477,15 +477,17 @@ function SettingRow({
   canManage: boolean;
 }) {
     const { t } = useTranslation();
+  const { refresh } = useAuth();
   const client = useQueryClient();
   const [draft, setDraft] = useState(setting.value);
   const dirty = draft !== setting.value;
 
   const save = useMutation({
     mutationFn: () => opsMutations.updateSetting(setting.key, draft),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(t("Setting saved"));
       void client.invalidateQueries({ queryKey: ["settings-catalog"] });
+      if (setting.key === "madrasa.name_en" || setting.key === "madrasa.logo_file_id") await refresh();
     },
   });
 

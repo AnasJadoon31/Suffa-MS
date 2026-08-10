@@ -75,7 +75,7 @@ async def load_report_branding(session, madrasa) -> ReportBranding:
         except Exception:
             logo_bytes = None
     return ReportBranding(
-        name_en=values.get("madrasa.name_en") or madrasa.name,
+        name_en=madrasa.name,
         name_ur=values.get("madrasa.name_ur") or madrasa.name,
         address=values.get("madrasa.address", ""),
         phone=values.get("madrasa.phone", ""),

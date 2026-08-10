@@ -1,9 +1,11 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 
 import { BottomNav, DesktopSidebar, TopBar } from "./Navigation";
 import { useAuth } from "@/lib/mms/auth";
+import { featureForPath } from "@/lib/mms/nav";
+import { isTenantWorkspace } from "@/lib/mms/workspace";
 
 export function AppShell({
   title,
@@ -16,8 +18,11 @@ export function AppShell({
   right?: ReactNode | undefined;
   children: ReactNode;
 }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, hasFeature, user } = useAuth();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const feature = featureForPath(pathname);
+  const featureDisabled = Boolean(feature && !hasFeature(feature) && !(user?.role === "super_admin" && !isTenantWorkspace(user.role)));
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) void navigate({ to: "/" });
@@ -30,6 +35,8 @@ export function AppShell({
       </div>
     );
   }
+
+  if (featureDisabled) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="min-h-screen bg-background">

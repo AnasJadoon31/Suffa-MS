@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.core.dependencies import require_feature
+from app.core.dependencies import require_feature, require_operations_feature
 from app.core.logging import setup_logging
 from app.db.session import get_session
 from app.modules.academics.routes import router as academics_router
@@ -139,10 +139,14 @@ def create_app() -> FastAPI:
         messaging_router, prefix="/api/v1/messaging", tags=["messaging"],
         dependencies=[Depends(require_feature("messaging"))],
     )
-    # operations bundles several features (timetable, holidays, forms, blog…);
-    # those are gated per-route as their screens are reworked.
-    app.include_router(operations_router, prefix="/api/v1/operations", tags=["operations"])
-    app.include_router(reporting_router, prefix="/api/v1/reporting", tags=["reporting"])
+    app.include_router(
+        operations_router, prefix="/api/v1/operations", tags=["operations"],
+        dependencies=[Depends(require_operations_feature)],
+    )
+    app.include_router(
+        reporting_router, prefix="/api/v1/reporting", tags=["reporting"],
+        dependencies=[Depends(require_feature("reports"))],
+    )
 
     @app.get("/healthz", tags=["system"])
     async def healthz() -> dict[str, str]:

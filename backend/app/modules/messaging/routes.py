@@ -99,11 +99,11 @@ def _split_evolution_events(value: str) -> list[str]:
 async def _evolution_config(session: AsyncSession, madrasa: Madrasa) -> EvolutionConfig:
     base_url = settings.evolution_api_url.strip().rstrip("/")
     api_key = settings.evolution_api_key.strip()
-    instance_name = settings.evolution_instance.strip()
+    instance_name = madrasa.slug
     webhook_url = settings.evolution_webhook_url.strip()
     webhook_base64 = settings.evolution_webhook_base64
     webhook_events = _split_evolution_events(settings.evolution_webhook_events)
-    if not (base_url and api_key and instance_name):
+    if not (base_url and api_key):
         raise HTTPException(status_code=503, detail=ErrorCode.WHATSAPP_DELIVERY_NOT_CONFIGURED)
     return EvolutionConfig(
         base_url=base_url,
@@ -114,12 +114,6 @@ async def _evolution_config(session: AsyncSession, madrasa: Madrasa) -> Evolutio
         webhook_base64=webhook_base64,
         webhook_events=webhook_events,
     )
-
-
-def _require_evolution_tenant(madrasa: Madrasa, config: EvolutionConfig | None = None) -> None:
-    configured_tenant = settings.evolution_tenant_slug or settings.default_tenant
-    if madrasa.slug != configured_tenant:
-        raise HTTPException(status_code=403, detail=ErrorCode.PERMISSION_REQUIRED)
 
 
 def _evolution_state(response: httpx.Response) -> str:
@@ -268,7 +262,6 @@ async def whatsapp_connection_status(
     session: AsyncSession = Depends(get_session),
 ) -> WhatsAppConnectionStatus:
     config = await _evolution_config(session, madrasa)
-    _require_evolution_tenant(madrasa, config)
     headers = {"apikey": config.api_key}
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -309,7 +302,6 @@ async def disconnect_whatsapp_connection(
     session: AsyncSession = Depends(get_session),
 ) -> WhatsAppConnectionStatus:
     config = await _evolution_config(session, madrasa)
-    _require_evolution_tenant(madrasa, config)
     headers = {"apikey": config.api_key}
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -339,7 +331,6 @@ async def request_whatsapp_qr_code(
     session: AsyncSession = Depends(get_session),
 ) -> WhatsAppQrResponse:
     config = await _evolution_config(session, madrasa)
-    _require_evolution_tenant(madrasa, config)
     headers = {"apikey": config.api_key, "Content-Type": "application/json"}
     qr_response: httpx.Response
     saved_webhook = _configured_webhook_payload(config)
@@ -429,7 +420,6 @@ async def request_whatsapp_pairing_code(
     session: AsyncSession = Depends(get_session),
 ) -> WhatsAppPairingResponse:
     config = await _evolution_config(session, madrasa)
-    _require_evolution_tenant(madrasa, config)
     try:
         phone_number = evolution_number(payload.phone_number)
     except ValueError as exc:
@@ -589,7 +579,6 @@ async def render_and_dispatch(
     result = WhatsAppLinkResponse(normalised_number=number, url=f"https://wa.me/{number}?text={quote(message)}")
     if attachment_bytes is None and force_direct_text:
         config = await _evolution_config(session, madrasa)
-        _require_evolution_tenant(madrasa, config)
         endpoint = f"{config.base_url}/message/sendText/{config.instance_path}"
         payload = {"number": number, "text": message}
         headers = {"apikey": config.api_key, "Content-Type": "application/json"}
@@ -611,7 +600,6 @@ async def render_and_dispatch(
 
     if attachment_bytes is not None:
         config = await _evolution_config(session, madrasa)
-        _require_evolution_tenant(madrasa, config)
         endpoint = f"{config.base_url}/message/sendMedia/{config.instance_path}"
         payload = {
             "number": number,

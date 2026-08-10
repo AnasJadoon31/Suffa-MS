@@ -48,13 +48,9 @@ class Settings(BaseSettings):
     # a click-to-chat URL that cannot pre-attach files.
     evolution_api_url: str = ""
     evolution_api_key: str = ""
-    evolution_instance: str = ""
     evolution_webhook_url: str = ""
     evolution_webhook_base64: bool = True
     evolution_webhook_events: str = ""
-    # The single configured Evolution instance belongs only to this tenant.
-    # Empty falls back to DEFAULT_TENANT for single-tenant deployments.
-    evolution_tenant_slug: str = ""
 
     @field_validator("upload_allowed_content_types", mode="before")
     @classmethod

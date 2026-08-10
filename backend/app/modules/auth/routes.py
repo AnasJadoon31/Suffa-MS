@@ -110,9 +110,14 @@ async def login(
         )
     )
     result = await session.execute(stmt)
-    user = result.scalar_one_or_none()
+    candidates = result.scalars().all()
+    user = None
+    for candidate in candidates:
+        if await verify_password(payload.password, candidate.password_hash):
+            user = candidate
+            break
 
-    if not user or not await verify_password(payload.password, user.password_hash):
+    if user is None:
         await record_failure(lockout_key, LOGIN_LOCKOUT_SECONDS)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -179,12 +184,16 @@ async def get_me(
     user_read = UserRead.model_validate(current_user)
     user_read.is_principal_delegate = is_delegate
 
+    branding = {key: value for key, value in profile_rows}
+    madrasa_read = MadrasaRead.model_validate(madrasa)
+    madrasa_read.logo_file_key = branding.get("madrasa.logo_file_id") or None
+
     return CurrentUserResponse(
         user=user_read,
-        madrasa=MadrasaRead.model_validate(madrasa),
+        madrasa=madrasa_read,
         permissions=permissions,
         features=await get_enabled_features(madrasa.id, session),
-        branding={key: value for key, value in profile_rows},
+        branding={**branding, "madrasa.name_en": madrasa.name},
         has_teaching_assignment=has_teaching_assignment,
     )
 
@@ -201,6 +210,18 @@ async def update_me(
     user = await session.get(User, current_user.id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if payload.username is not None and payload.username != user.username:
+        existing = await session.scalar(
+            select(User.id).where(
+                User.username == payload.username,
+                User.madrasa_id.is_(None) if user.role == UserRole.super_admin else User.madrasa_id == user.madrasa_id,
+                User.id != user.id,
+            )
+        )
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="Username already exists")
+        user.username = payload.username
 
     if payload.preferred_language is not None:
         user.preferred_language = payload.preferred_language

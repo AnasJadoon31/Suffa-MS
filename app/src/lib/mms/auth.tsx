@@ -7,7 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api, setAcademicSessionId, DEFAULT_TENANT, TENANT_KEY, TOKEN_KEY, readToken } from "./api";
+import { setSuperAdminWorkspace } from "./workspace";
 import i18n from "@/i18n";
 
 export interface MmsUser {
@@ -27,7 +29,7 @@ export interface Madrasa {
   name: string;
   name_en?: string;
   name_ur?: string;
-  logo_url?: string;
+  logo_file_key?: string | null;
 }
 
 interface ProfilePayload {
@@ -54,6 +56,7 @@ interface AuthState {
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<MmsUser | null>(null);
   const [madrasa, setMadrasa] = useState<Madrasa | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -99,12 +102,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     window.localStorage.removeItem(TOKEN_KEY);
+    queryClient.clear();
     applyProfile({});
     setIsLoading(false);
-  }, [applyProfile]);
+  }, [applyProfile, queryClient]);
 
   const login = useCallback(
     async (username: string, password: string, tenant: string) => {
+      queryClient.clear();
+      // A new sign-in always starts from the platform boundary. This flag only
+      // affects super-admin accounts; tenant workspaces are entered explicitly
+      // from the Platform screen after authentication.
+      setSuperAdminWorkspace("platform");
       const response = await api.post<{ access_token: string }>(
         "/api/v1/auth/token",
         { username, password },
@@ -115,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       await refresh();
     },
-    [refresh],
+    [queryClient, refresh],
   );
 
   useEffect(() => {

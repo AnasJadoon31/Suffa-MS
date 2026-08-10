@@ -72,11 +72,13 @@ function MePage() {
   const [personPhones, setPersonPhones] = useState<string[]>(["+92"]);
   const [personDefaultPhone, setPersonDefaultPhone] = useState("+92");
   const [admissionAnswers, setAdmissionAnswers] = useState<Record<string, unknown>>({});
+  const [accountUsername, setAccountUsername] = useState(user?.username ?? "");
 
   useEffect(() => {
     setLanguage(user?.preferred_language ?? "en");
     setSelectedSessionId(user?.selected_session_id ?? "");
-  }, [user?.preferred_language, user?.selected_session_id]);
+    setAccountUsername(user?.username ?? "");
+  }, [user?.preferred_language, user?.selected_session_id, user?.username]);
   useEffect(() => {
     const profile = personProfile.data?.profile as Record<string, unknown> | undefined;
     if (!profile) return;
@@ -140,9 +142,10 @@ function MePage() {
       if (error instanceof Error) toast.error(error.message);
     },
   });
+  const changeUsername = useMutation({ mutationFn: () => authApi.updateMe({ username: accountUsername.trim() }), onSuccess: async () => { await refresh(); toast.success("Username updated"); }, onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Failed to update username") });
 
   return (
-    <AppShell title={t("My Profile")} subtitle={madrasa?.name ?? "Suffa MS"}>
+    <AppShell title={t("My Profile")} subtitle={user?.role === "super_admin" ? t("Suffa MS Platform") : madrasa?.name ?? "Suffa MS"}>
       <Card className="flex items-center gap-3">
         <span className="gradient-emerald grid h-14 w-14 shrink-0 place-items-center rounded-2xl font-display text-xl font-extrabold text-primary-foreground">
           {user?.username?.slice(0, 1).toUpperCase()}
@@ -156,10 +159,12 @@ function MePage() {
         </div>
       </Card>
 
+      {user?.role === "super_admin" ? <><SectionTitle>{t("Platform account")}</SectionTitle><Card className="space-y-3 p-3.5"><Field label={t("Username")}><TextInput value={accountUsername} onChange={(event) => setAccountUsername(event.target.value)} /></Field><ActionButton onClick={() => changeUsername.mutate()} disabled={changeUsername.isPending || !accountUsername.trim()} className="w-full">{t("Save username")}</ActionButton></Card></> : null}
+
       <SectionTitle>{t("Account")}</SectionTitle>
       <div className="space-y-2.5">
-        <Row icon={<Building2 className="h-4 w-4" />} label={t("Madrasa")} value={madrasa?.name ?? "—"} />
-        <Row icon={<IdCard className="h-4 w-4" />} label={t("Tenant")} value={madrasa?.slug ?? "—"} />
+        <Row icon={<Building2 className="h-4 w-4" />} label={t(user?.role === "super_admin" ? "Platform" : "Madrasa")} value={user?.role === "super_admin" ? t("Suffa MS Platform") : madrasa?.name ?? "—"} />
+        <Row icon={<IdCard className="h-4 w-4" />} label={t(user?.role === "super_admin" ? "Scope" : "Tenant")} value={user?.role === "super_admin" ? t("All madaris") : madrasa?.slug ?? "—"} />
         <Row
           icon={<ShieldCheck className="h-4 w-4" />}
           label={t("Permissions")}

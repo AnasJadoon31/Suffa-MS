@@ -5,6 +5,10 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-10 — Platform Workspace Follow-Up
+
+- Run a browser walkthrough for super-admin madrasa selection, return-to-Platform navigation, screen enable/disable behavior, madrasa slug changes, username updates, and fresh sign-in starting at Platform.
+
 ## 2026-08-09 — Attendance History Seed Visibility Follow-Up
 
 - Status: Shared filter buttons are now used on Announcements, Forms, Blog, Reports, and Timetable, in addition to the screens that already had `FilterBar`.

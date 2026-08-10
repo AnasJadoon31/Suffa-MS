@@ -39,6 +39,7 @@ class MadrasaRead(BaseModel):
     id: UUID
     slug: str
     name: str
+    logo_file_key: str | None = None
     created_at: datetime
 
 
@@ -73,6 +74,7 @@ class UpdateMeRequest(BaseModel):
     # selected_session_id=None means "leave unchanged"; set this flag to reset
     # the user back to following the madrasa's active session.
     clear_selected_session: bool = False
+    username: str | None = Field(default=None, min_length=3, max_length=80)
 
 
 class ScopeType(StrEnum):

@@ -24,6 +24,7 @@ from app.modules.platform.schemas import (
     FeatureFlagsUpdate,
     MadrasaCreateRequest,
     MadrasaCreateResponse,
+    MadrasaUpdateRequest,
     PlatformMadrasaRead,
 )
 
@@ -107,6 +108,26 @@ async def create_madrasa(
         principal_user_id=principal.id,
         set_password_url=set_password_url,
     )
+
+
+@router.patch("/madaris/{madrasa_id}", response_model=PlatformMadrasaRead)
+async def update_madrasa(
+    madrasa_id: UUID,
+    payload: MadrasaUpdateRequest,
+    current_user: User = Depends(require_super_admin),
+    session: AsyncSession = Depends(get_session),
+) -> PlatformMadrasaRead:
+    madrasa = await _get_madrasa_or_404(session, madrasa_id)
+    if payload.slug != madrasa.slug:
+        taken = await session.scalar(select(Madrasa.id).where(Madrasa.slug == payload.slug, Madrasa.id != madrasa.id))
+        if taken is not None:
+            raise HTTPException(status_code=409, detail=f"Slug '{payload.slug}' already exists")
+        old_slug = madrasa.slug
+        madrasa.slug = payload.slug
+        record_audit(session, madrasa_id=madrasa.id, actor_id=current_user.id, action="platform.madrasa.slug.update", entity_name="madrasa", entity_id=str(madrasa.id), old_values={"slug": old_slug}, new_values={"slug": madrasa.slug})
+        await session.commit()
+        await session.refresh(madrasa)
+    return PlatformMadrasaRead.model_validate(madrasa)
 
 
 @router.get("/madaris/{madrasa_id}/features", response_model=list[FeatureFlagRead])

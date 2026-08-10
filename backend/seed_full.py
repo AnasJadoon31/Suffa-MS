@@ -451,7 +451,7 @@ async def seed():
             MessageTemplate(id=uid("tmpl-credentials"), madrasa_id=MID, code="credentials", name="Credentials", content={"en": "Assalamu alaikum {name}, your Suffa MS login is {username}.", "ur": "{name}، آپ کا سفہ ایم ایس لاگ ان {username} ہے۔"}, created_at=NOW, updated_at=NOW),
             MessageTemplate(id=uid("tmpl-receipt"), madrasa_id=MID, code="receipt", name="Receipt", content={"en": "Receipt for {name}: {amount}", "ur": "{name} کی رسید: {amount}"}, created_at=NOW, updated_at=NOW),
             MessageLog(id=uid("msg-log-1"), madrasa_id=MID, template_code="credentials", recipient_number=g_profiles[0].phone_numbers, recipient_type="guardian", recipient_id=g_profiles[0].id, dispatched_at=NOW - timedelta(days=1), sent_by_id=admin_u.id, content_sent="Seed credential message", created_at=NOW, updated_at=NOW),
-            MadrasaSetting(id=uid("setting-name-en"), madrasa_id=MID, key="madrasa.name_en", value="Suffa Madrasa", created_at=NOW, updated_at=NOW),
+            MadrasaSetting(id=uid("setting-name-en"), madrasa_id=MID, key="madrasa.name_en", value="Suffa MS", created_at=NOW, updated_at=NOW),
             MadrasaSetting(id=uid("setting-name-ur"), madrasa_id=MID, key="madrasa.name_ur", value="جامعہ سفہ", created_at=NOW, updated_at=NOW),
             MadrasaSetting(id=uid("setting-phone"), madrasa_id=MID, key="madrasa.phone", value="+923001112233", created_at=NOW, updated_at=NOW),
             MadrasaSetting(id=uid("setting-address"), madrasa_id=MID, key="madrasa.address", value="Suffa Road, Lahore", created_at=NOW, updated_at=NOW),

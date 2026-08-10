@@ -1,18 +1,26 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { CalendarCheck2, Home, LayoutGrid, LogOut, Menu, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/mms/auth";
-import { navGroups } from "@/lib/mms/nav";
+import { navGroups, type NavItem } from "@/lib/mms/nav";
+import { isTenantWorkspace } from "@/lib/mms/workspace";
+import { filesApi } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
 const tabs = [
   { to: "/dashboard", label: "Home", icon: Home },
-  { to: "/attendance", label: "Attendance", icon: CalendarCheck2 },
+  { to: "/attendance", label: "Attendance", icon: CalendarCheck2, feature: "attendance" },
   { to: "/people", label: "People", icon: Users },
   { to: "/more", label: "More", icon: LayoutGrid },
 ] as const;
+
+function canShow(item: Pick<NavItem, "feature" | "to">, role: string | undefined, hasFeature: (key: string) => boolean) {
+  if (item.to === "/platform") return role === "super_admin" && !isTenantWorkspace(role);
+  return !item.feature || (role === "super_admin" && !isTenantWorkspace(role)) || hasFeature(item.feature);
+}
 
 function useActive() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -22,11 +30,13 @@ function useActive() {
 export function BottomNav() {
     const { t } = useTranslation();
   const isActive = useActive();
+  const { user, hasFeature } = useAuth();
+  const visibleTabs = tabs.filter((tab) => canShow(tab, user?.role, hasFeature));
 
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur-md lg:hidden">
-      <ul className="mx-auto grid max-w-lg grid-cols-4">
-        {tabs.map(({ to, label, icon: Icon }) => {
+      <ul className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}>
+        {visibleTabs.map(({ to, label, icon: Icon }) => {
           const active = isActive(to);
           return (
             <li key={to}>
@@ -56,14 +66,21 @@ export function BottomNav() {
 function BrandBlock() {
     const { t } = useTranslation();
   const { madrasa, user } = useAuth();
+  const logo = useQuery({
+    queryKey: ["madrasa-logo", madrasa?.logo_file_key],
+    queryFn: () => filesApi.presignDownload(madrasa!.logo_file_key!),
+    enabled: Boolean(madrasa?.logo_file_key),
+    staleTime: 10 * 60 * 1000,
+  });
+  const isPlatform = user?.role === "super_admin" && !isTenantWorkspace(user.role);
   return (
     <div className="flex min-w-0 items-center gap-3 px-2">
-      <span className="gradient-emerald grid h-11 w-11 shrink-0 place-items-center rounded-2xl font-display text-lg font-extrabold text-primary-foreground">
-        {(madrasa?.name ?? "S").slice(0, 1).toUpperCase()}
+      <span className={logo.data && !isPlatform ? "grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-card" : "gradient-emerald grid h-11 w-11 shrink-0 place-items-center rounded-2xl font-display text-lg font-extrabold text-primary-foreground"}>
+        {!isPlatform && logo.data ? <img src={logo.data} alt="" className="h-full w-full object-contain" /> : (isPlatform ? "P" : madrasa?.name ?? "S").slice(0, 1).toUpperCase()}
       </span>
       <div className="min-w-0">
         <p className="truncate font-display text-base font-extrabold">
-          {madrasa?.name ?? "Suffa MS"}
+          {isPlatform ? "Suffa MS Platform" : madrasa?.name ?? "Suffa MS"}
         </p>
         <p className="truncate text-xs text-muted-foreground">
           {user?.username ?? ""}
@@ -75,11 +92,15 @@ function BrandBlock() {
 }
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
+  const { user, hasFeature } = useAuth();
   const isActive = useActive();
+  const groups = user?.role === "super_admin" && !isTenantWorkspace(user.role)
+    ? navGroups.map((group) => ({ ...group, items: group.items.filter((item) => item.to === "/platform" || item.to === "/me") })).filter((group) => group.items.length)
+    : navGroups.map((group) => ({ ...group, items: group.items.filter((item) => canShow(item, user?.role, hasFeature)) })).filter((group) => group.items.length);
   return (
     <div className="space-y-5">
-      {navGroups.map((group) => (
+      {groups.map((group) => (
         <div key={group.title}>
           <p className="px-3.5 pb-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.16em] text-muted-foreground/70">
             {t(group.title)}

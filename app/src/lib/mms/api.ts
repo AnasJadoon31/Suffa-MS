@@ -1,12 +1,13 @@
 import axios, { AxiosError } from "axios";
 import { toast } from "sonner";
+import { isTenantWorkspace } from "./workspace";
 
 export const API_BASE =
   (import.meta.env["VITE_API_BASE"] as string | undefined) ?? "http://localhost:8001";
 
 export const TOKEN_KEY = "mms_token";
 export const TENANT_KEY = "mms_tenant";
-export const DEFAULT_TENANT = "suffa";
+export const DEFAULT_TENANT = (import.meta.env["VITE_DEFAULT_TENANT"] as string | undefined) ?? "default";
 
 export const api = axios.create({
   baseURL: API_BASE,
@@ -74,7 +75,11 @@ api.interceptors.request.use((config) => {
 
   const token = readToken();
   if (token) config.headers["Authorization"] = `Bearer ${token}`;
-  config.headers["X-Madrasa"] = readTenant();
+  // Authentication may explicitly target a madrasa before it is saved as the
+  // active workspace. Preserve that header instead of reviving a stale tenant
+  // from local storage.
+  if (!config.headers["X-Madrasa"]) config.headers["X-Madrasa"] = readTenant();
+  if (isTenantWorkspace("super_admin")) config.headers["X-Platform-Workspace"] = "tenant";
   if (academicSessionId) config.headers["X-Academic-Session-Id"] = academicSessionId;
 
   return config;

@@ -30,6 +30,7 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   description: string;
+  feature?: string;
 }
 
 export const primaryNav: NavItem[] = [
@@ -39,9 +40,10 @@ export const primaryNav: NavItem[] = [
     label: "Attendance",
     icon: CalendarCheck2,
     description: "Mark and review rosters",
+    feature: "attendance",
   },
   { to: "/people", label: "People", icon: Users, description: "Students, teachers, guardians" },
-  { to: "/timetable", label: "Timetable", icon: CalendarClock, description: "Your weekly periods" },
+  { to: "/timetable", label: "Timetable", icon: CalendarClock, description: "Your weekly periods", feature: "timetable" },
 ];
 
 export const academicNav: NavItem[] = [
@@ -50,13 +52,15 @@ export const academicNav: NavItem[] = [
     label: "Assessments",
     icon: ClipboardList,
     description: "Madrasa assessments and submissions",
+    feature: "assessments",
   },
-  { to: "/results", label: "Results", icon: Trophy, description: "Marks and grade bands" },
+  { to: "/results", label: "Results", icon: Trophy, description: "Marks and grade bands", feature: "assessments" },
   {
     to: "/examination",
     label: "Examination",
     icon: ClipboardList,
     description: "Grading, exams and results",
+    feature: "assessments",
   },
   {
     to: "/academics",
@@ -64,7 +68,7 @@ export const academicNav: NavItem[] = [
     icon: BookOpen,
     description: "Classes, courses and sessions",
   },
-  { to: "/resources", label: "Resources", icon: Library, description: "Shared study material" },
+  { to: "/resources", label: "Resources", icon: Library, description: "Shared study material", feature: "resources" },
 ];
 
 export const operationsNav: NavItem[] = [
@@ -73,12 +77,13 @@ export const operationsNav: NavItem[] = [
     label: "Announcements",
     icon: Megaphone,
     description: "Notices for your audience",
+    feature: "announcements",
   },
-  { to: "/leave", label: "Leave", icon: CalendarDays, description: "Requests and approvals" },
-  { to: "/holidays", label: "Holidays", icon: BookOpen, description: "Academic calendar breaks" },
-  { to: "/admissions", label: "Admissions", icon: UserPlus, description: "Applications pipeline" },
-  { to: "/blog", label: "Blog", icon: Newspaper, description: "Published madrasa posts" },
-  { to: "/forms", label: "Forms", icon: FileText, description: "Custom forms and responses" },
+  { to: "/leave", label: "Leave", icon: CalendarDays, description: "Requests and approvals", feature: "leave" },
+  { to: "/holidays", label: "Holidays", icon: BookOpen, description: "Academic calendar breaks", feature: "holidays" },
+  { to: "/admissions", label: "Admissions", icon: UserPlus, description: "Applications pipeline", feature: "admissions" },
+  { to: "/blog", label: "Blog", icon: Newspaper, description: "Published madrasa posts", feature: "blog" },
+  { to: "/forms", label: "Forms", icon: FileText, description: "Custom forms and responses", feature: "forms" },
 ];
 
 export const myNav: NavItem[] = [
@@ -103,8 +108,8 @@ export const myNav: NavItem[] = [
 ];
 
 export const adminNav: NavItem[] = [
-  { to: "/finance", label: "Finance", icon: Wallet, description: "Fees, donations, salary" },
-  { to: "/reports", label: "Reports", icon: FileBarChart2, description: "Export CSV and PDF" },
+  { to: "/finance", label: "Finance", icon: Wallet, description: "Fees, donations, salary", feature: "finance" },
+  { to: "/reports", label: "Reports", icon: FileBarChart2, description: "Export CSV and PDF", feature: "reports" },
   { to: "/settings", label: "Settings", icon: Settings, description: "Madrasa configuration" },
   { to: "/roles", label: "Roles", icon: ShieldCheck, description: "Permission roles" },
   { to: "/platform", label: "Platform", icon: Monitor, description: "Super admin console" },
@@ -126,5 +131,9 @@ export const allNavItems: NavItem[] = [
   ...operationsNav,
   ...adminNav,
 ];
+
+export function featureForPath(pathname: string): string | undefined {
+  return allNavItems.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))?.feature;
+}
 
 export const gradIcon = GraduationCap;

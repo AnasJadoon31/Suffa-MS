@@ -251,6 +251,30 @@ async def get_enabled_features(
     return {feature.key: overrides.get(feature.key, True) for feature in FEATURES}
 
 
+def _is_platform_workspace(current_user: Optional[User], x_platform_workspace: Optional[str]) -> bool:
+    return current_user is not None and current_user.role == UserRole.super_admin and x_platform_workspace == "tenant"
+
+
+async def _ensure_feature_enabled(
+    key: str,
+    madrasa: Madrasa,
+    current_user: Optional[User],
+    session: AsyncSession,
+    x_platform_workspace: Optional[str],
+) -> None:
+    if current_user is not None and current_user.role == UserRole.super_admin and not _is_platform_workspace(current_user, x_platform_workspace):
+        return
+    result = await session.execute(
+        select(MadrasaFeature).where(
+            MadrasaFeature.madrasa_id == madrasa.id,
+            MadrasaFeature.feature_key == key,
+        )
+    )
+    flag = result.scalar_one_or_none()
+    if flag is not None and not flag.enabled:
+        raise HTTPException(status_code=403, detail=f"Feature '{key}' is not enabled for this madrasa")
+
+
 def require_feature(key: str):
     """Router/route dependency: 403 when the feature is switched off for the
     tenant. Super admins bypass (platform endpoints have their own guard)."""
@@ -259,20 +283,38 @@ def require_feature(key: str):
         madrasa: Madrasa = Depends(get_current_madrasa),
         current_user: Optional[User] = Depends(get_optional_user),
         session: AsyncSession = Depends(get_session),
+        x_platform_workspace: Optional[str] = Header(None, alias="X-Platform-Workspace"),
     ) -> None:
-        if current_user is not None and current_user.role == UserRole.super_admin:
-            return
-        result = await session.execute(
-            select(MadrasaFeature).where(
-                MadrasaFeature.madrasa_id == madrasa.id,
-                MadrasaFeature.feature_key == key,
-            )
-        )
-        flag = result.scalar_one_or_none()
-        if flag is not None and not flag.enabled:
-            raise HTTPException(status_code=403, detail=f"Feature '{key}' is not enabled for this madrasa")
+        await _ensure_feature_enabled(key, madrasa, current_user, session, x_platform_workspace)
 
     return feature_checker
+
+
+async def require_operations_feature(
+    request: Request,
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    current_user: Optional[User] = Depends(get_optional_user),
+    session: AsyncSession = Depends(get_session),
+    x_platform_workspace: Optional[str] = Header(None, alias="X-Platform-Workspace"),
+) -> None:
+    path = request.url.path.removeprefix("/api/v1/operations")
+    prefixes = (
+        ("/timetable", "timetable"),
+        ("/holidays", "holidays"),
+        ("/leave", "leave"),
+        ("/resource-categories", "resources"),
+        ("/resources", "resources"),
+        ("/form-responses", "forms"),
+        ("/forms", "forms"),
+        ("/announcements", "announcements"),
+        ("/blog", "blog"),
+        ("/admission-forms", "admissions"),
+        ("/admissions", "admissions"),
+    )
+    for prefix, feature in prefixes:
+        if path == prefix or path.startswith(f"{prefix}/"):
+            await _ensure_feature_enabled(feature, madrasa, current_user, session, x_platform_workspace)
+            return
 
 
 async def ensure_writable_session(
@@ -293,8 +335,8 @@ async def ensure_writable_session(
 
 
 async def _user_is_admin(user: User, session: AsyncSession) -> bool:
-    """True if user is a principal OR a teacher marked as principal delegate."""
-    if user.role == UserRole.principal:
+    """True for the platform super admin, a principal, or a principal delegate."""
+    if user.role in {UserRole.super_admin, UserRole.principal}:
         return True
     if user.role == UserRole.teacher:
         result = await session.execute(

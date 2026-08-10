@@ -2479,7 +2479,11 @@ async def list_settings(
         SettingRead(
             id=row.id,
             key=row.key,
-            value="" if CATALOG_BY_KEY.get(row.key) and CATALOG_BY_KEY[row.key].type == "secret" else row.value,
+            value=(
+                "" if CATALOG_BY_KEY.get(row.key) and CATALOG_BY_KEY[row.key].type == "secret"
+                else madrasa.name if row.key == "madrasa.name_en"
+                else row.value
+            ),
             updated_at=row.updated_at,
         )
         for row in rows
@@ -2511,7 +2515,11 @@ async def list_settings_catalog(
             category=item.category,
             type=item.type,
             label=item.label,
-            value="" if item.type == "secret" and stored.get(item.key) else stored.get(item.key, item.default),
+            value=(
+                "" if item.type == "secret" and stored.get(item.key)
+                else madrasa.name if item.key == "madrasa.name_en"
+                else stored.get(item.key, item.default)
+            ),
         )
         for item in CATALOG
     ], limit=limit, offset=offset, response=response)
@@ -2531,16 +2539,20 @@ async def upsert_setting(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    value = payload.value.strip() if payload.key == "madrasa.name_en" else payload.value
+    if payload.key == "madrasa.name_en":
+        madrasa.name = value
+
     setting = (
         await session.execute(
             select(MadrasaSetting).where(MadrasaSetting.madrasa_id == madrasa.id, MadrasaSetting.key == payload.key)
         )
     ).scalar_one_or_none()
     if setting is None:
-        setting = MadrasaSetting(madrasa_id=madrasa.id, key=payload.key, value=payload.value)
+        setting = MadrasaSetting(madrasa_id=madrasa.id, key=payload.key, value=value)
         session.add(setting)
     else:
-        setting.value = payload.value
+        setting.value = value
     await session.commit()
     await session.refresh(setting)
     return SettingRead.model_validate(setting)

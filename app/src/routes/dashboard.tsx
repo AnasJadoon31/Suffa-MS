@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, Navigate, createFileRoute } from "@tanstack/react-router";
 import {
   BookOpen,
   CalendarClock,
@@ -21,6 +21,7 @@ import {
   StatCard,
 } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
+import { isTenantWorkspace } from "@/lib/mms/workspace";
 import {
   academicsApi,
   attendanceApi,
@@ -53,16 +54,18 @@ function DashboardPage() {
   const today = useQuery({
     queryKey: ["today"],
     queryFn: () => academicsApi.today(),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && (user?.role !== "super_admin" || isTenantWorkspace(user.role)),
   });
 
   const dashboard = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => reportingApi.dashboard(),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && (user?.role !== "super_admin" || isTenantWorkspace(user.role)),
   });
 
   const data = dashboard.data;
+
+  if (user?.role === "super_admin" && !isTenantWorkspace(user.role)) return <Navigate to="/platform" replace />;
 
   return (
     <AppShell

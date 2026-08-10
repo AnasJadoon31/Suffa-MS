@@ -20,7 +20,7 @@ class SettingDef:
 
 CATALOG: tuple[SettingDef, ...] = (
     # Madrasa profile — visible to every member of the madrasa.
-    SettingDef("madrasa.name_en", "profile", "string", "", "Name (English)"),
+    SettingDef("madrasa.name_en", "profile", "string", "", "Name"),
     SettingDef("madrasa.name_ur", "profile", "string", "", "Name (Urdu)"),
     SettingDef("madrasa.address", "profile", "string", "", "Address"),
     SettingDef("madrasa.phone", "profile", "string", "", "Phone number"),
@@ -53,6 +53,8 @@ def validate_setting(key: str, value: str) -> None:
     definition = CATALOG_BY_KEY.get(key)
     if definition is None:
         raise ValueError(f"Unknown setting: {key}")
+    if key == "madrasa.name_en" and not value.strip():
+        raise ValueError("Madrasa name is required")
     if definition.type == "int":
         try:
             int(value)

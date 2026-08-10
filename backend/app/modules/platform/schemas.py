@@ -38,3 +38,7 @@ class FeatureFlagRead(BaseModel):
 class FeatureFlagsUpdate(BaseModel):
     # Partial update: only the keys present are changed.
     features: dict[str, bool]
+
+
+class MadrasaUpdateRequest(BaseModel):
+    slug: str = Field(min_length=2, max_length=80, pattern=r"^[a-z0-9][a-z0-9-]*$")

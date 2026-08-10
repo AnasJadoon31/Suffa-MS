@@ -402,6 +402,7 @@ export const authApi = {
       .then((r) => r.data),
   me: () => api.get("/api/v1/auth/me").then((r) => r.data),
   updateMe: (payload: {
+    username?: string;
     preferred_language?: string;
     selected_session_id?: string | null;
     clear_selected_session?: boolean;
