@@ -189,7 +189,21 @@ async def list_classes(
     rows = await paginate_scalars(
         session, stmt.order_by(AcademicClass.name), limit=limit, offset=offset, response=response
     )
-    return [AcademicClassRead.model_validate(c) for c in rows]
+    class_ids = [row.id for row in rows]
+    counts: dict[UUID, int] = {}
+    if class_ids:
+        count_rows = await session.execute(
+            select(Section.class_id, func.count(Section.id))
+            .where(Section.class_id.in_(class_ids), Section.madrasa_id == madrasa.id)
+            .group_by(Section.class_id)
+        )
+        counts = {row[0]: row[1] for row in count_rows}
+    result = []
+    for academic_class in rows:
+        item = AcademicClassRead.model_validate(academic_class)
+        item.section_count = counts.get(academic_class.id, 0)
+        result.append(item)
+    return result
 
 
 @router.put("/classes/{class_id}", response_model=AcademicClassRead)

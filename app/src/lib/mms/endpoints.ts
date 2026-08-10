@@ -16,6 +16,7 @@ export interface AcademicClass {
   name: string;
   default_portal_enabled?: boolean;
   assignment_limit?: number | null;
+  section_count?: number;
 }
 
 export const academicsApi = {

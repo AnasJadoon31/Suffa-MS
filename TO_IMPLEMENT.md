@@ -385,3 +385,13 @@ role/language/screenshot matrix.
 
 - Remaining: Browser-check Marking, Results, and My Assessments with real teacher/admin accounts to confirm class accordion expansion, section selection, Back headers, and search filtering on mobile.
 - Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
+
+## 2026-08-10 - Published Results Exam Breakdown Follow-up
+
+- Remaining: Browser-check `/results` for staff and student accounts to confirm spacing, no publish action, PDF export, and subject expansion showing every exam mark.
+- Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
+
+## 2026-08-10 - Academics Search and Section Count Follow-up
+
+- Remaining: Browser-check Academics Programs, Classes, and Courses search plus class section counts after the running frontend reloads.
+- Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.

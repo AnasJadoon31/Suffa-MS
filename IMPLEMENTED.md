@@ -2003,3 +2003,20 @@ and authorization tests, the backend suite is now 120 tests.
 - Files: `app/src/routes/examination.tsx`, `app/src/routes/my-assessments.tsx`
 - Verified: Focused TypeScript output has no errors for the touched route files.
 - Notes: Full frontend/backend test suites were intentionally not run for this focused UI navigation update.
+
+## 2026-08-10 - Published Results Exam Breakdown
+
+- Implemented: Removed the publish action from the separate `/results` screen so publishing remains in the internal Assessments/Examination workflow.
+- Implemented: Added extra vertical spacing after the results filters and made subject/course result cards expandable to show exam-level marks for staff and students.
+- Files: `app/src/routes/results.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/assessments/schemas.py`, `backend/app/modules/assessments/routes.py`
+- Verified: Focused TypeScript output has no errors for `results.tsx` or `more-endpoints.ts`; backend assessment route/schema files pass `py_compile`.
+- Notes: Full frontend/backend test suites were intentionally not run for this focused results-view update.
+
+## 2026-08-10 - Academics Search and Class Section Counts
+
+- Implemented: Added search bars to the Academics Programs, Classes, and Courses tabs.
+- Implemented: Added `section_count` to the classes API and used it on class cards so collapsed classes show the real section count instead of counting only the currently expanded class sections.
+- Implemented: Added a frontend fallback that fetches each class's sections on the Classes tab and counts them directly, so section counts work even before the running backend exposes `section_count`.
+- Files: `app/src/routes/academics.tsx`, `app/src/lib/mms/endpoints.ts`, `backend/app/modules/academics/routes.py`, `backend/app/modules/academics/schemas.py`
+- Verified: Focused TypeScript output has no errors for `academics.tsx` or `endpoints.ts`; backend academics route/schema files pass `py_compile`.
+- Notes: Full frontend/backend test suites were intentionally not run for this focused Academics update.

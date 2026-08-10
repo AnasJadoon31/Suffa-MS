@@ -1566,6 +1566,7 @@ async def _compute_course_result(
     total_weight = 0.0
     weighted_sum = 0.0
     count = 0
+    mark_details = []
     
     # 1. Include Exams
     for exam_type in exam_types:
@@ -1574,6 +1575,12 @@ async def _compute_course_result(
                 select(Mark).where(Mark.exam_type_id == exam_type.id, Mark.student_id == student_id)
             )
         ).scalar_one_or_none()
+        mark_details.append({
+            "exam_type_id": exam_type.id,
+            "name": exam_type.name,
+            "weightage": exam_type.weightage,
+            "score": mark.score if mark is not None else None,
+        })
         if mark is None:
             continue
         weighted_sum += mark.score * exam_type.weightage
@@ -1614,11 +1621,11 @@ async def _compute_course_result(
     count += assignment_count
 
     if total_weight == 0:
-        return CourseResult(course_id=course_id, raw_score=None, band=None, exam_count=0)
+        return CourseResult(course_id=course_id, raw_score=None, band=None, exam_count=0, marks=mark_details)
 
     raw_score = weighted_sum / total_weight
     band = _band_for_score(result_scheme.bands, raw_score) if result_scheme is not None else None
-    return CourseResult(course_id=course_id, raw_score=round(raw_score, 2), band=band, exam_count=count)
+    return CourseResult(course_id=course_id, raw_score=round(raw_score, 2), band=band, exam_count=count, marks=mark_details)
 
 
 @router.get("/results/course", response_model=CourseResult)

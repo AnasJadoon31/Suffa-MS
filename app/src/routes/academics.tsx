@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { BookOpen, CalendarRange, ChevronDown, ChevronUp, GraduationCap, Layers, Plus, Trash2, Users } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
@@ -41,7 +41,7 @@ function AcademicsPage() {
     const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
-  const canManage = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
+  const canManage = Boolean(user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate);
   const [tab, setTab] = useState<Tab>("sessions");
   const today = new Date().toISOString().slice(0, 10);
 
@@ -69,12 +69,56 @@ function AcademicsPage() {
   const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
   const [expandedProgramId, setExpandedProgramId] = useState<string | null>(null);
   const [sectionName, setSectionName] = useState("");
+  const [programSearch, setProgramSearch] = useState("");
+  const [classSearch, setClassSearch] = useState("");
+  const [courseSearch, setCourseSearch] = useState("");
+
+  const filteredPrograms = useMemo(() => {
+    const term = programSearch.trim().toLowerCase();
+    const list = programs.data ?? [];
+    if (!term) return list;
+    return list.filter((program) => program.name.toLowerCase().includes(term));
+  }, [programSearch, programs.data]);
+
+  const filteredClasses = useMemo(() => {
+    const term = classSearch.trim().toLowerCase();
+    const list = classes.data ?? [];
+    if (!term) return list;
+    return list.filter((academicClass) => {
+      const program = (programs.data ?? []).find((item) => item.id === academicClass.program_id);
+      return `${academicClass.name} ${program?.name ?? ""}`.toLowerCase().includes(term);
+    });
+  }, [classSearch, classes.data, programs.data]);
+
+  const filteredCourses = useMemo(() => {
+    const term = courseSearch.trim().toLowerCase();
+    const list = courses.data ?? [];
+    if (!term) return list;
+    return list.filter((course) => course.name.toLowerCase().includes(term));
+  }, [courseSearch, courses.data]);
 
   const sections = useQuery({
     queryKey: ["sections", expandedClassId],
     queryFn: () => (expandedClassId ? academicsExtraApi.listSections(expandedClassId) : Promise.resolve([])),
     enabled: Boolean(expandedClassId),
   });
+  const classSectionQueries = useQueries({
+    queries: (classes.data ?? []).map((academicClass) => ({
+      queryKey: ["sections", academicClass.id],
+      queryFn: () => academicsExtraApi.listSections(academicClass.id),
+      enabled: tab === "classes",
+    })),
+  });
+  const allClassSections = useMemo(() => {
+    return classSectionQueries.flatMap((query) => query.data ?? []);
+  }, [classSectionQueries]);
+  const classSectionCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const section of allClassSections) {
+      counts.set(section.class_id, (counts.get(section.class_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [allClassSections]);
 
   const createSection = useMutation({
     mutationFn: ({ classId, name }: { classId: string; name: string }) =>
@@ -83,6 +127,7 @@ function AcademicsPage() {
       toast.success("Section added");
       setSectionName("");
       void client.invalidateQueries({ queryKey: ["sections", classId] });
+      void client.invalidateQueries({ queryKey: ["classes"] });
     },
   });
 
@@ -92,6 +137,7 @@ function AcademicsPage() {
     onSuccess: (_data, { classId }) => {
       toast.success("Section removed");
       void client.invalidateQueries({ queryKey: ["sections", classId] });
+      void client.invalidateQueries({ queryKey: ["classes"] });
     },
   });
 
@@ -240,7 +286,12 @@ function AcademicsPage() {
 
       {!loading && tab === "programs" ? (
         <div className="space-y-2">
-          {(programs.data ?? []).map((program) => {
+          <TextInput
+            value={programSearch}
+            onChange={(event) => setProgramSearch(event.target.value)}
+            placeholder={t("Search programs...")}
+          />
+          {filteredPrograms.map((program) => {
             const isExpanded = expandedProgramId === program.id;
             const assignedCourses = (isExpanded ? programCourses.data ?? [] : []);
             const availableCourses = (courses.data ?? []).filter(
@@ -301,37 +352,52 @@ function AcademicsPage() {
               </div>
             );
           })}
-          {programs.data?.length === 0 ? <EmptyState title={t("Nothing here yet")} /> : null}
+          {filteredPrograms.length === 0 ? <EmptyState title={t("Nothing here yet")} /> : null}
         </div>
       ) : null}
 
       {!loading && tab === "classes" ? (
-        <ClassList
-          classes={classes.data ?? []}
-          programs={programs.data ?? []}
-          expandedClassId={expandedClassId}
-          onToggle={(id) => setExpandedClassId(expandedClassId === id ? null : id)}
-          sections={sections.data ?? []}
-          sectionName={sectionName}
-          onSectionNameChange={setSectionName}
-          canManage={canManage}
-          createSection={(classId: string, name: string) => createSection.mutate({ classId, name })}
-          createSectionPending={createSection.isPending}
-          deleteSection={(classId: string, sectionId: string) => deleteSection.mutate({ classId, sectionId })}
-          deleteSectionPending={deleteSection.isPending}
-        />
+        <div className="space-y-2">
+          <TextInput
+            value={classSearch}
+            onChange={(event) => setClassSearch(event.target.value)}
+            placeholder={t("Search classes...")}
+          />
+          <ClassList
+            classes={filteredClasses}
+            programs={programs.data ?? []}
+            expandedClassId={expandedClassId}
+            onToggle={(id) => setExpandedClassId(expandedClassId === id ? null : id)}
+            sections={allClassSections.length > 0 ? allClassSections : sections.data ?? []}
+            sectionCounts={classSectionCounts}
+            sectionName={sectionName}
+            onSectionNameChange={setSectionName}
+            canManage={canManage}
+            createSection={(classId: string, name: string) => createSection.mutate({ classId, name })}
+            createSectionPending={createSection.isPending}
+            deleteSection={(classId: string, sectionId: string) => deleteSection.mutate({ classId, sectionId })}
+            deleteSectionPending={deleteSection.isPending}
+          />
+        </div>
       ) : null}
 
       {!loading && tab === "courses" ? (
-        <Items
-          empty={(courses.data ?? []).length === 0}
-          rows={(courses.data ?? []).map((item) => ({
-            id: item.id,
-            icon: <BookOpen className="h-5 w-5" />,
-            title: item.name,
-            subtitle: "Course",
-          }))}
-        />
+        <div className="space-y-2">
+          <TextInput
+            value={courseSearch}
+            onChange={(event) => setCourseSearch(event.target.value)}
+            placeholder={t("Search courses...")}
+          />
+          <Items
+            empty={filteredCourses.length === 0}
+            rows={filteredCourses.map((item) => ({
+              id: item.id,
+              icon: <BookOpen className="h-5 w-5" />,
+              title: item.name,
+              subtitle: "Course",
+            }))}
+          />
+        </div>
       ) : null}
     </AppShell>
   );
@@ -391,6 +457,7 @@ function ClassList({
   expandedClassId,
   onToggle,
   sections,
+  sectionCounts,
   sectionName,
   onSectionNameChange,
   canManage,
@@ -404,6 +471,7 @@ function ClassList({
   expandedClassId: string | null;
   onToggle: (id: string) => void;
   sections: Section[];
+  sectionCounts: Map<string, number>;
   sectionName: string;
   onSectionNameChange: (v: string) => void;
   canManage: boolean;
@@ -422,6 +490,7 @@ function ClassList({
         const program = programs.find((p) => p.id === cls.program_id);
         const isExpanded = expandedClassId === cls.id;
         const classSections = sections.filter((s) => s.class_id === cls.id);
+        const sectionCount = sectionCounts.get(cls.id) ?? cls.section_count ?? classSections.length;
 
         return (
           <div key={cls.id}>
@@ -436,7 +505,7 @@ function ClassList({
                 <div className="min-w-0 text-left">
                   <p className="truncate font-semibold">{cls.name}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {program?.name ?? "Class"} · {classSections.length} {t("sections")}
+                    {program?.name ?? "Class"} · {sectionCount} {t("sections")}
                   </p>
                 </div>
                 {isExpanded ? (

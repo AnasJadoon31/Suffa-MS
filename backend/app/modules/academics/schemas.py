@@ -25,6 +25,7 @@ class AcademicClassRead(BaseModel):
     name: str
     default_portal_enabled: bool
     assignment_limit: int | None = Field(default=None, ge=1)
+    section_count: int = 0
 
 
 class AcademicClassUpdate(BaseModel):

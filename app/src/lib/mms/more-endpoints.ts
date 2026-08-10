@@ -105,6 +105,7 @@ export interface CourseResult {
   raw_score: number | null;
   band: string | null;
   exam_count: number;
+  marks: { exam_type_id: string; name: string; weightage: number; score: number | null }[];
 }
 export interface SessionResult {
   session_id: string;

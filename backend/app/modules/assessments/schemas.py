@@ -228,11 +228,19 @@ class MarkRead(BaseModel):
     entered_by_id: UUID | None
 
 
+class CourseResultMark(BaseModel):
+    exam_type_id: UUID
+    name: str
+    weightage: float
+    score: float | None = None
+
+
 class CourseResult(BaseModel):
     course_id: UUID
     raw_score: float | None
     band: str | None
     exam_count: int
+    marks: list[CourseResultMark] = []
 
 
 class SessionResult(BaseModel):
