@@ -5,6 +5,16 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-11 — Current Completion and Release Readiness
+
+- Current assessment: approximately 70% functionally complete and 45% production-ready. Core workflows are implemented across people, academics, attendance, admissions, assessments, finance, messaging, sessions, tenant administration, and the super-admin platform.
+- Release blockers:
+  - Run authenticated browser journeys for super admin, principal, teacher, student, guardian, donor, and admissions staff against the live API, including fresh login, tenant switching, logout, and protected-route behavior.
+  - Run responsive English and Urdu/RTL checks at phone, 920px, and desktop widths for the changed core workflows.
+  - Verify real upload/download, WhatsApp delivery acknowledgement, and tenant-specific Evolution instance lifecycle against the configured external services.
+  - Resolve the remaining feature-specific follow-ups below and add focused regression coverage for the high-risk flows.
+- Completion rule: do not describe the app as production-ready until these release blockers and the open items below are verified end to end.
+
 ## 2026-08-10 — Platform Workspace Follow-Up
 
 - Run a browser walkthrough for super-admin madrasa selection, return-to-Platform navigation, screen enable/disable behavior, madrasa slug changes, username updates, and fresh sign-in starting at Platform.
@@ -62,7 +72,7 @@ they do not close or weaken the new July 23 requirements.
 ## 2026-08-08 — WhatsApp Evolution Settings Follow-Up
 
 - Status: Evolution API v2 URL/key/instance/webhook settings are no longer editable from Madrasa Settings; messaging now reads them from env only.
-- Status: Local `.env` is configured for the provided Evolution URL/API key and `suffa-ms` instance; `/settings/catalog` exposes no `whatsapp.*` config rows.
+- Status: Evolution uses env-provided URL/key credentials and a tenant-specific instance named after each madrasa slug; `/settings/catalog` exposes no `whatsapp.*` config rows.
 - Status: Connected sessions now show the Evolution owner phone/JID when reported, and admins can close the current Evolution instance before pairing another phone.
 - Status: Opened student, teacher, and guardian person cards now expose WhatsApp credential sending; independent students can use their own registered phone and linked students can use guardian phones.
 - Status: Dependent students are now blocked from being created or updated without a guardian, the last guardian link cannot be removed, and existing invalid dependent records show a person-card warning with WhatsApp credential sending disabled until a guardian phone is linked.
