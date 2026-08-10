@@ -19,6 +19,10 @@ they do not close or weaken the new July 23 requirements.
 
 - Run a browser walkthrough for super-admin madrasa selection, return-to-Platform navigation, screen enable/disable behavior, madrasa slug changes, username updates, and fresh sign-in starting at Platform.
 
+## 2026-08-11 — Class-Scoped Course Assignment Follow-Up
+
+- Run a browser walkthrough of Academics: create a program, assign classes to it, create a course, assign and remove that course from an expanded class card, and confirm Timetable and Assessments show only that class's assigned courses.
+
 ## 2026-08-09 — Attendance History Seed Visibility Follow-Up
 
 - Status: Shared filter buttons are now used on Announcements, Forms, Blog, Reports, and Timetable, in addition to the screens that already had `FilterBar`.

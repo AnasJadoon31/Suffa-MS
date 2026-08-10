@@ -59,17 +59,6 @@ class ClassCourseAssignRequest(BaseModel):
     course_id: UUID
 
 
-class ProgramCourseAssignRequest(BaseModel):
-    course_id: UUID
-
-
-class ProgramCourseRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    program_id: UUID
-    course_id: UUID
-
-
 class StudentProfileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID

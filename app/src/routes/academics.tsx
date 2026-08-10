@@ -17,7 +17,6 @@ import {
   TextInput,
 } from "@/components/app/Primitives";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/mms/api";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi, type AcademicClass, type AcademicSession } from "@/lib/mms/endpoints";
 import { academicsExtraApi, academicsMutations, type Section } from "@/lib/mms/more-endpoints";
@@ -77,7 +76,6 @@ function AcademicsPage() {
   const [start, setStart] = useState(today);
   const [end, setEnd] = useState(today);
   const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
-  const [expandedProgramId, setExpandedProgramId] = useState<string | null>(null);
   const [sectionName, setSectionName] = useState("");
   const [programSearch, setProgramSearch] = useState("");
   const [classSearch, setClassSearch] = useState("");
@@ -170,6 +168,21 @@ function AcademicsPage() {
     return counts;
   }, [allClassSections]);
 
+  const classCourseQueries = useQueries({
+    queries: (classes.data ?? []).map((academicClass) => ({
+      queryKey: ["class-courses", academicClass.id],
+      queryFn: () => academicsExtraApi.listClassCourses(academicClass.id),
+      enabled: tab === "classes",
+    })),
+  });
+  const classCourses = useMemo(() => {
+    const coursesByClass = new Map<string, { id: string; name: string }[]>();
+    for (const [index, academicClass] of (classes.data ?? []).entries()) {
+      coursesByClass.set(academicClass.id, classCourseQueries[index]?.data ?? []);
+    }
+    return coursesByClass;
+  }, [classCourseQueries, classes.data]);
+
   const createSection = useMutation({
     mutationFn: ({ classId, name }: { classId: string; name: string }) =>
       academicsMutations.createSection(classId, name),
@@ -191,27 +204,21 @@ function AcademicsPage() {
     },
   });
 
-  const programCourses = useQuery({
-    queryKey: ["program-courses", expandedProgramId],
-    queryFn: () => (expandedProgramId ? academicsExtraApi.listProgramCourses(expandedProgramId) : Promise.resolve([])),
-    enabled: Boolean(expandedProgramId),
-  });
-
-  const assignProgramCourse = useMutation({
-    mutationFn: ({ programId, courseId }: { programId: string; courseId: string }) =>
-      academicsMutations.assignCourseToProgram(programId, courseId),
-    onSuccess: (_data, { programId }) => {
+  const assignClassCourse = useMutation({
+    mutationFn: ({ classId, courseId }: { classId: string; courseId: string }) =>
+      academicsMutations.assignCourse(classId, courseId),
+    onSuccess: (_data, { classId }) => {
       toast.success("Course assigned");
-      void client.invalidateQueries({ queryKey: ["program-courses", programId] });
+      void client.invalidateQueries({ queryKey: ["class-courses", classId] });
     },
   });
 
-  const unassignProgramCourse = useMutation({
-    mutationFn: ({ programId, courseId }: { programId: string; courseId: string }) =>
-      api.delete(`/api/v1/academics/programs/${programId}/courses/${courseId}`).then((r) => r.data),
-    onSuccess: (_data, { programId }) => {
+  const unassignClassCourse = useMutation({
+    mutationFn: ({ classId, courseId }: { classId: string; courseId: string }) =>
+      academicsMutations.unassignCourse(classId, courseId),
+    onSuccess: (_data, { classId }) => {
       toast.success("Course removed");
-      void client.invalidateQueries({ queryKey: ["program-courses", programId] });
+      void client.invalidateQueries({ queryKey: ["class-courses", classId] });
     },
   });
 
@@ -302,7 +309,6 @@ function AcademicsPage() {
       toast.success("Course updated");
       setEditingCourse(null);
       await client.invalidateQueries({ queryKey: ["courses"] });
-      await client.invalidateQueries({ queryKey: ["program-courses"] });
       await client.invalidateQueries({ queryKey: ["class-courses"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update course"),
@@ -314,7 +320,7 @@ function AcademicsPage() {
       toast.success("Course deleted");
       setDeleteCourseId(null);
       await client.invalidateQueries({ queryKey: ["courses"] });
-      await client.invalidateQueries({ queryKey: ["program-courses"] });
+      await client.invalidateQueries({ queryKey: ["class-courses"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not delete course"),
   });
@@ -589,67 +595,15 @@ function AcademicsPage() {
             onChange={(event) => setProgramSearch(event.target.value)}
             placeholder={t("Search programs...")}
           />
-          {filteredPrograms.map((program) => {
-            const isExpanded = expandedProgramId === program.id;
-            const assignedCourses = (isExpanded ? programCourses.data ?? [] : []);
-            const availableCourses = (courses.data ?? []).filter(
-              (c) => !assignedCourses.some((ac) => ac.id === c.id),
-            );
-            return (
-              <div key={program.id}>
-                <button
-                  onClick={() => setExpandedProgramId(isExpanded ? null : program.id)}
-                  className="w-full"
-                >
-                  <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-                      <Layers className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0 text-left">
-                      <p className="truncate font-semibold">{program.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">Program</p>
-                    </div>
-                    {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-                  </Card>
-                </button>
-                {isExpanded ? (
-                  <div className="ml-4 mt-1 space-y-2 border-l-2 border-border pl-4">
-                    <p className="text-xs font-semibold text-muted-foreground">{t("Courses")}</p>
-                    {assignedCourses.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {assignedCourses.map((course) => (
-                          <span
-                            key={course.id}
-                            className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary"
-                          >
-                            {course.name}
-                            {canManage ? (
-                              <button
-                                onClick={() => unassignProgramCourse.mutate({ programId: program.id, courseId: course.id })}
-                                className="ml-0.5 text-primary/60 hover:text-destructive"
-                              >
-                                ×
-                              </button>
-                            ) : null}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">{t("No courses assigned")}</p>
-                    )}
-                    {canManage ? (
-                      <SearchableSelect
-                        value=""
-                        onChange={(courseId) => { if (courseId) assignProgramCourse.mutate({ programId: program.id, courseId }); }}
-                        options={availableCourses.map((c) => ({ value: c.id, label: c.name }))}
-                        placeholder={t("Assign course...")}
-                      />
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+          <Items
+            empty={filteredPrograms.length === 0}
+            rows={filteredPrograms.map((program) => ({
+              id: program.id,
+              icon: <Layers className="h-5 w-5" />,
+              title: program.name,
+              subtitle: "Program",
+            }))}
+          />
           {filteredPrograms.length === 0 ? <EmptyState title={t("Nothing here yet")} /> : null}
         </div>
       ) : null}
@@ -667,6 +621,8 @@ function AcademicsPage() {
             expandedClassId={expandedClassId}
             onToggle={(id) => setExpandedClassId(expandedClassId === id ? null : id)}
             sections={allClassSections.length > 0 ? allClassSections : sections.data ?? []}
+            courses={classCourses}
+            availableCourses={courses.data ?? []}
             sectionCounts={classSectionCounts}
             sectionName={sectionName}
             onSectionNameChange={setSectionName}
@@ -675,6 +631,10 @@ function AcademicsPage() {
             createSectionPending={createSection.isPending}
             deleteSection={(classId: string, sectionId: string) => deleteSection.mutate({ classId, sectionId })}
             deleteSectionPending={deleteSection.isPending}
+            assignCourse={(classId: string, courseId: string) => assignClassCourse.mutate({ classId, courseId })}
+            assignCoursePending={assignClassCourse.isPending}
+            unassignCourse={(classId: string, courseId: string) => unassignClassCourse.mutate({ classId, courseId })}
+            unassignCoursePending={unassignClassCourse.isPending}
           />
         </div>
       ) : null}
@@ -778,6 +738,8 @@ function ClassList({
   expandedClassId,
   onToggle,
   sections,
+  courses,
+  availableCourses,
   sectionCounts,
   sectionName,
   onSectionNameChange,
@@ -786,12 +748,18 @@ function ClassList({
   createSectionPending,
   deleteSection,
   deleteSectionPending,
+  assignCourse,
+  assignCoursePending,
+  unassignCourse,
+  unassignCoursePending,
 }: {
   classes: AcademicClass[];
   programs: { id: string; name: string }[];
   expandedClassId: string | null;
   onToggle: (id: string) => void;
   sections: Section[];
+  courses: Map<string, { id: string; name: string }[]>;
+  availableCourses: { id: string; name: string }[];
   sectionCounts: Map<string, number>;
   sectionName: string;
   onSectionNameChange: (v: string) => void;
@@ -800,6 +768,10 @@ function ClassList({
   createSectionPending: boolean;
   deleteSection: (classId: string, sectionId: string) => void;
   deleteSectionPending: boolean;
+  assignCourse: (classId: string, courseId: string) => void;
+  assignCoursePending: boolean;
+  unassignCourse: (classId: string, courseId: string) => void;
+  unassignCoursePending: boolean;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -811,6 +783,10 @@ function ClassList({
         const program = programs.find((p) => p.id === cls.program_id);
         const isExpanded = expandedClassId === cls.id;
         const classSections = sections.filter((s) => s.class_id === cls.id);
+        const classCourses = courses.get(cls.id) ?? [];
+        const assignableCourses = availableCourses.filter(
+          (course) => !classCourses.some((assigned) => assigned.id === course.id),
+        );
         const sectionCount = sectionCounts.get(cls.id) ?? cls.section_count ?? classSections.length;
 
         return (
@@ -839,6 +815,38 @@ function ClassList({
 
             {isExpanded ? (
               <div className="ml-4 mt-1 space-y-2 border-l-2 border-border pl-4">
+                <div className="space-y-2 px-3 py-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground">{t("Courses")}</p>
+                  {classCourses.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {classCourses.map((course) => (
+                        <span key={course.id} className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary">
+                          {course.name}
+                          {canManage ? (
+                            <button
+                              type="button"
+                              aria-label={`${t("Remove")} ${course.name}`}
+                              disabled={unassignCoursePending}
+                              onClick={() => unassignCourse(cls.id, course.id)}
+                              className="ml-0.5 text-primary/60 hover:text-destructive disabled:opacity-50"
+                            >
+                              ×
+                            </button>
+                          ) : null}
+                        </span>
+                      ))}
+                    </div>
+                  ) : <p className="text-xs text-muted-foreground">{t("No courses assigned")}</p>}
+                  {canManage ? (
+                    <SearchableSelect
+                      value=""
+                      onChange={(courseId) => { if (courseId) assignCourse(cls.id, courseId); }}
+                      options={assignableCourses.map((course) => ({ value: course.id, label: course.name }))}
+                      placeholder={t("Assign course...")}
+                      className={assignCoursePending ? "pointer-events-none opacity-50" : undefined}
+                    />
+                  ) : null}
+                </div>
                 {classSections.map((sec) => (
                   <div
                     key={sec.id}

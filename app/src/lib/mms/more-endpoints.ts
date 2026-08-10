@@ -308,8 +308,8 @@ export const academicsExtraApi = {
   listCourses: () => getAllPages<Course>("/api/v1/academics/courses"),
   listSections: (classId: string) =>
     getAllPages<Section>(`/api/v1/academics/classes/${classId}/sections`),
-  listProgramCourses: (programId: string) =>
-    getAllPages<Course>(`/api/v1/academics/programs/${programId}/courses`),
+  listClassCourses: (classId: string) =>
+    getAllPages<Course>(`/api/v1/academics/classes/${classId}/courses`),
 };
 
 export interface FormFieldDefinition {
@@ -898,10 +898,8 @@ export const academicsMutations = {
     api
       .post(`/api/v1/academics/classes/${classId}/courses/assign`, { course_id: courseId })
       .then((r) => r.data),
-  assignCourseToProgram: (programId: string, courseId: string) =>
-    api
-      .post(`/api/v1/academics/programs/${programId}/courses/assign`, { course_id: courseId })
-      .then((r) => r.data),
+  unassignCourse: (classId: string, courseId: string) =>
+    api.delete(`/api/v1/academics/classes/${classId}/courses/${courseId}`).then((r) => r.data),
   activateSession: (id: string) =>
     api.post(`/api/v1/academics/sessions/${id}/activate`).then((r) => r.data),
   updateSession: (id: string, payload: { name: string; start_date: string; end_date: string }) =>

@@ -8,7 +8,7 @@ from sqlalchemy import text
 from app.core.security import hash_password
 from app.db import core_models  # ensure FileObject loaded for FK resolution
 from app.db.session import SessionLocal
-from app.modules.academics.models import AcademicSession, AcademicClass, Course, Enrollment, Madrasa, Program, ProgramCourse, ClassCourse, Section
+from app.modules.academics.models import AcademicSession, AcademicClass, Course, Enrollment, Madrasa, Program, ClassCourse, Section
 from app.modules.auth.models import User, UserRole, UserStatus, PermissionRole, PermissionRoleGrant, UserRoleAssignment
 from app.modules.people.models import TeacherProfile, StudentProfile, Guardian, StudentGuardian
 from app.modules.finance.models import Donor, Donation, Payment, PaymentCategory, SalaryRecord, SalaryPayment
@@ -77,12 +77,8 @@ async def seed():
             db.add(c)
         await db.flush()
 
-        # Program-Course links
+        # Course catalog; courses are assigned to individual classes below.
         pc_map = {"Hifz-ul-Qur'an": ["Qur'an","Tajweed","Arabic Grammar"], "Nazra": ["Qur'an","Tajweed","Urdu"], "Alimiyya": ["Qur'an","Fiqh","Hadith","Arabic Grammar","Urdu"]}
-        for pname, cnames in pc_map.items():
-            for cn in cnames:
-                db.add(ProgramCourse(id=uid(f"pc-{pname}-{cn}"), madrasa_id=MID, program_id=progs[pname].id, course_id=courses[cn].id, created_at=NOW, updated_at=NOW))
-        await db.flush()
 
         # Classes & Sections
         class_map = {"Hifz A": "Hifz-ul-Qur'an", "Hifz B": "Hifz-ul-Qur'an", "Nazra A": "Nazra", "Nazra B": "Nazra", "Alim 1": "Alimiyya", "Alim 2": "Alimiyya"}

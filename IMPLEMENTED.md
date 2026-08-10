@@ -3,6 +3,28 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-11 — Class-Scoped Academic Courses
+
+**Fix:**
+- Established the academic hierarchy as Program → Class → Course. Programs own classes; courses are assigned independently to each class.
+- Removed the conflicting program-course model and API endpoints. The migration copies every existing program-level course assignment to each class in that program before removing the obsolete relation.
+- Moved course assignment and removal into the expanded class cards in Academics. Timetable, assignments, marking, results, and teacher scope already read class-course assignments and now follow this hierarchy consistently.
+- Updated the full seed so it creates only the course catalog and class-course assignments.
+
+**Files:**
+- `backend/app/modules/academics/models.py`
+- `backend/app/modules/academics/schemas.py`
+- `backend/app/modules/academics/routes.py`
+- `backend/alembic/versions/7c2d19b9a50e_remove_program_course_assignments.py`
+- `backend/seed_full.py`
+- `app/src/routes/academics.tsx`
+- `app/src/lib/mms/more-endpoints.ts`
+
+**Verification:**
+- `python -m py_compile app/modules/academics/models.py app/modules/academics/schemas.py app/modules/academics/routes.py seed_full.py alembic/versions/7c2d19b9a50e_remove_program_course_assignments.py`
+- `npm run build`
+- Rebuilt the backend; Alembic reports `7c2d19b9a50e (head)` and `/healthz` returns `ok`.
+
 ## 2026-08-11 — Tenant WhatsApp Instances and Workspace Navigation
 
 **Fix:**

@@ -26,7 +26,6 @@ from app.modules.academics.models import (
     Enrollment,
     Madrasa,
     Program,
-    ProgramCourse,
     Section,
 )
 from app.modules.operations.models import TimetableSlot
@@ -41,8 +40,6 @@ from app.modules.academics.schemas import (
     AcademicSessionRead,
     AcademicSessionUpdate,
     ClassCourseAssignRequest,
-    ProgramCourseAssignRequest,
-    ProgramCourseRead,
     CourseCreate,
     CourseRead,
     CourseUpdate,
@@ -524,76 +521,6 @@ async def unassign_class_course(
         raise HTTPException(status_code=409, detail="Cannot unassign Course because it is scheduled in the timetable for this class.")
 
     await session.delete(class_course)
-    await session.commit()
-    return {"status": "success"}
-
-
-# ----------------------------------------------------------- Program–Course
-
-@router.post("/programs/{program_id}/courses/assign", response_model=dict[str, str])
-async def assign_course_to_program(
-    program_id: UUID,
-    payload: ProgramCourseAssignRequest,
-    current_user: User = Depends(require_permission("academics.manage")),
-    madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, str]:
-    course = await session.get(Course, payload.course_id)
-    if not course or course.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    program = await session.get(Program, program_id)
-    if not program or program.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Program not found")
-
-    assignment = ProgramCourse(madrasa_id=madrasa.id, program_id=program_id, course_id=payload.course_id)
-    session.add(assignment)
-    try:
-        await session.commit()
-    except Exception:
-        await session.rollback()
-        raise HTTPException(status_code=400, detail="Course already assigned to this program")
-    return {"status": "success"}
-
-
-@router.get("/programs/{program_id}/courses", response_model=list[CourseRead])
-async def list_program_courses(
-    program_id: UUID,
-    response: Response,
-    current_user: User = Depends(get_current_user),
-    madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session),
-    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
-    offset: int = Query(default=0, ge=0),
-) -> list[CourseRead]:
-    stmt = (
-        select(Course)
-        .join(ProgramCourse, Course.id == ProgramCourse.course_id)
-        .where(ProgramCourse.program_id == program_id, ProgramCourse.madrasa_id == madrasa.id)
-    )
-    rows = await paginate_scalars(session, stmt.order_by(Course.name), limit=limit, offset=offset, response=response)
-    return [CourseRead.model_validate(c) for c in rows]
-
-
-@router.delete("/programs/{program_id}/courses/{course_id}")
-async def unassign_program_course(
-    program_id: UUID,
-    course_id: UUID,
-    current_user: User = Depends(require_permission("academics.manage")),
-    madrasa: Madrasa = Depends(get_current_madrasa),
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, str]:
-    program = await session.get(Program, program_id)
-    if not program or program.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Program not found")
-
-    stmt = select(ProgramCourse).where(ProgramCourse.program_id == program_id, ProgramCourse.course_id == course_id)
-    result = await session.execute(stmt)
-    program_course = result.scalars().first()
-    if not program_course:
-        raise HTTPException(status_code=404, detail="Course is not assigned to this program")
-
-    await session.delete(program_course)
     await session.commit()
     return {"status": "success"}
 
