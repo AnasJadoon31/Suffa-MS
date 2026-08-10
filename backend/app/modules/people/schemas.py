@@ -197,3 +197,17 @@ class GuardianCredentialsRequest(BaseModel):
     # Required on first provisioning; ignored when the guardian already has a
     # login (the link is simply re-issued).
     username: str | None = None
+
+
+class MyProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = None
+    date_of_birth: date | None = None
+    b_form_number: str | None = None
+    address: str | None = None
+    phone_list: list[PakistanPhone] | None = None
+    default_phone_number: PakistanPhone | None = None
+    cnic: str | None = None
+    relationship: str | None = None
+    admission_answers: dict | None = None

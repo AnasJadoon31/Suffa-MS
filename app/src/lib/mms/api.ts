@@ -44,7 +44,19 @@ export function setAcademicSessionId(id: string | null): void {
 
 export function readToken(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
+  const token = window.localStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))) as { exp?: number };
+    if (payload.exp && payload.exp <= Math.floor(Date.now() / 1000)) {
+      window.localStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
+  } catch {
+    window.localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+  return token;
 }
 
 export function readTenant(): string {

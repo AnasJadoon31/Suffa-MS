@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from fastapi.responses import Response
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,8 +31,93 @@ from app.modules.operations.models import Announcement, Form, Resource
 from app.modules.operations.routes import _active_session_id, _visible
 from app.modules.operations.audience import ViewerContext, scope_allows
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
+from app.modules.people.models import StudentAdmissionRecord
+from app.modules.messaging.models import MessageTemplate
+from app.modules.messaging.routes import render_and_dispatch
 
 router = APIRouter()
+
+
+class IncompleteProfileReminderRequest(BaseModel):
+    profile_type: str
+    profile_ids: list[UUID]
+
+
+def _missing_required_answers(record: StudentAdmissionRecord | None) -> list[str]:
+    if record is None:
+        return []
+    missing: list[str] = []
+    for field in record.fields_definition or []:
+        if not field.get("required") or field.get("enabled") is False or field.get("built_in") or str(field.get("key", "")).startswith("guardian_"):
+            continue
+        value = (record.answers or {}).get(field.get("key"))
+        if value in (None, "", [], {}):
+            missing.append(str(field.get("label") or field.get("key")))
+    return missing
+
+
+async def _incomplete_profiles(session: AsyncSession, madrasa_id: UUID) -> list[dict[str, object]]:
+    records = {
+        record.student_id: record
+        for record in (await session.execute(select(StudentAdmissionRecord).where(StudentAdmissionRecord.madrasa_id == madrasa_id))).scalars().all()
+    }
+    guardian_links = {
+        student_id: count
+        for student_id, count in (await session.execute(select(StudentGuardian.student_id, func.count()).where(StudentGuardian.madrasa_id == madrasa_id).group_by(StudentGuardian.student_id))).all()
+    }
+    rows: list[dict[str, object]] = []
+    for student in (await session.execute(select(StudentProfile).where(StudentProfile.madrasa_id == madrasa_id, StudentProfile.status == "active"))).scalars().all():
+        missing = _missing_required_answers(records.get(student.id))
+        if not student.b_form_number:
+            missing.append("B-Form / CNIC")
+        if student.is_independent:
+            if not student.default_phone_number:
+                missing.append("Phone")
+            if not student.address:
+                missing.append("Address")
+        elif not guardian_links.get(student.id):
+            missing.append("Guardian")
+        if missing:
+            rows.append({"id": str(student.id), "profile_type": "student", "name": student.name, "missing_fields": missing, "phone": student.default_phone_number})
+    for guardian in (await session.execute(select(Guardian).where(Guardian.madrasa_id == madrasa_id))).scalars().all():
+        missing = [label for label, value in (("CNIC", guardian.cnic), ("Address", guardian.address), ("Phone", guardian.default_phone_number)) if not value]
+        if missing:
+            rows.append({"id": str(guardian.id), "profile_type": "guardian", "name": guardian.name, "missing_fields": missing, "phone": guardian.default_phone_number})
+    return rows
+
+
+@router.get("/incomplete-profiles")
+async def incomplete_profiles(
+    current_user: User = Depends(require_permission("students.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+    profile_type: str | None = Query(default=None),
+) -> list[dict[str, object]]:
+    del current_user
+    rows = await _incomplete_profiles(session, madrasa.id)
+    return [row for row in rows if profile_type is None or row["profile_type"] == profile_type]
+
+
+@router.post("/incomplete-profiles/remind")
+async def remind_incomplete_profiles(
+    payload: IncompleteProfileReminderRequest,
+    current_user: User = Depends(require_permission("messaging.send")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int]:
+    rows = [row for row in await _incomplete_profiles(session, madrasa.id) if row["profile_type"] == payload.profile_type and UUID(str(row["id"])) in set(payload.profile_ids)]
+    template = await session.scalar(select(MessageTemplate).where(MessageTemplate.madrasa_id == madrasa.id, MessageTemplate.code == "profile_completion"))
+    if template is None:
+        session.add(MessageTemplate(madrasa_id=madrasa.id, code="profile_completion", name="Profile completion", content={"en": "Assalamu alaikum {name}, please complete your profile in the Suffa MS portal. Missing details: {missing_fields}", "ur": ""}))
+        await session.commit()
+    sent = 0
+    for row in rows:
+        phone = str(row["phone"] or "")
+        if not phone:
+            continue
+        await render_and_dispatch(session, madrasa=madrasa, current_user=current_user, template_code="profile_completion", language="ur", variables={"name": str(row["name"]), "missing_fields": ", ".join(row["missing_fields"])}, recipient_type=str(row["profile_type"]), recipient_id=UUID(str(row["id"])), phone_number=phone, force_direct_text=True)
+        sent += 1
+    return {"sent": sent}
 
 
 @router.get("/dashboard")
@@ -273,15 +359,7 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
         )
     ).scalar_one()
 
-    recent_logs = (
-        await session.execute(
-            select(AuditLog)
-            .where(AuditLog.madrasa_id == madrasa.id)
-            .order_by(AuditLog.action_time.desc())
-            .limit(5)
-        )
-    ).scalars().all()
-    activity = [f"{log.action} · {log.entity_name} ({log.action_time:%Y-%m-%d %H:%M})" for log in recent_logs]
+    incomplete = await _incomplete_profiles(session, madrasa.id)
 
     return {
         "role": "principal",
@@ -297,7 +375,7 @@ async def _principal_dashboard(session: AsyncSession, madrasa: Madrasa) -> dict[
             "missing_sync_teacher_list": missing_sync_teacher_list,
         },
         "finance": {"month_total": float(payments) + float(donations), "currency": "PKR"},
-        "activity": activity,
+        "incomplete_profiles": {"students": sum(row["profile_type"] == "student" for row in incomplete), "guardians": sum(row["profile_type"] == "guardian" for row in incomplete)},
     }
 
 

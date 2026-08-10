@@ -2196,3 +2196,27 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: Students, guardians, teachers, and donors now support ordered phone numbers and an explicit default contact. Existing single-value contact columns mirror that default for compatibility; dependent student profiles display linked guardian phone numbers and addresses instead of duplicating them. Application enrollment provisions every guardian a disabled portal account with a generated username.
 - Files: `backend/alembic/versions/32502fc5c5d0_add_profile_phone_lists.py`, `backend/app/modules/{people,finance,messaging,operations}/`, `app/src/components/app/people/{PhoneNumbersField.tsx,StudentForm.tsx,GuardianForm.tsx,TeacherForm.tsx,DonorForm.tsx,PersonDetail.tsx}`, `app/src/lib/mms/{endpoints.ts,more-endpoints.ts}`.
 - Verified: backend `py_compile`, `cd app && npm run build`, rebuilt backend migration, and `/healthz`; no full test suite run per request.
+
+## 2026-08-10 - Incomplete Student And Guardian Profiles
+
+- Implemented: Replaced the principal dashboard Recent activity panel with clickable student and guardian incomplete-profile counts. The drill-down lists missing profile fields and can send WhatsApp completion reminders to profiles with a default contact number. Student and guardian portals now expose complete editable personal-profile panels in My Profile, including required custom application fields for students.
+- Files: `backend/app/modules/{reporting,people}/{routes.py,schemas.py}`, `app/src/routes/{dashboard.tsx,incomplete-profiles.tsx,me.tsx}`, `app/src/lib/mms/endpoints.ts`.
+- Verified: backend `py_compile`, `cd app && npm run build`, rebuilt backend, `/healthz`, and `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Expired Session Request Guard
+
+- Implemented: The frontend now discards expired or malformed JWTs before authenticated API calls, preventing stale dashboard requests from producing avoidable 401 errors. Added the current mobile-web-app capability meta tag alongside the Apple-specific tag.
+- Files: `app/src/lib/mms/{api.ts,auth.tsx}`, `app/src/routes/__root.tsx`.
+- Verified: source review and `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Announcement Audience Tags
+
+- Implemented: Announcement cards now display a readable audience tag beside the category tag, covering all-audience, student, teacher, and multi-role announcements.
+- Files: `app/src/routes/announcements.tsx`.
+- Verified: source review; no build run for this presentation-only change per request.
+
+## 2026-08-10 - Donor Portal Setting
+
+- Implemented: Madrasa Settings now includes a Portal toggle for donor login access. It defaults to disabled and the authentication endpoint rejects donor sign-ins while it is off, without affecting donation history.
+- Files: `backend/app/core/settings_catalog.py`, `backend/app/modules/auth/routes.py`.
+- Verified: backend `py_compile`, rebuilt backend, `/healthz`, and `git diff --check`; no full test suite run per request.

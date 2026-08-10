@@ -21,6 +21,7 @@ import { Route as ExaminationRouteImport } from './routes/examination'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as FormsRouteImport } from './routes/forms'
 import { Route as HolidaysRouteImport } from './routes/holidays'
+import { Route as IncompleteProfilesRouteImport } from './routes/incomplete-profiles'
 import { Route as LeaveRouteImport } from './routes/leave'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as MoreRouteImport } from './routes/more'
@@ -100,6 +101,11 @@ const FormsRoute = FormsRouteImport.update({
 const HolidaysRoute = HolidaysRouteImport.update({
   id: '/holidays',
   path: '/holidays',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IncompleteProfilesRoute = IncompleteProfilesRouteImport.update({
+  id: '/incomplete-profiles',
+  path: '/incomplete-profiles',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeaveRoute = LeaveRouteImport.update({
@@ -216,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/finance': typeof FinanceRoute
   '/forms': typeof FormsRoute
   '/holidays': typeof HolidaysRoute
+  '/incomplete-profiles': typeof IncompleteProfilesRoute
   '/leave': typeof LeaveRoute
   '/me': typeof MeRoute
   '/more': typeof MoreRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   '/finance': typeof FinanceRoute
   '/forms': typeof FormsRoute
   '/holidays': typeof HolidaysRoute
+  '/incomplete-profiles': typeof IncompleteProfilesRoute
   '/leave': typeof LeaveRoute
   '/me': typeof MeRoute
   '/more': typeof MoreRoute
@@ -285,6 +293,7 @@ export interface FileRoutesById {
   '/finance': typeof FinanceRoute
   '/forms': typeof FormsRoute
   '/holidays': typeof HolidaysRoute
+  '/incomplete-profiles': typeof IncompleteProfilesRoute
   '/leave': typeof LeaveRoute
   '/me': typeof MeRoute
   '/more': typeof MoreRoute
@@ -321,6 +330,7 @@ export interface FileRouteTypes {
     | '/finance'
     | '/forms'
     | '/holidays'
+    | '/incomplete-profiles'
     | '/leave'
     | '/me'
     | '/more'
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
     | '/finance'
     | '/forms'
     | '/holidays'
+    | '/incomplete-profiles'
     | '/leave'
     | '/me'
     | '/more'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/finance'
     | '/forms'
     | '/holidays'
+    | '/incomplete-profiles'
     | '/leave'
     | '/me'
     | '/more'
@@ -424,6 +436,7 @@ export interface RootRouteChildren {
   FinanceRoute: typeof FinanceRoute
   FormsRoute: typeof FormsRoute
   HolidaysRoute: typeof HolidaysRoute
+  IncompleteProfilesRoute: typeof IncompleteProfilesRoute
   LeaveRoute: typeof LeaveRoute
   MeRoute: typeof MeRoute
   MoreRoute: typeof MoreRoute
@@ -528,6 +541,13 @@ declare module '@tanstack/react-router' {
       path: '/holidays'
       fullPath: '/holidays'
       preLoaderRoute: typeof HolidaysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/incomplete-profiles': {
+      id: '/incomplete-profiles'
+      path: '/incomplete-profiles'
+      fullPath: '/incomplete-profiles'
+      preLoaderRoute: typeof IncompleteProfilesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leave': {
@@ -709,6 +729,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceRoute: FinanceRoute,
   FormsRoute: FormsRoute,
   HolidaysRoute: HolidaysRoute,
+  IncompleteProfilesRoute: IncompleteProfilesRoute,
   LeaveRoute: LeaveRoute,
   MeRoute: MeRoute,
   MoreRoute: MoreRoute,

@@ -175,21 +175,11 @@ function PrincipalView({ data }: { data: PrincipalDashboard }) {
         </>
       ) : null}
 
-      {data.activity?.length ? (
-        <>
-          <SectionTitle>{t("Recent activity")}</SectionTitle>
-          <Card className="space-y-2.5">
-            {data.activity.slice(0, 6).map((entry, index) => (
-              <p
-                key={index}
-                className="border-b border-border pb-2.5 text-sm last:border-0 last:pb-0"
-              >
-                {entry}
-              </p>
-            ))}
-          </Card>
-        </>
-      ) : null}
+      <SectionTitle>{t("Profile completion")}</SectionTitle>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Link to="/incomplete-profiles" search={{ type: "student" }}><StatCard label={t("Students incomplete")} value={data.incomplete_profiles.students} icon={GraduationCap} tone="gold" /></Link>
+        <Link to="/incomplete-profiles" search={{ type: "guardian" }}><StatCard label={t("Guardians incomplete")} value={data.incomplete_profiles.guardians} icon={Users} tone="gold" /></Link>
+      </div>
     </>
   );
 }

@@ -32,6 +32,7 @@ from app.modules.people.schemas import (
     GuardianCredentialsRequest,
     GuardianRead,
     GuardianUpdate,
+    MyProfileUpdate,
     StudentCreate,
     StudentAdmissionRecordRead,
     StudentEnrollmentRead,
@@ -53,6 +54,66 @@ def _contacts(numbers: list[str] | None, fallback: str | None, default: str | No
         values = [part.strip() for part in fallback.replace(";", ",").split(",") if part.strip()]
     selected = default if default in values else (values[0] if values else None)
     return values, selected
+
+
+@router.get("/me/profile")
+async def get_my_profile(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if current_user.role == UserRole.student:
+        student = await session.scalar(select(StudentProfile).where(StudentProfile.user_id == current_user.id, StudentProfile.madrasa_id == madrasa.id))
+        if student is None:
+            raise HTTPException(status_code=404, detail="Student profile not found")
+        return {"profile_type": "student", "profile": (await _student_read(session, student)).model_dump(mode="json")}
+    if current_user.role == UserRole.parent:
+        guardian = await session.scalar(select(Guardian).where(Guardian.user_id == current_user.id, Guardian.madrasa_id == madrasa.id))
+        if guardian is None:
+            raise HTTPException(status_code=404, detail="Guardian profile not found")
+        return {"profile_type": "guardian", "profile": GuardianRead.model_validate(guardian).model_dump(mode="json")}
+    raise HTTPException(status_code=404, detail="This account has no editable person profile")
+
+
+@router.patch("/me/profile")
+async def update_my_profile(
+    payload: MyProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if current_user.role == UserRole.student:
+        student = await session.scalar(select(StudentProfile).where(StudentProfile.user_id == current_user.id, StudentProfile.madrasa_id == madrasa.id))
+        if student is None:
+            raise HTTPException(status_code=404, detail="Student profile not found")
+        for key in ("name", "date_of_birth", "b_form_number"):
+            if getattr(payload, key) is not None:
+                setattr(student, key, getattr(payload, key))
+        if payload.admission_answers is not None:
+            record = await session.scalar(select(StudentAdmissionRecord).where(StudentAdmissionRecord.student_id == student.id, StudentAdmissionRecord.madrasa_id == madrasa.id))
+            if record is not None:
+                editable_keys = {field.get("key") for field in record.fields_definition or [] if not field.get("built_in") and not str(field.get("key", "")).startswith("guardian_")}
+                record.answers = {**(record.answers or {}), **{key: value for key, value in payload.admission_answers.items() if key in editable_keys}}
+        if student.is_independent:
+            if payload.address is not None: student.address = payload.address
+            if payload.phone_list is not None or payload.default_phone_number is not None:
+                numbers, default = _contacts(payload.phone_list if payload.phone_list is not None else student.phone_list, student.phone, payload.default_phone_number or student.default_phone_number)
+                student.phone_list, student.default_phone_number, student.phone = numbers, default, default
+        await session.commit()
+        return {"profile_type": "student", "profile": (await _student_read(session, student)).model_dump(mode="json")}
+    if current_user.role == UserRole.parent:
+        guardian = await session.scalar(select(Guardian).where(Guardian.user_id == current_user.id, Guardian.madrasa_id == madrasa.id))
+        if guardian is None:
+            raise HTTPException(status_code=404, detail="Guardian profile not found")
+        for key in ("name", "relationship", "cnic", "address"):
+            if getattr(payload, key) is not None:
+                setattr(guardian, key, getattr(payload, key))
+        if payload.phone_list is not None or payload.default_phone_number is not None:
+            numbers, default = _contacts(payload.phone_list if payload.phone_list is not None else guardian.phone_list, guardian.phone_numbers, payload.default_phone_number or guardian.default_phone_number)
+            guardian.phone_list, guardian.default_phone_number, guardian.phone_numbers = numbers, default, default or guardian.phone_numbers
+        await session.commit()
+        return {"profile_type": "guardian", "profile": GuardianRead.model_validate(guardian).model_dump(mode="json")}
+    raise HTTPException(status_code=404, detail="This account has no editable person profile")
 
 
 @router.get("/username-proposal")

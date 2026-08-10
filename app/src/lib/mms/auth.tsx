@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, setAcademicSessionId, DEFAULT_TENANT, TENANT_KEY, TOKEN_KEY } from "./api";
+import { api, setAcademicSessionId, DEFAULT_TENANT, TENANT_KEY, TOKEN_KEY, readToken } from "./api";
 import i18n from "@/i18n";
 
 export interface MmsUser {
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!window.localStorage.getItem(TOKEN_KEY)) {
+    if (!readToken()) {
       applyProfile({});
       setIsLoading(false);
       return;

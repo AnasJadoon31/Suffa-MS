@@ -42,6 +42,7 @@ CATALOG: tuple[SettingDef, ...] = (
     SettingDef("finance.receipt_footer", "finance", "string", "", "Receipt footer text"),
     # Portal.
     SettingDef("portal.default_language", "portal", "language", "ur", "Default language"),
+    SettingDef("portal.donors_can_login", "portal", "bool", "false", "Allow donors to log in and view donation history"),
 )
 
 CATALOG_BY_KEY: dict[str, SettingDef] = {item.key: item for item in CATALOG}

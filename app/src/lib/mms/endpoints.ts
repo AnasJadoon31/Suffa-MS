@@ -68,6 +68,9 @@ export interface Student {
   portal_enabled?: boolean;
   photo_file_id?: string | null;
   current_class?: string | null;
+  b_form_number?: string | null;
+  is_independent?: boolean;
+  admission_record?: { fields_definition: import("./more-endpoints").FormFieldDefinition[]; answers: Record<string, unknown> } | null;
 }
 export interface Teacher {
   id: string;
@@ -104,7 +107,11 @@ export const peopleApi = {
 
   listGuardiansPage: (params: { search?: string; limit: number; offset: number }) =>
     getPage<Guardian>("/api/v1/people/guardians", params),
+  myProfile: () => api.get<MyPersonProfile>("/api/v1/people/me/profile").then((r) => r.data),
+  updateMyProfile: (payload: Record<string, unknown>) => api.patch<MyPersonProfile>("/api/v1/people/me/profile", payload).then((r) => r.data),
 };
+
+export interface MyPersonProfile { profile_type: "student" | "guardian"; profile: Student | Guardian; }
 
 // ----------------------------------------------------------------- Attendance
 export type AttendanceStatus = "present" | "absent" | "leave";
@@ -333,7 +340,7 @@ export interface PrincipalDashboard {
     missing_sync_teacher_list: { id: string; name: string }[];
   };
   finance: { month_total: number; currency: string };
-  activity: string[];
+  incomplete_profiles: { students: number; guardians: number };
 }
 export interface TeacherDashboard {
   role: "teacher";
@@ -371,7 +378,17 @@ export type DashboardData =
 
 export const reportingApi = {
   dashboard: () => api.get<DashboardData>("/api/v1/reporting/dashboard").then((r) => r.data),
+  incompleteProfiles: (profileType?: "student" | "guardian") => api.get<IncompleteProfile[]>("/api/v1/reporting/incomplete-profiles", { params: profileType ? { profile_type: profileType } : undefined }).then((r) => r.data),
+  remindIncompleteProfiles: (profile_type: "student" | "guardian", profile_ids: string[]) => api.post<{ sent: number }>("/api/v1/reporting/incomplete-profiles/remind", { profile_type, profile_ids }).then((r) => r.data),
 };
+
+export interface IncompleteProfile {
+  id: string;
+  profile_type: "student" | "guardian";
+  name: string;
+  missing_fields: string[];
+  phone: string | null;
+}
 
 // ----------------------------------------------------------------------- Auth
 export const authApi = {

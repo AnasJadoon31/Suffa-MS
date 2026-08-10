@@ -85,6 +85,11 @@ function AnnouncementsPage() {
     link: "",
   });
 
+  const audienceLabel = (scope: { all?: boolean; roles?: string[] }) => {
+    if (scope?.all || !scope?.roles?.length) return t("All");
+    return scope.roles.map((role) => t(role === "teachers" ? "Teachers" : role === "students" ? "Students" : role)).join(", ");
+  };
+
   const create = useMutation({
     mutationFn: () =>
       opsMutations.createAnnouncement({
@@ -185,7 +190,10 @@ function AnnouncementsPage() {
                   {new Date(item.publish_at ?? item.created_at).toLocaleString()}
                 </p>
               </div>
-              {item.category ? <Pill tone="gold">{item.category}</Pill> : null}
+              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                {item.category ? <Pill tone="gold">{item.category}</Pill> : null}
+                <Pill>{audienceLabel(item.audience_scope)}</Pill>
+              </div>
             </div>
             <RichText html={item.body} />
             <div className="flex items-center gap-3">

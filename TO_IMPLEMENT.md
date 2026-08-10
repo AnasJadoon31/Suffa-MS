@@ -490,3 +490,7 @@ role/language/screenshot matrix.
 ## 2026-08-10 - Default Contact Numbers And Guardian Accounts Follow-up
 
 - Browser-check adding, removing, and selecting the default phone number for independent students, guardians, teachers, and donors; confirm WhatsApp credentials use the chosen default and an enrolled application guardian has a generated, disabled account.
+
+## 2026-08-10 - Incomplete Profiles Follow-up
+
+- Browser-check principal counts and drill-down filters, WhatsApp reminder delivery, and student/guardian My Profile editing for independent and dependent students at mobile and desktop widths.
