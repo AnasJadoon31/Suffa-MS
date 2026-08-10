@@ -5,21 +5,11 @@ import { toast } from "sonner";
 import { FormSheet } from "@/components/app/FormSheet";
 import { Field, CustomDropdown, TextInput } from "@/components/app/Primitives";
 import { MultiPicker } from "./MultiPicker";
+import { PhoneNumbersField } from "./PhoneNumbersField";
 import { peopleApi } from "@/lib/mms/endpoints";
 import { peopleMutations, type GuardianDetail } from "@/lib/mms/more-endpoints";
-import { maskPhone, maskBForm } from "@/lib/masks";
+import { maskBForm } from "@/lib/masks";
 import { useTranslation } from "react-i18next";
-
-function maskGuardianPhones(value: string): string {
-  return value
-    .split(",")
-    .map((part) => {
-      const trimmed = part.trim();
-      if (!trimmed) return trimmed;
-      return maskPhone(trimmed);
-    })
-    .join(", ");
-}
 
 export function GuardianForm({
   guardian,
@@ -37,10 +27,10 @@ export function GuardianForm({
   const client = useQueryClient();
   const [name, setName] = useState(guardian?.name ?? "");
   const [relationship, setRelationship] = useState(guardian?.relationship ?? "father");
-  const [phones, setPhones] = useState(guardian?.phone_numbers ?? "");
+  const [phones, setPhones] = useState(guardian?.phone_list?.length ? guardian.phone_list : guardian?.phone_numbers ? guardian.phone_numbers.split(",").map((phone) => phone.trim()) : ["+92"]);
+  const [defaultPhone, setDefaultPhone] = useState(guardian?.default_phone_number ?? phones[0] ?? "+92");
   const [cnic, setCnic] = useState(guardian?.cnic ?? "");
   const [address, setAddress] = useState(guardian?.address ?? "");
-  const [lang, setLang] = useState(guardian?.preferred_language ?? "en");
   const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
 
   async function handleSubmit() {
@@ -49,7 +39,7 @@ export function GuardianForm({
       toast.error("Enter a valid name (max 120 chars)");
       throw new Error("validation");
     }
-    if (!phones.trim()) {
+    if (!phones.some((phone) => phone.length > 3)) {
       toast.error("At least one phone number is required");
       throw new Error("validation");
     }
@@ -58,25 +48,27 @@ export function GuardianForm({
       await peopleMutations.updateGuardian(guardian.id, {
         name: trimmedName,
         relationship,
-        phone_numbers: phones.trim(),
+        phone_numbers: defaultPhone,
+        phone_list: phones.filter((phone) => phone.length > 3),
+        default_phone_number: defaultPhone,
         cnic: cnic.trim() || undefined,
         address: address.trim() || undefined,
-        preferred_language: lang,
       });
       toast.success("Guardian updated");
     } else {
       await peopleMutations.createGuardian({
         name: trimmedName,
         relationship,
-        phone_numbers: phones.trim(),
+        phone_numbers: defaultPhone,
+        phone_list: phones.filter((phone) => phone.length > 3),
+        default_phone_number: defaultPhone,
         cnic: cnic.trim() || undefined,
         address: address.trim() || undefined,
-        preferred_language: lang,
         student_ids: students.map((s) => s.id),
       });
       toast.success("Guardian created");
       setName("");
-      setPhones("");
+      setPhones(["+92"]);
       setCnic("");
       setAddress("");
       setStudents([]);
@@ -114,13 +106,7 @@ export function GuardianForm({
         </CustomDropdown>
       </Field>
       <Field label={t("Phone number(s) *")}>
-        <TextInput
-          required
-          maxLength={200}
-          placeholder={t("Separate multiple with commas")}
-          value={phones ?? "+92"}
-          onChange={(e) => setPhones(maskGuardianPhones(e.target.value))}
-        />
+        <PhoneNumbersField numbers={phones} defaultNumber={defaultPhone} onChange={(next, selected) => { setPhones(next); setDefaultPhone(selected); }} />
       </Field>
       <Field label={t("CNIC")}>
           <TextInput maxLength={15} value={cnic ?? ""} onChange={(e) => setCnic(maskBForm(e.target.value))} />
@@ -131,12 +117,6 @@ export function GuardianForm({
           value={address ?? ""}
           onChange={(e) => setAddress(e.target.value)}
         />
-      </Field>
-      <Field label={t("Preferred language")}>
-        <CustomDropdown value={lang} onChange={(e) => setLang(e.target.value)}>
-          <option value="en">{t("English")}</option>
-          <option value="ur">{t("Urdu")}</option>
-        </CustomDropdown>
       </Field>
       {!isEdit ? (
         <MultiPicker

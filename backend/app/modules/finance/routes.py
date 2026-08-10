@@ -44,6 +44,14 @@ from app.modules.people.models import StudentProfile, TeacherProfile
 router = APIRouter()
 
 
+def _donor_contacts(numbers: list[str] | None, fallback: str | None, default: str | None) -> tuple[list[str], str | None]:
+    values = list(dict.fromkeys(number for number in (numbers or []) if number))
+    if not values and fallback:
+        values = [part.strip() for part in fallback.replace(";", ",").split(",") if part.strip()]
+    chosen = default if default in values else (values[0] if values else None)
+    return values, chosen
+
+
 async def _payment_reads(session: AsyncSession, rows: list[Payment]) -> list[PaymentRead]:
     if not rows:
         return []
@@ -369,7 +377,8 @@ async def create_donor(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> DonorRead:
-    donor = Donor(madrasa_id=madrasa.id, name=payload.name, contact=payload.contact)
+    phones, default_phone = _donor_contacts(payload.phone_list, payload.contact, payload.default_phone_number)
+    donor = Donor(madrasa_id=madrasa.id, name=payload.name, contact=default_phone or payload.contact, phone_list=phones, default_phone_number=default_phone)
     session.add(donor)
     await session.flush()
 
@@ -404,7 +413,9 @@ async def update_donor(
     if donor is None or donor.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Donor not found")
     if payload.name is not None: donor.name = payload.name
-    if payload.contact is not None: donor.contact = payload.contact
+    if payload.contact is not None or payload.phone_list is not None or payload.default_phone_number is not None:
+        phones, default_phone = _donor_contacts(payload.phone_list if payload.phone_list is not None else donor.phone_list, payload.contact or donor.contact, payload.default_phone_number or donor.default_phone_number)
+        donor.phone_list, donor.default_phone_number, donor.contact = phones, default_phone, default_phone or donor.contact
     await session.commit()
     await session.refresh(donor)
     return DonorRead.model_validate(donor)

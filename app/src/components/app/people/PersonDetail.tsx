@@ -164,8 +164,8 @@ export function StudentDetailSheet({
   if (!student) return null;
 
   const credentialPhoneOptions = [
-    ...(student.is_independent ? phoneOptions(student.phone, t("Student")) : []),
-    ...(guardiansQuery.data ?? []).flatMap((guardian) => phoneOptions(guardian.phone_numbers, guardian.name)),
+    ...(student.is_independent ? phoneOptions(student.phone_list?.join(",") || student.phone, t("Student")) : []),
+    ...(guardiansQuery.data ?? []).flatMap((guardian) => phoneOptions(guardian.phone_list?.join(",") || guardian.phone_numbers, guardian.name)),
   ];
   const missingRequiredGuardian =
     !student.is_independent && !guardiansQuery.isLoading && (guardiansQuery.data ?? []).length === 0;
@@ -195,9 +195,9 @@ export function StudentDetailSheet({
     >
       <div className="mb-4">
           <Row label={t("Date of birth")} value={student.date_of_birth} />
-          {student.is_independent ? <Row label={t("Phone")} value={student.phone} /> : null}
+          <Row label={t("Phone")} value={student.is_independent ? (student.phone_list?.join(" · ") || student.phone) : (guardiansQuery.data ?? []).flatMap((guardian) => (guardian.phone_list?.length ? guardian.phone_list : guardian.phone_numbers.split(",").map((phone) => phone.trim()))).join(" · ")} />
           <Row label={t("B-Form #")} value={student.b_form_number} />
-          <Row label={t("Address")} value={student.address} />
+          <Row label={t("Address")} value={student.is_independent ? student.address : (guardiansQuery.data ?? []).map((guardian) => guardian.address).filter(Boolean).join(" · ")} />
           <Row label={t("Independent")} value={student.is_independent ? "Yes" : "No"} />
           <Row label={t("Portal access")} value={student.portal_enabled ? "Enabled" : "Disabled"} />
           {student.active_enrollment ? (
@@ -218,12 +218,11 @@ export function StudentDetailSheet({
               <SectionTitle>{student.admission_record.form_title ?? t("Admission application")}</SectionTitle>
               <div className="mt-2">
                 {student.admission_record.fields_definition
-                  .filter((field) => field.enabled !== false && field.type !== "label")
+                  .filter((field) => field.enabled !== false && field.type !== "label" && !field.built_in && !field.key.startsWith("guardian_"))
                   .map((field) => {
                     const answer = student.admission_record?.answers[field.key];
-                    if (answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0)) return null;
-                    if (field.type === "file" || field.type === "image") return <Row key={field.key} label={field.label} value={<button type="button" onClick={async () => { const url = await filesApi.presignDownload(String(answer)); window.open(url, "_blank", "noopener,noreferrer"); }} className="inline-flex items-center gap-1 font-semibold text-primary"><>{field.type === "image" ? <Image className="h-4 w-4" /> : <Download className="h-4 w-4" />}</> {t("Open")}</button>} />;
-                    return <Row key={field.key} label={field.label} value={Array.isArray(answer) ? answer.join(", ") : String(answer)} />;
+                    if (field.type === "file" || field.type === "image") return <Row key={field.key} label={field.label} value={typeof answer === "string" && answer ? <button type="button" onClick={async () => { const url = await filesApi.presignDownload(answer); window.open(url, "_blank", "noopener,noreferrer"); }} className="inline-flex items-center gap-1 font-semibold text-primary"><>{field.type === "image" ? <Image className="h-4 w-4" /> : <Download className="h-4 w-4" />}</> {t("Open")}</button> : "—"} />;
+                    return <Row key={field.key} label={field.label} value={answer === undefined || answer === "" ? "—" : Array.isArray(answer) ? answer.join(", ") : String(answer)} />;
                   })}
               </div>
             </div>
@@ -371,7 +370,7 @@ export function StudentDetailSheet({
   );
 }
 
-function StudentDetailContainer({
+export function StudentDetailContainer({
   page,
   open,
   onBack,
@@ -590,10 +589,9 @@ export function GuardianDetailSheet({
       }
     >
       <div className="mb-4">
-          <Row label={t("Phone(s)")} value={guardian.phone_numbers} />
+          <Row label={t("Phone(s)")} value={guardian.phone_list?.join(" · ") || guardian.phone_numbers} />
           <Row label={t("CNIC")} value={guardian.cnic} />
           <Row label={t("Address")} value={guardian.address} />
-          <Row label={t("Preferred language")} value={guardian.preferred_language} />
         </div>
 
         <div className="mb-4">

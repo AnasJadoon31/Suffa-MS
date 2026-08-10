@@ -2109,6 +2109,36 @@ and authorization tests, the backend suite is now 120 tests.
 - Files: `app/src/routes/admissions.tsx`, `app/src/components/app/admissions/AdmissionAnswerFields.tsx`, `app/src/components/app/admissions/AdmissionFormEditorSheet.tsx`, `app/src/components/app/people/StudentForm.tsx`, `app/src/components/app/people/PersonDetail.tsx`, `app/src/components/app/forms/FormFieldsEditor.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/operations/{schemas.py,admissions.py}`, `backend/app/modules/people/routes.py`.
 - Verified: `cd app && npm run build`, backend `py_compile`, and `git diff --check`; no full test suite run per request.
 
+- Fixed: Existing application-form definitions no longer reintroduce obsolete portal or guardian-language fields. The public endpoint returns all programs for the form's madrasa.
+
+- Fixed: Guardian relationship is now the same fixed dropdown used by the New student guardian flow.
+
+- Fixed: Removed Preferred language from public application forms; language and portal access remain administrative decisions during conversion.
+
+- Fixed: Public admission submission ignores retired built-in answers from an already-open browser form after a field is removed.
+
+## 2026-08-10 - Application Enrollment Without Placement
+
+- Implemented: Applications now expose one Enroll student action. It creates the student and guardian directly from the submitted application, records the admission snapshot, and leaves the student unassigned to a class or section until staff place them later.
+- Files: `app/src/routes/admissions.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/operations/{routes.py,schemas.py}`.
+- Verified: `cd app && npm run build`, backend `py_compile`, backend container startup/health, and `git diff --check`; no full test suite run per request.
+
+- Fixed: Enrollment now requires a confirmation that names the student and guardian records about to be created.
+
+- Fixed: Removed the application status/history panel. Reject now sits beside Enroll student as the two admission decisions.
+
+## 2026-08-10 - Complete Application Profiles
+
+- Implemented: Removed Preferred language from New student creation. Applications now open as dedicated profile pages using the Student profile layout; pending applications display every submitted default and custom field, while enrolled applications open the resulting Student profile with the immutable application record. Public admission image/file uploads are stored as tenant files and a submitted profile image is attached to the student during enrollment.
+- Files: `app/src/{components/app/people/{StudentForm.tsx,PersonDetail.tsx},routes/{admissions.tsx,admissions.$applicationId.tsx,admission.$token.tsx},lib/mms/more-endpoints.ts}`, `backend/app/modules/{public/routes.py,operations/routes.py}`.
+- Verified: frontend build, backend syntax check, rebuilt backend startup/health, and `git diff --check`; no full test suite run per request.
+
+- Fixed: Admissions now renders its nested application profile route after a card click. Public file/image upload errors are shown beside the affected field instead of being silently discarded.
+
+- Fixed: Application cards now display the submitted profile picture, with the admission icon as the fallback.
+
+- Fixed: Enrolling an application now invalidates the Students list cache, so the new student appears in People immediately.
+
 ## 2026-08-10 - Dedicated Student Profile Route
 
 - Implemented: Selecting a student from People now opens `/people/:studentId` as a dedicated profile page. The page fetches the complete student record and retains the existing enrollment, guardian, credential, admission-record, and file actions with a consistent Back control.
@@ -2132,3 +2162,37 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: New student creation retains its default student and guardian fields, then offers an optional application-form selector. Selected forms contribute only their custom fields; their answers and a schema snapshot are stored with the student.
 - Files: `app/src/components/app/people/StudentForm.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/people/routes.py`.
 - Verified: backend `py_compile`, `cd app && npm run build`, `git diff --check`, backend health, and frontend availability; no full test suite run per request.
+
+- Fixed: Admission form cards now count only custom fields, excluding the 12 system default fields returned by the API.
+
+## 2026-08-10 - Admissions Filters
+
+- Implemented: Applications now have filter-button controls for form, program, conversion state, and created-date range. Application Forms now have search, open/closed status, category, and program filters. The tab header count follows the active tab.
+- Files: `app/src/routes/admissions.tsx`, `app/src/components/app/FilterBar.tsx`.
+- Verified: `cd app && npm run build`, `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Student And Guardian Addresses
+
+- Implemented: The New student form shows a student address only for independent students. The inline Create new guardian accordion now collects and saves the guardian address.
+- Files: `app/src/components/app/people/StudentForm.tsx`.
+- Verified: pending focused frontend check.
+
+## 2026-08-10 - Public Application Form Sharing
+
+- Implemented: Removed manual application creation from the Applications tab. Application Forms now have a Share action that opens the native phone share sheet or copies the public form URL on web. The existing public route displays default admission fields plus custom form fields and submits into Applications without a class selector.
+- Files: `app/src/routes/admissions.tsx`, `app/src/routes/admission.$token.tsx`, `backend/app/modules/public/routes.py`.
+- Verified: `cd app && npm run build`, `git diff --check`; public-link browser walkthrough remains in `TO_IMPLEMENT.md`.
+
+- Fixed: Public application fields now follow New student input behavior: non-phone fields no longer receive a `+92` value, date of birth uses a date picker, and core labels match the student form.
+
+## 2026-08-10 - Public Application Program Selection
+
+- Implemented: Removed the form-editor Program selector. Public application links now show a required Program dropdown, validate that the selected program belongs to the madrasa, and store that selection on the submitted application. Public fields conditionally follow the independent/dependent student flow and use the existing phone and B-Form/CNIC masks; portal and guardian-language controls are excluded.
+- Files: `app/src/components/app/admissions/AdmissionFormEditorSheet.tsx`, `app/src/routes/admission.$token.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/{operations/admissions.py,operations/schemas.py,public/routes.py}`.
+- Verified: `cd app && npm run build`, backend `py_compile`, and `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Default Contact Numbers And Guardian Accounts
+
+- Implemented: Students, guardians, teachers, and donors now support ordered phone numbers and an explicit default contact. Existing single-value contact columns mirror that default for compatibility; dependent student profiles display linked guardian phone numbers and addresses instead of duplicating them. Application enrollment provisions every guardian a disabled portal account with a generated username.
+- Files: `backend/alembic/versions/32502fc5c5d0_add_profile_phone_lists.py`, `backend/app/modules/{people,finance,messaging,operations}/`, `app/src/components/app/people/{PhoneNumbersField.tsx,StudentForm.tsx,GuardianForm.tsx,TeacherForm.tsx,DonorForm.tsx,PersonDetail.tsx}`, `app/src/lib/mms/{endpoints.ts,more-endpoints.ts}`.
+- Verified: backend `py_compile`, `cd app && npm run build`, rebuilt backend migration, and `/healthz`; no full test suite run per request.

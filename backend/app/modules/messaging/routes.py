@@ -694,8 +694,8 @@ async def _student_credentials_recipient(
     requested_number: str | None = None,
 ) -> tuple[str, str, UUID, str]:
     candidates: list[tuple[str, str, UUID, str]] = []
-    if student.is_independent and student.phone:
-        candidates.append((student.phone, "student", student.id, "ur"))
+    if student.is_independent and (student.default_phone_number or student.phone):
+        candidates.append((student.default_phone_number or student.phone, "student", student.id, "ur"))
 
     guardians = (
         await session.execute(
@@ -705,7 +705,7 @@ async def _student_credentials_recipient(
         )
     ).scalars().all()
     for guardian in guardians:
-        for phone in [part.strip() for part in guardian.phone_numbers.replace(";", ",").split(",") if part.strip()]:
+        for phone in guardian.phone_list or [part.strip() for part in guardian.phone_numbers.replace(";", ",").split(",") if part.strip()]:
             candidates.append((phone, "guardian", guardian.id, guardian.preferred_language))
 
     if not candidates and not student.is_independent:
@@ -800,7 +800,7 @@ async def send_report(
         session_name = academic_session.name
 
     guardian = await _primary_guardian(session, student.id)
-    phone = guardian.phone_numbers.split(",")[0].strip()
+    phone = guardian.default_phone_number or (guardian.phone_list or guardian.phone_numbers.split(","))[0].strip()
 
     from app.modules.assessments.routes import _render_result_card
 
@@ -843,7 +843,7 @@ async def send_credentials(
             raise HTTPException(status_code=404, detail="Teacher profile not found")
         user = await session.get(User, profile.user_id)
         subject_name = profile.name
-        phone = _recipient_phone(profile.whatsapp_number, payload.phone_number)
+        phone = _recipient_phone(profile.default_phone_number or profile.whatsapp_number, payload.phone_number)
         language = "ur"
         recipient_type = "teacher"
         recipient_id = profile.id
@@ -862,7 +862,7 @@ async def send_credentials(
             raise HTTPException(status_code=404, detail="Guardian not found")
         user = await session.get(User, guardian.user_id)
         subject_name = guardian.name
-        phone = _recipient_phone(guardian.phone_numbers, payload.phone_number)
+        phone = _recipient_phone(guardian.default_phone_number or guardian.phone_numbers, payload.phone_number)
         language = guardian.preferred_language
         recipient_type = "guardian"
         recipient_id = guardian.id

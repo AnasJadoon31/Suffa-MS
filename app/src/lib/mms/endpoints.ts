@@ -61,6 +61,8 @@ export interface Student {
   name: string;
   status: string;
   phone?: string | null;
+  phone_list?: string[];
+  default_phone_number?: string | null;
   address?: string | null;
   date_of_birth?: string | null;
   portal_enabled?: boolean;
@@ -74,6 +76,8 @@ export interface Teacher {
   name: string;
   status: string;
   whatsapp_number?: string | null;
+  phone_list?: string[];
+  default_phone_number?: string | null;
   qualifications?: string | null;
   join_date?: string | null;
   is_principal_delegate?: boolean;
@@ -85,6 +89,8 @@ export interface Guardian {
   name: string;
   relationship: string;
   phone_numbers: string;
+  phone_list?: string[];
+  default_phone_number?: string | null;
   status?: string;
 }
 

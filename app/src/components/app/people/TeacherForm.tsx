@@ -5,10 +5,11 @@ import { toast } from "sonner";
 import { FormSheet } from "@/components/app/FormSheet";
 import { Field, TextInput } from "@/components/app/Primitives";
 import { useUsernameProposal } from "./useUsernameProposal";
+import { PhoneNumbersField } from "./PhoneNumbersField";
 import { peopleMutations, type TeacherDetail } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
-import { maskBForm, maskPhone } from "@/lib/masks";
+import { maskBForm } from "@/lib/masks";
 
 export function TeacherForm({
   teacher,
@@ -26,6 +27,8 @@ export function TeacherForm({
   const client = useQueryClient();
   const [name, setName] = useState(teacher?.name ?? "");
   const [whatsapp, setWhatsapp] = useState(teacher?.whatsapp_number ?? "");
+  const [phones, setPhones] = useState(teacher?.phone_list?.length ? teacher.phone_list : [teacher?.whatsapp_number ?? "+92"]);
+  const [defaultPhone, setDefaultPhone] = useState(teacher?.default_phone_number ?? teacher?.whatsapp_number ?? "+92");
   const [qualifications, setQualifications] = useState(teacher?.qualifications ?? "");
   const [joinDate, setJoinDate] = useState(teacher?.join_date ?? "");
   const [cnic, setCnic] = useState(teacher?.cnic ?? "");
@@ -40,7 +43,7 @@ export function TeacherForm({
       toast.error("Enter a valid name (max 120 chars)");
       throw new Error("validation");
     }
-    if (!whatsapp.trim()) {
+    if (!phones.some((phone) => phone.length > 3)) {
       toast.error("WhatsApp number is required");
       throw new Error("validation");
     }
@@ -52,7 +55,8 @@ export function TeacherForm({
     if (isEdit && teacher) {
       await peopleMutations.updateTeacher(teacher.id, {
         name: trimmedName,
-        whatsapp_number: whatsapp.trim(),
+        whatsapp_number: defaultPhone,
+        phone_list: phones.filter((phone) => phone.length > 3), default_phone_number: defaultPhone,
         qualifications: qualifications.trim() || undefined,
         join_date: joinDate || undefined,
         cnic: cnic.trim() || undefined,
@@ -65,7 +69,8 @@ export function TeacherForm({
       await peopleMutations.createTeacher({
         username: usernameField.username.trim(),
         name: trimmedName,
-        whatsapp_number: whatsapp.trim(),
+        whatsapp_number: defaultPhone,
+        phone_list: phones.filter((phone) => phone.length > 3), default_phone_number: defaultPhone,
         qualifications: qualifications.trim() || undefined,
         join_date: joinDate || undefined,
         cnic: cnic.trim() || undefined,
@@ -114,13 +119,8 @@ export function TeacherForm({
           onChange={(e) => setName(e.target.value)}
         />
       </Field>
-      <Field label={t("WhatsApp number *")}>
-        <TextInput
-          required
-          maxLength={15}
-          value={whatsapp ?? "+92"}
-          onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
-        />
+      <Field label={t("WhatsApp number(s) *")}>
+        <PhoneNumbersField numbers={phones} defaultNumber={defaultPhone} onChange={(next, selected) => { setPhones(next); setDefaultPhone(selected); setWhatsapp(selected); }} />
       </Field>
       <Field label={t("Qualifications")}>
         <TextInput

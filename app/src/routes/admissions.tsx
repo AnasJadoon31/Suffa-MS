@@ -1,15 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Edit2, FileText, History, Phone, Trash2, UserPlus, XCircle } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { Edit2, FileText, Phone, Share2, Trash2, UserPlus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/mms/api";
-import { maskPhone } from "@/lib/masks";
 
 import { AppShell } from "@/components/app/AppShell";
 import { FilterBar } from "@/components/app/FilterBar";
-import { FormSheet } from "@/components/app/FormSheet";
 import {
   ActionButton,
   Card,
@@ -18,19 +16,14 @@ import {
   Pill,
   CustomDropdown,
   SkeletonList,
-  TextArea,
   TextInput,
   Segmented,
 } from "@/components/app/Primitives";
-import { AdmissionAnswerFields } from "@/components/app/admissions/AdmissionAnswerFields";
 import { AdmissionFormEditorSheet } from "@/components/app/admissions/AdmissionFormEditorSheet";
-import { academicsApi } from "@/lib/mms/endpoints";
 import { useAuth } from "@/lib/mms/auth";
 import {
-  academicsExtraApi,
-  admissionsMutations,
+  filesApi,
   opsApi,
-  peopleMutations,
   type AdmissionApplication,
   type AdmissionForm,
 } from "@/lib/mms/more-endpoints";
@@ -54,14 +47,40 @@ export const Route = createFileRoute("/admissions")({
 const FILTERS = ["all", "pending", "accepted", "rejected"] as const;
 const emptyExtra = { search: "" };
 
+function ApplicationAvatar({ application }: { application: AdmissionApplication }) {
+  const pictureKey = typeof application.extra_data?.student_profile_picture === "string"
+    ? application.extra_data.student_profile_picture
+    : "";
+  const picture = useQuery({
+    queryKey: ["admission-photo", pictureKey],
+    queryFn: () => filesApi.presignDownload(pictureKey),
+    enabled: Boolean(pictureKey),
+    retry: false,
+  });
+
+  return <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary-soft text-primary">
+    {picture.data ? <img src={picture.data} alt="" className="h-full w-full object-cover" /> : <UserPlus className="h-5 w-5" />}
+  </span>;
+}
+
 function AdmissionsPage() {
     const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const canManage = hasPermission("admissions.manage");
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [extra, setExtra] = useState(emptyExtra);
-  const [active, setActive] = useState<AdmissionApplication | null>(null);
+  const [applicationFormFilter, setApplicationFormFilter] = useState("");
+  const [applicationProgramFilter, setApplicationProgramFilter] = useState("");
+  const [conversionFilter, setConversionFilter] = useState("all");
+  const [applicationFrom, setApplicationFrom] = useState("");
+  const [applicationTo, setApplicationTo] = useState("");
+  const [formSearch, setFormSearch] = useState("");
+  const [formStatusFilter, setFormStatusFilter] = useState("all");
+  const [formCategoryFilter, setFormCategoryFilter] = useState("");
+  const [formProgramFilter, setFormProgramFilter] = useState("");
+  const navigate = useNavigate();
   const [tab, setTab] = useState<"applications" | "forms">("applications");
   const [formEditorOpen, setFormEditorOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<AdmissionForm | null>(null);
@@ -77,6 +96,12 @@ function AdmissionsPage() {
     const search = extra.search.trim().toLowerCase();
     return (query.data ?? []).filter((item) => {
       if (filter !== "all" && item.status !== filter) return false;
+      if (applicationFormFilter && item.form_id !== applicationFormFilter) return false;
+      if (applicationProgramFilter && item.program_id !== applicationProgramFilter) return false;
+      if (conversionFilter === "converted" && !item.converted_at) return false;
+      if (conversionFilter === "not_converted" && item.converted_at) return false;
+      if (applicationFrom && item.created_at.slice(0, 10) < applicationFrom) return false;
+      if (applicationTo && item.created_at.slice(0, 10) > applicationTo) return false;
       if (!search) return true;
       return [
         item.applicant_name,
@@ -88,7 +113,7 @@ function AdmissionsPage() {
         .toLowerCase()
         .includes(search);
     });
-  }, [extra.search, filter, query.data]);
+  }, [applicationFormFilter, applicationFrom, applicationProgramFilter, applicationTo, conversionFilter, extra.search, filter, query.data]);
 
   const programs = useQuery({
     queryKey: ["programs"],
@@ -103,115 +128,110 @@ function AdmissionsPage() {
     retry: false,
   });
 
-  const [applicant, setApplicant] = useState("");
-  const [contact, setContact] = useState("");
-  const [programId, setProgramId] = useState("");
-  const [dob, setDob] = useState("");
-  const [notes, setNotes] = useState("");
-  const [formId, setFormId] = useState("");
-  const [extraData, setExtraData] = useState<Record<string, unknown>>({});
-  const selectedForm = forms.data?.find((form) => form.id === formId) ?? forms.data?.find((form) => form.is_open);
+  const filteredForms = useMemo(() => {
+    const search = formSearch.trim().toLowerCase();
+    return (forms.data ?? []).filter((form) => {
+      if (formStatusFilter === "open" && !form.is_open) return false;
+      if (formStatusFilter === "closed" && form.is_open) return false;
+      if (formCategoryFilter && form.category !== formCategoryFilter) return false;
+      if (formProgramFilter && form.program_id !== formProgramFilter) return false;
+      if (!search) return true;
+      return `${form.title} ${form.description} ${form.category} ${form.program_name ?? ""}`.toLowerCase().includes(search);
+    });
+  }, [formCategoryFilter, formProgramFilter, formSearch, formStatusFilter, forms.data]);
 
-  const create = useMutation({
-    mutationFn: () => {
-      const resolvedFormId = formId || forms.data?.find((form) => form.is_open)?.id;
-      if (!resolvedFormId) throw new Error("Create an admission form first");
-      return admissionsMutations.createAdmission({
-        applicant_name: applicant.trim(),
-        guardian_contact: contact.trim(),
-        form_id: resolvedFormId,
-        ...(programId ? { program_id: programId } : {}),
-        ...(dob ? { date_of_birth: dob } : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-        ...(Object.keys(extraData).length ? { extra_data: extraData } : {}),
-      });
-    },
-    onSuccess: () => {
-      toast.success("Application added");
-      setApplicant("");
-      setContact("");
-      setProgramId("");
-      setDob("");
-      setNotes("");
-      setFormId("");
-      setExtraData({});
-      void queryClient.invalidateQueries({ queryKey: ["admissions"] });
-    },
-    onError: (error: unknown) => {
-      if (error instanceof Error) toast.error(error.message);
-    },
-  });
+  async function shareApplicationForm(form: AdmissionForm) {
+    const link = new URL(`/admission/${form.public_token}`, window.location.origin).toString();
+    const supportsNativeShare = typeof navigator.share === "function" && navigator.maxTouchPoints > 0;
+    try {
+      if (supportsNativeShare) {
+        await navigator.share({ title: form.title, text: form.description || form.title, url: link });
+        return;
+      }
+      await navigator.clipboard.writeText(link);
+      toast.success("Application form link copied");
+    } catch (error) {
+      if ((error as DOMException)?.name !== "AbortError") toast.error("Failed to share application form");
+    }
+  }
 
-  const activeCount = (filter !== "all" ? 1 : 0) + (extra.search ? 1 : 0);
+  const activeCount =
+    (filter !== "all" ? 1 : 0) +
+    (extra.search ? 1 : 0) +
+    (applicationFormFilter ? 1 : 0) +
+    (applicationProgramFilter ? 1 : 0) +
+    (conversionFilter !== "all" ? 1 : 0) +
+    (applicationFrom ? 1 : 0) +
+    (applicationTo ? 1 : 0);
+
+  const formActiveCount =
+    (formSearch ? 1 : 0) +
+    (formStatusFilter !== "all" ? 1 : 0) +
+    (formCategoryFilter ? 1 : 0) +
+    (formProgramFilter ? 1 : 0);
+
+  if (/^\/admissions\/[^/]+$/.test(location.pathname)) return <Outlet />;
 
   return (
     <AppShell
       title={t("Admissions")}
-      subtitle={`${items.length} applications`}
-      right={canManage ? (
-        tab === "forms" ? (
-          <button type="button" onClick={() => { setEditingForm(null); setFormEditorOpen(true); }} className="gradient-emerald inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground">
-            {t("New")}
-          </button>
-        ) : (
-          <FormSheet
-            title={t("New application")}
-            triggerLabel="Add"
-            submitLabel="Create"
-            onSubmit={() => create.mutateAsync()}
-          >
-            <Field label={t("Admission form")}>
-              <CustomDropdown value={formId} onChange={(e) => { setFormId(e.target.value); setExtraData({}); }}>
-                <option value="">{t("Use first open form")}</option>
-                {(forms.data ?? []).map((form) => (
-                  <option key={form.id} value={form.id}>
-                    {form.title}
-                    {form.is_open ? " (Open)" : " (Closed)"}
-                  </option>
-                ))}
-              </CustomDropdown>
-            </Field>
-            {selectedForm ? <AdmissionAnswerFields fields={selectedForm.fields_definition} answers={extraData} onChange={setExtraData} /> : null}
-            <Field label={t("Applicant name")}>
-              <TextInput required value={applicant} onChange={(e) => setApplicant(e.target.value)} />
-            </Field>
-            <Field label={t("Guardian contact")}>
-              <TextInput required value={contact || "+92"} onChange={(e) => setContact(maskPhone(e.target.value))} />
-            </Field>
-            <Field label={t("Program")}>
-              <CustomDropdown value={programId} onChange={(e) => setProgramId(e.target.value)}>
-                <option value="">{t("Keep form program")}</option>
-                {(programs.data ?? []).map((program) => (
-                  <option key={program.id} value={program.id}>
-                    {program.name}
-                  </option>
-                ))}
-              </CustomDropdown>
-            </Field>
-            <Field label={t("Date of birth")}>
-              <TextInput type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
-            </Field>
-            <Field label={t("Notes")}>
-              <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </Field>
-          </FormSheet>
-        )
+      subtitle={tab === "forms" ? `${filteredForms.length} application forms` : `${items.length} applications`}
+      right={canManage && tab === "forms" ? (
+        <button type="button" onClick={() => { setEditingForm(null); setFormEditorOpen(true); }} className="gradient-emerald inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground">
+          {t("New")}
+        </button>
       ) : undefined}
     >
       <Segmented value={tab} onChange={(value) => setTab(value as "applications" | "forms")} options={[{ key: "applications", label: "Applications" }, { key: "forms", label: "Application forms" }]} />
 
       {tab === "forms" ? (
+        <>
+        <FilterBar
+          search={{ value: formSearch, onChange: setFormSearch, placeholder: "Search application forms…" }}
+          activeCount={formActiveCount}
+          onClear={() => {
+            setFormSearch("");
+            setFormStatusFilter("all");
+            setFormCategoryFilter("");
+            setFormProgramFilter("");
+          }}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Field label={t("Status")}>
+              <CustomDropdown value={formStatusFilter} onChange={(event) => setFormStatusFilter(event.target.value)}>
+                <option value="all">{t("All statuses")}</option>
+                <option value="open">{t("Open")}</option>
+                <option value="closed">{t("Closed")}</option>
+              </CustomDropdown>
+            </Field>
+            <Field label={t("Category")}>
+              <CustomDropdown value={formCategoryFilter} onChange={(event) => setFormCategoryFilter(event.target.value)}>
+                <option value="">{t("All categories")}</option>
+                {[...new Set((forms.data ?? []).map((form) => form.category))].filter(Boolean).sort().map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </CustomDropdown>
+            </Field>
+            <Field label={t("Program")}>
+              <CustomDropdown value={formProgramFilter} onChange={(event) => setFormProgramFilter(event.target.value)}>
+                <option value="">{t("All programs")}</option>
+                {(programs.data ?? []).map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+              </CustomDropdown>
+            </Field>
+          </div>
+        </FilterBar>
         <div className="space-y-2.5">
-          {(forms.data ?? []).map((form) => (
+          {filteredForms.map((form) => (
             <Card key={form.id} className="space-y-2 p-3.5">
               <div className="flex items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary-soft text-primary"><FileText className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="font-semibold">{form.title}</p><p className="text-xs text-muted-foreground">{form.program_name ?? form.category} · {form.is_open ? "Open" : "Closed"}</p></div></div>
               {form.description ? <p className="text-sm text-muted-foreground">{form.description}</p> : null}
-              <p className="text-xs text-muted-foreground">{form.fields_definition.filter((field) => field.enabled !== false && field.type !== "label").length} fields</p>
-              {canManage ? <div className="flex gap-2"><button type="button" className="inline-flex items-center gap-1 rounded-xl bg-muted px-3 py-2 text-xs font-bold" onClick={() => { setEditingForm(form); setFormEditorOpen(true); }}><Edit2 className="h-3.5 w-3.5" />{t("Edit")}</button><button type="button" className="inline-flex items-center gap-1 rounded-xl bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive" onClick={() => setDeleteForm(form)}><Trash2 className="h-3.5 w-3.5" />{t("Delete")}</button></div> : null}
+              <p className="text-xs text-muted-foreground">{form.fields_definition.filter((field) => field.enabled !== false && field.type !== "label" && !field.built_in).length} fields</p>
+              {canManage ? <div className="flex flex-wrap gap-2"><button type="button" className="inline-flex items-center gap-1 rounded-xl bg-primary-soft px-3 py-2 text-xs font-bold text-primary" onClick={() => void shareApplicationForm(form)}><Share2 className="h-3.5 w-3.5" />{t("Share")}</button><button type="button" className="inline-flex items-center gap-1 rounded-xl bg-muted px-3 py-2 text-xs font-bold" onClick={() => { setEditingForm(form); setFormEditorOpen(true); }}><Edit2 className="h-3.5 w-3.5" />{t("Edit")}</button><button type="button" className="inline-flex items-center gap-1 rounded-xl bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive" onClick={() => setDeleteForm(form)}><Trash2 className="h-3.5 w-3.5" />{t("Delete")}</button></div> : null}
             </Card>
           ))}
-          {!forms.isLoading && (forms.data ?? []).length === 0 ? <EmptyState title="No application forms" /> : null}
+          {!forms.isLoading && filteredForms.length === 0 ? <EmptyState title="No application forms" /> : null}
         </div>
+        </>
       ) : <>
       <FilterBar
         chips={FILTERS.map((key) => ({
@@ -229,8 +249,37 @@ function AdmissionsPage() {
         onClear={() => {
           setFilter("all");
           setExtra(emptyExtra);
+          setApplicationFormFilter("");
+          setApplicationProgramFilter("");
+          setConversionFilter("all");
+          setApplicationFrom("");
+          setApplicationTo("");
         }}
-      />
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label={t("Application form")}>
+            <CustomDropdown value={applicationFormFilter} onChange={(event) => setApplicationFormFilter(event.target.value)}>
+              <option value="">{t("All forms")}</option>
+              {(forms.data ?? []).map((form) => <option key={form.id} value={form.id}>{form.title}</option>)}
+            </CustomDropdown>
+          </Field>
+          <Field label={t("Program")}>
+            <CustomDropdown value={applicationProgramFilter} onChange={(event) => setApplicationProgramFilter(event.target.value)}>
+              <option value="">{t("All programs")}</option>
+              {(programs.data ?? []).map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+            </CustomDropdown>
+          </Field>
+          <Field label={t("Conversion")}>
+            <CustomDropdown value={conversionFilter} onChange={(event) => setConversionFilter(event.target.value)}>
+              <option value="all">{t("All applications")}</option>
+              <option value="converted">{t("Converted")}</option>
+              <option value="not_converted">{t("Not converted")}</option>
+            </CustomDropdown>
+          </Field>
+          <Field label={t("From") }><TextInput type="date" value={applicationFrom} onChange={(event) => setApplicationFrom(event.target.value)} /></Field>
+          <Field label={t("To") }><TextInput type="date" value={applicationTo} onChange={(event) => setApplicationTo(event.target.value)} /></Field>
+        </div>
+      </FilterBar>
 
       {query.isLoading ? <SkeletonList rows={5} /> : null}
       {query.isError ? (
@@ -243,11 +292,9 @@ function AdmissionsPage() {
       <div className="space-y-2.5">
         {items.map((item) => (
           <Card key={item.id} className="space-y-2 p-3.5">
-            <button type="button" className="block w-full text-left" onClick={() => setActive(item)}>
+            <button type="button" className="block w-full text-left" onClick={() => navigate({ to: "/admissions/$applicationId", params: { applicationId: item.id } })}>
               <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-                  <UserPlus className="h-5 w-5" />
-                </span>
+                <ApplicationAvatar application={item} />
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{item.applicant_name}</p>
                   <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
@@ -273,260 +320,9 @@ function AdmissionsPage() {
         ))}
       </div>
 
-      {active ? (
-        <AdmissionDetailSheet
-          application={active}
-          onClose={() => setActive(null)}
-          canManage={canManage}
-        />
-      ) : null}
       </>}
       <AdmissionFormEditorSheet form={editingForm} open={formEditorOpen} onOpenChange={setFormEditorOpen} onSaved={() => { setFormEditorOpen(false); void queryClient.invalidateQueries({ queryKey: ["admission-forms"] }); }} />
       {deleteForm ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-sm space-y-3 p-5"><p className="font-display font-extrabold">Delete application form?</p><p className="text-sm text-muted-foreground">{deleteForm.title} will no longer be available for new students.</p><div className="flex gap-2"><ActionButton className="flex-1" variant="soft" onClick={() => setDeleteForm(null)}>{t("Cancel")}</ActionButton><ActionButton className="flex-1" variant="danger" onClick={async () => { await opsApi.deleteAdmissionForm(deleteForm.id); setDeleteForm(null); void queryClient.invalidateQueries({ queryKey: ["admission-forms"] }); }}>{t("Delete")}</ActionButton></div></Card></div> : null}
     </AppShell>
   );
-}
-
-function AdmissionDetailSheet({
-  application,
-  onClose,
-  canManage,
-}: {
-  application: AdmissionApplication;
-  onClose: () => void;
-  canManage: boolean;
-}) {
-    const { t } = useTranslation();
-  const client = useQueryClient();
-  const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => academicsApi.listSessions(), enabled: canManage });
-  const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses(), enabled: canManage });
-  const sections = useQuery({
-    queryKey: ["admission-sections", application.id],
-    queryFn: async () => {
-      const rows = await Promise.all((classes.data ?? []).map((item) => academicsExtraApi.listSections(item.id)));
-      return rows.flat();
-    },
-    enabled: canManage && Boolean(classes.data),
-  });
-  const statusHistory = useQuery({
-    queryKey: ["admission-history", application.id],
-    queryFn: () => opsApi.getAdmissionStatusHistory(application.id),
-    enabled: canManage,
-  });
-
-  const [applicantName, setApplicantName] = useState(application.applicant_name);
-  const [guardianContact, setGuardianContact] = useState(application.guardian_contact);
-  const [notes, setNotes] = useState(application.notes ?? "");
-  const [dateOfBirth, setDateOfBirth] = useState(application.date_of_birth ?? "");
-  const [studentUsername, setStudentUsername] = useState("");
-  const [guardianUsername, setGuardianUsername] = useState("");
-  const [sessionId, setSessionId] = useState("");
-  const [classId, setClassId] = useState("");
-  const [sectionId, setSectionId] = useState("");
-  const [guardianName, setGuardianName] = useState("");
-  const [guardianRelationship, setGuardianRelationship] = useState("");
-
-  const save = useMutation({
-    mutationFn: () =>
-      admissionsMutations.updateAdmission(application.id, {
-        applicant_name: applicantName.trim(),
-        guardian_contact: guardianContact.trim(),
-        ...(notes.trim() ? { notes: notes.trim() } : { notes: "" }),
-        ...(dateOfBirth ? { date_of_birth: dateOfBirth } : {}),
-      }),
-    onSuccess: () => {
-      toast.success("Application updated");
-      void client.invalidateQueries({ queryKey: ["admissions"] });
-    },
-  });
-
-  const setStatus = useMutation({
-    mutationFn: (status: "pending" | "rejected") => opsApi.setAdmissionStatus(application.id, status),
-    onSuccess: () => {
-      toast.success("Status updated");
-      void client.invalidateQueries({ queryKey: ["admissions"] });
-      void client.invalidateQueries({ queryKey: ["admission-history", application.id] });
-    },
-  });
-
-  const proposal = useQuery({
-    queryKey: ["username-proposal", applicantName],
-    queryFn: () => peopleMutations.usernameProposal(applicantName),
-    enabled: canManage && applicantName.trim().length >= 3 && !studentUsername,
-  });
-
-  const convert = useMutation({
-    mutationFn: () => {
-      if (!studentUsername.trim()) throw new Error("Student username is required");
-      if (!sessionId || !classId || !sectionId) throw new Error("Pick session, class, and section");
-      return admissionsMutations.convertAdmission(application.id, {
-        student_username: studentUsername.trim(),
-        guardian_username: guardianUsername.trim() || undefined,
-        session_id: sessionId,
-        class_id: classId,
-        section_id: sectionId,
-        guardian_name: guardianName.trim() || undefined,
-        guardian_relationship: guardianRelationship.trim() || undefined,
-      });
-    },
-    onSuccess: (result) => {
-      toast.success(result.already_converted ? "Already converted" : "Application converted");
-      if (result.student_set_password_url) navigator.clipboard.writeText(result.student_set_password_url).catch(() => {});
-      void client.invalidateQueries({ queryKey: ["admissions"] });
-      void client.invalidateQueries({ queryKey: ["admission-history", application.id] });
-    },
-    onError: (error: unknown) => {
-      if (error instanceof Error) toast.error(error.message);
-    },
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-      <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-card p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate font-display text-lg font-extrabold">{application.applicant_name}</p>
-            <p className="text-sm text-muted-foreground">
-              {application.form_title_snapshot ?? "Admission application"} · {new Date(application.created_at).toLocaleString()}
-            </p>
-          </div>
-          <ActionButton variant="ghost" onClick={onClose}>
-            {t("Close")}</ActionButton>
-        </div>
-
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <Card className="space-y-3 p-3.5">
-            <Field label={t("Applicant name")}>
-              <TextInput value={applicantName} onChange={(e) => setApplicantName(e.target.value)} />
-            </Field>
-            <Field label={t("Guardian contact")}>
-              <TextInput value={guardianContact || "+92"} onChange={(e) => setGuardianContact(maskPhone(e.target.value))} />
-            </Field>
-            <Field label={t("Date of birth")}>
-              <TextInput type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
-            </Field>
-            <Field label={t("Notes")}>
-              <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </Field>
-            <ActionButton onClick={() => save.mutate()} disabled={save.isPending} className="w-full">
-              {t("Save application")}</ActionButton>
-          </Card>
-
-          <Card className="space-y-3 p-3.5">
-            <div className="flex flex-wrap gap-2">
-              <Pill
-                tone={
-                  application.status === "accepted"
-                    ? "success"
-                    : application.status === "rejected"
-                      ? "destructive"
-                      : "warning"
-                }
-              >
-                {application.status}
-              </Pill>
-              {application.converted_at ? <Pill tone="gold">{t("Converted")}</Pill> : null}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {application.status !== "rejected" ? (
-                <ActionButton variant="danger" onClick={() => setStatus.mutate("rejected")}>
-                  <XCircle className="h-4 w-4" />
-                  {t("Reject")}</ActionButton>
-              ) : null}
-              {application.status !== "pending" ? (
-                <ActionButton variant="soft" onClick={() => setStatus.mutate("pending")}>
-                  {t("Return to pending")}</ActionButton>
-              ) : null}
-            </div>
-
-            <Field label={t("Status history")}>
-              {statusHistory.isLoading ? <SkeletonList rows={2} /> : null}
-              <div className="space-y-2">
-                {(statusHistory.data ?? application.status_history ?? []).map((entry, index) => (
-                  <div key={`${entry.changed_at}-${index}`} className="rounded-2xl bg-muted px-3 py-2 text-sm">
-                    <div className="flex items-center gap-2 font-semibold">
-                      <History className="h-4 w-4" />
-                      {entry.status}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(entry.changed_at).toLocaleString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Field>
-          </Card>
-        </div>
-
-        {canManage ? (
-          <>
-            <SectionHeader title={t("Convert to student")} />
-            <Card className="grid gap-3 p-3.5 lg:grid-cols-2">
-              <Field label={t("Student username")}>
-                <TextInput
-                  value={studentUsername}
-                  onChange={(e) => setStudentUsername(e.target.value)}
-                  placeholder={proposal.data ?? "student username"}
-                />
-              </Field>
-              <Field label={t("Guardian username")}>
-                <TextInput value={guardianUsername} onChange={(e) => setGuardianUsername(e.target.value)} />
-              </Field>
-              <Field label={t("Session")}>
-                <CustomDropdown value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
-                  <option value="">{t("Select session")}</option>
-                  {(sessions.data ?? []).map((session) => (
-                    <option key={session.id} value={session.id}>
-                      {session.name}
-                    </option>
-                  ))}
-                </CustomDropdown>
-              </Field>
-              <Field label={t("Class")}>
-                <CustomDropdown value={classId} onChange={(e) => setClassId(e.target.value)}>
-                  <option value="">{t("Select class")}</option>
-                  {(classes.data ?? []).map((academicClass) => (
-                    <option key={academicClass.id} value={academicClass.id}>
-                      {academicClass.name}
-                    </option>
-                  ))}
-                </CustomDropdown>
-              </Field>
-              <Field label={t("Section")}>
-                <CustomDropdown value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-                  <option value="">{t("Select section")}</option>
-                  {(sections.data ?? [])
-                    .filter((section) => !classId || section.class_id === classId)
-                    .map((section) => (
-                      <option key={section.id} value={section.id}>
-                        {section.name}
-                      </option>
-                    ))}
-                </CustomDropdown>
-              </Field>
-              <Field label={t("Guardian name override")}>
-                <TextInput value={guardianName} onChange={(e) => setGuardianName(e.target.value)} />
-              </Field>
-              <Field label={t("Guardian relationship")}>
-                <TextInput
-                  value={guardianRelationship}
-                  onChange={(e) => setGuardianRelationship(e.target.value)}
-                />
-              </Field>
-              <div className="lg:col-span-2">
-                <ActionButton onClick={() => convert.mutate()} disabled={convert.isPending} className="w-full">
-                  <CheckCircle2 className="h-4 w-4" />
-                  {t("Convert application")}</ActionButton>
-              </div>
-            </Card>
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function SectionHeader({ title }: { title: string }) {
-    const { t } = useTranslation();
-  return <h3 className="mb-3 mt-6 font-display text-sm font-extrabold uppercase tracking-[0.14em] text-muted-foreground">{title}</h3>;
 }

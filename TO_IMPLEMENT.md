@@ -462,3 +462,31 @@ role/language/screenshot matrix.
 ## 2026-08-10 - Optional Application Fields For Manual Students Follow-up
 
 - Browser-check an unselected form, required custom form fields, and file/image custom fields during manual student creation.
+
+## 2026-08-10 - Admissions Filters Follow-up
+
+- Browser-check Applications and Application Forms filter-button interactions at mobile and desktop widths, including clear/reset behavior.
+
+## 2026-08-10 - Student And Guardian Addresses Follow-up
+
+- Browser-check dependent and independent New student form states, including inline guardian address creation.
+
+## 2026-08-10 - Public Application Form Sharing Follow-up
+
+- Browser-check Share on mobile and web, public form loading, default/custom fields, submission, and Applications-tab receipt.
+
+## 2026-08-10 - Public Application Program Selection Follow-up
+
+- Browser-check the required Program dropdown, dependent/independent field visibility, phone and B-Form/CNIC masks, and submission into Applications. Public file/image uploads remain deferred because the public route currently records submitted field values rather than creating authenticated file records.
+
+## 2026-08-10 - Application Enrollment Without Placement Follow-up
+
+- Browser-check dependent and independent applications enrolling through the single action, then placing the resulting student into a class later.
+
+## 2026-08-10 - Complete Application Profiles Follow-up
+
+- Browser-check public image/file upload, pending application profile rendering, enrollment photo attachment, and the enrolled student profile at mobile and desktop widths.
+
+## 2026-08-10 - Default Contact Numbers And Guardian Accounts Follow-up
+
+- Browser-check adding, removing, and selecting the default phone number for independent students, guardians, teachers, and donors; confirm WhatsApp credentials use the chosen default and an enrolled application guardian has a generated, disabled account.

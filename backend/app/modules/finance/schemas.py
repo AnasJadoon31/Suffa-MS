@@ -2,6 +2,7 @@ from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.core.phone import PakistanPhone
 
 class PaymentCategoryCreate(BaseModel):
     name: str
@@ -39,11 +40,15 @@ class PaymentRead(BaseModel):
 class DonorCreate(BaseModel):
     name: str
     contact: str
+    phone_list: list[PakistanPhone] = Field(default_factory=list)
+    default_phone_number: PakistanPhone | None = None
 
 
 class DonorUpdate(BaseModel):
     name: str | None = None
     contact: str | None = None
+    phone_list: list[PakistanPhone] | None = None
+    default_phone_number: PakistanPhone | None = None
 
 
 class DonorRead(BaseModel):
@@ -53,6 +58,8 @@ class DonorRead(BaseModel):
     username: str | None = None
     name: str
     contact: str
+    phone_list: list[str] = Field(default_factory=list)
+    default_phone_number: str | None = None
 
 
 class DonationCreate(BaseModel):

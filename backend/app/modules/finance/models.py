@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import Date, ForeignKey, Numeric, String, Text, select
 from sqlalchemy.orm import Mapped, column_property, mapped_column
 
-from app.db.base import Base, IdMixin, TenantMixin, TimestampMixin
+from app.db.base import Base, IdMixin, PortableJSONB, TenantMixin, TimestampMixin
 from app.modules.auth.models import User
 
 
@@ -32,6 +32,8 @@ class Donor(Base, IdMixin, TenantMixin, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(160))
     contact: Mapped[str] = mapped_column(String(80))
+    phone_list: Mapped[list] = mapped_column(PortableJSONB, default=list)
+    default_phone_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     user_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     username: Mapped[Optional[str]] = column_property(

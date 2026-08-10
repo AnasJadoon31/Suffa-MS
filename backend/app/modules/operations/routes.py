@@ -23,6 +23,7 @@ from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars, paginate_sequence
 from app.core.teaching_scope import taught_class_ids, teacher_teaches
 from app.db.session import get_session
+from app.db.core_models import FileObject
 from app.modules.academics.models import (
     AcademicClass,
     AcademicSession,
@@ -38,7 +39,6 @@ from app.modules.auth.models import User, UserRole
 from app.modules.auth.service import UsernameTakenError, generate_unique_username, provision_login
 from app.modules.operations.admissions import (
     admission_answer_date,
-    admission_answer_enabled,
     admission_guardian_payloads,
     admission_answer_text,
     normalize_admission_fields,
@@ -2052,6 +2052,19 @@ async def list_admission_applications(
     return [AdmissionApplicationRead.model_validate(row) for row in rows]
 
 
+@router.get("/admissions/{application_id}", response_model=AdmissionApplicationRead)
+async def get_admission_application(
+    application_id: UUID,
+    current_user: User = Depends(require_permission("admissions.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> AdmissionApplicationRead:
+    application = await session.get(AdmissionApplication, application_id)
+    if application is None or application.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Admission application not found")
+    return AdmissionApplicationRead.model_validate(application)
+
+
 @router.get("/admissions/{application_id}/status-history", response_model=list[dict])
 async def get_admission_status_history(
     application_id: UUID,
@@ -2136,12 +2149,15 @@ async def convert_admission_application(
     # returns the already-created records and never provisions more accounts.
     if application.converted_student_id is not None:
         student = await session.get(StudentProfile, application.converted_student_id)
-        guardian = await session.get(Guardian, application.converted_guardian_id)
+        guardian = (
+            await session.get(Guardian, application.converted_guardian_id)
+            if application.converted_guardian_id is not None
+            else None
+        )
         if (
             student is None
-            or guardian is None
             or student.madrasa_id != madrasa.id
-            or guardian.madrasa_id != madrasa.id
+            or (guardian is not None and guardian.madrasa_id != madrasa.id)
         ):
             raise HTTPException(status_code=409, detail="Application conversion links are incomplete")
         from app.modules.people.routes import _student_read
@@ -2149,85 +2165,53 @@ async def convert_admission_application(
         return AdmissionConversionRead(
             application=AdmissionApplicationRead.model_validate(application),
             student=await _student_read(session, student),
-            guardian=GuardianRead.model_validate(guardian),
+            guardian=GuardianRead.model_validate(guardian) if guardian else None,
             already_converted=True,
         )
 
-    academic_session = await session.get(AcademicSession, payload.session_id)
-    if academic_session is None or academic_session.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Academic session not found")
-    await ensure_writable_session(session, madrasa.id, payload.session_id)
-
-    academic_class = await session.get(AcademicClass, payload.class_id)
-    if academic_class is None or academic_class.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Class not found")
-    section = await session.get(Section, payload.section_id)
-    if (
-        section is None
-        or section.madrasa_id != madrasa.id
-        or section.class_id != academic_class.id
-    ):
-        raise HTTPException(status_code=404, detail="Section not found")
-    if application.program_id is not None and application.program_id != academic_class.program_id:
-        raise HTTPException(status_code=422, detail="Class does not belong to the application's program")
     answers = application.extra_data or {}
     student_name = admission_answer_text(answers, "student_name") or application.applicant_name
     student_dob = admission_answer_date(answers, "student_date_of_birth") or application.date_of_birth
-    student_portal_enabled = payload.student_portal_enabled
-    if student_portal_enabled is None:
-        student_portal_enabled = admission_answer_enabled(answers, "student_portal_enabled", default=True)
-    guardian_portal_enabled_override = payload.guardian_portal_enabled
-    guardian_payloads = admission_guardian_payloads(answers)
-    if guardian_payloads and payload.guardian_name:
-        guardian_payloads[0]["name"] = payload.guardian_name
-    if guardian_payloads and payload.guardian_relationship:
-        guardian_payloads[0]["relationship"] = payload.guardian_relationship
-    if guardian_payloads and payload.guardian_cnic:
-        guardian_payloads[0]["cnic"] = payload.guardian_cnic
-    if guardian_payloads and payload.guardian_address:
-        guardian_payloads[0]["address"] = payload.guardian_address
-    if guardian_payloads and payload.guardian_preferred_language:
-        guardian_payloads[0]["preferred_language"] = payload.guardian_preferred_language
-    if guardian_payloads and guardian_portal_enabled_override is not None:
-        guardian_payloads[0]["portal_enabled"] = guardian_portal_enabled_override
+    is_independent = answers.get("student_is_independent") is True
+    guardian_payloads = [] if is_independent else admission_guardian_payloads(answers)
 
     if student_dob is None:
         raise HTTPException(status_code=422, detail="Application date_of_birth is required for conversion")
-    if not guardian_payloads:
-        raise HTTPException(status_code=422, detail="At least one guardian or independent workflow is required for conversion")
-    primary_guardian = guardian_payloads[0]
-    if not primary_guardian["name"]:
-        raise HTTPException(status_code=422, detail="Guardian name is required for conversion")
-    if not primary_guardian["relationship"]:
-        raise HTTPException(status_code=422, detail="Guardian relationship is required for conversion")
-    if not primary_guardian["phone_numbers"]:
-        raise HTTPException(status_code=422, detail="Guardian phone number is required for conversion")
-    if primary_guardian["portal_enabled"] and not payload.guardian_username:
-        raise HTTPException(status_code=422, detail="Guardian username is required when guardian portal is enabled")
+    primary_guardian = guardian_payloads[0] if guardian_payloads else None
+    if not is_independent:
+        if primary_guardian is None:
+            raise HTTPException(status_code=422, detail="Guardian details are required for a dependent student")
+        if not primary_guardian["name"]:
+            raise HTTPException(status_code=422, detail="Guardian name is required for conversion")
+        if not primary_guardian["relationship"]:
+            raise HTTPException(status_code=422, detail="Guardian relationship is required for conversion")
+        if not primary_guardian["phone_numbers"]:
+            raise HTTPException(status_code=422, detail="Guardian phone number is required for conversion")
 
     admission_number = await _next_admission_number(session, madrasa.id)
+    profile_photo_key = admission_answer_text(answers, "student_profile_picture")
+    profile_photo_id = (
+        await session.scalar(
+            select(FileObject.id).where(
+                FileObject.madrasa_id == madrasa.id,
+                FileObject.object_key == profile_photo_key,
+            )
+        )
+        if profile_photo_key
+        else None
+    )
 
     try:
-        student_user, student_link = await provision_login(
+        student_username = await generate_unique_username(session, student_name, madrasa.id)
+        student_user, _ = await provision_login(
             session,
             madrasa_id=madrasa.id,
             actor_id=current_user.id,
-            username=payload.student_username,
+            username=student_username,
             role=UserRole.student,
-            preferred_language=payload.student_preferred_language,
-            portal_enabled=student_portal_enabled and academic_class.default_portal_enabled,
+            preferred_language="ur",
+            portal_enabled=False,
         )
-        guardian_user = None
-        guardian_link = None
-        if primary_guardian["portal_enabled"]:
-            guardian_user, guardian_link = await provision_login(
-                session,
-                madrasa_id=madrasa.id,
-                actor_id=current_user.id,
-                username=payload.guardian_username or primary_guardian["name"],
-                role=UserRole.parent,
-                preferred_language=primary_guardian["preferred_language"],
-            )
     except UsernameTakenError as exc:
         await session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -2238,50 +2222,34 @@ async def convert_admission_application(
         admission_number=admission_number,
         name=student_name,
         date_of_birth=student_dob,
-        portal_enabled=student_portal_enabled and academic_class.default_portal_enabled,
+        portal_enabled=False,
         b_form_number=admission_answer_text(answers, "student_b_form_number") or None,
-        address=admission_answer_text(answers, "student_address") or None,
-        phone=admission_answer_text(answers, "student_phone") or None,
+        address=admission_answer_text(answers, "student_address") if is_independent else None,
+        phone=admission_answer_text(answers, "student_phone") if is_independent else None,
+        phone_list=[admission_answer_text(answers, "student_phone")] if is_independent and admission_answer_text(answers, "student_phone") else [],
+        default_phone_number=admission_answer_text(answers, "student_phone") if is_independent else None,
+        is_independent=is_independent,
+        photo_file_id=profile_photo_id,
     )
-    guardian = Guardian(
-        madrasa_id=madrasa.id,
-        user_id=guardian_user.id if guardian_user else None,
-        name=primary_guardian["name"],
-        relationship=primary_guardian["relationship"],
-        phone_numbers=primary_guardian["phone_numbers"],
-        cnic=primary_guardian["cnic"],
-        address=primary_guardian["address"],
-        preferred_language=primary_guardian["preferred_language"],
-    )
-    session.add_all([student, guardian])
-    await session.flush()
-    linked_guardians = [guardian]
-    for extra_guardian in guardian_payloads[1:]:
-        extra_user = None
-        if extra_guardian["portal_enabled"]:
-            try:
-                extra_username = await generate_unique_username(session, extra_guardian["name"], madrasa.id)
-                extra_user, _ = await provision_login(
-                    session,
-                    madrasa_id=madrasa.id,
-                    actor_id=current_user.id,
-                    username=extra_username,
-                    role=UserRole.parent,
-                    preferred_language=extra_guardian["preferred_language"],
-                )
-            except UsernameTakenError as exc:
-                await session.rollback()
-                raise HTTPException(status_code=409, detail=str(exc)) from exc
-        row = Guardian(
-            madrasa_id=madrasa.id,
-            user_id=extra_user.id if extra_user else None,
-            name=extra_guardian["name"],
-            relationship=extra_guardian["relationship"],
-            phone_numbers=extra_guardian["phone_numbers"],
-            cnic=extra_guardian["cnic"],
-            address=extra_guardian["address"],
-            preferred_language=extra_guardian["preferred_language"],
+    async def make_guardian(data: dict) -> Guardian:
+        username = await generate_unique_username(session, data["name"], madrasa.id)
+        user, _ = await provision_login(
+            session, madrasa_id=madrasa.id, actor_id=current_user.id, username=username,
+            role=UserRole.parent, preferred_language="ur", portal_enabled=False,
         )
+        return Guardian(
+            madrasa_id=madrasa.id, user_id=user.id, name=data["name"],
+            relationship=data["relationship"], phone_numbers=data["phone_numbers"],
+            phone_list=[data["phone_numbers"]], default_phone_number=data["phone_numbers"],
+            cnic=data["cnic"], address=data["address"], preferred_language="ur",
+        )
+
+    guardian = await make_guardian(primary_guardian) if primary_guardian else None
+    session.add_all([student, *([guardian] if guardian else [])])
+    await session.flush()
+    linked_guardians = [guardian] if guardian else []
+    for extra_guardian in guardian_payloads[1:]:
+        row = await make_guardian(extra_guardian)
         session.add(row)
         await session.flush()
         linked_guardians.append(row)
@@ -2294,18 +2262,10 @@ async def convert_admission_application(
                     guardian_id=item.id,
                     relationship=item.relationship,
                     is_primary=index == 0,
-                    portal_access=guardian_payloads[index]["portal_enabled"],
+                    portal_access=False,
                 )
                 for index, item in enumerate(linked_guardians)
             ],
-            Enrollment(
-                madrasa_id=madrasa.id,
-                student_id=student.id,
-                session_id=academic_session.id,
-                program_id=academic_class.program_id,
-                class_id=academic_class.id,
-                section_id=section.id,
-            ),
         ]
     )
 
@@ -2331,7 +2291,7 @@ async def convert_admission_application(
         },
     ]
     application.converted_student_id = student.id
-    application.converted_guardian_id = guardian.id
+    application.converted_guardian_id = guardian.id if guardian else None
     application.converted_by_id = current_user.id
     application.converted_at = datetime.now(UTC)
     session.add(
@@ -2350,16 +2310,17 @@ async def convert_admission_application(
     await session.commit()
     await session.refresh(application)
     await session.refresh(student)
-    await session.refresh(guardian)
+    if guardian:
+        await session.refresh(guardian)
 
     from app.modules.people.routes import _student_read
 
     return AdmissionConversionRead(
         application=AdmissionApplicationRead.model_validate(application),
         student=await _student_read(session, student),
-        guardian=GuardianRead.model_validate(guardian),
-        student_set_password_url=student_link if student.portal_enabled else None,
-        guardian_set_password_url=guardian_link,
+        guardian=GuardianRead.model_validate(guardian) if guardian else None,
+        student_set_password_url=None,
+        guardian_set_password_url=None,
         already_converted=False,
     )
 

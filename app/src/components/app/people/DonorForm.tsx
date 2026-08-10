@@ -5,8 +5,8 @@ import { useTranslation } from "react-i18next";
 
 import { FormSheet } from "@/components/app/FormSheet";
 import { Field, TextInput } from "@/components/app/Primitives";
-import { maskPhone } from "@/lib/masks";
 import { financeMutations, type Donor } from "@/lib/mms/more-endpoints";
+import { PhoneNumbersField } from "./PhoneNumbersField";
 
 export function DonorForm({
   donor,
@@ -24,10 +24,14 @@ export function DonorForm({
   const client = useQueryClient();
   const [name, setName] = useState(donor?.name ?? "");
   const [contact, setContact] = useState(donor?.contact ?? "");
+  const [phones, setPhones] = useState(donor?.phone_list?.length ? donor.phone_list : [donor?.contact ?? "+92"]);
+  const [defaultPhone, setDefaultPhone] = useState(donor?.default_phone_number ?? donor?.contact ?? "+92");
 
   useEffect(() => {
     setName(donor?.name ?? "");
     setContact(donor?.contact ?? "");
+    setPhones(donor?.phone_list?.length ? donor.phone_list : [donor?.contact ?? "+92"]);
+    setDefaultPhone(donor?.default_phone_number ?? donor?.contact ?? "+92");
   }, [donor?.contact, donor?.name]);
 
   async function handleSubmit() {
@@ -40,13 +44,15 @@ export function DonorForm({
     if (isEdit && donor) {
       await financeMutations.updateDonor(donor.id, {
         name: trimmedName,
-        contact: contact.trim(),
+        contact: defaultPhone,
+        phone_list: phones.filter((phone) => phone.length > 3), default_phone_number: defaultPhone,
       });
       toast.success(t("Donor saved"));
     } else {
       await financeMutations.createDonor({
         name: trimmedName,
-        contact: contact.trim(),
+        contact: defaultPhone,
+        phone_list: phones.filter((phone) => phone.length > 3), default_phone_number: defaultPhone,
       });
       toast.success(t("Donor recorded"));
     }
@@ -73,11 +79,7 @@ export function DonorForm({
         />
       </Field>
       <Field label={t("Contact / Phone Number")}>
-        <TextInput
-          value={contact || "+92"}
-          onChange={(e) => setContact(maskPhone(e.target.value))}
-          placeholder={t("e.g. +92 300 1234567")}
-        />
+        <PhoneNumbersField numbers={phones} defaultNumber={defaultPhone} onChange={(next, selected) => { setPhones(next); setDefaultPhone(selected); setContact(selected); }} />
       </Field>
     </FormSheet>
   );

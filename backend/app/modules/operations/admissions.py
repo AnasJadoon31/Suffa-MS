@@ -8,19 +8,41 @@ from app.core.phone import normalize_pakistan_phone
 from app.modules.operations.schemas import FormFieldDefinition
 
 BUILT_IN_ADMISSION_FIELDS = {
-    "student_name": {"label": "Student name", "type": "text", "required": True, "enabled": True},
+    "student_profile_picture": {"label": "Profile picture", "type": "image", "required": False, "enabled": True},
+    "student_name": {"label": "Full name", "type": "text", "required": True, "enabled": True},
     "student_date_of_birth": {"label": "Date of birth", "type": "text", "required": True, "enabled": True},
-    "student_b_form_number": {"label": "B-Form number", "type": "text", "required": False, "enabled": True},
-    "student_address": {"label": "Student address", "type": "textarea", "required": False, "enabled": True},
-    "student_phone": {"label": "Student phone", "type": "phone", "required": False, "enabled": False},
-    "student_portal_enabled": {"label": "Student portal", "type": "dropdown", "required": True, "enabled": True, "options": ["enabled", "disabled"]},
+    "student_b_form_number": {"label": "B-Form / CNIC number", "type": "text", "required": False, "enabled": True},
+    "student_is_independent": {"label": "Independent student", "type": "boolean", "required": False, "enabled": True},
+    "student_address": {"label": "Address", "type": "textarea", "required": False, "enabled": True},
+    "student_phone": {"label": "Phone", "type": "phone", "required": False, "enabled": True},
     "guardian_name": {"label": "Guardian name", "type": "text", "required": True, "enabled": True},
-    "guardian_relationship": {"label": "Guardian relationship", "type": "text", "required": True, "enabled": True},
+    "guardian_relationship": {
+        "label": "Guardian relationship",
+        "type": "dropdown",
+        "required": True,
+        "enabled": True,
+        "options": [
+            "father",
+            "mother",
+            "brother",
+            "sister",
+            "uncle",
+            "aunt",
+            "grandfather",
+            "grandmother",
+            "other",
+        ],
+    },
     "guardian_phone_numbers": {"label": "Guardian phone number", "type": "phone", "required": True, "enabled": True},
     "guardian_cnic": {"label": "Guardian CNIC", "type": "text", "required": False, "enabled": True},
     "guardian_address": {"label": "Guardian address", "type": "textarea", "required": False, "enabled": True},
-    "guardian_preferred_language": {"label": "Guardian preferred language", "type": "dropdown", "required": True, "enabled": True, "options": ["ur", "en"]},
-    "guardian_portal_enabled": {"label": "Guardian portal", "type": "dropdown", "required": True, "enabled": True, "options": ["enabled", "disabled"]},
+}
+
+REMOVED_BUILT_IN_ADMISSION_FIELD_KEYS = {
+    "student_preferred_language",
+    "student_portal_enabled",
+    "guardian_preferred_language",
+    "guardian_portal_enabled",
 }
 
 
@@ -32,21 +54,21 @@ def normalize_admission_fields(fields_definition: list) -> list[dict]:
     }
     normalized: list[dict] = []
     for key, defaults in BUILT_IN_ADMISSION_FIELDS.items():
-        current = incoming.pop(key, {})
+        incoming.pop(key, None)
         normalized.append({
             "key": key,
-            "label": current.get("label") or defaults["label"],
+            "label": defaults["label"],
             "type": defaults["type"],
-            "required": bool(current.get("required", defaults["required"])),
+            "required": defaults["required"],
             "options": defaults.get("options", []),
             "built_in": True,
-            "enabled": bool(current.get("enabled", defaults["enabled"])),
+            "enabled": defaults["enabled"],
         })
     for field in fields_definition:
         if not isinstance(field, dict):
             continue
         key = str(field.get("key") or "")
-        if key in BUILT_IN_ADMISSION_FIELDS:
+        if key in BUILT_IN_ADMISSION_FIELDS or key in REMOVED_BUILT_IN_ADMISSION_FIELD_KEYS:
             continue
         normalized.append(FormFieldDefinition.model_validate(field).model_dump())
     return normalized
@@ -121,6 +143,9 @@ def admission_guardian_payloads(answers: dict | None) -> list[dict]:
 
 
 def validate_admission_answers(fields_definition: list, answers: dict, *, require_guardian: bool = True) -> None:
+    for key in REMOVED_BUILT_IN_ADMISSION_FIELD_KEYS:
+        answers.pop(key, None)
+
     fields = enabled_admission_fields(fields_definition)
     answer_fields = {field.key: field for field in fields if field.type != "label"}
     unknown_keys = sorted(set(answers) - set(answer_fields) - {"guardians"})

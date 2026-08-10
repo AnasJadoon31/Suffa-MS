@@ -47,6 +47,14 @@ from app.modules.people.schemas import (
 router = APIRouter()
 
 
+def _contacts(numbers: list[str] | None, fallback: str | None, default: str | None) -> tuple[list[str], str | None]:
+    values = list(dict.fromkeys(number for number in (numbers or []) if number))
+    if not values and fallback:
+        values = [part.strip() for part in fallback.replace(";", ",").split(",") if part.strip()]
+    selected = default if default in values else (values[0] if values else None)
+    return values, selected
+
+
 @router.get("/username-proposal")
 async def username_proposal(
     name: str = Query(min_length=1, max_length=160),
@@ -208,7 +216,9 @@ async def create_teacher(
         user_id=user.id,
         employee_code=employee_code,
         name=payload.name,
-        whatsapp_number=payload.whatsapp_number,
+        whatsapp_number=_contacts(payload.phone_list, payload.whatsapp_number, payload.default_phone_number)[1] or payload.whatsapp_number,
+        phone_list=_contacts(payload.phone_list, payload.whatsapp_number, payload.default_phone_number)[0],
+        default_phone_number=_contacts(payload.phone_list, payload.whatsapp_number, payload.default_phone_number)[1],
         qualifications=payload.qualifications,
         join_date=payload.join_date,
         cnic=payload.cnic,
@@ -267,7 +277,11 @@ async def update_teacher(
     session: AsyncSession = Depends(get_session),
 ) -> TeacherRead:
     teacher = await _get_or_404(session, TeacherProfile, teacher_id, madrasa.id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    if {"phone_list", "default_phone_number", "whatsapp_number"} & updates.keys():
+        numbers, default = _contacts(updates.get("phone_list", teacher.phone_list), updates.get("whatsapp_number", teacher.whatsapp_number), updates.get("default_phone_number", teacher.default_phone_number))
+        updates.update(phone_list=numbers, default_phone_number=default, whatsapp_number=default or teacher.whatsapp_number)
+    for field, value in updates.items():
         setattr(teacher, field, value)
     await session.commit()
     await session.refresh(teacher)
@@ -372,6 +386,8 @@ async def create_student(
     if student_dob is None:
         raise HTTPException(status_code=422, detail="Student date of birth is required")
     student_phone = payload.phone or admission_answer_text(payload.admission_answers, "student_phone") or None
+    student_contacts, student_default_phone = _contacts(payload.phone_list, student_phone, payload.default_phone_number)
+    student_phone = student_default_phone or student_phone
     student_portal_enabled = payload.portal_enabled
     if student_portal_enabled is None:
         student_portal_enabled = admission_answer_enabled(payload.admission_answers, "student_portal_enabled", default=True)
@@ -405,8 +421,10 @@ async def create_student(
         date_of_birth=student_dob,
         portal_enabled=student_portal_enabled,
         b_form_number=payload.b_form_number or admission_answer_text(payload.admission_answers, "student_b_form_number") or None,
-        address=payload.address or admission_answer_text(payload.admission_answers, "student_address") or None,
+        address=(payload.address or admission_answer_text(payload.admission_answers, "student_address") or None) if payload.is_independent else None,
         phone=student_phone,
+        phone_list=student_contacts,
+        default_phone_number=student_default_phone,
         is_independent=payload.is_independent,
         photo_file_id=payload.photo_file_id,
     )
@@ -503,6 +521,9 @@ async def update_student(
     updates = payload.model_dump(exclude_unset=True)
     admission_answers = updates.pop("admission_answers", None)
     resulting_independent = updates.get("is_independent", student.is_independent)
+    if {"phone_list", "default_phone_number", "phone"} & updates.keys():
+        numbers, default = _contacts(updates.get("phone_list", student.phone_list), updates.get("phone", student.phone), updates.get("default_phone_number", student.default_phone_number))
+        updates.update(phone_list=numbers, default_phone_number=default, phone=default)
     resulting_phone = updates.get("phone", student.phone)
     resulting_portal = updates.get("portal_enabled", student.portal_enabled)
     if resulting_independent and resulting_portal and not resulting_phone:
@@ -608,10 +629,12 @@ async def create_guardian(
         madrasa_id=madrasa.id,
         name=payload.name,
         relationship=payload.relationship,
-        phone_numbers=payload.phone_numbers,
+        phone_numbers=(_contacts(payload.phone_list, payload.phone_numbers, payload.default_phone_number)[1] or payload.phone_numbers),
+        phone_list=_contacts(payload.phone_list, payload.phone_numbers, payload.default_phone_number)[0],
+        default_phone_number=_contacts(payload.phone_list, payload.phone_numbers, payload.default_phone_number)[1],
         cnic=payload.cnic,
         address=payload.address,
-        preferred_language=payload.preferred_language,
+        preferred_language="ur",
     )
     session.add(guardian)
     await session.flush()
@@ -624,7 +647,7 @@ async def create_guardian(
             actor_id=current_user.id,
             username=guardian_username,
             role=UserRole.parent,
-            preferred_language=payload.preferred_language,
+            preferred_language="ur",
         )
     except UsernameTakenError:
         raise HTTPException(status_code=500, detail="Failed to generate unique guardian username")
@@ -659,10 +682,11 @@ async def update_guardian(
     guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
     if payload.name is not None: guardian.name = payload.name
     if payload.relationship is not None: guardian.relationship = payload.relationship
-    if payload.phone_numbers is not None: guardian.phone_numbers = payload.phone_numbers
+    if payload.phone_numbers is not None or payload.phone_list is not None or payload.default_phone_number is not None:
+        numbers, default = _contacts(payload.phone_list if payload.phone_list is not None else guardian.phone_list, payload.phone_numbers or guardian.phone_numbers, payload.default_phone_number or guardian.default_phone_number)
+        guardian.phone_list, guardian.default_phone_number, guardian.phone_numbers = numbers, default, default or guardian.phone_numbers
     if payload.cnic is not None: guardian.cnic = payload.cnic
     if payload.address is not None: guardian.address = payload.address
-    if payload.preferred_language is not None: guardian.preferred_language = payload.preferred_language
     await session.commit()
     await session.refresh(guardian)
     return GuardianRead.model_validate(guardian)

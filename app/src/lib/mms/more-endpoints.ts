@@ -315,7 +315,7 @@ export const academicsExtraApi = {
 export interface FormFieldDefinition {
   key: string;
   label: string;
-  type: "label" | "text" | "textarea" | "radio" | "checkbox_group" | "dropdown" | "phone" | "file" | "image";
+  type: "label" | "text" | "textarea" | "radio" | "checkbox_group" | "dropdown" | "phone" | "file" | "image" | "boolean";
   required: boolean;
   options: string[];
   built_in?: boolean;
@@ -427,6 +427,8 @@ export const opsApi = {
   }) => getAllPages<Announcement>("/api/v1/operations/announcements", params),
   listAdmissions: (params?: { status?: string; q?: string }) =>
     getAllPages<AdmissionApplication>("/api/v1/operations/admissions", params),
+  getAdmission: (id: string) =>
+    api.get<AdmissionApplication>(`/api/v1/operations/admissions/${id}`).then((response) => response.data),
   getAdmissionStatusHistory: (id: string) =>
     getAllPages<{ status: string; changed_at: string; changed_by_id?: string }>(
       `/api/v1/operations/admissions/${id}/status-history`,
@@ -644,6 +646,8 @@ export interface Donor {
   username: string | null;
   name: string;
   contact: string;
+  phone_list?: string[];
+  default_phone_number?: string | null;
 }
 export interface Submission {
   id: string;
@@ -843,9 +847,9 @@ export const financeMutations = {
   createCategory: (name: string) =>
     api.post<PaymentCategory>("/api/v1/finance/categories", { name }).then((r) => r.data),
   listDonors: (params?: { q?: string }) => getAllPages<Donor>("/api/v1/finance/donors", params),
-  createDonor: (payload: { name: string; contact: string }) =>
+  createDonor: (payload: { name: string; contact: string; phone_list?: string[]; default_phone_number?: string }) =>
     api.post<Donor>("/api/v1/finance/donors", payload).then((r) => r.data),
-  updateDonor: (id: string, payload: { name?: string; contact?: string }) =>
+  updateDonor: (id: string, payload: { name?: string; contact?: string; phone_list?: string[]; default_phone_number?: string }) =>
     api.put<Donor>(`/api/v1/finance/donors/${id}`, payload).then((r) => r.data),
   createPayment: (payload: {
     student_id: string;
@@ -990,6 +994,8 @@ export interface TeacherDetail {
   name: string;
   status: string;
   whatsapp_number?: string | null;
+  phone_list?: string[];
+  default_phone_number?: string | null;
   qualifications?: string | null;
   join_date?: string | null;
   cnic?: string | null;
@@ -1004,6 +1010,8 @@ export interface GuardianDetail {
   name: string;
   relationship: string;
   phone_numbers: string;
+  phone_list?: string[];
+  default_phone_number?: string | null;
   cnic?: string | null;
   address?: string | null;
   preferred_language?: string;
@@ -1026,6 +1034,8 @@ export const peopleMutations = {
     b_form_number?: string;
     address?: string;
     phone?: string;
+    phone_list?: string[];
+    default_phone_number?: string;
     is_independent?: boolean;
     photo_file_id?: string;
     admission_form_id?: string;
@@ -1040,6 +1050,8 @@ export const peopleMutations = {
       b_form_number?: string;
       address?: string;
       phone?: string | null;
+      phone_list?: string[];
+      default_phone_number?: string | null;
       is_independent?: boolean;
       notes?: string;
       status?: string;
@@ -1052,6 +1064,8 @@ export const peopleMutations = {
     username: string;
     name: string;
     whatsapp_number: string;
+    phone_list?: string[];
+    default_phone_number?: string;
     qualifications?: string;
     join_date?: string;
     cnic?: string;
@@ -1064,6 +1078,8 @@ export const peopleMutations = {
     payload: {
       name?: string;
       whatsapp_number?: string;
+      phone_list?: string[];
+      default_phone_number?: string;
       qualifications?: string;
       join_date?: string;
       cnic?: string;
@@ -1081,6 +1097,8 @@ export const peopleMutations = {
     name: string;
     relationship: string;
     phone_numbers: string;
+    phone_list?: string[];
+    default_phone_number?: string;
     student_ids?: string[];
     cnic?: string;
     address?: string;
@@ -1092,6 +1110,8 @@ export const peopleMutations = {
       name?: string;
       relationship?: string;
       phone_numbers?: string;
+      phone_list?: string[];
+      default_phone_number?: string;
       cnic?: string;
       address?: string;
       preferred_language?: string;
@@ -1156,24 +1176,8 @@ export const admissionsMutations = {
     extra_data?: Record<string, unknown>;
   }) =>
     api.post<AdmissionApplication>("/api/v1/operations/admissions", payload).then((r) => r.data),
-  convertAdmission: (
-    id: string,
-    payload: {
-      student_username: string;
-      guardian_username?: string | null;
-      session_id: string;
-      class_id: string;
-      section_id: string;
-      student_preferred_language?: string;
-      student_portal_enabled?: boolean;
-      guardian_portal_enabled?: boolean;
-      guardian_name?: string;
-      guardian_relationship?: string;
-      guardian_cnic?: string;
-      guardian_address?: string;
-      guardian_preferred_language?: string;
-    },
-  ) => api.post<AdmissionConversion>(`/api/v1/operations/admissions/${id}/convert`, payload).then((r) => r.data),
+  convertAdmission: (id: string, payload: Record<string, never> = {}) =>
+    api.post<AdmissionConversion>(`/api/v1/operations/admissions/${id}/convert`, payload).then((r) => r.data),
 };
 
 export interface PresignUpload {
@@ -1227,6 +1231,7 @@ export interface PublicAdmissionForm {
   title: string;
   description: string | null;
   program_name: string | null;
+  programs: { id: string; name: string }[];
   fields_definition: FormFieldDefinition[];
   is_open: boolean;
 }
@@ -1240,6 +1245,7 @@ export const publicApi = {
       applicant_name: string;
       guardian_contact: string;
       date_of_birth?: string;
+      program_id: string;
       extra_data?: Record<string, unknown>;
       website?: string;
     },
@@ -1247,6 +1253,22 @@ export const publicApi = {
     api
       .post<AdmissionApplication>(`/api/v1/public/admission-forms/${token}`, payload)
       .then((r) => r.data),
+  uploadAdmissionFile: async (token: string, file: File): Promise<string> => {
+    const upload = await api
+      .post<{ object_key: string; upload_url: string }>(`/api/v1/public/admission-forms/${token}/uploads`, {
+        filename: file.name,
+        content_type: file.type || "application/octet-stream",
+        size_bytes: file.size,
+      })
+      .then((response) => response.data);
+    const response = await fetch(upload.upload_url, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!response.ok) throw new Error("File upload failed");
+    return upload.object_key;
+  },
 };
 
 // ------------------------------------------------------------------ Timetable

@@ -11,6 +11,7 @@ import { academicsApi, peopleApi, type AcademicClass } from "@/lib/mms/endpoints
 import { academicsExtraApi, opsApi, peopleMutations, uploadFileObject, type Section, type StudentDetail } from "@/lib/mms/more-endpoints";
 import { api, apiErrorMessage } from "@/lib/mms/api";
 import { maskBForm, maskPhone } from "@/lib/masks";
+import { PhoneNumbersField } from "./PhoneNumbersField";
 import { useTranslation } from "react-i18next";
 
 export function StudentForm({
@@ -32,11 +33,12 @@ export function StudentForm({
   const [name, setName] = useState(student?.name ?? "");
   const [dob, setDob] = useState(student?.date_of_birth ?? "");
   const [phone, setPhone] = useState(student?.phone ?? "");
+  const [phones, setPhones] = useState(student?.phone_list?.length ? student.phone_list : [student?.phone ?? "+92"]);
+  const [defaultPhone, setDefaultPhone] = useState(student?.default_phone_number ?? student?.phone ?? "+92");
   const [bForm, setBForm] = useState(student?.b_form_number ?? "");
   const [address, setAddress] = useState(student?.address ?? "");
   const [independent, setIndependent] = useState(student?.is_independent ?? false);
   const [portal, setPortal] = useState(student?.portal_enabled ?? true);
-  const [lang, setLang] = useState(student?.preferred_language ?? "en");
   const [guardians, setGuardians] = useState<{ id: string; name: string }[]>([]);
   const [guardianSearch, setGuardianSearch] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
@@ -58,6 +60,7 @@ export function StudentForm({
   const [newGuardianName, setNewGuardianName] = useState("");
   const [newGuardianPhone, setNewGuardianPhone] = useState("");
   const [newGuardianRel, setNewGuardianRel] = useState("father");
+  const [newGuardianAddress, setNewGuardianAddress] = useState("");
   const [creatingGuardian, setCreatingGuardian] = useState(false);
 
   const [enrollClassId, setEnrollClassId] = useState("");
@@ -114,11 +117,13 @@ export function StudentForm({
         name: trimmedName,
         relationship: newGuardianRel,
         phone_numbers: newGuardianPhone.trim(),
+        address: newGuardianAddress.trim() || undefined,
       });
       setGuardians((prev) => [...prev, { id: created.id, name: created.name }]);
       setNewGuardianName("");
       setNewGuardianPhone("");
       setNewGuardianRel("father");
+      setNewGuardianAddress("");
       setShowNewGuardian(false);
       toast.success("Guardian created");
     } catch (err) {
@@ -141,9 +146,11 @@ export function StudentForm({
       await peopleMutations.updateStudent(student.id, {
         name: trimmedName,
         date_of_birth: dob || undefined,
-        phone: independent ? phone.trim() || undefined : null,
+        phone: independent ? defaultPhone || undefined : null,
+        phone_list: independent ? phones.filter((value) => value.length > 3) : [],
+        default_phone_number: independent ? defaultPhone : null,
         b_form_number: bForm.trim() || undefined,
-        address: address.trim() || undefined,
+        address: independent ? address.trim() || undefined : undefined,
         is_independent: independent,
         portal_enabled: portal,
       });
@@ -153,12 +160,13 @@ export function StudentForm({
       const created = await peopleMutations.createStudent({
         name: trimmedName,
         date_of_birth: dob || undefined,
-        phone: independent ? phone.trim() || undefined : undefined,
+        phone: independent ? defaultPhone || undefined : undefined,
+        phone_list: independent ? phones.filter((value) => value.length > 3) : [],
+        default_phone_number: independent ? defaultPhone : undefined,
         b_form_number: bForm.trim() || undefined,
-        address: address.trim() || undefined,
+        address: independent ? address.trim() || undefined : undefined,
         is_independent: independent,
         portal_enabled: portal,
-        preferred_language: lang,
         guardian_ids: guardians.map((g) => g.id),
         ...(photoFileId ? { photo_file_id: photoFileId } : {}),
         ...(admissionFormId ? { admission_form_id: admissionFormId, admission_answers: admissionAnswers } : {}),
@@ -219,26 +227,20 @@ export function StudentForm({
         <TextInput type="date" value={dob ?? ""} onChange={(e) => setDob(e.target.value)} />
       </Field>
       {independent ? (
-        <Field label={t("Phone")}>
-          <TextInput maxLength={15} value={phone ?? "+92"} onChange={(e) => setPhone(maskPhone(e.target.value))} />
+        <Field label={t("Phone number(s)")}>
+          <PhoneNumbersField numbers={phones} defaultNumber={defaultPhone} onChange={(next, selected) => { setPhones(next); setDefaultPhone(selected); setPhone(selected); }} />
         </Field>
       ) : null}
       <Field label={t("B-Form number")}>
           <TextInput maxLength={15} value={bForm ?? ""} onChange={(e) => setBForm(maskBForm(e.target.value))} />
       </Field>
-      <Field label={t("Address")}>
-        <TextInput
-          maxLength={200}
-          value={address ?? ""}
-          onChange={(e) => setAddress(e.target.value)}
-        />
-      </Field>
-      {!isEdit ? (
-        <Field label={t("Preferred language")}>
-          <CustomDropdown value={lang} onChange={(e) => setLang(e.target.value)}>
-            <option value="en">{t("English")}</option>
-            <option value="ur">{t("Urdu")}</option>
-          </CustomDropdown>
+      {independent ? (
+        <Field label={t("Address")}>
+          <TextInput
+            maxLength={200}
+            value={address ?? ""}
+            onChange={(e) => setAddress(e.target.value)}
+          />
         </Field>
       ) : null}
       {!isEdit ? (
@@ -270,7 +272,7 @@ export function StudentForm({
           onChange={(e) => {
             setIndependent(e.target.checked);
             if (e.target.checked) setGuardians([]);
-            else setPhone("");
+            else { setPhone(""); setAddress(""); }
           }}
         />
         {t("Independent student")}</label>
@@ -347,6 +349,13 @@ export function StudentForm({
                   <option value="grandmother">{t("Grandmother")}</option>
                   <option value="other">{t("Other")}</option>
                 </CustomDropdown>
+              </Field>
+              <Field label={t("Address")}>
+                <TextInput
+                  maxLength={200}
+                  value={newGuardianAddress}
+                  onChange={(e) => setNewGuardianAddress(e.target.value)}
+                />
               </Field>
               <button
                 type="button"

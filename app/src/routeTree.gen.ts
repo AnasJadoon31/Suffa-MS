@@ -39,6 +39,7 @@ import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TimetableRouteImport } from './routes/timetable'
 import { Route as AdmissionTokenRouteImport } from './routes/admission.$token'
+import { Route as AdmissionsApplicationIdRouteImport } from './routes/admissions.$applicationId'
 import { Route as PeopleStudentIdRouteImport } from './routes/people.$studentId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -191,6 +192,11 @@ const AdmissionTokenRoute = AdmissionTokenRouteImport.update({
   path: '/admission/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdmissionsApplicationIdRoute = AdmissionsApplicationIdRouteImport.update({
+  id: '/$applicationId',
+  path: '/$applicationId',
+  getParentRoute: () => AdmissionsRoute,
+} as any)
 const PeopleStudentIdRoute = PeopleStudentIdRouteImport.update({
   id: '/$studentId',
   path: '/$studentId',
@@ -200,7 +206,7 @@ const PeopleStudentIdRoute = PeopleStudentIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/academics': typeof AcademicsRoute
-  '/admissions': typeof AdmissionsRoute
+  '/admissions': typeof AdmissionsRouteWithChildren
   '/announcements': typeof AnnouncementsRoute
   '/assignments': typeof AssignmentsRoute
   '/attendance': typeof AttendanceRoute
@@ -228,12 +234,13 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/timetable': typeof TimetableRoute
   '/admission/$token': typeof AdmissionTokenRoute
+  '/admissions/$applicationId': typeof AdmissionsApplicationIdRoute
   '/people/$studentId': typeof PeopleStudentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/academics': typeof AcademicsRoute
-  '/admissions': typeof AdmissionsRoute
+  '/admissions': typeof AdmissionsRouteWithChildren
   '/announcements': typeof AnnouncementsRoute
   '/assignments': typeof AssignmentsRoute
   '/attendance': typeof AttendanceRoute
@@ -261,13 +268,14 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/timetable': typeof TimetableRoute
   '/admission/$token': typeof AdmissionTokenRoute
+  '/admissions/$applicationId': typeof AdmissionsApplicationIdRoute
   '/people/$studentId': typeof PeopleStudentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/academics': typeof AcademicsRoute
-  '/admissions': typeof AdmissionsRoute
+  '/admissions': typeof AdmissionsRouteWithChildren
   '/announcements': typeof AnnouncementsRoute
   '/assignments': typeof AssignmentsRoute
   '/attendance': typeof AttendanceRoute
@@ -295,6 +303,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/timetable': typeof TimetableRoute
   '/admission/$token': typeof AdmissionTokenRoute
+  '/admissions/$applicationId': typeof AdmissionsApplicationIdRoute
   '/people/$studentId': typeof PeopleStudentIdRoute
 }
 export interface FileRouteTypes {
@@ -330,6 +339,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/timetable'
     | '/admission/$token'
+    | '/admissions/$applicationId'
     | '/people/$studentId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -363,6 +373,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/timetable'
     | '/admission/$token'
+    | '/admissions/$applicationId'
     | '/people/$studentId'
   id:
     | '__root__'
@@ -396,13 +407,14 @@ export interface FileRouteTypes {
     | '/settings'
     | '/timetable'
     | '/admission/$token'
+    | '/admissions/$applicationId'
     | '/people/$studentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AcademicsRoute: typeof AcademicsRoute
-  AdmissionsRoute: typeof AdmissionsRoute
+  AdmissionsRoute: typeof AdmissionsRouteWithChildren
   AnnouncementsRoute: typeof AnnouncementsRoute
   AssignmentsRoute: typeof AssignmentsRoute
   AttendanceRoute: typeof AttendanceRoute
@@ -644,6 +656,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdmissionTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admissions/$applicationId': {
+      id: '/admissions/$applicationId'
+      path: '/$applicationId'
+      fullPath: '/admissions/$applicationId'
+      preLoaderRoute: typeof AdmissionsApplicationIdRouteImport
+      parentRoute: typeof AdmissionsRoute
+    }
     '/people/$studentId': {
       id: '/people/$studentId'
       path: '/$studentId'
@@ -653,6 +672,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AdmissionsRouteChildren {
+  AdmissionsApplicationIdRoute: typeof AdmissionsApplicationIdRoute
+}
+
+const AdmissionsRouteChildren: AdmissionsRouteChildren = {
+  AdmissionsApplicationIdRoute: AdmissionsApplicationIdRoute,
+}
+
+const AdmissionsRouteWithChildren = AdmissionsRoute._addFileChildren(
+  AdmissionsRouteChildren,
+)
 
 interface PeopleRouteChildren {
   PeopleStudentIdRoute: typeof PeopleStudentIdRoute
@@ -668,7 +699,7 @@ const PeopleRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcademicsRoute: AcademicsRoute,
-  AdmissionsRoute: AdmissionsRoute,
+  AdmissionsRoute: AdmissionsRouteWithChildren,
   AnnouncementsRoute: AnnouncementsRoute,
   AssignmentsRoute: AssignmentsRoute,
   AttendanceRoute: AttendanceRoute,

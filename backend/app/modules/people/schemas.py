@@ -10,6 +10,8 @@ class TeacherCreate(BaseModel):
     username: str = Field(min_length=3, max_length=80)
     name: str
     whatsapp_number: PakistanPhone = ""
+    phone_list: list[PakistanPhone] = Field(default_factory=list)
+    default_phone_number: PakistanPhone | None = None
     qualifications: str | None = None
     join_date: date | None = None
     employee_code: str | None = None
@@ -24,6 +26,8 @@ class TeacherCreate(BaseModel):
 class TeacherUpdate(BaseModel):
     name: str | None = None
     whatsapp_number: PakistanPhone | None = None
+    phone_list: list[PakistanPhone] | None = None
+    default_phone_number: PakistanPhone | None = None
     qualifications: str | None = None
     join_date: date | None = None
     notes: str | None = None
@@ -41,6 +45,8 @@ class TeacherRead(BaseModel):
     employee_code: str
     name: str
     whatsapp_number: str
+    phone_list: list[str] = Field(default_factory=list)
+    default_phone_number: str | None = None
     qualifications: str | None
     join_date: date | None
     status: str
@@ -69,6 +75,8 @@ class StudentCreate(BaseModel):
     b_form_number: str | None = None
     address: str | None = None
     phone: PakistanPhone | None = None
+    phone_list: list[PakistanPhone] = Field(default_factory=list)
+    default_phone_number: PakistanPhone | None = None
     is_independent: bool = False
     photo_file_id: UUID | None = None
     admission_form_id: UUID | None = None
@@ -91,6 +99,8 @@ class StudentUpdate(BaseModel):
     b_form_number: str | None = None
     address: str | None = None
     phone: PakistanPhone | None = None
+    phone_list: list[PakistanPhone] | None = None
+    default_phone_number: PakistanPhone | None = None
     is_independent: bool | None = None
     photo_file_id: UUID | None = None
     admission_answers: dict | None = None
@@ -135,6 +145,8 @@ class StudentRead(BaseModel):
     b_form_number: str | None = None
     address: str | None = None
     phone: str | None = None
+    phone_list: list[str] = Field(default_factory=list)
+    default_phone_number: str | None = None
     is_independent: bool = False
     photo_file_id: UUID | None = None
     admission_record: StudentAdmissionRecordRead | None = None
@@ -150,18 +162,20 @@ class GuardianCreate(BaseModel):
     name: str
     relationship: str
     phone_numbers: PakistanPhone
+    phone_list: list[PakistanPhone] = Field(default_factory=list)
+    default_phone_number: PakistanPhone | None = None
     cnic: str | None = None
     address: str | None = None
-    preferred_language: str = "ur"
     student_ids: list[UUID] = Field(default_factory=list)
 
 class GuardianUpdate(BaseModel):
     name: str | None = None
     relationship: str | None = None
     phone_numbers: PakistanPhone | None = None
+    phone_list: list[PakistanPhone] | None = None
+    default_phone_number: PakistanPhone | None = None
     cnic: str | None = None
     address: str | None = None
-    preferred_language: str | None = None
 
 
 class GuardianRead(BaseModel):
@@ -172,9 +186,10 @@ class GuardianRead(BaseModel):
     name: str
     relationship: str
     phone_numbers: str
+    phone_list: list[str] = Field(default_factory=list)
+    default_phone_number: str | None = None
     cnic: str | None = None
     address: str | None = None
-    preferred_language: str
     created_at: datetime
 
 

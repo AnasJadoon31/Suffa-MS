@@ -5,7 +5,7 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import { CustomDropdown } from "@/components/app/Primitives";
 import { apiErrorMessage } from "@/lib/mms/api";
-import { maskPhone } from "@/lib/masks";
+import { maskBForm, maskPhone } from "@/lib/masks";
 import { publicApi, type FormFieldDefinition } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
@@ -32,6 +32,7 @@ function PublicAdmissionPage() {
     const { t } = useTranslation();
   const { token } = Route.useParams();
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  const [programId, setProgramId] = useState("");
   const [website, setWebsite] = useState("");
   const [error, setError] = useState("");
 
@@ -51,6 +52,7 @@ function PublicAdmissionPage() {
         applicant_name: answerString(answers, STUDENT_NAME_KEYS),
         guardian_contact: answerString(answers, GUARDIAN_CONTACT_KEYS),
         date_of_birth: answerString(answers, DOB_KEYS) || undefined,
+        program_id: programId,
         extra_data: answers,
         website,
       }),
@@ -60,7 +62,15 @@ function PublicAdmissionPage() {
     event.preventDefault();
     setError("");
 
-    const missing = fields.find((field) => {
+    if (!programId) {
+      setError(t("Please select a program."));
+      return;
+    }
+
+    const independent = answers.student_is_independent === true;
+    const visibleFields = fields.filter((field) => isPublicFieldVisible(field, independent));
+
+    const missing = visibleFields.find((field) => {
       if (!field.required || field.type === "label") return false;
       const value = answers[field.key];
       return value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
@@ -124,11 +134,28 @@ function PublicAdmissionPage() {
           </div>
         ) : (
           <form onSubmit={onSubmit} className="mt-4 space-y-3">
-            {fields.map((field) => (
+            <label className="card-surface block px-4 py-3">
+              <span className="block text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
+                {t("Program")} *
+              </span>
+              <CustomDropdown
+                className="mt-2 w-full bg-transparent text-base outline-none"
+                value={programId}
+                onChange={(event) => setProgramId(event.target.value)}
+                required
+              >
+                <option value="">{t("Select")}</option>
+                {(form.data.programs ?? []).map((program) => (
+                  <option key={program.id} value={program.id}>{program.name}</option>
+                ))}
+              </CustomDropdown>
+            </label>
+            {fields.filter((field) => isPublicFieldVisible(field, answers.student_is_independent === true)).map((field) => (
               <AdmissionField
                 key={field.key}
                 field={field}
                 value={answers[field.key]}
+                token={token}
                 onChange={(value) => setAnswers((current) => ({ ...current, [field.key]: value }))}
               />
             ))}
@@ -169,24 +196,36 @@ function PublicAdmissionPage() {
 function AdmissionField({
   field,
   value,
+  token,
   onChange,
 }: {
   field: FormFieldDefinition;
   value: unknown;
+  token: string;
   onChange: (value: unknown) => void;
 }) {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   if (field.type === "label") {
     return <p className="px-1 pt-2 text-sm font-semibold text-muted-foreground">{field.label}</p>;
   }
 
   const commonClass =
     "mt-2 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground";
+  const displayLabel =
+    field.key === "student_name"
+      ? t("Full name")
+      : field.key === "student_address"
+        ? t("Address")
+        : field.key === "student_portal_enabled"
+          ? t("Portal access enabled")
+          : field.label;
 
   return (
     <label className="card-surface block px-4 py-3">
       <span className="block text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
-        {field.label}
+        {displayLabel}
         {field.required ? " *" : ""}
       </span>
       {field.type === "textarea" ? (
@@ -254,20 +293,57 @@ function AdmissionField({
             );
           })}
         </span>
+      ) : field.type === "boolean" ? (
+        <span className="mt-2 flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={value === true}
+            onChange={(event) => onChange(event.target.checked)}
+          />
+          <span className="text-sm font-semibold">{t("Yes")}</span>
+        </span>
       ) : (
         <input
-          type={field.type === "phone" ? "tel" : "text"}
+          type={field.type === "phone" ? "tel" : field.key === "student_date_of_birth" ? "date" : field.type === "file" || field.type === "image" ? "file" : "text"}
           className={commonClass}
-          value={typeof value === "string" ? value : "+92"}
+          value={field.type === "file" || field.type === "image" ? undefined : typeof value === "string" ? value : field.type === "phone" ? "+92" : ""}
           onChange={(event) => {
-            const v = field.type === "phone" ? maskPhone(event.target.value) : event.target.value;
+            const file = event.target.files?.[0];
+            if (file && (field.type === "file" || field.type === "image")) {
+              setUploading(true);
+              setUploadError("");
+              void publicApi
+                .uploadAdmissionFile(token, file)
+                .then(onChange)
+                .catch(() => {
+                  onChange("");
+                  setUploadError(t("Could not upload this file. Please try again."));
+                })
+                .finally(() => setUploading(false));
+              return;
+            }
+            const v = field.type === "phone"
+                ? maskPhone(event.target.value)
+                : field.key === "student_b_form_number" || field.key === "guardian_cnic"
+                  ? maskBForm(event.target.value)
+                  : event.target.value;
             onChange(v);
           }}
           required={field.required}
+          disabled={uploading}
         />
       )}
+      {uploading ? <span className="mt-2 block text-xs text-muted-foreground">{t("Uploading...")}</span> : null}
+      {uploadError ? <span className="mt-2 block text-xs text-destructive">{uploadError}</span> : null}
     </label>
   );
+}
+
+function isPublicFieldVisible(field: FormFieldDefinition, independent: boolean): boolean {
+  if (field.key === "student_portal_enabled" || field.key === "guardian_portal_enabled" || field.key === "guardian_preferred_language") return false;
+  if (field.key === "student_phone" || field.key === "student_address") return independent;
+  if (field.key.startsWith("guardian_")) return !independent;
+  return true;
 }
 
 function CenteredState({
