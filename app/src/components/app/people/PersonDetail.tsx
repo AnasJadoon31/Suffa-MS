@@ -1,4 +1,4 @@
-import { Copy, MessageCircle, ShieldOff, ArrowRight } from "lucide-react";
+import { ArrowLeft, Copy, Download, Image, MessageCircle, ShieldOff, UserRound, ArrowRight } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -10,7 +10,7 @@ import { TeacherForm } from "./TeacherForm";
 import { GuardianForm } from "./GuardianForm";
 import { DonorForm } from "./DonorForm";
 import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
-import { academicsExtraApi } from "@/lib/mms/more-endpoints";
+import { academicsExtraApi, filesApi } from "@/lib/mms/more-endpoints";
 import { api, apiErrorMessage } from "@/lib/mms/api";
 import {
   peopleMutations,
@@ -94,10 +94,12 @@ export function StudentDetailSheet({
   student,
   open,
   onOpenChange,
+  page = false,
 }: {
   student: StudentDetail | null;
   open: boolean;
   onOpenChange: (next: boolean) => void;
+  page?: boolean;
 }) {
     const { t } = useTranslation();
   const client = useQueryClient();
@@ -167,9 +169,10 @@ export function StudentDetailSheet({
   }
 
   return (
-    <ManagedSheet
+    <StudentDetailContainer
+      page={page}
+      onBack={() => onOpenChange(false)}
       open={open}
-      onOpenChange={onOpenChange}
       title={student.name}
       subtitle={
         <div className="flex items-center gap-2">
@@ -197,6 +200,22 @@ export function StudentDetailSheet({
           ) : (
             <Row label={t("Enrollment")} value="No active enrollment" />
           )}
+
+          {student.admission_record ? (
+            <div className="mt-4 border-t border-border pt-3">
+              <SectionTitle>{student.admission_record.form_title ?? t("Admission application")}</SectionTitle>
+              <div className="mt-2">
+                {student.admission_record.fields_definition
+                  .filter((field) => field.enabled !== false && field.type !== "label")
+                  .map((field) => {
+                    const answer = student.admission_record?.answers[field.key];
+                    if (answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0)) return null;
+                    if (field.type === "file" || field.type === "image") return <Row key={field.key} label={field.label} value={<button type="button" onClick={async () => { const url = await filesApi.presignDownload(String(answer)); window.open(url, "_blank", "noopener,noreferrer"); }} className="inline-flex items-center gap-1 font-semibold text-primary"><>{field.type === "image" ? <Image className="h-4 w-4" /> : <Download className="h-4 w-4" />}</> {t("Open")}</button>} />;
+                    return <Row key={field.key} label={field.label} value={Array.isArray(answer) ? answer.join(", ") : String(answer)} />;
+                  })}
+              </div>
+            </div>
+          ) : null}
 
           {editEnrollment ? (
             <div className="space-y-3 border-t border-border px-2 pt-3">
@@ -329,8 +348,28 @@ export function StudentDetailSheet({
         ) : null}
 
         <StudentForm student={student} open={editOpen} onOpenChange={setEditOpen} />
-    </ManagedSheet>
+    </StudentDetailContainer>
   );
+}
+
+function StudentDetailContainer({
+  page,
+  open,
+  onBack,
+  title,
+  subtitle,
+  children,
+}: {
+  page: boolean;
+  open: boolean;
+  onBack: () => void;
+  title: string;
+  subtitle: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  if (!page) return <ManagedSheet open={open} onOpenChange={(next) => !next && onBack()} title={title} subtitle={subtitle}>{children}</ManagedSheet>;
+  const initials = title.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  return <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 sm:px-6"><div className="flex items-start gap-3"><button type="button" aria-label="Back" onClick={onBack} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted"><ArrowLeft className="h-5 w-5" /></button><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-soft text-primary" title="Profile picture"><UserRound className="h-5 w-5" /><span className="sr-only">{initials || "Student"}</span></div><div className="min-w-0"><h1 className="truncate font-display text-xl font-extrabold">{title}</h1>{subtitle}</div></div><div className="rounded-2xl border border-border bg-card p-4 shadow-sm">{children}</div></div>;
 }
 
 export function TeacherDetailSheet({

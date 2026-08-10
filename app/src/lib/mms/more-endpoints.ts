@@ -315,7 +315,7 @@ export const academicsExtraApi = {
 export interface FormFieldDefinition {
   key: string;
   label: string;
-  type: "label" | "text" | "textarea" | "radio" | "checkbox_group" | "dropdown" | "phone";
+  type: "label" | "text" | "textarea" | "radio" | "checkbox_group" | "dropdown" | "phone" | "file" | "image";
   required: boolean;
   options: string[];
   built_in?: boolean;
@@ -460,6 +460,21 @@ export const opsApi = {
     getAllPages<BlogPost>("/api/v1/operations/blog", { published_only: publishedOnly }),
   listAdmissionForms: (params?: { category?: string; program_id?: string }) =>
     getAllPages<AdmissionForm>("/api/v1/operations/admission-forms", params),
+  createAdmissionForm: (payload: {
+    title: string;
+    category?: string;
+    description?: string;
+    program_id?: string;
+    fields: FormFieldDefinition[];
+  }) => api.post<AdmissionForm>("/api/v1/operations/admission-forms", payload).then((r) => r.data),
+  updateAdmissionForm: (id: string, payload: {
+    title?: string;
+    category?: string;
+    description?: string;
+    fields?: FormFieldDefinition[];
+    is_open?: boolean;
+  }) => api.put<AdmissionForm>(`/api/v1/operations/admission-forms/${id}`, payload).then((r) => r.data),
+  deleteAdmissionForm: (id: string) => api.delete(`/api/v1/operations/admission-forms/${id}`),
 };
 
 export const formsApi = {
@@ -957,6 +972,15 @@ export interface StudentDetail {
     section_name: string;
     started_on: string;
   } | null;
+  admission_record?: {
+    id: string;
+    form_id?: string | null;
+    application_id?: string | null;
+    form_title?: string | null;
+    fields_definition: FormFieldDefinition[];
+    answers: Record<string, unknown>;
+    created_at: string;
+  } | null;
 }
 export interface TeacherDetail {
   id: string;
@@ -985,6 +1009,7 @@ export interface GuardianDetail {
 }
 
 export const peopleMutations = {
+  getStudent: (studentId: string) => api.get<StudentDetail>(`/api/v1/people/students/${studentId}`).then((r) => r.data),
   usernameProposal: (name: string) =>
     api
       .get<{ username: string }>("/api/v1/people/username-proposal", { params: { name } })
@@ -1001,6 +1026,8 @@ export const peopleMutations = {
     address?: string;
     phone?: string;
     is_independent?: boolean;
+    admission_form_id: string;
+    admission_answers: Record<string, unknown>;
   }) => api.post<StudentDetail>("/api/v1/people/students", payload).then((r) => r.data),
   updateStudent: (
     id: string,

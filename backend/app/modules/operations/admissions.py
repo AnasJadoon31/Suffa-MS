@@ -136,7 +136,7 @@ def validate_admission_answers(fields_definition: list, answers: dict, *, requir
             raise HTTPException(status_code=422, detail=f"Required form field is missing: {key}")
         if is_empty:
             continue
-        if field.type in {"text", "textarea"} and not isinstance(value, str):
+        if field.type in {"text", "textarea", "file", "image"} and not isinstance(value, str):
             raise HTTPException(status_code=422, detail=f"Form field must be text: {key}")
         if field.type == "phone":
             try:

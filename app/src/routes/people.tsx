@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation, useNavigate, useSearch } from "@tanstack/react-router";
 import { GraduationCap, HeartHandshake, KeyRound, ShieldCheck, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -18,7 +18,6 @@ import {
 } from "@/components/app/Primitives";
 import {
   GuardianDetailSheet,
-  StudentDetailSheet,
   TeacherDetailSheet,
   DonorDetailSheet,
 } from "@/components/app/people/PersonDetail";
@@ -72,6 +71,7 @@ function renderAddButton(tab: Tab, sectionId?: string, label?: string) {
 function PeoplePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const location = useLocation();
   const canManage = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
   const routeSearch = useSearch({ from: "/people" });
   const sectionId = routeSearch.section_id || undefined;
@@ -82,7 +82,7 @@ function PeoplePage() {
   const [classFilter, setClassFilter] = useState("");
   const [genderFilter, setGenderFilter] = useState("all");
 
-  const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const [detailTeacherId, setDetailTeacherId] = useState<string | null>(null);
   const [detailGuardianId, setDetailGuardianId] = useState<string | null>(null);
   const [detailDonorId, setDetailDonorId] = useState<string | null>(null);
@@ -179,6 +179,8 @@ function PeoplePage() {
     }
   };
 
+  if (/^\/people\/[^/]+$/.test(location.pathname)) return <Outlet />;
+
   return (
     <AppShell
       title={t("People")}
@@ -271,7 +273,7 @@ function PeoplePage() {
                 type="button"
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft font-display text-sm font-extrabold text-primary"
                 onClick={() => {
-                  if (tab === "students") setDetailStudentId(id);
+                  if (tab === "students") navigate({ to: "/people/$studentId", params: { studentId: id } });
                   else if (tab === "teachers") setDetailTeacherId(id);
                   else if (tab === "guardians") setDetailGuardianId(id);
                   else if (tab === "donors") setDetailDonorId(id);
@@ -283,7 +285,7 @@ function PeoplePage() {
                 type="button"
                 className="min-w-0 text-left ltr:text-left rtl:text-right"
                 onClick={() => {
-                  if (tab === "students") setDetailStudentId(id);
+                  if (tab === "students") navigate({ to: "/people/$studentId", params: { studentId: id } });
                   else if (tab === "teachers") setDetailTeacherId(id);
                   else if (tab === "guardians") setDetailGuardianId(id);
                   else if (tab === "donors") setDetailDonorId(id);
@@ -340,11 +342,6 @@ function PeoplePage() {
         </button>
       ) : null}
 
-      <StudentDetailSheet
-        student={(rawItems as Student[]).find((s) => s.id === detailStudentId) as never}
-        open={Boolean(detailStudentId)}
-        onOpenChange={(next) => !next && setDetailStudentId(null)}
-      />
       <TeacherDetailSheet
         teacher={(rawItems as Teacher[]).find((t) => t.id === detailTeacherId) as never}
         open={Boolean(detailTeacherId)}
@@ -363,4 +360,3 @@ function PeoplePage() {
     </AppShell>
   );
 }
-

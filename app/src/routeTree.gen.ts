@@ -39,6 +39,7 @@ import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TimetableRouteImport } from './routes/timetable'
 import { Route as AdmissionTokenRouteImport } from './routes/admission.$token'
+import { Route as PeopleStudentIdRouteImport } from './routes/people.$studentId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -190,6 +191,11 @@ const AdmissionTokenRoute = AdmissionTokenRouteImport.update({
   path: '/admission/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PeopleStudentIdRoute = PeopleStudentIdRouteImport.update({
+  id: '/$studentId',
+  path: '/$studentId',
+  getParentRoute: () => PeopleRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -211,7 +217,7 @@ export interface FileRoutesByFullPath {
   '/my-attendance': typeof MyAttendanceRoute
   '/my-profile': typeof MyProfileRoute
   '/my-timetable': typeof MyTimetableRoute
-  '/people': typeof PeopleRoute
+  '/people': typeof PeopleRouteWithChildren
   '/platform': typeof PlatformRoute
   '/profile': typeof ProfileRoute
   '/reports': typeof ReportsRoute
@@ -222,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/timetable': typeof TimetableRoute
   '/admission/$token': typeof AdmissionTokenRoute
+  '/people/$studentId': typeof PeopleStudentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -243,7 +250,7 @@ export interface FileRoutesByTo {
   '/my-attendance': typeof MyAttendanceRoute
   '/my-profile': typeof MyProfileRoute
   '/my-timetable': typeof MyTimetableRoute
-  '/people': typeof PeopleRoute
+  '/people': typeof PeopleRouteWithChildren
   '/platform': typeof PlatformRoute
   '/profile': typeof ProfileRoute
   '/reports': typeof ReportsRoute
@@ -254,6 +261,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/timetable': typeof TimetableRoute
   '/admission/$token': typeof AdmissionTokenRoute
+  '/people/$studentId': typeof PeopleStudentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -276,7 +284,7 @@ export interface FileRoutesById {
   '/my-attendance': typeof MyAttendanceRoute
   '/my-profile': typeof MyProfileRoute
   '/my-timetable': typeof MyTimetableRoute
-  '/people': typeof PeopleRoute
+  '/people': typeof PeopleRouteWithChildren
   '/platform': typeof PlatformRoute
   '/profile': typeof ProfileRoute
   '/reports': typeof ReportsRoute
@@ -287,6 +295,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/timetable': typeof TimetableRoute
   '/admission/$token': typeof AdmissionTokenRoute
+  '/people/$studentId': typeof PeopleStudentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -321,6 +330,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/timetable'
     | '/admission/$token'
+    | '/people/$studentId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -353,6 +363,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/timetable'
     | '/admission/$token'
+    | '/people/$studentId'
   id:
     | '__root__'
     | '/'
@@ -385,6 +396,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/timetable'
     | '/admission/$token'
+    | '/people/$studentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -407,7 +419,7 @@ export interface RootRouteChildren {
   MyAttendanceRoute: typeof MyAttendanceRoute
   MyProfileRoute: typeof MyProfileRoute
   MyTimetableRoute: typeof MyTimetableRoute
-  PeopleRoute: typeof PeopleRoute
+  PeopleRoute: typeof PeopleRouteWithChildren
   PlatformRoute: typeof PlatformRoute
   ProfileRoute: typeof ProfileRoute
   ReportsRoute: typeof ReportsRoute
@@ -632,8 +644,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdmissionTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/people/$studentId': {
+      id: '/people/$studentId'
+      path: '/$studentId'
+      fullPath: '/people/$studentId'
+      preLoaderRoute: typeof PeopleStudentIdRouteImport
+      parentRoute: typeof PeopleRoute
+    }
   }
 }
+
+interface PeopleRouteChildren {
+  PeopleStudentIdRoute: typeof PeopleStudentIdRoute
+}
+
+const PeopleRouteChildren: PeopleRouteChildren = {
+  PeopleStudentIdRoute: PeopleStudentIdRoute,
+}
+
+const PeopleRouteWithChildren =
+  PeopleRoute._addFileChildren(PeopleRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -655,7 +685,7 @@ const rootRouteChildren: RootRouteChildren = {
   MyAttendanceRoute: MyAttendanceRoute,
   MyProfileRoute: MyProfileRoute,
   MyTimetableRoute: MyTimetableRoute,
-  PeopleRoute: PeopleRoute,
+  PeopleRoute: PeopleRouteWithChildren,
   PlatformRoute: PlatformRoute,
   ProfileRoute: ProfileRoute,
   ReportsRoute: ReportsRoute,

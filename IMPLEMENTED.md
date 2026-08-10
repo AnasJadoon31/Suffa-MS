@@ -2102,3 +2102,21 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: The ARQ worker checks the completed prior day at 00:05 Asia/Karachi and marks active teachers absent when they have no attendance record and no approved leave. It respects each madrasa's school days and madrasa-wide holidays, and is idempotent on worker restarts.
 - Files: `backend/app/worker.py`.
 - Verified: Focused Python compilation, whitespace check, and running worker container health; no full test suite run per request.
+
+## 2026-08-10 - Application-Based Student Creation
+
+- Implemented: Admissions now separates Applications and Application forms. Staff with admissions access can create, edit, and delete application templates; templates include text, choice, phone, file, and image fields. Manual student creation requires an application form and persists its answers as the student's admission record, including downloadable file and image entries in the student detail sheet.
+- Files: `app/src/routes/admissions.tsx`, `app/src/components/app/admissions/AdmissionAnswerFields.tsx`, `app/src/components/app/admissions/AdmissionFormEditorSheet.tsx`, `app/src/components/app/people/StudentForm.tsx`, `app/src/components/app/people/PersonDetail.tsx`, `app/src/components/app/forms/FormFieldsEditor.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/operations/{schemas.py,admissions.py}`, `backend/app/modules/people/routes.py`.
+- Verified: `cd app && npm run build`, backend `py_compile`, and `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Dedicated Student Profile Route
+
+- Implemented: Selecting a student from People now opens `/people/:studentId` as a dedicated profile page. The page fetches the complete student record and retains the existing enrollment, guardian, credential, admission-record, and file actions with a consistent Back control.
+- Files: `app/src/routes/people.tsx`, `app/src/routes/people.$studentId.tsx`, `app/src/components/app/people/PersonDetail.tsx`, `app/src/lib/mms/{endpoints.ts,more-endpoints.ts}`.
+- Verified: `cd app && npm run build`; authenticated Playwright click from People to `/people/:studentId` confirmed the visible `Student profile` heading; no full test suite run per request.
+
+## 2026-08-10 - Student Profile Avatar Placeholder
+
+- Implemented: The dedicated student profile header now includes a profile-picture placeholder beside the student name when no displayable avatar is available.
+- Files: `app/src/components/app/people/PersonDetail.tsx`.
+- Verified: `git diff --check`; no full test suite run per request.

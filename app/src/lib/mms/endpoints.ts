@@ -89,6 +89,7 @@ export interface Guardian {
 }
 
 export const peopleApi = {
+  getStudent: (studentId: string) => api.get<Student>(`/api/v1/people/students/${studentId}`).then((r) => r.data),
   listStudentsPage: (params: { search?: string; limit: number; offset: number; section_id?: string }) =>
     getPage<Student>("/api/v1/people/students", params),
   listTeachers: () => getAllPages<Teacher>("/api/v1/people/teachers"),

@@ -449,3 +449,12 @@ role/language/screenshot matrix.
 ## 2026-08-10 - Automatic Teacher Absences Follow-up
 
 - In a non-production session, browser-check the next-day absence job for a teacher with no check-in, an approved-leave teacher, and a madrasa-wide holiday.
+
+## 2026-08-10 - Application-Based Student Creation Follow-up
+
+- Browser-check application-form creation, file/image upload, manual student creation, and the recorded answers at mobile and desktop widths.
+- Public admission pages do not yet support unauthenticated file/image uploads; keep those field types for staff-created applications until a token-scoped upload endpoint is introduced.
+
+## 2026-08-10 - Dedicated Student Profile Route Follow-up
+
+- Browser-check direct navigation, browser Back behavior, and student profile actions at mobile and desktop widths.

@@ -12,6 +12,8 @@ const FIELD_TYPES: FormFieldDefinition["type"][] = [
   "checkbox_group",
   "dropdown",
   "phone",
+  "file",
+  "image",
 ];
 const OPTION_TYPES = new Set(["radio", "checkbox_group", "dropdown"]);
 

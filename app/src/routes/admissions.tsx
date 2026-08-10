@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, History, Phone, UserPlus, XCircle } from "lucide-react";
+import { CheckCircle2, Edit2, FileText, History, Phone, Trash2, UserPlus, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -20,7 +20,10 @@ import {
   SkeletonList,
   TextArea,
   TextInput,
+  Segmented,
 } from "@/components/app/Primitives";
+import { AdmissionAnswerFields } from "@/components/app/admissions/AdmissionAnswerFields";
+import { AdmissionFormEditorSheet } from "@/components/app/admissions/AdmissionFormEditorSheet";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { useAuth } from "@/lib/mms/auth";
 import {
@@ -29,6 +32,7 @@ import {
   opsApi,
   peopleMutations,
   type AdmissionApplication,
+  type AdmissionForm,
 } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
@@ -58,6 +62,10 @@ function AdmissionsPage() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [extra, setExtra] = useState(emptyExtra);
   const [active, setActive] = useState<AdmissionApplication | null>(null);
+  const [tab, setTab] = useState<"applications" | "forms">("applications");
+  const [formEditorOpen, setFormEditorOpen] = useState(false);
+  const [editingForm, setEditingForm] = useState<AdmissionForm | null>(null);
+  const [deleteForm, setDeleteForm] = useState<AdmissionForm | null>(null);
 
   const query = useQuery({
     queryKey: ["admissions"],
@@ -101,6 +109,8 @@ function AdmissionsPage() {
   const [dob, setDob] = useState("");
   const [notes, setNotes] = useState("");
   const [formId, setFormId] = useState("");
+  const [extraData, setExtraData] = useState<Record<string, unknown>>({});
+  const selectedForm = forms.data?.find((form) => form.id === formId) ?? forms.data?.find((form) => form.is_open);
 
   const create = useMutation({
     mutationFn: () => {
@@ -113,6 +123,7 @@ function AdmissionsPage() {
         ...(programId ? { program_id: programId } : {}),
         ...(dob ? { date_of_birth: dob } : {}),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
+        ...(Object.keys(extraData).length ? { extra_data: extraData } : {}),
       });
     },
     onSuccess: () => {
@@ -123,6 +134,7 @@ function AdmissionsPage() {
       setDob("");
       setNotes("");
       setFormId("");
+      setExtraData({});
       void queryClient.invalidateQueries({ queryKey: ["admissions"] });
     },
     onError: (error: unknown) => {
@@ -136,8 +148,12 @@ function AdmissionsPage() {
     <AppShell
       title={t("Admissions")}
       subtitle={`${items.length} applications`}
-      right={
-        canManage ? (
+      right={canManage ? (
+        tab === "forms" ? (
+          <button type="button" onClick={() => { setEditingForm(null); setFormEditorOpen(true); }} className="gradient-emerald inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground">
+            {t("New")}
+          </button>
+        ) : (
           <FormSheet
             title={t("New application")}
             triggerLabel="Add"
@@ -145,7 +161,7 @@ function AdmissionsPage() {
             onSubmit={() => create.mutateAsync()}
           >
             <Field label={t("Admission form")}>
-              <CustomDropdown value={formId} onChange={(e) => setFormId(e.target.value)}>
+              <CustomDropdown value={formId} onChange={(e) => { setFormId(e.target.value); setExtraData({}); }}>
                 <option value="">{t("Use first open form")}</option>
                 {(forms.data ?? []).map((form) => (
                   <option key={form.id} value={form.id}>
@@ -155,6 +171,7 @@ function AdmissionsPage() {
                 ))}
               </CustomDropdown>
             </Field>
+            {selectedForm ? <AdmissionAnswerFields fields={selectedForm.fields_definition} answers={extraData} onChange={setExtraData} /> : null}
             <Field label={t("Applicant name")}>
               <TextInput required value={applicant} onChange={(e) => setApplicant(e.target.value)} />
             </Field>
@@ -178,9 +195,24 @@ function AdmissionsPage() {
               <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
           </FormSheet>
-        ) : undefined
-      }
+        )
+      ) : undefined}
     >
+      <Segmented value={tab} onChange={(value) => setTab(value as "applications" | "forms")} options={[{ key: "applications", label: "Applications" }, { key: "forms", label: "Application forms" }]} />
+
+      {tab === "forms" ? (
+        <div className="space-y-2.5">
+          {(forms.data ?? []).map((form) => (
+            <Card key={form.id} className="space-y-2 p-3.5">
+              <div className="flex items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary-soft text-primary"><FileText className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="font-semibold">{form.title}</p><p className="text-xs text-muted-foreground">{form.program_name ?? form.category} · {form.is_open ? "Open" : "Closed"}</p></div></div>
+              {form.description ? <p className="text-sm text-muted-foreground">{form.description}</p> : null}
+              <p className="text-xs text-muted-foreground">{form.fields_definition.filter((field) => field.enabled !== false && field.type !== "label").length} fields</p>
+              {canManage ? <div className="flex gap-2"><button type="button" className="inline-flex items-center gap-1 rounded-xl bg-muted px-3 py-2 text-xs font-bold" onClick={() => { setEditingForm(form); setFormEditorOpen(true); }}><Edit2 className="h-3.5 w-3.5" />{t("Edit")}</button><button type="button" className="inline-flex items-center gap-1 rounded-xl bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive" onClick={() => setDeleteForm(form)}><Trash2 className="h-3.5 w-3.5" />{t("Delete")}</button></div> : null}
+            </Card>
+          ))}
+          {!forms.isLoading && (forms.data ?? []).length === 0 ? <EmptyState title="No application forms" /> : null}
+        </div>
+      ) : <>
       <FilterBar
         chips={FILTERS.map((key) => ({
           key,
@@ -248,6 +280,9 @@ function AdmissionsPage() {
           canManage={canManage}
         />
       ) : null}
+      </>}
+      <AdmissionFormEditorSheet form={editingForm} open={formEditorOpen} onOpenChange={setFormEditorOpen} onSaved={() => { setFormEditorOpen(false); void queryClient.invalidateQueries({ queryKey: ["admission-forms"] }); }} />
+      {deleteForm ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-sm space-y-3 p-5"><p className="font-display font-extrabold">Delete application form?</p><p className="text-sm text-muted-foreground">{deleteForm.title} will no longer be available for new students.</p><div className="flex gap-2"><ActionButton className="flex-1" variant="soft" onClick={() => setDeleteForm(null)}>{t("Cancel")}</ActionButton><ActionButton className="flex-1" variant="danger" onClick={async () => { await opsApi.deleteAdmissionForm(deleteForm.id); setDeleteForm(null); void queryClient.invalidateQueries({ queryKey: ["admission-forms"] }); }}>{t("Delete")}</ActionButton></div></Card></div> : null}
     </AppShell>
   );
 }

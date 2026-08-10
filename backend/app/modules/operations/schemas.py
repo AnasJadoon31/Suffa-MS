@@ -184,7 +184,7 @@ class ResourceRead(BaseModel):
 # ------------------------------------------------------------------ Forms
 
 FormFieldText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-FormFieldType = Literal["label", "text", "textarea", "radio", "checkbox_group", "dropdown", "phone"]
+FormFieldType = Literal["label", "text", "textarea", "radio", "checkbox_group", "dropdown", "phone", "file", "image"]
 OPTION_FIELD_TYPES = {"radio", "checkbox_group", "dropdown"}
 
 
