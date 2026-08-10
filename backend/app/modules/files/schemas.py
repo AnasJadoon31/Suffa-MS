@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from uuid import UUID
 
 
 class PresignUploadRequest(BaseModel):
@@ -12,6 +13,7 @@ class PresignUploadRequest(BaseModel):
 class PresignUploadResponse(BaseModel):
     object_key: str
     upload_url: str
+    file_id: UUID
 
 
 class PresignDownloadResponse(BaseModel):

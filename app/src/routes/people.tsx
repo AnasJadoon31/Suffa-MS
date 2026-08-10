@@ -27,7 +27,7 @@ import { GuardianForm } from "@/components/app/people/GuardianForm";
 import { DonorForm } from "@/components/app/people/DonorForm";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi, peopleApi, type Guardian, type Student, type Teacher } from "@/lib/mms/endpoints";
-import { financeMutations, peopleMutations, type Donor } from "@/lib/mms/more-endpoints";
+import { filesApi, financeMutations, peopleMutations, type Donor } from "@/lib/mms/more-endpoints";
 
 export const Route = createFileRoute("/people")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -66,6 +66,26 @@ function renderAddButton(tab: Tab, sectionId?: string, label?: string) {
   if (tab === "teachers") return <TeacherForm triggerLabel={defaultLabel} />;
   if (tab === "guardians") return <GuardianForm triggerLabel={defaultLabel} />;
   return <DonorForm triggerLabel={defaultLabel} />;
+}
+
+function StudentAvatar({ student, onOpen }: { student: Student; onOpen: () => void }) {
+  const photo = useQuery({
+    queryKey: ["student-photo", student.photo_file_id],
+    queryFn: () => filesApi.presignDownloadById(student.photo_file_id!),
+    enabled: Boolean(student.photo_file_id),
+    retry: false,
+  });
+
+  return (
+    <button
+      type="button"
+      className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary-soft font-display text-sm font-extrabold text-primary"
+      onClick={onOpen}
+      title="Profile picture"
+    >
+      {photo.data ? <img src={photo.data} alt="" className="h-full w-full object-cover" /> : student.name.slice(0, 1).toUpperCase()}
+    </button>
+  );
 }
 
 function PeoplePage() {
@@ -269,18 +289,24 @@ function PeoplePage() {
               key={id}
               className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 p-3.5 transition-shadow hover:shadow-md"
             >
-              <button
-                type="button"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft font-display text-sm font-extrabold text-primary"
-                onClick={() => {
-                  if (tab === "students") navigate({ to: "/people/$studentId", params: { studentId: id } });
-                  else if (tab === "teachers") setDetailTeacherId(id);
-                  else if (tab === "guardians") setDetailGuardianId(id);
-                  else if (tab === "donors") setDetailDonorId(id);
-                }}
-              >
-                {name.slice(0, 1).toUpperCase()}
-              </button>
+              {tab === "students" ? (
+                <StudentAvatar
+                  student={person as Student}
+                  onOpen={() => navigate({ to: "/people/$studentId", params: { studentId: id } })}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft font-display text-sm font-extrabold text-primary"
+                  onClick={() => {
+                    if (tab === "teachers") setDetailTeacherId(id);
+                    else if (tab === "guardians") setDetailGuardianId(id);
+                    else if (tab === "donors") setDetailDonorId(id);
+                  }}
+                >
+                  {name.slice(0, 1).toUpperCase()}
+                </button>
+              )}
               <button
                 type="button"
                 className="min-w-0 text-left ltr:text-left rtl:text-right"

@@ -8,12 +8,14 @@ export function FilePickerField({
   onChange,
   placeholder = "Choose file",
   icon: Icon = Upload,
+  accept,
 }: {
   label: string;
   fileName?: string;
   onChange: (file: File | null) => void;
   placeholder?: string;
   icon?: LucideIcon;
+  accept?: string;
 }) {
   return (
     <Field label={label}>
@@ -22,6 +24,7 @@ export function FilePickerField({
         {fileName ?? placeholder}
         <input
           type="file"
+          accept={accept}
           className="hidden"
           onChange={(event) => onChange(event.target.files?.[0] ?? null)}
         />

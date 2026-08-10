@@ -356,8 +356,8 @@ async def create_student(
             raise HTTPException(status_code=404, detail="Admission form not found")
         fields_definition = normalize_admission_fields(admission_form.fields_definition or [])
         validate_admission_answers(fields_definition, payload.admission_answers, require_guardian=not payload.is_independent)
-    else:
-        raise HTTPException(status_code=422, detail="An admission form is required to create a student")
+    elif payload.admission_answers:
+        raise HTTPException(status_code=422, detail="admission_form_id is required with admission_answers")
 
     student_name = payload.name or admission_answer_text(payload.admission_answers, "student_name")
     student_dob = payload.date_of_birth or admission_answer_date(payload.admission_answers, "student_date_of_birth")

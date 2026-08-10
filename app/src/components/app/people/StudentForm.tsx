@@ -1,17 +1,16 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Image, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { FormSheet } from "@/components/app/FormSheet";
+import { FilePickerField } from "@/components/app/FilePickerField";
 import { Field, CustomDropdown, SearchableSelect, TextInput } from "@/components/app/Primitives";
 import { academicsApi, peopleApi, type AcademicClass } from "@/lib/mms/endpoints";
-import { academicsExtraApi, peopleMutations, type Section, type StudentDetail } from "@/lib/mms/more-endpoints";
-import { opsApi } from "@/lib/mms/more-endpoints";
+import { academicsExtraApi, peopleMutations, uploadFileObject, type Section, type StudentDetail } from "@/lib/mms/more-endpoints";
 import { api, apiErrorMessage } from "@/lib/mms/api";
 import { maskBForm, maskPhone } from "@/lib/masks";
 import { useTranslation } from "react-i18next";
-import { AdmissionAnswerFields } from "@/components/app/admissions/AdmissionAnswerFields";
 
 export function StudentForm({
   student,
@@ -39,15 +38,7 @@ export function StudentForm({
   const [lang, setLang] = useState(student?.preferred_language ?? "en");
   const [guardians, setGuardians] = useState<{ id: string; name: string }[]>([]);
   const [guardianSearch, setGuardianSearch] = useState("");
-  const [admissionFormId, setAdmissionFormId] = useState("");
-  const [admissionAnswers, setAdmissionAnswers] = useState<Record<string, unknown>>({});
-
-  const admissionFormsQuery = useQuery({
-    queryKey: ["admission-forms"],
-    queryFn: () => opsApi.listAdmissionForms(),
-    enabled: !isEdit,
-  });
-  const admissionForm = admissionFormsQuery.data?.find((form) => form.id === admissionFormId);
+  const [photo, setPhoto] = useState<File | null>(null);
 
   const guardiansQuery = useQuery({
     queryKey: ["guardians-search", guardianSearch],
@@ -123,7 +114,6 @@ export function StudentForm({
   }
 
   async function handleSubmit() {
-    if (!isEdit && !admissionFormId) throw toast.error("Select an application form first");
     const trimmedName = name.trim();
     if (!trimmedName || trimmedName.length > 120)
       throw toast.error("Enter a valid name (max 120 chars)");
@@ -144,6 +134,7 @@ export function StudentForm({
       });
       toast.success("Student updated");
     } else {
+      const photoFileId = photo ? await uploadFileObject(photo, "student-photos") : undefined;
       const created = await peopleMutations.createStudent({
         name: trimmedName,
         date_of_birth: dob || undefined,
@@ -154,8 +145,7 @@ export function StudentForm({
         portal_enabled: portal,
         preferred_language: lang,
         guardian_ids: guardians.map((g) => g.id),
-        admission_form_id: admissionFormId,
-        admission_answers: admissionAnswers,
+        ...(photoFileId ? { photo_file_id: photoFileId } : {}),
       });
       toast.success("Student created");
       setName("");
@@ -164,8 +154,7 @@ export function StudentForm({
       setBForm("");
       setAddress("");
       setGuardians([]);
-      setAdmissionFormId("");
-      setAdmissionAnswers({});
+      setPhoto(null);
       setEnrollClassId("");
       setEnrollSectionId("");
 
@@ -199,32 +188,7 @@ export function StudentForm({
       open={open}
       onOpenChange={onOpenChange}
     >
-      {!isEdit ? (
-        <>
-          <Field label={t("Application form") }>
-            <CustomDropdown
-              required
-              value={admissionFormId}
-              onChange={(event) => {
-                setAdmissionFormId(event.target.value);
-                setAdmissionAnswers({});
-              }}
-            >
-              <option value="">{t("Select application form")}</option>
-              {(admissionFormsQuery.data ?? []).filter((form) => form.is_open).map((form) => (
-                <option key={form.id} value={form.id}>{form.title}</option>
-              ))}
-            </CustomDropdown>
-          </Field>
-          {admissionForm ? (
-            <AdmissionAnswerFields
-              fields={admissionForm.fields_definition}
-              answers={admissionAnswers}
-              onChange={setAdmissionAnswers}
-            />
-          ) : null}
-        </>
-      ) : null}
+      {!isEdit ? <FilePickerField label={t("Profile picture")} fileName={photo?.name} onChange={setPhoto} placeholder={t("Choose profile picture")} icon={Image} accept="image/*" /> : null}
       <Field label={t("Full name *")}>
         <TextInput
           required

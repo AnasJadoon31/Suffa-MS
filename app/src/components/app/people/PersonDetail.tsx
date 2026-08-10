@@ -12,6 +12,7 @@ import { DonorForm } from "./DonorForm";
 import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
 import { academicsExtraApi, filesApi } from "@/lib/mms/more-endpoints";
 import { api, apiErrorMessage } from "@/lib/mms/api";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   peopleMutations,
   financeMutations,
@@ -106,6 +107,7 @@ export function StudentDetailSheet({
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [credentialPhone, setCredentialPhone] = useState("");
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   const guardiansQuery = useQuery({
     queryKey: ["student-guardians", student?.id],
@@ -127,6 +129,13 @@ export function StudentDetailSheet({
     queryKey: ["sections", enrollClassId],
     queryFn: () => (enrollClassId ? academicsExtraApi.listSections(enrollClassId) : Promise.resolve([])),
     enabled: editEnrollment && Boolean(enrollClassId),
+  });
+
+  const photoQuery = useQuery({
+    queryKey: ["student-photo", student?.photo_file_id],
+    queryFn: () => filesApi.presignDownloadById(student!.photo_file_id!),
+    enabled: Boolean(open && student?.photo_file_id),
+    retry: false,
   });
 
   async function submitEnrollment() {
@@ -169,11 +178,14 @@ export function StudentDetailSheet({
   }
 
   return (
+    <>
     <StudentDetailContainer
       page={page}
       onBack={() => onOpenChange(false)}
       open={open}
       title={student.name}
+      photoUrl={photoQuery.data}
+      onPhotoClick={() => setPhotoOpen(true)}
       subtitle={
         <div className="flex items-center gap-2">
           <Pill tone={student.status === "active" ? "success" : "muted"}>{student.status}</Pill>
@@ -349,6 +361,13 @@ export function StudentDetailSheet({
 
         <StudentForm student={student} open={editOpen} onOpenChange={setEditOpen} />
     </StudentDetailContainer>
+    <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
+      <DialogContent className="max-w-4xl border-0 bg-transparent p-2 shadow-none [&>button]:text-white">
+        <DialogTitle className="sr-only">{t("Profile picture")}</DialogTitle>
+        {photoQuery.data ? <img src={photoQuery.data} alt={student.name} className="max-h-[78vh] w-auto max-w-full rounded-lg object-contain" /> : null}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
@@ -357,6 +376,8 @@ function StudentDetailContainer({
   open,
   onBack,
   title,
+  photoUrl,
+  onPhotoClick,
   subtitle,
   children,
 }: {
@@ -364,12 +385,14 @@ function StudentDetailContainer({
   open: boolean;
   onBack: () => void;
   title: string;
+  photoUrl?: string;
+  onPhotoClick: () => void;
   subtitle: React.ReactNode;
   children: React.ReactNode;
 }) {
   if (!page) return <ManagedSheet open={open} onOpenChange={(next) => !next && onBack()} title={title} subtitle={subtitle}>{children}</ManagedSheet>;
   const initials = title.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-  return <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 sm:px-6"><div className="flex items-start gap-3"><button type="button" aria-label="Back" onClick={onBack} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted"><ArrowLeft className="h-5 w-5" /></button><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-soft text-primary" title="Profile picture"><UserRound className="h-5 w-5" /><span className="sr-only">{initials || "Student"}</span></div><div className="min-w-0"><h1 className="truncate font-display text-xl font-extrabold">{title}</h1>{subtitle}</div></div><div className="rounded-2xl border border-border bg-card p-4 shadow-sm">{children}</div></div>;
+  return <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 sm:px-6"><div className="flex items-start gap-3"><button type="button" aria-label="Back" onClick={onBack} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted"><ArrowLeft className="h-5 w-5" /></button>{photoUrl ? <button type="button" onClick={onPhotoClick} aria-label="View profile picture" className="grid h-12 w-12 shrink-0 cursor-zoom-in place-items-center overflow-hidden rounded-full bg-primary-soft text-primary" title="View profile picture"><img src={photoUrl} alt="" className="h-full w-full object-cover" /></button> : <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-primary-soft text-primary" title="Profile picture"><UserRound className="h-5 w-5" /><span className="sr-only">{initials || "Student"}</span></div>}<div className="min-w-0"><h1 className="truncate font-display text-xl font-extrabold">{title}</h1>{subtitle}</div></div><div className="rounded-2xl border border-border bg-card p-4 shadow-sm">{children}</div></div>;
 }
 
 export function TeacherDetailSheet({

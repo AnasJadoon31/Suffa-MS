@@ -963,6 +963,7 @@ export interface StudentDetail {
   is_independent?: boolean;
   preferred_language?: string;
   notes?: string | null;
+  photo_file_id?: string | null;
   current_class?: string | null;
   active_enrollment?: {
     id: string;
@@ -1026,8 +1027,7 @@ export const peopleMutations = {
     address?: string;
     phone?: string;
     is_independent?: boolean;
-    admission_form_id: string;
-    admission_answers: Record<string, unknown>;
+    photo_file_id?: string;
   }) => api.post<StudentDetail>("/api/v1/people/students", payload).then((r) => r.data),
   updateStudent: (
     id: string,
@@ -1177,6 +1177,7 @@ export const admissionsMutations = {
 export interface PresignUpload {
   object_key: string;
   upload_url: string;
+  file_id: string;
 }
 
 export const filesApi = {
@@ -1188,6 +1189,8 @@ export const filesApi = {
   }) => api.post<PresignUpload>("/api/v1/files/presign-upload", payload).then((r) => r.data),
   presignDownload: (objectKey: string) =>
     api.get<{ url: string }>("/api/v1/files/presign-download", { params: { object_key: objectKey } }).then((r) => r.data.url),
+  presignDownloadById: (fileId: string) =>
+    api.get<{ url: string }>(`/api/v1/files/${fileId}/presign-download`).then((r) => r.data.url),
 };
 
 export async function uploadFile(file: File, category: string): Promise<string> {
@@ -1206,6 +1209,15 @@ export async function uploadFile(file: File, category: string): Promise<string> 
     throw new Error("File upload failed");
   }
   return object_key;
+}
+
+export async function uploadFileObject(file: File, category: string): Promise<string> {
+  const { object_key, upload_url, file_id } = await filesApi.presignUpload({
+    category, filename: file.name, content_type: file.type || "application/octet-stream", size_bytes: file.size,
+  });
+  const response = await fetch(upload_url, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+  if (!response.ok) throw new Error("File upload failed");
+  return file_id;
 }
 
 export interface PublicAdmissionForm {

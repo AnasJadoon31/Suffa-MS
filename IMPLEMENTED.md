@@ -2105,7 +2105,7 @@ and authorization tests, the backend suite is now 120 tests.
 
 ## 2026-08-10 - Application-Based Student Creation
 
-- Implemented: Admissions now separates Applications and Application forms. Staff with admissions access can create, edit, and delete application templates; templates include text, choice, phone, file, and image fields. Manual student creation requires an application form and persists its answers as the student's admission record, including downloadable file and image entries in the student detail sheet.
+- Implemented: Admissions now separates Applications and Application forms. Staff with admissions access can create, edit, and delete application templates; templates include text, choice, phone, file, and image fields. Direct student creation remains independent of application forms.
 - Files: `app/src/routes/admissions.tsx`, `app/src/components/app/admissions/AdmissionAnswerFields.tsx`, `app/src/components/app/admissions/AdmissionFormEditorSheet.tsx`, `app/src/components/app/people/StudentForm.tsx`, `app/src/components/app/people/PersonDetail.tsx`, `app/src/components/app/forms/FormFieldsEditor.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/operations/{schemas.py,admissions.py}`, `backend/app/modules/people/routes.py`.
 - Verified: `cd app && npm run build`, backend `py_compile`, and `git diff --check`; no full test suite run per request.
 
@@ -2120,3 +2120,9 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: The dedicated student profile header now includes a profile-picture placeholder beside the student name when no displayable avatar is available.
 - Files: `app/src/components/app/people/PersonDetail.tsx`.
 - Verified: `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Student Photo Upload
+
+- Implemented: The direct New student form accepts an image-only profile-picture upload. The upload creates a tenant-scoped file record, attaches its ID to the student profile, and the profile header and student directory cards resolve and display it. Clicking the profile image in the student profile opens a zoomed modal view.
+- Files: `app/src/components/app/{FilePickerField.tsx,people/{StudentForm.tsx,PersonDetail.tsx}}`, `app/src/routes/people.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/files/{routes.py,schemas.py}`.
+- Verified: backend `py_compile`, `cd app && npm run build`, `git diff --check`, and API health; no full test suite run per request.

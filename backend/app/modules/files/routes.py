@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from uuid import UUID
 
 from app.core.dependencies import get_current_madrasa, get_current_user
+from app.db.core_models import FileObject
+from app.db.session import get_session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.storage import (
     StorageNotConfigured,
     UploadRejected,
@@ -22,6 +26,7 @@ async def presign_upload(
     payload: PresignUploadRequest,
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
 ) -> PresignUploadResponse:
     try:
         assert_upload_allowed(
@@ -38,7 +43,17 @@ async def presign_upload(
         url = presign_upload_url(object_key, payload.content_type, size_bytes=payload.size_bytes)
     except StorageNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return PresignUploadResponse(object_key=object_key, upload_url=url)
+    file_object = FileObject(
+        madrasa_id=madrasa.id,
+        object_key=object_key,
+        content_type=payload.content_type,
+        file_size=payload.size_bytes,
+        owner_id=current_user.id,
+    )
+    session.add(file_object)
+    await session.commit()
+    await session.refresh(file_object)
+    return PresignUploadResponse(object_key=object_key, upload_url=url, file_id=file_object.id)
 
 
 @router.get("/presign-download", response_model=PresignDownloadResponse)
@@ -51,6 +66,23 @@ async def presign_download(
         raise HTTPException(status_code=403, detail="File does not belong to the active madrasa")
     try:
         url = presign_download_url(object_key)
+    except StorageNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return PresignDownloadResponse(url=url)
+
+
+@router.get("/{file_id}/presign-download", response_model=PresignDownloadResponse)
+async def presign_download_by_id(
+    file_id: UUID,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> PresignDownloadResponse:
+    file_object = await session.get(FileObject, file_id)
+    if file_object is None or file_object.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        url = presign_download_url(file_object.object_key)
     except StorageNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return PresignDownloadResponse(url=url)
