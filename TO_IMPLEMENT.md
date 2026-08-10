@@ -284,7 +284,7 @@ role/language/screenshot matrix.
 
 ## 2026-08-09 - Single Filter Card Selection Follow-up
 
-- Audit remaining portal routes for any future screens that have exactly one true selector filter; Marking and `/my-timetable` now use card selection instead of dropdown filters.
+- Audit remaining portal routes for any future screens that have exactly one true selector filter; Marking and `/my-timetable` now use card selection instead of dropdown filters, and Results no longer uses a filter wrapper for drill-down navigation.
 
 ## 2026-08-09 - Teacher Assignment Review Follow-up
 
@@ -370,3 +370,18 @@ role/language/screenshot matrix.
 - **UI-AUDIT** — reviewed EN/UR desktop/mobile captures under `app/artifacts/ui-audit/final/`.
 - **PDF-RENDER** — deterministic EN/UR report PDFs and page renders under `app/artifacts/issue-verification/`.
 - **UI-LIVE** — `npm run test:live-seed` and `npm run test:live-roles`; actual API login, mutation, upload/download, and persisted-data journeys for all five portal roles against isolated PostgreSQL/Redis/MinIO services.
+
+## 2026-08-09 - My Assessments Assignment Drilldown Follow-up
+
+- Remaining: Browser-check the class -> section -> course -> assignments drilldown with a real teacher account after the running frontend picks up the latest source.
+- Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
+
+## 2026-08-10 - Assessment Drilldown Back Button Follow-up
+
+- Remaining: Browser-check the Back button appearance in Examination and My Assessments on mobile once the running frontend refreshes.
+- Release blocker: None for the code path; no touched-route TypeScript errors were reported.
+
+## 2026-08-10 - Assessment Accordion Search Follow-up
+
+- Remaining: Browser-check Marking, Results, and My Assessments with real teacher/admin accounts to confirm class accordion expansion, section selection, Back headers, and search filtering on mobile.
+- Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.

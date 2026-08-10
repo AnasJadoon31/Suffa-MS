@@ -6,7 +6,6 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
-import { FilterBar } from "@/components/app/FilterBar";
 import {
   Card,
   EmptyState,
@@ -35,6 +34,56 @@ export const Route = createFileRoute("/examination")({
 });
 
 type Tab = "schemes" | "exams" | "assign" | "marking" | "results";
+
+export function DrillBackButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <button onClick={onClick} className="rounded-xl border border-border px-3 py-2 text-xs font-bold text-primary">
+      {label ?? t("Back")}
+    </button>
+  );
+}
+
+export function DrillHeader({
+  onBack,
+  children,
+}: {
+  onBack: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3">
+      <DrillBackButton onClick={onBack} />
+      {children}
+    </div>
+  );
+}
+
+export function DrillSearchInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <TextInput
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      className="mb-2"
+    />
+  );
+}
 
 function ExaminationPage() {
   const { t } = useTranslation();
@@ -162,10 +211,9 @@ function ExamsView({ canManage }: { canManage: boolean }) {
         </>
       ) : (
         <>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setSelectedSchemeId(null)} className="text-xs text-primary">{t("← Back")}</button>
+          <DrillHeader onBack={() => setSelectedSchemeId(null)}>
             <span className="text-xs font-bold text-muted-foreground">{scheme?.name}</span>
-          </div>
+          </DrillHeader>
           {canManage ? (
             <Card className="space-y-2 p-3.5">
               <p className="text-xs font-bold text-muted-foreground">{t("Add exam")}{totalWeightage > 0 ? ` — ${t("total")} ${totalWeightage}%` : ""}</p>
@@ -305,10 +353,9 @@ function AssignView({ canManage }: { canManage: boolean }) {
         </>
       ) : (
         <>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setSelectedSchemeId(null)} className="text-xs text-primary">{t("← Back")}</button>
+          <DrillHeader onBack={() => setSelectedSchemeId(null)}>
             <span className="text-xs font-bold text-muted-foreground">{scheme?.name}</span>
-          </div>
+          </DrillHeader>
           <SectionTitle>{t("Classes")}</SectionTitle>
           <div className="space-y-2">
             {(classes.data ?? []).map((cls) => {
@@ -352,6 +399,9 @@ export function MarkingView({
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [selectedExamId, setSelectedExamId] = useState("");
   const [step, setStep] = useState<"sections" | "courses" | "exams" | "subExams" | "students">("sections");
+  const [classSearch, setClassSearch] = useState("");
+  const [courseSearch, setCourseSearch] = useState("");
+  const [examSearch, setExamSearch] = useState("");
 
   const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses(), enabled: !teacherScoped });
   const sections = useQuery({ queryKey: ["sections", selectedClassId], queryFn: () => selectedClassId ? academicsExtraApi.listSections(selectedClassId) : Promise.resolve([]), enabled: !!selectedClassId });
@@ -366,22 +416,19 @@ export function MarkingView({
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [myTimetable.data]);
   const classOptions = teacherScoped ? teacherClassOptions : classes.data ?? [];
+  const searchedClassOptions = useMemo(() => {
+    const term = classSearch.trim().toLowerCase();
+    if (!term) return classOptions;
+    return classOptions.filter((item) => item.name.toLowerCase().includes(term));
+  }, [classOptions, classSearch]);
   const selectedClassName = classOptions.find((item) => item.id === selectedClassId)?.name;
   const selectMarkingClass = (id: string) => {
-    setSelectedClassId(id);
+    setSelectedClassId((current) => current === id && step === "sections" ? "" : id);
     setSelectedSectionId("");
     setSelectedCourseId("");
     setSelectedExamId("");
     setStep("sections");
   };
-  const clearMarkingClass = () => {
-    setSelectedClassId("");
-    setSelectedSectionId("");
-    setSelectedCourseId("");
-    setSelectedExamId("");
-    setStep("sections");
-  };
-
   const courseExams = useMemo(() => {
     if (!selectedCourseId || !selectedClassId) return [];
     return (allExamTypes.data ?? []).filter((e) =>
@@ -421,63 +468,75 @@ export function MarkingView({
     }
     return Array.from(map.values());
   }, [classCourses.data, myTimetable.data, selectedClassId, selectedSectionId, teacherScoped]);
+  const searchedCourseOptions = useMemo(() => {
+    const term = courseSearch.trim().toLowerCase();
+    if (!term) return courseOptions;
+    return courseOptions.filter((course: any) => String(course.name ?? "").toLowerCase().includes(term));
+  }, [courseOptions, courseSearch]);
+  const searchedParentExams = useMemo(() => {
+    const term = examSearch.trim().toLowerCase();
+    if (!term) return parentExams;
+    return parentExams.filter((exam) => exam.name.toLowerCase().includes(term));
+  }, [examSearch, parentExams]);
 
   return (
     <div className="space-y-3">
-      {!selectedClassId ? (
+      {step === "sections" ? (
         <>
           <SectionTitle>{t("Class")}</SectionTitle>
+          {classOptions.length > 4 ? (
+            <DrillSearchInput value={classSearch} onChange={setClassSearch} placeholder={t("Search classes...")} />
+          ) : null}
           <div className="space-y-2">
-            {classOptions.map((item) => (
-              <button key={item.id} onClick={() => selectMarkingClass(item.id)} className="w-full">
-                <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><GraduationCap className="h-5 w-5" /></span>
+            {searchedClassOptions.map((item) => (
+              <Card key={item.id} className="space-y-2 p-3.5">
+                <button onClick={() => selectMarkingClass(item.id)} className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+                    <GraduationCap className="h-5 w-5" />
+                  </span>
                   <div className="min-w-0 text-left">
                     <p className="truncate font-semibold">{item.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{t("View sections")}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {selectedClassId === item.id ? t("Select section") : t("View sections")}
+                    </p>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </Card>
-              </button>
+                  <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", selectedClassId === item.id ? "rotate-90" : "")} />
+                </button>
+                {selectedClassId === item.id ? (
+                  <div className="space-y-2 border-t border-border pt-2">
+                    {filteredSections.map((sec) => (
+                      <button key={sec.id} onClick={() => { setSelectedSectionId(sec.id); setStep("courses"); }} className="w-full">
+                        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl bg-muted px-3 py-2.5">
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Users className="h-4 w-4" /></span>
+                          <div className="min-w-0 text-left"><p className="truncate text-sm font-semibold">{sec.name}</p><p className="truncate text-xs text-muted-foreground">{sec.student_count} {t("students")}</p></div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </button>
+                    ))}
+                    {filteredSections.length === 0 ? <EmptyState title={t("No sections found")} /> : null}
+                  </div>
+                ) : null}
+              </Card>
             ))}
             {(teacherScoped ? myTimetable.isLoading : classes.isLoading) ? <SkeletonList rows={3} /> : null}
-            {!(teacherScoped ? myTimetable.isLoading : classes.isLoading) && classOptions.length === 0 ? <EmptyState title={t("No classes found")} /> : null}
-          </div>
-        </>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3">
-          <button onClick={clearMarkingClass} className="rounded-xl border border-border px-3 py-2 text-xs font-bold text-primary">{t("Back")}</button>
-          <span className="text-xs font-bold uppercase text-muted-foreground">{t("Class")}</span>
-          <Pill tone="gold">{selectedClassName ?? t("Selected")}</Pill>
-        </div>
-      )}
-
-      {step === "sections" && selectedClassId ? (
-        <>
-          <SectionTitle>{t("Sections")}</SectionTitle>
-          <div className="space-y-2">
-            {filteredSections.map((sec) => (
-              <button key={sec.id} onClick={() => { setSelectedSectionId(sec.id); setStep("courses"); }} className="w-full">
-                <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><Users className="h-5 w-5" /></span>
-                  <div className="min-w-0 text-left"><p className="truncate font-semibold">{sec.name}</p><p className="truncate text-xs text-muted-foreground">{sec.student_count} {t("students")}</p></div>
-                </Card>
-              </button>
-            ))}
-            {filteredSections.length === 0 ? <EmptyState title={t("No sections found")} /> : null}
+            {!(teacherScoped ? myTimetable.isLoading : classes.isLoading) && searchedClassOptions.length === 0 ? <EmptyState title={t("No classes found")} /> : null}
           </div>
         </>
       ) : null}
 
       {step === "courses" && selectedSectionId ? (
         <>
-          <div className="flex items-center gap-2">
-            <button onClick={() => { setStep("sections"); setSelectedCourseId(""); }} className="text-xs text-primary">{t("← Back to sections")}</button>
+          <DrillHeader onBack={() => { setStep("sections"); setSelectedCourseId(""); }}>
+            <span className="text-xs font-bold uppercase text-muted-foreground">{t("Class")}</span>
+            <Pill tone="gold">{selectedClassName ?? t("Selected")}</Pill>
             <span className="text-xs text-muted-foreground">{filteredSections.find((s) => s.id === selectedSectionId)?.name}</span>
-          </div>
+          </DrillHeader>
           <SectionTitle>{t("Courses")}</SectionTitle>
+          {courseOptions.length > 4 ? (
+            <DrillSearchInput value={courseSearch} onChange={setCourseSearch} placeholder={t("Search courses...")} />
+          ) : null}
           <div className="space-y-2">
-            {courseOptions.map((course: any) => (
+            {searchedCourseOptions.map((course: any) => (
               <button key={course.id} onClick={() => { setSelectedCourseId(course.id); setStep("exams"); }} className="w-full">
                 <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><GraduationCap className="h-5 w-5" /></span>
@@ -485,19 +544,20 @@ export function MarkingView({
                 </Card>
               </button>
             ))}
-            {courseOptions.length === 0 ? <EmptyState title={t("No courses assigned")} /> : null}
+            {searchedCourseOptions.length === 0 ? <EmptyState title={t("No courses assigned")} /> : null}
           </div>
         </>
       ) : null}
 
       {step === "exams" && selectedCourseId && selectedSectionId ? (
         <>
-          <div className="flex items-center gap-2">
-            <button onClick={() => { setStep("courses"); setSelectedExamId(""); }} className="text-xs text-primary">{t("← Back to courses")}</button>
-          </div>
+          <DrillHeader onBack={() => { setStep("courses"); setSelectedExamId(""); }} />
           <SectionTitle>{t("Exams")}</SectionTitle>
+          {parentExams.length > 4 ? (
+            <DrillSearchInput value={examSearch} onChange={setExamSearch} placeholder={t("Search exams...")} />
+          ) : null}
           <div className="space-y-2">
-            {parentExams.map((exam) => {
+            {searchedParentExams.map((exam) => {
               const children = getChildren(exam.id);
               return (
                 <button
@@ -515,17 +575,16 @@ export function MarkingView({
                 </button>
               );
             })}
-            {parentExams.length === 0 ? <EmptyState title={t("No exams assigned")} /> : null}
+            {searchedParentExams.length === 0 ? <EmptyState title={t("No exams assigned")} /> : null}
           </div>
         </>
       ) : null}
 
       {step === "subExams" && selectedExamId ? (
         <>
-          <div className="flex items-center gap-2">
-            <button onClick={() => { setStep("exams"); setSelectedExamId(""); }} className="text-xs text-primary">{t("← Back")}</button>
+          <DrillHeader onBack={() => { setStep("exams"); setSelectedExamId(""); }}>
             <span className="text-xs font-bold text-muted-foreground">{parentExams.find((e) => e.id === selectedExamId)?.name}</span>
-          </div>
+          </DrillHeader>
           <SectionTitle>{t("Units")}</SectionTitle>
           <div className="grid grid-cols-2 gap-2">
             {getChildren(selectedExamId).map((child) => (
@@ -551,12 +610,19 @@ function ExamMarkEntry({ examId, classId, sectionId, onBack }: { examId: string;
   const { t } = useTranslation();
   const client = useQueryClient();
   const [scores, setScores] = useState<Record<string, string>>({});
+  const [studentSearch, setStudentSearch] = useState("");
 
   const examTypes = useQuery({ queryKey: ["exam-types"], queryFn: () => assessmentsApi.listExamTypes() });
   const exam = useMemo(() => (examTypes.data ?? []).find((e) => e.id === examId), [examTypes.data, examId]);
 
   const marks = useQuery({ queryKey: ["marks", examId, classId, sectionId], queryFn: () => assessmentsApi.listMarks({ exam_type_id: examId, class_id: classId, section_id: sectionId }), enabled: true });
   const roster = useQuery({ queryKey: ["roster", classId, sectionId], queryFn: () => peopleApi.listStudentsPage({ limit: 100, offset: 0, section_id: sectionId }), enabled: true });
+  const rosterStudents = useMemo(() => {
+    const students = roster.data?.items ?? [];
+    const term = studentSearch.trim().toLowerCase();
+    if (!term) return students;
+    return students.filter((student) => `${student.name} ${student.admission_number ?? ""}`.toLowerCase().includes(term));
+  }, [roster.data?.items, studentSearch]);
 
   const enterMark = useMutation({
     mutationFn: (p: { exam_type_id: string; student_id: string; score: number }) => assessmentsMutations.enterMark(p),
@@ -565,11 +631,13 @@ function ExamMarkEntry({ examId, classId, sectionId, onBack }: { examId: string;
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <button onClick={onBack} className="text-xs text-primary">{t("← Back")}</button>
+      <DrillHeader onBack={onBack}>
         <span className="text-xs font-bold text-muted-foreground">{exam?.name} ({exam?.weightage}%)</span>
-      </div>
-      {(roster.data?.items ?? []).map((student) => {
+      </DrillHeader>
+      {(roster.data?.items?.length ?? 0) > 8 ? (
+        <DrillSearchInput value={studentSearch} onChange={setStudentSearch} placeholder={t("Search students...")} />
+      ) : null}
+      {rosterStudents.map((student) => {
         const existing = (marks.data ?? []).find((m) => m.student_id === student.id);
         const scoreKey = `${examId}_${student.id}`;
         const score = scores[scoreKey] ?? String(existing?.score ?? "");
@@ -581,6 +649,7 @@ function ExamMarkEntry({ examId, classId, sectionId, onBack }: { examId: string;
           </Card>
         );
       })}
+      {!roster.isLoading && rosterStudents.length === 0 ? <EmptyState title={t("No students found")} /> : null}
     </div>
   );
 }
@@ -600,10 +669,13 @@ export function ResultsView({
   type ClassCard = { id: string; name: string; sectionCount?: number; courseCount?: number };
   type SectionCard = { id: string; name: string; class_id: string; class_name: string; courseCount?: number; studentCount?: number };
   type CourseCard = { course_id: string; course_name: string; teacher_name: string | null; exam_types: { id: string; name: string; weightage: number }[] };
-  const [step, setStep] = useState<ResultStep>(teacherScoped ? "sections" : "classes");
+  const [step, setStep] = useState<ResultStep>("classes");
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [courseId, setCourseId] = useState("");
+  const [classSearch, setClassSearch] = useState("");
+  const [courseSearch, setCourseSearch] = useState("");
+  const [markSearch, setMarkSearch] = useState("");
   const classes = useQuery({ queryKey: ["classes"], queryFn: () => academicsApi.listClasses(), enabled: !teacherScoped });
   const myTimetable = useQuery({ queryKey: ["my-timetable"], queryFn: () => operationsApi.listMyTimetable(), enabled: teacherScoped });
   const sections = useQuery({ queryKey: ["sections", classId], queryFn: () => classId ? academicsExtraApi.listSections(classId) : Promise.resolve([]), enabled: !!classId });
@@ -633,11 +705,41 @@ export function ResultsView({
     }));
   }, [myTimetable.data, t]);
   const classCards = useMemo<ClassCard[]>(() => {
-    if (teacherScoped) return [];
+    if (teacherScoped) {
+      const map = new Map<string, { id: string; name: string; sectionIds: Set<string>; courseIds: Set<string> }>();
+      for (const section of teacherSections) {
+        const existing = map.get(section.class_id);
+        if (existing) {
+          existing.sectionIds.add(section.id);
+          continue;
+        }
+        map.set(section.class_id, {
+          id: section.class_id,
+          name: section.class_name,
+          sectionIds: new Set([section.id]),
+          courseIds: new Set(),
+        });
+      }
+      for (const slot of myTimetable.data ?? []) {
+        if (!slot.class_id || !slot.course_id) continue;
+        map.get(slot.class_id)?.courseIds.add(slot.course_id);
+      }
+      return Array.from(map.values()).map((item) => ({
+        id: item.id,
+        name: item.name,
+        sectionCount: item.sectionIds.size,
+        courseCount: item.courseIds.size,
+      }));
+    }
     return (classes.data ?? []).map((item) => ({ id: item.id, name: item.name }));
-  }, [classes.data, teacherScoped]);
+  }, [classes.data, myTimetable.data, teacherScoped, teacherSections]);
+  const searchedClassCards = useMemo(() => {
+    const term = classSearch.trim().toLowerCase();
+    if (!term) return classCards;
+    return classCards.filter((item) => item.name.toLowerCase().includes(term));
+  }, [classCards, classSearch]);
   const sectionCards = useMemo<SectionCard[]>(() => {
-    if (teacherScoped) return teacherSections;
+    if (teacherScoped) return teacherSections.filter((section) => !classId || section.class_id === classId);
     const selectedClass = classCards.find((item) => item.id === classId);
     return (sections.data ?? []).map((item) => ({
       id: item.id,
@@ -662,16 +764,24 @@ export function ResultsView({
     );
     return courses.filter((course) => allowed.has(course.course_id));
   }, [activeSectionMatrix?.courses, classId, myTimetable.data, sectionId, teacherScoped]);
+  const searchedCourseCards = useMemo(() => {
+    const term = courseSearch.trim().toLowerCase();
+    if (!term) return courseCards;
+    return courseCards.filter((course) => `${course.course_name} ${course.teacher_name ?? ""}`.toLowerCase().includes(term));
+  }, [courseCards, courseSearch]);
   const selectedCourse = useMemo(() => {
     return courseCards.find((course) => course.course_id === courseId);
   }, [courseCards, courseId]);
   const markRows = useMemo(() => {
     if (!activeSectionMatrix || !selectedCourse) return [];
-    return activeSectionMatrix.students.map((student) => ({
+    const rows = activeSectionMatrix.students.map((student) => ({
       ...student,
       course: student.courses.find((course) => course.course_id === selectedCourse.course_id),
     }));
-  }, [activeSectionMatrix, selectedCourse]);
+    const term = markSearch.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((student) => `${student.name} ${student.admission_number ?? ""}`.toLowerCase().includes(term));
+  }, [activeSectionMatrix, markSearch, selectedCourse]);
   const classMissingMarkCount = useMemo(() => {
     let count = 0;
     for (const section of classMatrix.data?.sections ?? []) {
@@ -706,10 +816,10 @@ export function ResultsView({
     setCourseId("");
   };
   const selectClass = (id: string) => {
-    setClassId(id);
+    setClassId((current) => current === id && step === "classes" ? "" : id);
     setSectionId("");
     setCourseId("");
-    setStep("sections");
+    setStep("classes");
   };
   const selectSection = (section: SectionCard) => {
     setClassId(section.class_id);
@@ -759,7 +869,20 @@ export function ResultsView({
           ? `${selectedSection?.class_name ?? ""} · ${selectedSection?.name ?? ""}`
           : selectedCourse?.course_name ?? t("Marks");
 
-  const activeCount = (classId ? 1 : 0) + (sectionId ? 1 : 0) + (courseId ? 1 : 0);
+  const backFromResultsStep = () => {
+    if (step === "marks") {
+      setStep("courses");
+      setCourseId("");
+      return;
+    }
+    if (step === "courses") {
+      setStep("classes");
+      setSectionId("");
+      setCourseId("");
+      return;
+    }
+    goToClasses();
+  };
   const renderDrillCard = (
     key: string,
     icon: ReactNode,
@@ -781,74 +904,96 @@ export function ResultsView({
 
   return (
     <div className="space-y-3">
-      <FilterBar activeCount={activeCount} onClear={goToClasses}>
-        <div className="flex flex-wrap items-center gap-2">
-          {step !== (teacherScoped ? "sections" : "classes") ? (
-            <button onClick={() => {
-              if (step === "marks") { setStep("courses"); setCourseId(""); return; }
-              if (step === "courses") { setStep("sections"); setSectionId(""); setCourseId(""); return; }
-              goToClasses();
-            }} className="rounded-xl border border-border px-3 py-2 text-xs font-bold text-primary">
-              {t("Back")}
-            </button>
-          ) : null}
+      {step !== "classes" ? (
+        <DrillHeader onBack={backFromResultsStep}>
           <div className="min-w-0">
-            <p className="truncate text-xs font-bold uppercase text-muted-foreground">{headerTitle}</p>
-            <p className="text-[0.65rem] font-medium text-muted-foreground">
-              {teacherScoped ? t("Teacher scoped results") : t("Select class, section, then course")}
-            </p>
+            <SectionTitle>{headerTitle}</SectionTitle>
           </div>
+        </DrillHeader>
+      ) : (
+        <div className="min-w-0">
+          <SectionTitle>{headerTitle}</SectionTitle>
+          {!teacherScoped ? (
+            <p className="text-[0.65rem] font-medium text-muted-foreground">
+              {t("Select class, section, then course")}
+            </p>
+          ) : null}
         </div>
-      </FilterBar>
+      )}
 
-      {!teacherScoped && step === "classes" ? (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {classCards.map((item) => renderDrillCard(item.id, <GraduationCap className="h-5 w-5" />, item.name, t("View sections"), () => selectClass(item.id)))}
-          {!classes.isLoading && classCards.length === 0 ? <EmptyState title={t("No classes found")} /> : null}
-          {classes.isLoading ? <SkeletonList rows={3} /> : null}
-        </div>
-      ) : null}
-
-      {step === "sections" ? (
+      {step === "classes" ? (
         <div className="space-y-2">
-          {!teacherScoped && canManage && classId ? (
-            <div className="space-y-1">
-              <button disabled={publish.isPending || classMatrix.isLoading || !canPublishClassResults} onClick={() => publish.mutate()} className="gradient-emerald w-full rounded-xl py-2 text-xs font-bold text-primary-foreground disabled:opacity-60">
-                {t("Publish class results")}
-              </button>
-              {!classMatrix.isLoading && classMissingMarkCount > 0 ? (
-                <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
-                  {t("Complete all course marks before publishing")} ({classMissingMarkCount})
-                </p>
-              ) : null}
-            </div>
+          {classCards.length > 4 ? (
+            <DrillSearchInput value={classSearch} onChange={setClassSearch} placeholder={t("Search classes...")} />
           ) : null}
           <div className="grid gap-2 sm:grid-cols-2">
-            {sectionCards.map((section) => renderDrillCard(
-              section.id,
-              <Users className="h-5 w-5" />,
-              teacherScoped ? `${section.class_name} · ${section.name}` : section.name,
-              teacherScoped ? t("View taught courses") : t("View courses"),
-              () => selectSection(section),
+            {searchedClassCards.map((item) => (
+              <Card key={item.id} className="space-y-2 p-3.5">
+                <button onClick={() => selectClass(item.id)} className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <GraduationCap className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 text-left">
+                    <span className="block truncate text-sm font-bold text-foreground">{item.name}</span>
+                    <span className="mt-0.5 block text-xs font-medium text-muted-foreground">{t("View sections")}</span>
+                  </span>
+                  <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", classId === item.id ? "rotate-90" : "")} />
+                </button>
+                {classId === item.id ? (
+                  <div className="space-y-2 border-t border-border pt-2">
+                    {!teacherScoped && canManage ? (
+                      <div className="space-y-1">
+                        <button disabled={publish.isPending || classMatrix.isLoading || !canPublishClassResults} onClick={() => publish.mutate()} className="gradient-emerald w-full rounded-xl py-2 text-xs font-bold text-primary-foreground disabled:opacity-60">
+                          {t("Publish class results")}
+                        </button>
+                        {!classMatrix.isLoading && classMissingMarkCount > 0 ? (
+                          <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+                            {t("Complete all course marks before publishing")} ({classMissingMarkCount})
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {sectionCards.map((section) => (
+                      <button key={section.id} onClick={() => selectSection(section)} className="w-full rounded-xl bg-muted px-3 py-2.5 text-left">
+                        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary"><Users className="h-4 w-4" /></span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">{section.name}</span>
+                            <span className="block truncate text-xs text-muted-foreground">{teacherScoped ? t("View taught courses") : t("View courses")}</span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </button>
+                    ))}
+                    {((teacherScoped && !myTimetable.isLoading) || (!teacherScoped && !sections.isLoading)) && sectionCards.length === 0 ? <EmptyState title={t("No sections found")} /> : null}
+                    {(teacherScoped ? myTimetable.isLoading : sections.isLoading) ? <SkeletonList rows={2} /> : null}
+                  </div>
+                ) : null}
+              </Card>
             ))}
-            {((teacherScoped && !myTimetable.isLoading) || (!teacherScoped && !sections.isLoading)) && sectionCards.length === 0 ? <EmptyState title={t("No sections found")} /> : null}
-            {(teacherScoped ? myTimetable.isLoading : sections.isLoading) ? <SkeletonList rows={3} /> : null}
+            {!classes.isLoading && !myTimetable.isLoading && searchedClassCards.length === 0 ? <EmptyState title={t("No classes found")} /> : null}
+            {(!teacherScoped && classes.isLoading) || (teacherScoped && myTimetable.isLoading) ? <SkeletonList rows={3} /> : null}
           </div>
         </div>
       ) : null}
 
       {step === "courses" ? (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {courseCards.map((course) => renderDrillCard(
-            course.course_id,
-            <BookOpen className="h-5 w-5" />,
-            course.course_name,
-            `${course.exam_types.length} ${t("components")}${course.teacher_name ? ` · ${course.teacher_name}` : ""}`,
-            () => selectCourse(course.course_id),
-          ))}
-          {!sectionMatrix.isLoading && courseCards.length === 0 ? <EmptyState title={t("No courses found")} /> : null}
-          {sectionMatrix.isLoading ? <SkeletonList rows={3} /> : null}
-        </div>
+        <>
+          {courseCards.length > 4 ? (
+            <DrillSearchInput value={courseSearch} onChange={setCourseSearch} placeholder={t("Search courses...")} />
+          ) : null}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {searchedCourseCards.map((course) => renderDrillCard(
+              course.course_id,
+              <BookOpen className="h-5 w-5" />,
+              course.course_name,
+              `${course.exam_types.length} ${t("components")}${course.teacher_name ? ` · ${course.teacher_name}` : ""}`,
+              () => selectCourse(course.course_id),
+            ))}
+            {!sectionMatrix.isLoading && searchedCourseCards.length === 0 ? <EmptyState title={t("No courses found")} /> : null}
+            {sectionMatrix.isLoading ? <SkeletonList rows={3} /> : null}
+          </div>
+        </>
       ) : null}
 
       {step === "marks" && selectedCourse ? (
@@ -857,6 +1002,9 @@ export function ResultsView({
             <button disabled={submitReview.isPending} onClick={() => submitReview.mutate()} className="gradient-emerald flex w-full items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold text-primary-foreground disabled:opacity-60">
               <Send className="h-4 w-4" /> {t("Submit result to Principal")}
             </button>
+          ) : null}
+          {(activeSectionMatrix?.students.length ?? 0) > 8 ? (
+            <DrillSearchInput value={markSearch} onChange={setMarkSearch} placeholder={t("Search students...")} />
           ) : null}
           {markRows.map((student) => (
             <Card key={student.student_id} className="space-y-2 p-3.5">

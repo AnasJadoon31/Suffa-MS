@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download } from "lucide-react";
+import { BookOpen, ChevronRight, Download, GraduationCap, Users } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppShell } from "@/components/app/AppShell";
-import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
 import { Card, CustomDropdown, EmptyState, Field, Pill, SectionTitle, SkeletonList, TextArea, TextInput } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
@@ -14,7 +13,7 @@ import { operationsApi } from "@/lib/mms/endpoints";
 import { assessmentsApi, assessmentsMutations, filesApi, type Assignment, uploadFile } from "@/lib/mms/more-endpoints";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { cn } from "@/lib/utils";
-import { MarkingView, ResultsView } from "./examination";
+import { DrillHeader, DrillSearchInput, MarkingView, ResultsView } from "./examination";
 
 export const Route = createFileRoute("/my-assessments")({
   head: () => ({
@@ -42,6 +41,9 @@ function MyAssessmentsPage() {
   const [newAttachmentFile, setNewAttachmentFile] = useState<File | null>(null);
   const [newDueDate, setNewDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [newMaxMarks, setNewMaxMarks] = useState("");
+  const [classSearch, setClassSearch] = useState("");
+  const [courseSearch, setCourseSearch] = useState("");
+  const [assignmentSearch, setAssignmentSearch] = useState("");
 
   const myTimetable = useQuery({
     queryKey: ["my-timetable"],
@@ -56,26 +58,31 @@ function MyAssessmentsPage() {
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [myTimetable.data]);
+  const searchedClassOptions = useMemo(() => {
+    const term = classSearch.trim().toLowerCase();
+    if (!term) return classOptions;
+    return classOptions.filter((item) => item.name.toLowerCase().includes(term));
+  }, [classOptions, classSearch]);
   const sectionOptions = useMemo(() => {
     if (!filters.classId) return [];
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
       if (
         slot.class_id === filters.classId &&
-        (!filters.courseId || slot.course_id === filters.courseId) &&
         slot.section_id
       ) {
         map.set(slot.section_id, slot.section_name ?? "—");
       }
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [filters.classId, filters.courseId, myTimetable.data]);
+  }, [filters.classId, myTimetable.data]);
   const courseOptions = useMemo(() => {
+    if (!filters.classId || !filters.sectionId) return [];
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
       if (
-        (!filters.classId || slot.class_id === filters.classId) &&
-        (!filters.sectionId || slot.section_id === filters.sectionId) &&
+        slot.class_id === filters.classId &&
+        slot.section_id === filters.sectionId &&
         slot.course_id
       ) {
         map.set(slot.course_id, slot.course_name ?? "—");
@@ -83,6 +90,11 @@ function MyAssessmentsPage() {
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [filters.classId, filters.sectionId, myTimetable.data]);
+  const searchedCourseOptions = useMemo(() => {
+    const term = courseSearch.trim().toLowerCase();
+    if (!term) return courseOptions;
+    return courseOptions.filter((item) => item.name.toLowerCase().includes(term));
+  }, [courseOptions, courseSearch]);
   const newSectionOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
@@ -113,9 +125,19 @@ function MyAssessmentsPage() {
       course_id: filters.courseId || undefined,
       sort: "created_at",
     }),
-    enabled: Boolean(user),
+    enabled: Boolean(user && filters.classId && filters.sectionId && filters.courseId),
   });
-  const activeCount = [filters.classId, filters.sectionId, filters.courseId].filter(Boolean).length;
+  const selectedClassName = classOptions.find((item) => item.id === filters.classId)?.name;
+  const selectedSectionName = sectionOptions.find((item) => item.id === filters.sectionId)?.name;
+  const selectedCourseName = courseOptions.find((item) => item.id === filters.courseId)?.name;
+  const visibleAssignments = useMemo(() => {
+    const list = assignments.data ?? [];
+    const term = assignmentSearch.trim().toLowerCase();
+    if (!term) return list;
+    return list.filter((assignment) =>
+      `${assignment.title} ${assignment.description ?? ""} ${assignment.due_date ?? ""}`.toLowerCase().includes(term),
+    );
+  }, [assignmentSearch, assignments.data]);
 
   const handleCreateAssignment = async () => {
     const attachmentKey = newAttachmentFile ? await uploadFile(newAttachmentFile, "assignments") : undefined;
@@ -221,105 +243,173 @@ function MyAssessmentsPage() {
       {tab === "results" ? <ResultsView canManage={false} teacherScoped /> : null}
       {tab !== "assignments" ? null : (
         <>
-      <FilterBar
-        activeCount={activeCount}
-        onClear={() => setFilters({ classId: "", sectionId: "", courseId: "" })}
-      >
-        <Field label={t("Class")}>
-          <CustomDropdown
-            value={filters.classId}
-            onChange={(event) => setFilters({ classId: event.target.value, sectionId: "", courseId: "" })}
-          >
-            <option value="">{t("All classes")}</option>
-            {classOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </CustomDropdown>
-        </Field>
-        <Field label={t("Section")}>
-          <CustomDropdown
-            value={filters.sectionId}
-            disabled={!filters.classId}
-            onChange={(event) => setFilters((current) => ({ ...current, sectionId: event.target.value }))}
-          >
-            <option value="">{t("All sections")}</option>
-            {sectionOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </CustomDropdown>
-        </Field>
-        <Field label={t("Course")}>
-          <CustomDropdown
-            value={filters.courseId}
-            onChange={(event) => setFilters((current) => ({ ...current, courseId: event.target.value, sectionId: "" }))}
-          >
-            <option value="">{t("All courses")}</option>
-            {courseOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </CustomDropdown>
-        </Field>
-      </FilterBar>
-      {assignments.isLoading ? <SkeletonList rows={4} /> : null}
-      {assignments.isError ? (
-        <EmptyState title={apiErrorMessage(assignments.error, t("Could not load assignments"))} />
-      ) : null}
-      <SectionTitle>{t("Assignments")}</SectionTitle>
-      {assignments.data?.length === 0 ? (
-        <EmptyState title={t("No assignments yet")} />
-      ) : (
-        <div className="space-y-2.5">
-          {assignments.data?.map((assignment) => {
-            return (
-              <div
-                key={assignment.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedAssignment(assignment)}
-                onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
-                  if (event.key === "Enter" || event.key === " ") setSelectedAssignment(assignment);
-                }}
-                className="cursor-pointer"
-              >
-              <Card className="space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-semibold">{assignment.title}</p>
-                    {assignment.description ? (
-                      <p className="mt-0.5 text-xs text-muted-foreground">{assignment.description}</p>
+          {!filters.sectionId ? (
+            <>
+              <SectionTitle>{t("Classes")}</SectionTitle>
+              {classOptions.length > 4 ? (
+                <DrillSearchInput value={classSearch} onChange={setClassSearch} placeholder={t("Search classes...")} />
+              ) : null}
+              <div className="space-y-2">
+                {searchedClassOptions.map((item) => (
+                  <Card key={item.id} className="space-y-2 p-3.5">
+                    <button
+                      onClick={() => setFilters((current) => ({
+                        classId: current.classId === item.id ? "" : item.id,
+                        sectionId: "",
+                        courseId: "",
+                      }))}
+                      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"
+                    >
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+                        <GraduationCap className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 text-left">
+                        <p className="truncate font-semibold">{item.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{t("View sections")}</p>
+                      </div>
+                      <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", filters.classId === item.id ? "rotate-90" : "")} />
+                    </button>
+                    {filters.classId === item.id ? (
+                      <div className="space-y-2 border-t border-border pt-2">
+                        {sectionOptions.map((section) => (
+                          <button
+                            key={section.id}
+                            onClick={() => setFilters((current) => ({ ...current, sectionId: section.id, courseId: "" }))}
+                            className="w-full"
+                          >
+                            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl bg-muted px-3 py-2.5">
+                              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
+                                <Users className="h-4 w-4" />
+                              </span>
+                              <div className="min-w-0 text-left">
+                                <p className="truncate text-sm font-semibold">{section.name}</p>
+                                <p className="truncate text-xs text-muted-foreground">{t("View courses")}</p>
+                              </div>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </button>
+                        ))}
+                        {sectionOptions.length === 0 ? <EmptyState title={t("No sections found")} /> : null}
+                      </div>
                     ) : null}
-                    {assignment.due_date ? (
-                      <p className="mt-1 text-xs">
-                        <Pill tone="warning">{t("Due")} {assignment.due_date.slice(0, 10)}</Pill>
-                      </p>
-                    ) : null}
-                  </div>
-                  <Pill tone="muted">{t("Review")}</Pill>
-                </div>
-                {assignment.attachment_key ? (
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void openAssignmentAttachment(assignment.attachment_key!);
-                    }}
-                    className="flex items-center gap-1 text-xs font-bold text-primary"
-                  >
-                    <Download className="h-3 w-3" />
-                    {t("Attachment")}
-                  </button>
-                ) : null}
-                {assignment.submission_mark != null ? (
-                  <p className="text-xs">
-                    {t("Mark")}: {assignment.submission_mark}{" "}
-                    {assignment.submission_feedback ? `— ${assignment.submission_feedback}` : ""}
-                  </p>
-                ) : null}
-              </Card>
+                  </Card>
+                ))}
+                {myTimetable.isLoading ? <SkeletonList rows={3} /> : null}
+                {!myTimetable.isLoading && searchedClassOptions.length === 0 ? <EmptyState title={t("No classes found")} /> : null}
               </div>
-            );
-          })}
-        </div>
-      )}
-      {selectedAssignment ? (
-        <TeacherAssignmentReviewSheet
-          assignment={selectedAssignment}
-          onClose={() => setSelectedAssignment(null)}
-        />
-      ) : null}
+            </>
+          ) : (
+            <DrillHeader onBack={() => setFilters({ classId: "", sectionId: "", courseId: "" })}>
+              <span className="text-xs font-bold uppercase text-muted-foreground">{t("Class")}</span>
+              <Pill tone="gold">{selectedClassName ?? t("Selected")}</Pill>
+              {selectedSectionName ? <Pill tone="muted">{selectedSectionName}</Pill> : null}
+              {selectedCourseName ? <Pill tone="muted">{selectedCourseName}</Pill> : null}
+            </DrillHeader>
+          )}
+
+          {filters.classId && filters.sectionId && !filters.courseId ? (
+            <>
+              <SectionTitle>{t("Courses")}</SectionTitle>
+              {courseOptions.length > 4 ? (
+                <DrillSearchInput value={courseSearch} onChange={setCourseSearch} placeholder={t("Search courses...")} />
+              ) : null}
+              <div className="space-y-2">
+                {searchedCourseOptions.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setFilters((current) => ({ ...current, courseId: item.id }))}
+                    className="w-full"
+                  >
+                    <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+                        <BookOpen className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 text-left">
+                        <p className="truncate font-semibold">{item.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{t("View assignments")}</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </Card>
+                  </button>
+                ))}
+                {searchedCourseOptions.length === 0 ? <EmptyState title={t("No courses assigned")} /> : null}
+              </div>
+            </>
+          ) : null}
+
+          {filters.classId && filters.sectionId && filters.courseId ? (
+            <>
+              {assignments.isLoading ? <SkeletonList rows={4} /> : null}
+              {assignments.isError ? (
+                <EmptyState title={apiErrorMessage(assignments.error, t("Could not load assignments"))} />
+              ) : null}
+              <SectionTitle>{t("Assignments")}</SectionTitle>
+              {(assignments.data?.length ?? 0) > 6 ? (
+                <DrillSearchInput value={assignmentSearch} onChange={setAssignmentSearch} placeholder={t("Search assignments...")} />
+              ) : null}
+              {visibleAssignments.length === 0 ? (
+                <EmptyState title={t("No assignments yet")} />
+              ) : (
+                <div className="space-y-2.5">
+                  {visibleAssignments.map((assignment) => {
+                    return (
+                      <div
+                        key={assignment.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedAssignment(assignment)}
+                        onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+                          if (event.key === "Enter" || event.key === " ") setSelectedAssignment(assignment);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <Card className="space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold">{assignment.title}</p>
+                              {assignment.description ? (
+                                <p className="mt-0.5 text-xs text-muted-foreground">{assignment.description}</p>
+                              ) : null}
+                              {assignment.due_date ? (
+                                <p className="mt-1 text-xs">
+                                  <Pill tone="warning">{t("Due")} {assignment.due_date.slice(0, 10)}</Pill>
+                                </p>
+                              ) : null}
+                            </div>
+                            <Pill tone="muted">{t("Review")}</Pill>
+                          </div>
+                          {assignment.attachment_key ? (
+                            <button
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void openAssignmentAttachment(assignment.attachment_key!);
+                              }}
+                              className="flex items-center gap-1 text-xs font-bold text-primary"
+                            >
+                              <Download className="h-3 w-3" />
+                              {t("Attachment")}
+                            </button>
+                          ) : null}
+                          {assignment.submission_mark != null ? (
+                            <p className="text-xs">
+                              {t("Mark")}: {assignment.submission_mark}{" "}
+                              {assignment.submission_feedback ? `— ${assignment.submission_feedback}` : ""}
+                            </p>
+                          ) : null}
+                        </Card>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {selectedAssignment ? (
+                <TeacherAssignmentReviewSheet
+                  assignment={selectedAssignment}
+                  onClose={() => setSelectedAssignment(null)}
+                />
+              ) : null}
+            </>
+          ) : null}
         </>
       )}
     </AppShell>

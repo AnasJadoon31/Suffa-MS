@@ -1889,6 +1889,7 @@ Suite: 51 backend tests green; frontend `tsc --noEmit` clean.
 
 - Implemented: Replaced the lone class dropdown in the Marking flow with class cards; clicking a card performs the same selection and continues to sections/courses/exams.
 - Implemented: Replaced the lone class dropdown in `/my-timetable` with class cards; clicking a class opens that class timetable and the Back action returns to the class cards.
+- Implemented: Removed the filter wrapper from Results drill-down; Results now uses section headings and Back navigation rather than showing a filter button for class/section/course drill-down state.
 - Files: `app/src/routes/examination.tsx`, `app/src/routes/my-timetable.tsx`
 - Verified: `cd app && npm exec tsc -- --noEmit --pretty false` was run and the touched routes cleared; existing unrelated TypeScript errors remain elsewhere.
 
@@ -1980,3 +1981,25 @@ Added `backend/tests/test_frontend_endpoint_contract.py`, which extracts PWA
 API calls and verifies that each method/path matches a registered FastAPI
 route (including dynamic path segments). Together with the existing behavioral
 and authorization tests, the backend suite is now 120 tests.
+
+## 2026-08-09 - My Assessments Assignment Drilldown
+
+- Implemented: Replaced the My Assessments assignment filter sheet with a teacher-scoped card flow: classes first, sections after class selection, courses after section selection, then latest assignments for that course.
+- Files: `app/src/routes/my-assessments.tsx`
+- Verified: Focused `npm exec tsc -- --noEmit --pretty false` output has no `src/routes/my-assessments.tsx` errors; existing unrelated TypeScript errors remain elsewhere.
+- Notes: Full frontend/backend test suites were intentionally not run for this focused UI flow update.
+
+## 2026-08-10 - Assessment Drilldown Back Button Consistency
+
+- Implemented: Removed the `Teacher scoped results` helper line from My Results and standardized drilldown Back buttons across Examination and My Assessments using one shared button style.
+- Files: `app/src/routes/examination.tsx`, `app/src/routes/my-assessments.tsx`
+- Verified: Focused TypeScript output has no errors for the touched route files; `git diff --check` passed for touched files.
+- Notes: Full frontend/backend test suites were intentionally not run for this focused UI copy/style update.
+
+## 2026-08-10 - Assessment Class Accordion Search Flow
+
+- Implemented: Marking, Results, and My Assessments now start from searchable class cards; selecting a class expands an inline section accordion instead of jumping to a separate section screen.
+- Implemented: Standardized drilldown Back headers across Examination and My Assessments, and added search inputs for larger class, course, exam, student, and assignment lists.
+- Files: `app/src/routes/examination.tsx`, `app/src/routes/my-assessments.tsx`
+- Verified: Focused TypeScript output has no errors for the touched route files.
+- Notes: Full frontend/backend test suites were intentionally not run for this focused UI navigation update.
