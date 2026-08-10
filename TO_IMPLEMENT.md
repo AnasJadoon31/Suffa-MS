@@ -458,3 +458,7 @@ role/language/screenshot matrix.
 ## 2026-08-10 - Dedicated Student Profile Route Follow-up
 
 - Browser-check direct navigation, browser Back behavior, and student profile actions at mobile and desktop widths.
+
+## 2026-08-10 - Optional Application Fields For Manual Students Follow-up
+
+- Browser-check an unselected form, required custom form fields, and file/image custom fields during manual student creation.

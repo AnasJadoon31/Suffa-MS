@@ -354,8 +354,14 @@ async def create_student(
         admission_form = await session.get(AdmissionForm, payload.admission_form_id)
         if admission_form is None or admission_form.madrasa_id != madrasa.id:
             raise HTTPException(status_code=404, detail="Admission form not found")
-        fields_definition = normalize_admission_fields(admission_form.fields_definition or [])
-        validate_admission_answers(fields_definition, payload.admission_answers, require_guardian=not payload.is_independent)
+        # Direct student creation already collects the core student and guardian
+        # information. An application form contributes only its custom fields.
+        fields_definition = [
+            field
+            for field in normalize_admission_fields(admission_form.fields_definition or [])
+            if not field.get("built_in", False)
+        ]
+        validate_admission_answers(fields_definition, payload.admission_answers)
     elif payload.admission_answers:
         raise HTTPException(status_code=422, detail="admission_form_id is required with admission_answers")
 

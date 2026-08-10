@@ -5,9 +5,10 @@ import { toast } from "sonner";
 
 import { FormSheet } from "@/components/app/FormSheet";
 import { FilePickerField } from "@/components/app/FilePickerField";
+import { AdmissionAnswerFields } from "@/components/app/admissions/AdmissionAnswerFields";
 import { Field, CustomDropdown, SearchableSelect, TextInput } from "@/components/app/Primitives";
 import { academicsApi, peopleApi, type AcademicClass } from "@/lib/mms/endpoints";
-import { academicsExtraApi, peopleMutations, uploadFileObject, type Section, type StudentDetail } from "@/lib/mms/more-endpoints";
+import { academicsExtraApi, opsApi, peopleMutations, uploadFileObject, type Section, type StudentDetail } from "@/lib/mms/more-endpoints";
 import { api, apiErrorMessage } from "@/lib/mms/api";
 import { maskBForm, maskPhone } from "@/lib/masks";
 import { useTranslation } from "react-i18next";
@@ -39,6 +40,8 @@ export function StudentForm({
   const [guardians, setGuardians] = useState<{ id: string; name: string }[]>([]);
   const [guardianSearch, setGuardianSearch] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  const [admissionFormId, setAdmissionFormId] = useState("");
+  const [admissionAnswers, setAdmissionAnswers] = useState<Record<string, unknown>>({});
 
   const guardiansQuery = useQuery({
     queryKey: ["guardians-search", guardianSearch],
@@ -70,6 +73,18 @@ export function StudentForm({
     queryFn: () => (enrollClassId ? academicsExtraApi.listSections(enrollClassId) : Promise.resolve([])),
     enabled: Boolean(enrollClassId),
   });
+
+  const admissionFormsQuery = useQuery({
+    queryKey: ["admission-forms"],
+    queryFn: () => opsApi.listAdmissionForms(),
+    enabled: !isEdit,
+    retry: false,
+  });
+
+  const selectedAdmissionForm = admissionFormsQuery.data?.find((form) => form.id === admissionFormId);
+  const applicationFields = (selectedAdmissionForm?.fields_definition ?? []).filter(
+    (field) => field.enabled !== false && !field.built_in,
+  );
 
   const selectedSection = useMemo(() => {
     if (!sectionId || !sectionsQuery.data) return null;
@@ -146,6 +161,7 @@ export function StudentForm({
         preferred_language: lang,
         guardian_ids: guardians.map((g) => g.id),
         ...(photoFileId ? { photo_file_id: photoFileId } : {}),
+        ...(admissionFormId ? { admission_form_id: admissionFormId, admission_answers: admissionAnswers } : {}),
       });
       toast.success("Student created");
       setName("");
@@ -155,6 +171,8 @@ export function StudentForm({
       setAddress("");
       setGuardians([]);
       setPhoto(null);
+      setAdmissionFormId("");
+      setAdmissionAnswers({});
       setEnrollClassId("");
       setEnrollSectionId("");
 
@@ -342,6 +360,32 @@ export function StudentForm({
             </div>
           ) : null}
         </>
+      ) : null}
+      {!isEdit ? (
+        <div className="space-y-3 border-t border-border pt-4">
+          <Field label={t("Application form") }>
+            <CustomDropdown
+              value={admissionFormId}
+              onChange={(event) => {
+                setAdmissionFormId(event.target.value);
+                setAdmissionAnswers({});
+              }}
+            >
+              <option value="">{t("No application form")}</option>
+              {(admissionFormsQuery.data ?? []).map((form) => (
+                <option key={form.id} value={form.id}>{form.title}</option>
+              ))}
+            </CustomDropdown>
+          </Field>
+          {selectedAdmissionForm?.description ? <p className="text-sm text-muted-foreground">{selectedAdmissionForm.description}</p> : null}
+          {selectedAdmissionForm && applicationFields.length > 0 ? (
+            <AdmissionAnswerFields
+              fields={applicationFields}
+              answers={admissionAnswers}
+              onChange={setAdmissionAnswers}
+            />
+          ) : null}
+        </div>
       ) : null}
     </FormSheet>
   );

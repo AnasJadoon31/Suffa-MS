@@ -2126,3 +2126,9 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: The direct New student form accepts an image-only profile-picture upload. The upload creates a tenant-scoped file record, attaches its ID to the student profile, and the profile header and student directory cards resolve and display it. Clicking the profile image in the student profile opens a zoomed modal view.
 - Files: `app/src/components/app/{FilePickerField.tsx,people/{StudentForm.tsx,PersonDetail.tsx}}`, `app/src/routes/people.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/files/{routes.py,schemas.py}`.
 - Verified: backend `py_compile`, `cd app && npm run build`, `git diff --check`, and API health; no full test suite run per request.
+
+## 2026-08-10 - Optional Application Fields For Manual Students
+
+- Implemented: New student creation retains its default student and guardian fields, then offers an optional application-form selector. Selected forms contribute only their custom fields; their answers and a schema snapshot are stored with the student.
+- Files: `app/src/components/app/people/StudentForm.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/people/routes.py`.
+- Verified: backend `py_compile`, `cd app && npm run build`, `git diff --check`, backend health, and frontend availability; no full test suite run per request.

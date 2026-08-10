@@ -1028,6 +1028,8 @@ export const peopleMutations = {
     phone?: string;
     is_independent?: boolean;
     photo_file_id?: string;
+    admission_form_id?: string;
+    admission_answers?: Record<string, unknown>;
   }) => api.post<StudentDetail>("/api/v1/people/students", payload).then((r) => r.data),
   updateStudent: (
     id: string,
