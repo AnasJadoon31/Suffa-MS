@@ -377,6 +377,10 @@ async def _assert_can_mark_entry(
 @router.get("/classes", response_model=list[AttendanceClassRead])
 async def attendance_classes(
     response: Response,
+    attendance_date: date | None = Query(default=None),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    attendance_status: AttendanceStatus | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
@@ -415,6 +419,52 @@ async def attendance_classes(
     if not class_ids:
         response.headers["X-Total-Count"] = "0"
         return []
+
+    if (
+        attendance_date is not None
+        or start_date is not None
+        or end_date is not None
+        or attendance_status is not None
+    ):
+        matching_class_ids_stmt = (
+            select(Enrollment.class_id)
+            .join(
+                StudentAttendance,
+                and_(
+                    StudentAttendance.student_id == Enrollment.student_id,
+                    StudentAttendance.session_id == Enrollment.session_id,
+                ),
+            )
+            .where(
+                Enrollment.madrasa_id == madrasa.id,
+                Enrollment.session_id == active_session.id,
+                Enrollment.class_id.in_(class_ids),
+                Enrollment.ended_on.is_(None),
+            )
+            .distinct()
+        )
+        if attendance_date is not None:
+            matching_class_ids_stmt = matching_class_ids_stmt.where(
+                StudentAttendance.attendance_date == attendance_date
+            )
+        if start_date is not None:
+            matching_class_ids_stmt = matching_class_ids_stmt.where(
+                StudentAttendance.attendance_date >= start_date
+            )
+        if end_date is not None:
+            matching_class_ids_stmt = matching_class_ids_stmt.where(
+                StudentAttendance.attendance_date <= end_date
+            )
+        if attendance_status is not None:
+            matching_class_ids_stmt = matching_class_ids_stmt.where(
+                StudentAttendance.status == attendance_status
+            )
+        matching_class_ids = set((await session.execute(matching_class_ids_stmt)).scalars().all())
+        class_rows = [row for row in class_rows if row[0] in matching_class_ids]
+        class_ids = [row[0] for row in class_rows]
+        if not class_ids:
+            response.headers["X-Total-Count"] = "0"
+            return []
 
     section_stmt = select(Section.id, Section.class_id, Section.name).where(
         Section.madrasa_id == madrasa.id,
@@ -869,6 +919,7 @@ async def _teacher_history_entries(
         entries.append(
             TeacherAttendanceLogEntry(
                 id=record.id,
+                session_id=record.session_id,
                 teacher_id=record.teacher_id,
                 teacher_name=teacher_name,
                 employee_code=employee_code,

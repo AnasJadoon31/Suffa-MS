@@ -1,7 +1,7 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { BookOpen, CalendarRange, ChevronDown, ChevronUp, GraduationCap, Layers, Plus, Trash2, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
@@ -19,9 +19,19 @@ import {
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/mms/api";
 import { useAuth } from "@/lib/mms/auth";
-import { academicsApi, type AcademicClass } from "@/lib/mms/endpoints";
+import { academicsApi, type AcademicClass, type AcademicSession } from "@/lib/mms/endpoints";
 import { academicsExtraApi, academicsMutations, type Section } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/academics")({
   head: () => ({
@@ -39,7 +49,7 @@ type Tab = "sessions" | "programs" | "classes" | "courses";
 
 function AcademicsPage() {
     const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const client = useQueryClient();
   const canManage = Boolean(user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate);
   const [tab, setTab] = useState<Tab>("sessions");
@@ -72,6 +82,30 @@ function AcademicsPage() {
   const [programSearch, setProgramSearch] = useState("");
   const [classSearch, setClassSearch] = useState("");
   const [courseSearch, setCourseSearch] = useState("");
+  const [sessionCreateMode, setSessionCreateMode] = useState<"rollover" | "blank">("rollover");
+  const [rolloverSourceSessionId, setRolloverSourceSessionId] = useState("");
+  const [promotionTargets, setPromotionTargets] = useState<Record<string, string>>({});
+  const [copyTimetable, setCopyTimetable] = useState(true);
+  const [copyHolidays, setCopyHolidays] = useState(true);
+  const [editingSession, setEditingSession] = useState<AcademicSession | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
+  const [editingCourse, setEditingCourse] = useState<{ id: string; name: string } | null>(null);
+  const [courseName, setCourseName] = useState("");
+  const [deleteCourseId, setDeleteCourseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editingSession) return;
+    setEditName(editingSession.name);
+    setEditStart(editingSession.start_date ?? "");
+    setEditEnd(editingSession.end_date ?? "");
+  }, [editingSession]);
+
+  useEffect(() => {
+    if (editingCourse) setCourseName(editingCourse.name);
+  }, [editingCourse]);
 
   const filteredPrograms = useMemo(() => {
     const term = programSearch.trim().toLowerCase();
@@ -96,6 +130,22 @@ function AcademicsPage() {
     if (!term) return list;
     return list.filter((course) => course.name.toLowerCase().includes(term));
   }, [courseSearch, courses.data]);
+
+  const activeSession = useMemo(
+    () => (sessions.data ?? []).find((session) => session.is_active) ?? null,
+    [sessions.data],
+  );
+
+  const promotionClasses = useMemo(
+    () => [...(classes.data ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [classes.data],
+  );
+
+  const rolloverSourceId = rolloverSourceSessionId || activeSession?.id || "";
+
+  const defaultPromotionTarget = (index: number) => promotionClasses[index + 1]?.id ?? "__graduate__";
+  const promotionValue = (classId: string, index: number) =>
+    promotionTargets[classId] ?? defaultPromotionTarget(index);
 
   const sections = useQuery({
     queryKey: ["sections", expandedClassId],
@@ -167,6 +217,24 @@ function AcademicsPage() {
 
   const create = useMutation({
     mutationFn: async () => {
+      if (tab === "sessions" && sessionCreateMode === "rollover") {
+        if (!rolloverSourceId) throw new Error("Select the session to promote from");
+        return academicsMutations.rolloverSession(rolloverSourceId, {
+          name: name.trim(),
+          start_date: start,
+          end_date: end,
+          class_mappings: promotionClasses.map((academicClass, index) => {
+            const target = promotionValue(academicClass.id, index);
+            return {
+              current_class_id: academicClass.id,
+              next_class_id: target === "__graduate__" ? null : target,
+            };
+          }),
+          copy_timetable: copyTimetable,
+          copy_holidays: copyHolidays,
+          shift_holiday_dates: true,
+        });
+      }
       if (tab === "sessions")
         return academicsMutations.createSession({
           name: name.trim(),
@@ -178,19 +246,77 @@ function AcademicsPage() {
         return academicsMutations.createClass({ program_id: programId, name: name.trim() });
       return academicsMutations.createCourse(name.trim());
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Created");
       setName("");
-      void client.invalidateQueries({ queryKey: [tab] });
+      setPromotionTargets({});
+      if (tab === "sessions" && sessionCreateMode === "rollover") await refresh();
+      await client.invalidateQueries();
     },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not create"),
   });
 
   const activate = useMutation({
     mutationFn: (id: string) => academicsMutations.activateSession(id),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Session activated");
-      void client.invalidateQueries({ queryKey: ["sessions"] });
+      await refresh();
+      await client.invalidateQueries();
     },
+  });
+
+  const updateSession = useMutation({
+    mutationFn: () => {
+      if (!editingSession) throw new Error("Select a session first");
+      return academicsMutations.updateSession(editingSession.id, {
+        name: editName.trim(),
+        start_date: editStart,
+        end_date: editEnd,
+      });
+    },
+    onSuccess: async () => {
+      toast.success("Session updated");
+      setEditingSession(null);
+      await client.invalidateQueries({ queryKey: ["sessions"] });
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update session"),
+  });
+
+  const deleteSession = useMutation({
+    mutationFn: (id: string) => academicsMutations.deleteSession(id),
+    onSuccess: async () => {
+      toast.success("Session deleted");
+      setDeleteSessionId(null);
+      await client.invalidateQueries({ queryKey: ["sessions"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not delete session"),
+  });
+
+  const updateCourse = useMutation({
+    mutationFn: () => {
+      if (!editingCourse) throw new Error("Select a course first");
+      return academicsMutations.updateCourse(editingCourse.id, courseName.trim());
+    },
+    onSuccess: async () => {
+      toast.success("Course updated");
+      setEditingCourse(null);
+      await client.invalidateQueries({ queryKey: ["courses"] });
+      await client.invalidateQueries({ queryKey: ["program-courses"] });
+      await client.invalidateQueries({ queryKey: ["class-courses"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update course"),
+  });
+
+  const deleteCourse = useMutation({
+    mutationFn: (id: string) => academicsMutations.deleteCourse(id),
+    onSuccess: async () => {
+      toast.success("Course deleted");
+      setDeleteCourseId(null);
+      await client.invalidateQueries({ queryKey: ["courses"] });
+      await client.invalidateQueries({ queryKey: ["program-courses"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not delete course"),
   });
 
   return (
@@ -225,24 +351,110 @@ function AcademicsPage() {
               </Field>
             ) : null}
             {tab === "sessions" ? (
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={t("Start")}>
-                  <TextInput
-                    type="date"
-                    required
-                    value={start}
-                    onChange={(e) => setStart(e.target.value)}
-                  />
-                </Field>
-                <Field label={t("End")}>
-                  <TextInput
-                    type="date"
-                    required
-                    value={end}
-                    onChange={(e) => setEnd(e.target.value)}
-                  />
-                </Field>
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1">
+                  {(["rollover", "blank"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setSessionCreateMode(mode)}
+                      className={cn(
+                        "rounded-xl py-2 text-xs font-bold uppercase tracking-wide",
+                        sessionCreateMode === mode
+                          ? "bg-card text-primary shadow-[var(--shadow-soft)]"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {mode === "rollover" ? t("Promote students") : t("Empty session")}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label={t("Start")}>
+                    <TextInput
+                      type="date"
+                      required
+                      value={start}
+                      onChange={(e) => setStart(e.target.value)}
+                    />
+                  </Field>
+                  <Field label={t("End")}>
+                    <TextInput
+                      type="date"
+                      required
+                      value={end}
+                      onChange={(e) => setEnd(e.target.value)}
+                    />
+                  </Field>
+                </div>
+                {sessionCreateMode === "rollover" ? (
+                  <div className="space-y-3 rounded-2xl border border-border bg-muted/35 p-3">
+                    <Field label={t("Promote from")}>
+                      <CustomDropdown
+                        required
+                        value={rolloverSourceId}
+                        onChange={(event) => setRolloverSourceSessionId(event.target.value)}
+                      >
+                        <option value="">{t("Select session")}</option>
+                        {(sessions.data ?? []).map((session) => (
+                          <option key={session.id} value={session.id}>
+                            {session.name}
+                            {session.is_active ? " (Active)" : ""}
+                          </option>
+                        ))}
+                      </CustomDropdown>
+                    </Field>
+                    <div className="space-y-2">
+                      <p className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">
+                        {t("Promotion map")}
+                      </p>
+                      {promotionClasses.map((academicClass, index) => (
+                        <label
+                          key={academicClass.id}
+                          className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 rounded-xl bg-card p-2.5"
+                        >
+                          <span className="truncate text-sm font-bold">{academicClass.name}</span>
+                          <CustomDropdown
+                            value={promotionValue(academicClass.id, index)}
+                            onChange={(event) =>
+                              setPromotionTargets((current) => ({
+                                ...current,
+                                [academicClass.id]: event.target.value,
+                              }))
+                            }
+                          >
+                            <option value="__graduate__">{t("Graduate / leave unenrolled")}</option>
+                            {promotionClasses.map((targetClass) => (
+                              <option key={targetClass.id} value={targetClass.id}>
+                                {targetClass.name}
+                              </option>
+                            ))}
+                          </CustomDropdown>
+                        </label>
+                      ))}
+                    </div>
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={copyTimetable}
+                        onChange={(event) => setCopyTimetable(event.target.checked)}
+                      />
+                      {t("Copy timetable to new session")}
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={copyHolidays}
+                        onChange={(event) => setCopyHolidays(event.target.checked)}
+                      />
+                      {t("Copy holidays to new session")}
+                    </label>
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {t("Sections are matched by name in the target class. If no matching section exists, the first section in that class is used.")}
+                    </p>
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </FormSheet>
         ) : undefined
@@ -276,13 +488,99 @@ function AcademicsPage() {
             title: item.name,
             subtitle: `${item.start_date ?? ""} — ${item.end_date ?? ""}`,
             pill: item.is_active ? "Active" : undefined,
-            action:
-              canManage && !item.is_active
-                ? { label: "Activate", onClick: () => activate.mutate(item.id) }
-                : undefined,
+            actions: canManage
+              ? [
+                  { label: "Edit", onClick: () => setEditingSession(item), variant: "soft" as const },
+                  ...(!item.is_active
+                    ? [{ label: "Activate", onClick: () => activate.mutate(item.id), variant: "soft" as const }]
+                    : []),
+                  ...(!item.is_active
+                    ? [{ label: "Delete", onClick: () => setDeleteSessionId(item.id), variant: "danger" as const }]
+                    : []),
+                ]
+              : undefined,
           }))}
         />
       ) : null}
+
+      <FormSheet
+        title={t("Edit session")}
+        submitLabel={t("Save changes")}
+        open={Boolean(editingSession)}
+        onOpenChange={(open) => {
+          if (!open) setEditingSession(null);
+        }}
+        onSubmit={() => updateSession.mutateAsync()}
+      >
+        <Field label={t("Name")}>
+          <TextInput required value={editName} onChange={(event) => setEditName(event.target.value)} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t("Start")}>
+            <TextInput type="date" required value={editStart} onChange={(event) => setEditStart(event.target.value)} />
+          </Field>
+          <Field label={t("End")}>
+            <TextInput type="date" required value={editEnd} onChange={(event) => setEditEnd(event.target.value)} />
+          </Field>
+        </div>
+        {editingSession?.is_active ? (
+          <p className="text-xs font-semibold text-muted-foreground">{t("The active session remains active while its details are edited.")}</p>
+        ) : null}
+      </FormSheet>
+
+      <AlertDialog open={Boolean(deleteSessionId)} onOpenChange={(open) => !open && setDeleteSessionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Delete session?")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("Only an inactive session with no enrolled students or session records can be deleted.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteSessionId && deleteSession.mutate(deleteSessionId)}
+            >
+              {t("Delete session")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <FormSheet
+        title={t("Edit course")}
+        submitLabel={t("Save changes")}
+        open={Boolean(editingCourse)}
+        onOpenChange={(open) => {
+          if (!open) setEditingCourse(null);
+        }}
+        onSubmit={() => updateCourse.mutateAsync()}
+      >
+        <Field label={t("Name")}>
+          <TextInput required value={courseName} onChange={(event) => setCourseName(event.target.value)} />
+        </Field>
+      </FormSheet>
+
+      <AlertDialog open={Boolean(deleteCourseId)} onOpenChange={(open) => !open && setDeleteCourseId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Delete course?")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("A course can only be deleted when it is not assigned to any class.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteCourseId && deleteCourse.mutate(deleteCourseId)}
+            >
+              {t("Delete course")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {!loading && tab === "programs" ? (
         <div className="space-y-2">
@@ -395,6 +693,12 @@ function AcademicsPage() {
               icon: <BookOpen className="h-5 w-5" />,
               title: item.name,
               subtitle: "Course",
+              actions: canManage
+                ? [
+                    { label: "Edit", onClick: () => setEditingCourse({ id: item.id, name: item.name }), variant: "soft" as const },
+                    { label: "Delete", onClick: () => setDeleteCourseId(item.id), variant: "danger" as const },
+                  ]
+                : undefined,
             }))}
           />
         </div>
@@ -415,6 +719,7 @@ function Items({
     subtitle: string;
     pill?: string | undefined;
     action?: { label: string; onClick: () => void } | undefined;
+    actions?: { label: string; onClick: () => void; variant?: "soft" | "danger" }[];
   }[];
 }) {
     const { t } = useTranslation();
@@ -433,7 +738,23 @@ function Items({
             <p className="truncate font-semibold">{row.title}</p>
             <p className="truncate text-xs text-muted-foreground">{row.subtitle}</p>
           </div>
-          {row.pill ? (
+          {row.actions ? (
+            <div className="flex flex-wrap justify-end gap-1.5">
+              {row.pill ? <Pill tone="success">{row.pill}</Pill> : null}
+              {row.actions.map((action) => (
+                <button
+                  key={action.label}
+                  onClick={action.onClick}
+                  className={cn(
+                    "rounded-xl px-2.5 py-1.5 text-[0.68rem] font-bold",
+                    action.variant === "danger" ? "bg-destructive/10 text-destructive" : "bg-primary-soft text-primary",
+                  )}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          ) : row.pill ? (
             <Pill tone="success">{row.pill}</Pill>
           ) : row.action ? (
             <button

@@ -871,6 +871,10 @@ export const academicsMutations = {
     api.delete(`/api/v1/academics/classes/${classId}/sections/${sectionId}`).then((r) => r.data),
   createCourse: (name: string) =>
     api.post<Course>("/api/v1/academics/courses", { name }).then((r) => r.data),
+  updateCourse: (id: string, name: string) =>
+    api.put<Course>(`/api/v1/academics/courses/${id}`, { name }).then((r) => r.data),
+  deleteCourse: (id: string) =>
+    api.delete(`/api/v1/academics/courses/${id}`).then((r) => r.data),
   assignCourse: (classId: string, courseId: string) =>
     api
       .post(`/api/v1/academics/classes/${classId}/courses/assign`, { course_id: courseId })
@@ -881,8 +885,52 @@ export const academicsMutations = {
       .then((r) => r.data),
   activateSession: (id: string) =>
     api.post(`/api/v1/academics/sessions/${id}/activate`).then((r) => r.data),
-  createSession: (payload: { name: string; start_date: string; end_date: string }) =>
-    api.post("/api/v1/academics/sessions", payload).then((r) => r.data),
+  updateSession: (id: string, payload: { name: string; start_date: string; end_date: string }) =>
+    api
+      .put(`/api/v1/academics/sessions/${id}`, {
+        name: payload.name,
+        gregorian_start: payload.start_date,
+        gregorian_end: payload.end_date,
+        hijri_span: `${payload.start_date} - ${payload.end_date}`,
+      })
+      .then((r) => r.data),
+  deleteSession: (id: string) =>
+    api.delete(`/api/v1/academics/sessions/${id}`).then((r) => r.data),
+  createSession: (payload: {
+    name: string;
+    start_date: string;
+    end_date: string;
+    is_active?: boolean;
+  }) =>
+    api.post("/api/v1/academics/sessions", {
+      name: payload.name,
+      gregorian_start: payload.start_date,
+      gregorian_end: payload.end_date,
+      hijri_span: `${payload.start_date} - ${payload.end_date}`,
+      is_active: payload.is_active ?? false,
+    }).then((r) => r.data),
+  rolloverSession: (
+    sourceSessionId: string,
+    payload: {
+      name: string;
+      start_date: string;
+      end_date: string;
+      class_mappings: { current_class_id: string; next_class_id: string | null }[];
+      copy_timetable?: boolean;
+      copy_holidays?: boolean;
+      shift_holiday_dates?: boolean;
+    },
+  ) =>
+    api.post(`/api/v1/academics/sessions/${sourceSessionId}/rollover`, {
+      name: payload.name,
+      gregorian_start: payload.start_date,
+      gregorian_end: payload.end_date,
+      hijri_span: `${payload.start_date} - ${payload.end_date}`,
+      class_mappings: payload.class_mappings,
+      copy_timetable: payload.copy_timetable ?? false,
+      copy_holidays: payload.copy_holidays ?? false,
+      shift_holiday_dates: payload.shift_holiday_dates ?? true,
+    }).then((r) => r.data),
 };
 
 export interface StudentDetail {

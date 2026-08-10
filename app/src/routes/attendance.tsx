@@ -4,11 +4,11 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   CircleSlash,
   Loader2,
-  LogIn,
-  LogOut,
   Minus,
   Pencil,
   Search,
@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { FilterBar } from "@/components/app/FilterBar";
 import {
   AttendanceCalendar,
   monthRange,
@@ -31,9 +32,11 @@ import {
   Card,
   CustomDropdown,
   EmptyState,
+  Field,
   Pill,
   SectionTitle,
   SkeletonList,
+  TextInput,
 } from "@/components/app/Primitives";
 import { cn } from "@/lib/utils";
 import { apiErrorMessage } from "@/lib/mms/api";
@@ -45,6 +48,7 @@ import {
   type AttendanceLogEntry,
   type AttendanceStatus,
   type AttendanceSyncEntry,
+  type TeacherAttendanceLogEntry,
 } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import { useTranslation } from "react-i18next";
@@ -132,7 +136,11 @@ function AttendanceBoard() {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManageTeachers = hasPermission("teachers.attendance.manage");
-  const canEditStudentHistory = hasPermission("attendance.edit_locked");
+  const canEditAttendanceHistory =
+    user?.role === "principal" ||
+    user?.role === "super_admin" ||
+    Boolean(user?.is_principal_delegate) ||
+    hasPermission("attendance.edit_locked");
 
   const [mode, setMode] = useState<"students" | "teachers">("students");
   const [classId, setClassId] = useState<string | null>(null);
@@ -147,11 +155,25 @@ function AttendanceBoard() {
   const [editing, setEditing] = useState(false);
   const [marks, setMarks] = useState<Record<string, AttendanceStatus>>({});
   const [search, setSearch] = useState("");
+  const [classSearch, setClassSearch] = useState("");
+  const [classCourseFilter, setClassCourseFilter] = useState("");
+  const [studentDateFrom, setStudentDateFrom] = useState("");
+  const [studentDateTo, setStudentDateTo] = useState("");
+  const [studentClassFilter, setStudentClassFilter] = useState("");
+  const [studentStatusFilter, setStudentStatusFilter] = useState<AttendanceStatus | "all">("all");
+  const [expandedAttendanceClassId, setExpandedAttendanceClassId] = useState<string | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<AttendanceStatus | "all">("all");
   const [studentId, setStudentId] = useState("");
 
   const classes = useQuery({
-    queryKey: ["attendance-classes"],
-    queryFn: () => attendanceApi.listClasses(),
+    queryKey: ["attendance-classes", studentDateFrom, studentDateTo, studentStatusFilter],
+    queryFn: () =>
+      attendanceApi.listClasses({
+        start_date: studentDateFrom || undefined,
+        end_date: studentDateTo || undefined,
+        attendance_status: studentStatusFilter === "all" ? undefined : studentStatusFilter,
+      }),
   });
   const holidays = useQuery({
     queryKey: ["holidays"],
@@ -272,6 +294,47 @@ function AttendanceBoard() {
     () => (history.data?.entries ?? []).filter((entry) => entry.attendance_date === selectedDate),
     [history.data, selectedDate],
   );
+  const filteredDayEntries = useMemo(() => {
+    const term = historySearch.trim().toLowerCase();
+    return dayEntries.filter((entry) => {
+      const matchesStatus = historyStatusFilter === "all" || entry.status === historyStatusFilter;
+      const matchesSearch =
+        !term ||
+        entry.student_name.toLowerCase().includes(term) ||
+        entry.admission_number.toLowerCase().includes(term) ||
+        (entry.course?.name ?? "").toLowerCase().includes(term);
+      return matchesStatus && matchesSearch;
+    });
+  }, [dayEntries, historySearch, historyStatusFilter]);
+
+  const classCourseOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of classes.data ?? []) {
+      for (const course of item.courses) map.set(course.id, course.name);
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [classes.data]);
+
+  const attendanceClassCards = useMemo(() => {
+    const term = classSearch.trim().toLowerCase();
+    return (classes.data ?? []).flatMap((item) => {
+      const matchesClass = !studentClassFilter || item.id === studentClassFilter;
+      const matchesCourse =
+        !classCourseFilter || item.courses.some((course) => course.id === classCourseFilter);
+      const classTextMatches =
+        !term ||
+        item.name.toLowerCase().includes(term) ||
+        item.courses.some((course) => course.name.toLowerCase().includes(term));
+      const visibleSections = classTextMatches
+        ? item.sections
+        : item.sections.filter((section) => section.name.toLowerCase().includes(term));
+      return matchesClass && matchesCourse && visibleSections.length > 0
+        ? [{ item, sections: visibleSections }]
+        : [];
+    });
+  }, [classCourseFilter, classSearch, classes.data, studentClassFilter]);
 
   useEffect(() => {
     if (tab !== "calendar") return;
@@ -406,13 +469,28 @@ function AttendanceBoard() {
     setEditing(false);
     setStudentId("");
     setSelectedDate(todayKey);
+    setExpandedAttendanceClassId(null);
+  };
+
+  const resetClassFilters = () => {
+    setClassSearch("");
+    setClassCourseFilter("");
+    setStudentDateFrom("");
+    setStudentDateTo("");
+    setStudentClassFilter("");
+    setStudentStatusFilter("all");
+  };
+
+  const resetHistoryFilters = () => {
+    setHistorySearch("");
+    setHistoryStatusFilter("all");
   };
 
   if (mode === "teachers" && canManageTeachers) {
     return (
       <AppShell title={t("Attendance")} subtitle={t("Teacher attendance log")}>
         <ModeToggle mode={mode} setMode={setMode} canManageTeachers={canManageTeachers} />
-        <TeacherAttendancePanel />
+        <TeacherAttendancePanel canEdit={canEditAttendanceHistory} />
       </AppShell>
     );
   }
@@ -421,6 +499,47 @@ function AttendanceBoard() {
     return (
       <AppShell title={t("Attendance")} subtitle={t("Choose a class to begin")}>
         <ModeToggle mode={mode} setMode={setMode} canManageTeachers={canManageTeachers} />
+        <FilterBar
+          search={{ value: classSearch, onChange: setClassSearch, placeholder: t("Search classes, sections or courses...") }}
+          activeCount={
+            (classCourseFilter ? 1 : 0) +
+            (classSearch.trim() ? 1 : 0) +
+            (studentDateFrom ? 1 : 0) +
+            (studentDateTo ? 1 : 0) +
+            (studentClassFilter ? 1 : 0) +
+            (studentStatusFilter !== "all" ? 1 : 0)
+          }
+          onClear={resetClassFilters}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label={t("From")}>
+              <TextInput type="date" value={studentDateFrom} onChange={(event) => setStudentDateFrom(event.target.value)} />
+            </Field>
+            <Field label={t("To")}>
+              <TextInput type="date" value={studentDateTo} onChange={(event) => setStudentDateTo(event.target.value)} />
+            </Field>
+            <Field label={t("Class")}>
+              <CustomDropdown value={studentClassFilter} onChange={(event) => setStudentClassFilter(event.target.value)}>
+                <option value="">{t("All classes")}</option>
+                {(classes.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </CustomDropdown>
+            </Field>
+            <Field label={t("Status")}>
+              <CustomDropdown value={studentStatusFilter} onChange={(event) => setStudentStatusFilter(event.target.value as AttendanceStatus | "all")}>
+                <option value="all">{t("All statuses")}</option>
+                <option value="present">{t("Present")}</option>
+                <option value="absent">{t("Absent")}</option>
+                <option value="leave">{t("Leave")}</option>
+              </CustomDropdown>
+            </Field>
+            <Field label={t("Course")}>
+              <CustomDropdown value={classCourseFilter} onChange={(event) => setClassCourseFilter(event.target.value)}>
+                <option value="">{t("All courses")}</option>
+                {classCourseOptions.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
+              </CustomDropdown>
+            </Field>
+          </div>
+        </FilterBar>
         {classes.isLoading ? <SkeletonList rows={5} /> : null}
         {!classes.isLoading && (classes.data ?? []).every((item) => item.sections.length === 0) ? (
           <EmptyState
@@ -428,40 +547,61 @@ function AttendanceBoard() {
             hint="Ask your principal to assign classes to you."
           />
         ) : null}
+        {!classes.isLoading && attendanceClassCards.length === 0 && (classes.data ?? []).some((item) => item.sections.length > 0) ? (
+          <EmptyState title={t("No matching classes")} />
+        ) : null}
         <div className="space-y-2.5">
-          {(classes.data ?? []).flatMap((item) =>
-            item.sections.map((section) => (
-              <button
-                key={section.id}
-                onClick={() => {
-                  setClassId(item.id);
-                  setSectionId(section.id);
-                  setCourseId("");
-                  setSlotId("");
-                  setMarks({});
-                  setSelectedDate(todayKey);
-                  setMonth(new Date());
-                }}
-                className="card-surface grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5 text-left active:scale-[0.99]"
-              >
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-                  <BookOpen className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate font-display font-extrabold">
-                    {item.name} / {section.name}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {item.courses.map((course) => course.name).join(", ") || "No courses assigned"}
-                  </p>
-                  <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                    <UsersRound className="h-3.5 w-3.5" />
-                    {section.student_count} {t("students")}</p>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-            )),
-          )}
+          {attendanceClassCards.map(({ item, sections }) => {
+            const expanded = expandedAttendanceClassId === item.id;
+            return (
+              <div key={item.id}>
+                <button
+                  onClick={() => setExpandedAttendanceClassId(expanded ? null : item.id)}
+                  className="card-surface grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5 text-left active:scale-[0.99]"
+                >
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+                    <BookOpen className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-display font-extrabold">{item.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {item.courses.map((course) => course.name).join(", ") || t("No courses assigned")}
+                    </p>
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                      <UsersRound className="h-3.5 w-3.5" />
+                      {item.student_count} {t("students")} · {sections.length} {t("sections")}
+                    </p>
+                  </div>
+                  {expanded ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                </button>
+                {expanded ? (
+                  <div className="ms-5 mt-1 space-y-1.5 border-s-2 border-border ps-3">
+                    {sections.map((section) => (
+                      <button
+                        key={section.id}
+                        onClick={() => {
+                          setClassId(item.id);
+                          setSectionId(section.id);
+                          setCourseId("");
+                          setSlotId("");
+                          setMarks({});
+                          setSelectedDate(todayKey);
+                          setMonth(new Date());
+                        }}
+                        className="flex w-full items-center justify-between gap-3 rounded-xl bg-muted px-3 py-2.5 text-left text-sm font-bold text-foreground"
+                      >
+                        <span className="truncate">{section.name}</span>
+                        <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+                          {section.student_count} {t("students")}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </AppShell>
     );
@@ -615,16 +755,35 @@ function AttendanceBoard() {
                     <EmptyState title={t("Could not load roster")} hint="You may not be assigned to this class." />
                   </div>
                 ) : (
-                  <DayEntries
-                    entries={dayEntries}
-                    sessionId={history.data?.session_id}
-                    canEdit={canEditStudentHistory}
-                    correctingEntryId={correctHistory.variables?.entry.id}
-                    isCorrecting={correctHistory.isPending}
-                    onCorrect={(entry, status, sessionId) =>
-                      correctHistory.mutate({ entry, status, sessionId })
-                    }
-                  />
+                  <>
+                    <FilterBar
+                      search={{ value: historySearch, onChange: setHistorySearch, placeholder: t("Search students or courses...") }}
+                      activeCount={(historySearch.trim() ? 1 : 0) + (historyStatusFilter !== "all" ? 1 : 0)}
+                      onClear={resetHistoryFilters}
+                    >
+                      <Select
+                        label={t("Status")}
+                        value={historyStatusFilter}
+                        onChange={(value) => setHistoryStatusFilter(value as AttendanceStatus | "all")}
+                        options={[
+                          { value: "all", label: t("All statuses") },
+                          { value: "present", label: t("Present") },
+                          { value: "absent", label: t("Absent") },
+                          { value: "leave", label: t("Leave") },
+                        ]}
+                      />
+                    </FilterBar>
+                    <DayEntries
+                      entries={filteredDayEntries}
+                      sessionId={history.data?.session_id}
+                      canEdit={canEditAttendanceHistory}
+                      correctingEntryId={correctHistory.variables?.entry.id}
+                      isCorrecting={correctHistory.isPending}
+                      onCorrect={(entry, status, sessionId) =>
+                        correctHistory.mutate({ entry, status, sessionId })
+                      }
+                    />
+                  </>
                 )
               ) : (
                 <>
@@ -747,7 +906,7 @@ function AttendanceBoard() {
                       (entry) => entry.attendance_date === selectedDate,
                     )}
                     sessionId={studentHistory.data?.session_id}
-                    canEdit={canEditStudentHistory}
+                    canEdit={canEditAttendanceHistory}
                     correctingEntryId={correctHistory.variables?.entry.id}
                     isCorrecting={correctHistory.isPending}
                     onCorrect={(entry, status, sessionId) =>
@@ -912,74 +1071,227 @@ function Select({
 
 /* --------------------------------------------------------- Teacher panel */
 
-function TeacherAttendancePanel() {
+function TeacherAttendancePanel({ canEdit }: { canEdit: boolean }) {
     const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const today = useQuery({
-    queryKey: ["teacher-attendance-today"],
-    queryFn: () => attendanceApi.myTeacherAttendanceToday(),
-    retry: false,
-  });
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<AttendanceStatus | "all">("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [correctingEntryId, setCorrectingEntryId] = useState<string | null>(null);
+  const [teacherTimeEdits, setTeacherTimeEdits] = useState<Record<string, { checkIn: string; checkOut: string }>>({});
+  const [expandedTeacherEntryId, setExpandedTeacherEntryId] = useState<string | null>(null);
   const logs = useQuery({
-    queryKey: ["teacher-attendance-history"],
-    queryFn: () => attendanceApi.teacherHistory(),
+    queryKey: ["teacher-attendance-history", dateFrom, dateTo],
+    queryFn: () =>
+      attendanceApi.teacherHistory(
+        dateFrom || dateTo
+          ? { ...(dateFrom ? { start_date: dateFrom } : {}), ...(dateTo ? { end_date: dateTo } : {}) }
+          : undefined,
+      ),
     retry: false,
   });
 
-  const check = useMutation({
-    mutationFn: (action: "in" | "out") =>
-      action === "in" ? attendanceApi.teacherCheckIn() : attendanceApi.teacherCheckOut(),
-    onSuccess: () =>
-      applyMutationSuccess({
-        client: queryClient,
-        message: "Saved",
-        queryKeys: [["teacher-attendance-today"], ["teacher-attendance-history"]],
-      }),
-    onError: (error) => toast.error(apiErrorMessage(error, "Couldn't update attendance")),
+  const correctTeacherHistory = useMutation({
+    mutationFn: ({
+      entry,
+      status,
+      checkIn = entry.check_in ?? undefined,
+      checkOut = entry.check_out ?? undefined,
+    }: {
+      entry: TeacherAttendanceLogEntry;
+      status: AttendanceStatus;
+      checkIn?: string;
+      checkOut?: string;
+    }) =>
+      attendanceApi.override(
+        {
+          subject_type: "teacher",
+          subject_id: entry.teacher_id,
+          session_id: entry.session_id,
+          attendance_date: entry.attendance_date,
+          status,
+          check_in: checkIn || undefined,
+          check_out: checkOut || undefined,
+          captured_at: new Date().toISOString(),
+          idempotency_key: `${entry.teacher_id}:${entry.session_id}:${entry.attendance_date}`,
+        },
+        "Admin corrected teacher attendance history",
+      ),
+    onSuccess: async (_data, variables) => {
+      toast.success(t("Attendance updated"));
+      setCorrectingEntryId(null);
+      setTeacherTimeEdits((current) => {
+        const { [variables.entry.id]: _saved, ...remaining } = current;
+        return remaining;
+      });
+      await queryClient.invalidateQueries({ queryKey: ["teacher-attendance-history"] });
+    },
+    onError: (error) => {
+      setCorrectingEntryId(null);
+      toast.error(apiErrorMessage(error, t("Couldn't update attendance")));
+    },
   });
+
+  const filteredLogs = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (logs.data ?? []).filter((entry) => {
+      const matchesStatus = statusFilter === "all" || entry.status === statusFilter;
+      const matchesSearch =
+        !term ||
+        entry.teacher_name.toLowerCase().includes(term) ||
+        entry.employee_code.toLowerCase().includes(term) ||
+        entry.attendance_date.includes(term);
+      return matchesStatus && matchesSearch;
+    });
+  }, [logs.data, search, statusFilter]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setDateFrom("");
+    setDateTo("");
+  };
 
   return (
     <>
-      <Card className="grid grid-cols-2 gap-2">
-        <button
-          disabled={Boolean(today.data?.check_in) || check.isPending}
-          onClick={() => check.mutate("in")}
-          className="flex items-center justify-center gap-2 rounded-xl bg-primary-soft py-3 font-display text-sm font-extrabold text-primary disabled:opacity-40"
-        >
-          <LogIn className="h-4 w-4" />
-          {t("Check in")}{today.data?.check_in ? `· ${formatTime(today.data.check_in)}` : ""}
-        </button>
-        <button
-          disabled={!today.data?.check_in || Boolean(today.data?.check_out) || check.isPending}
-          onClick={() => check.mutate("out")}
-          className="flex items-center justify-center gap-2 rounded-xl bg-accent-soft py-3 font-display text-sm font-extrabold text-accent-foreground disabled:opacity-40"
-        >
-          <LogOut className="h-4 w-4" />
-          {t("Check out")}{today.data?.check_out ? `· ${formatTime(today.data.check_out)}` : ""}
-        </button>
-      </Card>
-
-      <SectionTitle>{t("Teacher log")}</SectionTitle>
+      <FilterBar
+        title={<h2 className="truncate font-display text-sm font-extrabold uppercase tracking-[0.14em] text-muted-foreground">{t("Teacher log")}</h2>}
+        search={{ value: search, onChange: setSearch, placeholder: t("Search teachers or dates...") }}
+        activeCount={(search.trim() ? 1 : 0) + (statusFilter !== "all" ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)}
+        onClear={clearFilters}
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label={t("From")}>
+            <TextInput type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          </Field>
+          <Field label={t("To")}>
+            <TextInput type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          </Field>
+          <Field label={t("Status")}>
+            <CustomDropdown value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as AttendanceStatus | "all")}>
+              <option value="all">{t("All statuses")}</option>
+              <option value="present">{t("Present")}</option>
+              <option value="absent">{t("Absent")}</option>
+              <option value="leave">{t("Leave")}</option>
+            </CustomDropdown>
+          </Field>
+        </div>
+      </FilterBar>
       {logs.isLoading ? <SkeletonList rows={5} /> : null}
-      {!logs.isLoading && (logs.data ?? []).length === 0 ? (
+      {!logs.isLoading && filteredLogs.length === 0 ? (
         <EmptyState title={t("No teacher attendance logs")} />
       ) : null}
       <div className="space-y-2">
-        {(logs.data ?? []).map((entry) => (
-          <Card
-            key={entry.id}
-            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5"
-          >
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{entry.teacher_name}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {entry.attendance_date} {t("· in")}{formatTime(entry.check_in)} {t("· out")}{" "}
-                {formatTime(entry.check_out)}
-              </p>
+        {filteredLogs.map((entry) => {
+          const timeEdit = teacherTimeEdits[entry.id] ?? {
+            checkIn: entry.check_in?.slice(0, 5) ?? "",
+            checkOut: entry.check_out?.slice(0, 5) ?? "",
+          };
+          const isEditingEntry = expandedTeacherEntryId === entry.id;
+          return (
+          <Card key={entry.id} className="space-y-3 p-3.5">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{entry.teacher_name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {entry.attendance_date} · {t("in")} {formatTime(entry.check_in)} · {t("out")} {formatTime(entry.check_out)}
+                </p>
+              </div>
+              <Pill tone={statusTone(entry.status)}>{entry.status}</Pill>
             </div>
-            <Pill tone={statusTone(entry.status)}>{entry.status}</Pill>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => setExpandedTeacherEntryId(isEditingEntry ? null : entry.id)}
+                className="flex w-full items-center justify-between rounded-xl bg-muted px-3 py-2.5 text-sm font-extrabold text-primary"
+              >
+                <span>{t("Edit attendance")}</span>
+                {isEditingEntry ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+            ) : null}
+            {canEdit && isEditingEntry ? (
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <span className="me-auto text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">
+                  {t("Change status")}
+                </span>
+                {STATUSES.map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={entry.status === value || correctingEntryId === entry.id}
+                    aria-label={`${t("Set")} ${entry.teacher_name} ${t(value)}`}
+                    onClick={() => {
+                      setCorrectingEntryId(entry.id);
+                      correctTeacherHistory.mutate({
+                        entry,
+                        status: value,
+                        checkIn: timeEdit.checkIn,
+                        checkOut: timeEdit.checkOut,
+                      });
+                    }}
+                    className={cn(
+                      "grid h-9 w-9 place-items-center rounded-xl border text-xs font-extrabold transition-colors disabled:opacity-40",
+                      entry.status === value && value === "present" && "border-transparent bg-success text-success-foreground",
+                      entry.status === value && value === "absent" && "border-transparent bg-destructive text-destructive-foreground",
+                      entry.status === value && value === "leave" && "border-transparent bg-accent text-accent-foreground",
+                      entry.status !== value && "border-border bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {correctingEntryId === entry.id && entry.status !== value ? <Loader2 className="h-4 w-4 animate-spin" /> : entry.status === value ? <Icon className="h-4 w-4" /> : label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {canEdit && isEditingEntry ? (
+              <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
+                <Field label={t("Time in")}>
+                  <TextInput
+                    type="time"
+                    value={timeEdit.checkIn}
+                    disabled={correctingEntryId === entry.id}
+                    onChange={(event) =>
+                      setTeacherTimeEdits((current) => ({
+                        ...current,
+                        [entry.id]: { ...timeEdit, checkIn: event.target.value },
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label={t("Time out")}>
+                  <TextInput
+                    type="time"
+                    value={timeEdit.checkOut}
+                    disabled={correctingEntryId === entry.id}
+                    onChange={(event) =>
+                      setTeacherTimeEdits((current) => ({
+                        ...current,
+                        [entry.id]: { ...timeEdit, checkOut: event.target.value },
+                      }))
+                    }
+                  />
+                </Field>
+                <button
+                  type="button"
+                  disabled={correctingEntryId === entry.id}
+                  onClick={() => {
+                    setCorrectingEntryId(entry.id);
+                    correctTeacherHistory.mutate({
+                      entry,
+                      status: entry.status,
+                      checkIn: timeEdit.checkIn,
+                      checkOut: timeEdit.checkOut,
+                    });
+                  }}
+                  className="col-span-2 rounded-xl bg-primary-soft px-3 py-2.5 text-sm font-extrabold text-primary disabled:opacity-40"
+                >
+                  {correctingEntryId === entry.id ? t("Saving...") : t("Save times")}
+                </button>
+              </div>
+            ) : null}
           </Card>
-        ))}
+          );
+        })}
       </div>
     </>
   );

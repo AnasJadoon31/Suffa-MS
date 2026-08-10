@@ -395,3 +395,57 @@ role/language/screenshot matrix.
 
 - Remaining: Browser-check Academics Programs, Classes, and Courses search plus class section counts after the running frontend reloads.
 - Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
+
+## 2026-08-10 - Session Switching Flow Follow-up
+
+- Remaining: Browser-check profile session selection for principal, teacher, student, and guardian accounts, including old-session read-only viewing for attendance, assignments, timetable, and results.
+- Remaining: Browser-check session activation/rollover on the running app to confirm open dashboards and self-service screens refresh to the new active session without manual logout.
+- Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
+
+## 2026-08-10 - Attendance Filters and Session Promotion Follow-up
+
+- Remaining: Browser-check Attendance student mode and teacher mode filters on the running app, including small mobile widths.
+- Remaining: Browser-check Academics session rollover with real seeded classes/sections to confirm class promotion mapping, section matching, copied timetable, copied holidays, and new active-session refresh.
+- Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
+
+## 2026-08-10 - Academic Session Editing and Deletion Follow-up
+
+- Browser-check the edit sheet, delete confirmation, and API dependency messages on the Sessions tab.
+- Keep deletion blocked for sessions with historical records so previous-session read-only access remains intact.
+
+## 2026-08-10 - Archived Session Activation Follow-up
+
+- Browser-check activating a previous session while the profile is viewing an archived session, then confirm the profile follows the newly active session.
+
+## 2026-08-10 - Course Editing and Deletion Follow-up
+
+- Browser-check the Courses tab edit sheet, duplicate-name validation, and deletion dependency message.
+
+## 2026-08-10 - Attendance Filters and History Editing Follow-up
+
+- Browser-check Students filters with dates containing present/absent/leave records and confirm class cards update correctly.
+- Browser-check Teachers date filter and admin/principal correction controls for old student and teacher attendance records.
+
+## 2026-08-10 - Attendance Date Range Follow-up
+
+- Browser-check the Finance-style Attendance filter layout and From/To range behavior at mobile and desktop widths.
+
+## 2026-08-10 - Class-First Attendance Navigation Follow-up
+
+- Browser-check class accordion expansion and section selection on mobile and desktop, including filtered class and section searches.
+
+## 2026-08-10 - Teacher Attendance Time Editing Follow-up
+
+- Browser-check admin/principal edits to check-in and check-out values, including clearing a time and status corrections with changed times.
+
+## 2026-08-10 - Collapsible Teacher Attendance Editing Follow-up
+
+- Browser-check the teacher history accordion state and compact time formatting on mobile and desktop.
+
+## 2026-08-10 - Teacher Log Toolbar Follow-up
+
+- Browser-check Teacher log title/filter alignment and shared FilterBar title rendering at narrow mobile widths.
+
+## 2026-08-10 - Automatic Teacher Absences Follow-up
+
+- In a non-production session, browser-check the next-day absence job for a teacher with no check-in, an approved-leave teacher, and a madrasa-wide holiday.

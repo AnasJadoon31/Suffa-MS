@@ -132,6 +132,7 @@ class AttendanceLogEntry(BaseModel):
 
 class TeacherAttendanceLogEntry(BaseModel):
     id: UUID
+    session_id: UUID
     teacher_id: UUID
     teacher_name: str
     employee_code: str

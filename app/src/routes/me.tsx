@@ -62,12 +62,26 @@ function MePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  useEffect(() => {
+    setLanguage(user?.preferred_language ?? "en");
+    setSelectedSessionId(user?.selected_session_id ?? "");
+  }, [user?.preferred_language, user?.selected_session_id]);
+
   const canChooseSession = (sessions.data ?? []).length > 0;
+  const activeSession = useMemo(
+    () => (sessions.data ?? []).find((session) => session.is_active) ?? null,
+    [sessions.data],
+  );
+  const selectedSession = useMemo(
+    () => (selectedSessionId ? (sessions.data ?? []).find((session) => session.id === selectedSessionId) ?? null : null),
+    [selectedSessionId, sessions.data],
+  );
+  const isViewingReadOnlySession = Boolean(selectedSession && !selectedSession.is_active);
   const activeSessionLabel = useMemo(() => {
     const sessionId = user?.selected_session_id;
-    if (!sessionId) return "Following active madrasa session";
+    if (!sessionId) return activeSession ? `${activeSession.name} (Active)` : "Following active madrasa session";
     return sessions.data?.find((session) => session.id === sessionId)?.name ?? "Custom session";
-  }, [sessions.data, user?.selected_session_id]);
+  }, [activeSession, sessions.data, user?.selected_session_id]);
 
   const saveProfile = useMutation({
     mutationFn: async () =>
@@ -80,7 +94,7 @@ function MePage() {
     onSuccess: async () => {
       await refresh();
       toast.success("Profile updated");
-      await client.invalidateQueries({ queryKey: ["dashboard"] });
+      await client.invalidateQueries();
     },
   });
 
@@ -147,15 +161,31 @@ function MePage() {
               value={selectedSessionId}
               onChange={(event) => setSelectedSessionId(event.target.value)}
             >
-              <option value="">{t("Follow active madrasa session")}</option>
+              <option value="">
+                {activeSession
+                  ? `${t("Follow active madrasa session")} (${activeSession.name})`
+                  : t("Follow active madrasa session")}
+              </option>
               {(sessions.data ?? []).map((session) => (
                 <option key={session.id} value={session.id}>
                   {session.name}
-                  {session.is_active ? " (Active)" : ""}
+                  {session.is_active ? " (Active)" : " (Read only)"}
                 </option>
               ))}
             </CustomDropdown>
           </Field>
+        ) : null}
+
+        {isViewingReadOnlySession ? (
+          <div className="space-y-1.5 rounded-xl bg-accent-soft p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-extrabold">{t("Read-only session")}</p>
+              <Pill tone="gold">{t("Archive")}</Pill>
+            </div>
+            <p className="text-xs font-semibold text-muted-foreground">
+              {t("Previous sessions can be viewed for attendance, assignments and results. Changes are only allowed in the active session.")}
+            </p>
+          </div>
         ) : null}
 
         <ActionButton

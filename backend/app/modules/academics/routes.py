@@ -3,7 +3,7 @@ from datetime import date as DateType
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -30,6 +30,8 @@ from app.modules.academics.models import (
     Section,
 )
 from app.modules.operations.models import TimetableSlot
+from app.modules.attendance.models import StudentAttendance, TeacherAttendance
+from app.modules.assessments.models import ResultPublication
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 from app.modules.academics.schemas import (
     AcademicClassCreate,
@@ -607,6 +609,7 @@ async def create_session_record(
 ) -> AcademicSessionRead:
     if payload.is_active:
         await _deactivate_all_sessions(session, madrasa.id)
+        await _clear_selected_session_preferences(session, madrasa.id)
     record = AcademicSession(madrasa_id=madrasa.id, **payload.model_dump())
     session.add(record)
     await session.commit()
@@ -642,6 +645,7 @@ async def update_session(
         
     if payload.is_active and not academic_session.is_active:
         await _deactivate_all_sessions(session, madrasa.id)
+        await _clear_selected_session_preferences(session, madrasa.id)
 
     if payload.name is not None:
         academic_session.name = payload.name
@@ -670,13 +674,22 @@ async def delete_session(
     if not academic_session or academic_session.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Check dependencies
-    enroll_exists = await session.scalar(select(Enrollment.id).where(Enrollment.session_id == session_id).limit(1))
-    if enroll_exists:
-        raise HTTPException(status_code=409, detail="Cannot delete Session because students are enrolled in it.")
-
     if academic_session.is_active:
         raise HTTPException(status_code=409, detail="Cannot delete an active session. Please activate another session first.")
+
+    # Keep deletion intentionally limited to mistaken, unused session records.
+    # Historical records must remain available for read-only session switching.
+    dependencies = (
+        (Enrollment, "students are enrolled in it"),
+        (TimetableSlot, "it has timetable entries"),
+        (StudentAttendance, "it has student attendance records"),
+        (TeacherAttendance, "it has teacher attendance records"),
+        (ResultPublication, "it has published results"),
+    )
+    for model, description in dependencies:
+        exists = await session.scalar(select(model.id).where(model.session_id == session_id).limit(1))
+        if exists:
+            raise HTTPException(status_code=409, detail=f"Cannot delete Session because {description}.")
 
     await session.delete(academic_session)
     await session.commit()
@@ -694,6 +707,7 @@ async def activate_session(
     if record is None or record.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Session not found")
     await _deactivate_all_sessions(session, madrasa.id)
+    await _clear_selected_session_preferences(session, madrasa.id)
     record.is_active = True
     await session.commit()
     await session.refresh(record)
@@ -711,6 +725,9 @@ async def rollover_session(
     session: AsyncSession = Depends(get_session),
 ) -> AcademicSessionRead:
     new_session = await perform_rollover(session, madrasa.id, session_id, payload)
+    await _clear_selected_session_preferences(session, madrasa.id)
+    await session.commit()
+    await session.refresh(new_session)
     return AcademicSessionRead.model_validate(new_session)
 
 
@@ -723,6 +740,14 @@ async def _deactivate_all_sessions(session: AsyncSession, madrasa_id: UUID) -> N
     )
     for record in result.scalars().all():
         record.is_active = False
+
+
+async def _clear_selected_session_preferences(session: AsyncSession, madrasa_id: UUID) -> None:
+    await session.execute(
+        update(User)
+        .where(User.madrasa_id == madrasa_id, User.selected_session_id.is_not(None))
+        .values(selected_session_id=None)
+    )
 
 
 # ------------------------------------------------------------------ Enrollment

@@ -53,9 +53,17 @@ async def ensure_request_context_writable(
     account or clear the selected session. Explicit route-level guards remain
     useful for payloads that target a session other than the user's context.
     """
+    # Session administration is madrasa-wide rather than scoped to the
+    # session currently selected for viewing. This lets a principal activate
+    # a previous session or correct/delete an unused session while browsing
+    # archived data, without opening ordinary historical-session writes.
+    is_session_management_route = request.url.path == "/api/v1/academics/sessions" or request.url.path.startswith(
+        "/api/v1/academics/sessions/"
+    )
     if (
         request.method in {"GET", "HEAD", "OPTIONS"}
         or user.selected_session_id is None
+        or is_session_management_route
         or request.url.path in {"/api/v1/auth/me", "/api/v1/auth/change-password"}
     ):
         return

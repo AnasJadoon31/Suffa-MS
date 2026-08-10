@@ -17,6 +17,7 @@ export function FilterBar({
   onClear,
   action,
   children,
+  title,
 }: {
   chips?: FilterChip[];
   search?: { value: string; onChange: (value: string) => void; placeholder?: string };
@@ -24,6 +25,7 @@ export function FilterBar({
   onClear: () => void;
   action?: ReactNode;
   children?: ReactNode;
+  title?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState(search?.value ?? "");
@@ -44,7 +46,9 @@ export function FilterBar({
   return (
     <div className="mb-3 space-y-2">
       <div className="flex items-center gap-2">
-        {chips && chips.length > 0 ? (
+        {title ? (
+          <div className="min-w-0 flex-1">{title}</div>
+        ) : chips && chips.length > 0 ? (
           <div className="no-scrollbar flex flex-1 gap-2 overflow-x-auto pb-0.5">
             {chips.map((chip) => (
               <button

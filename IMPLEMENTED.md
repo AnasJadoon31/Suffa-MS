@@ -2020,3 +2020,85 @@ and authorization tests, the backend suite is now 120 tests.
 - Files: `app/src/routes/academics.tsx`, `app/src/lib/mms/endpoints.ts`, `backend/app/modules/academics/routes.py`, `backend/app/modules/academics/schemas.py`
 - Verified: Focused TypeScript output has no errors for `academics.tsx` or `endpoints.ts`; backend academics route/schema files pass `py_compile`.
 - Notes: Full frontend/backend test suites were intentionally not run for this focused Academics update.
+
+## 2026-08-10 - Session Switching Flow
+
+- Implemented: Activating, updating-to-active, creating-as-active, or rolling over an academic session now clears saved per-user session selections so users automatically follow the new active madrasa session.
+- Implemented: Academics session activation now refreshes the authenticated profile and invalidates cached frontend queries so session-scoped screens shift together.
+- Implemented: My Profile now exposes the academic-session selector for all roles, labels previous sessions as read-only, and shows a read-only notice when an archived session is selected for viewing.
+- Implemented: Frontend session payloads now match the backend `gregorian_start` / `gregorian_end` contract while still exposing normalized `start_date` / `end_date` to the UI.
+- Files: `backend/app/modules/academics/routes.py`, `app/src/routes/academics.tsx`, `app/src/routes/me.tsx`, `app/src/lib/mms/endpoints.ts`, `app/src/lib/mms/more-endpoints.ts`
+- Verified: Focused TypeScript output has no errors for the touched session files; backend academics route file passes `py_compile`; `git diff --check` passed for touched files.
+- Notes: Previous-session writes are blocked by the existing backend session read-only guard. Full frontend/backend test suites were intentionally not run for this focused session-flow update.
+
+## 2026-08-10 - Attendance Filters and Session Promotion Setup
+
+- Implemented: Added attendance class/section search with a course filter before opening a roster.
+- Implemented: Added search and status filters to class attendance history and teacher attendance logs.
+- Implemented: Replaced the bare new-session form with a session creation mode selector; the default rollover flow now shows the source session, per-class promotion targets, graduate/leave-unenrolled options, and timetable/holiday copy choices.
+- Implemented: Added a frontend `rolloverSession` mutation wired to the existing backend session rollover endpoint.
+- Files: `app/src/routes/attendance.tsx`, `app/src/routes/academics.tsx`, `app/src/lib/mms/more-endpoints.ts`
+- Verified: Focused TypeScript output has no errors for the touched attendance/session files; `git diff --check` passed for touched files.
+- Notes: Full frontend/backend test suites were intentionally not run for this focused UI flow update.
+
+## 2026-08-10 - Academic Session Editing and Deletion
+
+- Implemented: Added edit and confirmed delete actions to the Academics Sessions tab. Editing updates the session name and dates; deletion is restricted to inactive, unused sessions.
+- Files: `app/src/routes/academics.tsx`, `app/src/lib/mms/more-endpoints.ts`, `backend/app/modules/academics/routes.py`.
+- Verified: Focused TypeScript diagnostics and Python compilation; no full test suite run per request.
+
+## 2026-08-10 - Session Administration While Viewing Archived Data
+
+- Implemented: Session-management endpoints are now allowed while a previous session is selected, so principals can activate, edit, roll over, or delete an eligible session. Ordinary historical-session writes remain blocked.
+- Files: `backend/app/core/dependencies.py`.
+- Verified: Backend dependency compilation; no full test suite run per request.
+
+## 2026-08-10 - Course Editing and Deletion
+
+- Implemented: Added edit and confirmed delete actions to the Academics Courses tab. Course deletion remains blocked when the course is assigned to a class.
+- Files: `app/src/routes/academics.tsx`, `app/src/lib/mms/more-endpoints.ts`.
+- Verified: Focused TypeScript diagnostics and diff checks; no full test suite run per request.
+
+## 2026-08-10 - Attendance Filters and Admin History Editing
+
+- Implemented: Added Date, Class, and Status filters inside the Students attendance filter button. Date and status filters narrow classes using matching attendance records.
+- Implemented: Added a date filter to the Teachers attendance tab and added admin/principal status correction controls for teacher history.
+- Implemented: Admin/principal attendance history editing is enabled for both student and teacher records; backend teacher history now returns the academic session ID required for corrections.
+- Files: `app/src/routes/attendance.tsx`, `app/src/lib/mms/endpoints.ts`, `backend/app/modules/attendance/routes.py`, `backend/app/modules/attendance/schemas.py`.
+- Verified: Focused TypeScript diagnostics, backend `py_compile`, and `git diff --check`; full test suites were not run per request.
+
+## 2026-08-10 - Finance-Style Attendance Date Ranges
+
+- Implemented: Reworked Attendance filter panels to use the shared Finance field-grid layout and replaced single date controls with inclusive From and To ranges for student class cards and teacher logs.
+- Files: `app/src/routes/attendance.tsx`, `app/src/lib/mms/endpoints.ts`, `backend/app/modules/attendance/routes.py`.
+- Verified: Focused TypeScript diagnostics, backend `py_compile`, and `git diff --check`; full test suites were not run per request.
+
+## 2026-08-10 - Class-First Student Attendance Navigation
+
+- Implemented: Students attendance now lists classes only. Clicking a class expands its sections inline; selecting a section continues through the existing course, calendar, marking, and history flow.
+- Files: `app/src/routes/attendance.tsx`.
+- Verified: Focused TypeScript diagnostics and `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Editable Teacher Check-In and Check-Out History
+
+- Implemented: Admin/principal teacher attendance history cards now include editable Time in and Time out fields with a dedicated save action. Status corrections retain the edited times.
+- Files: `app/src/routes/attendance.tsx`.
+- Verified: Focused TypeScript diagnostics and `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Collapsible Teacher Attendance History Editing
+
+- Implemented: Removed the Teacher Attendance screen's top check-in/check-out panel. Teacher history now displays times as `in08:10 · out 13:00`, and admin editing controls are contained within each record's Edit attendance accordion.
+- Files: `app/src/routes/attendance.tsx`.
+- Verified: Focused TypeScript diagnostics and `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Teacher Log Toolbar Alignment
+
+- Implemented: Added a title slot to the shared filter toolbar and used it to align Teacher log with its filter button. Corrected teacher time display to `in 08:10 · out 13:00`.
+- Files: `app/src/components/app/FilterBar.tsx`, `app/src/routes/attendance.tsx`.
+- Verified: Focused TypeScript diagnostics and `git diff --check`; no full test suite run per request.
+
+## 2026-08-10 - Automatic Teacher Absences
+
+- Implemented: The ARQ worker checks the completed prior day at 00:05 Asia/Karachi and marks active teachers absent when they have no attendance record and no approved leave. It respects each madrasa's school days and madrasa-wide holidays, and is idempotent on worker restarts.
+- Files: `backend/app/worker.py`.
+- Verified: Focused Python compilation, whitespace check, and running worker container health; no full test suite run per request.

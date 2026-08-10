@@ -8,7 +8,29 @@ export interface AcademicSession {
   name: string;
   start_date: string;
   end_date: string;
+  gregorian_start?: string;
+  gregorian_end?: string;
+  hijri_span?: string;
   is_active: boolean;
+}
+
+interface AcademicSessionApi {
+  id: string;
+  name: string;
+  start_date?: string;
+  end_date?: string;
+  gregorian_start?: string;
+  gregorian_end?: string;
+  hijri_span?: string;
+  is_active: boolean;
+}
+
+function normalizeSession(session: AcademicSessionApi): AcademicSession {
+  return {
+    ...session,
+    start_date: session.start_date ?? session.gregorian_start ?? "",
+    end_date: session.end_date ?? session.gregorian_end ?? "",
+  };
 }
 export interface AcademicClass {
   id: string;
@@ -26,7 +48,8 @@ export const academicsApi = {
         params: date ? { date } : {},
       })
       .then((r) => r.data),
-  listSessions: () => getAllPages<AcademicSession>("/api/v1/academics/sessions"),
+  listSessions: () =>
+    getAllPages<AcademicSessionApi>("/api/v1/academics/sessions").then((rows) => rows.map(normalizeSession)),
   listClasses: () => getAllPages<AcademicClass>("/api/v1/academics/classes"),
 };
 
@@ -152,6 +175,7 @@ export interface StudentAttendanceHistory extends ClassAttendanceHistory {
 }
 export interface TeacherAttendanceLogEntry {
   id: string;
+  session_id: string;
   teacher_id: string;
   teacher_name: string;
   employee_code: string;
@@ -181,7 +205,7 @@ export interface TeacherAttendanceToday {
   check_out: string | null;
 }
 export interface AttendanceSyncEntry {
-  subject_type: "student";
+  subject_type: "student" | "teacher";
   subject_id: string;
   session_id: string;
   course_id?: string;
@@ -190,10 +214,18 @@ export interface AttendanceSyncEntry {
   status: AttendanceStatus;
   captured_at?: string;
   idempotency_key: string;
+  check_in?: string;
+  check_out?: string;
 }
 
 export const attendanceApi = {
-  listClasses: () => getAllPages<AttendanceClassOption>("/api/v1/attendance/classes"),
+  listClasses: (params?: {
+    attendance_date?: string;
+    start_date?: string;
+    end_date?: string;
+    attendance_status?: AttendanceStatus;
+  }) =>
+    getAllPages<AttendanceClassOption>("/api/v1/attendance/classes", params),
   classRoster: (classId: string, sectionId?: string, courseId?: string, timetableSlotId?: string) =>
     api
       .get<AttendanceRoster>(`/api/v1/attendance/classes/${classId}/roster`, {
