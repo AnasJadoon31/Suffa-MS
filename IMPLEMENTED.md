@@ -3,6 +3,18 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-11 — Project README
+
+**Documentation:**
+- Replaced the baseline README with a professional project guide covering architecture, services, Docker and direct local development, configuration, tenancy, academic structure, migrations, seed-data safety, quality checks, deployment, and contribution expectations.
+
+**Files:**
+- `README.md`
+
+**Verification:**
+- Reviewed commands and environment variable names against `docker-compose.yml`, `.env.example`, package scripts, and backend entrypoint.
+- `git diff --check`
+
 ## 2026-08-11 — Class-Scoped Academic Courses
 
 **Fix:**

@@ -15,6 +15,10 @@ they do not close or weaken the new July 23 requirements.
   - Resolve the remaining feature-specific follow-ups below and add focused regression coverage for the high-risk flows.
 - Completion rule: do not describe the app as production-ready until these release blockers and the open items below are verified end to end.
 
+## Documentation Maintenance
+
+- Keep `README.md` deployment commands, environment variables, service URLs, and operational notes synchronized whenever the Docker stack, authentication boundary, storage integration, or messaging lifecycle changes.
+
 ## 2026-08-10 — Platform Workspace Follow-Up
 
 - Run a browser walkthrough for super-admin madrasa selection, return-to-Platform navigation, screen enable/disable behavior, madrasa slug changes, username updates, and fresh sign-in starting at Platform.
