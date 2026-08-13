@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from jose import JWTError, jwt
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -120,17 +120,33 @@ async def login(
     lockout_key = f"login_lockout:{tenant.slug}:{payload.username}"
     await assert_not_locked_out(lockout_key, LOGIN_MAX_ATTEMPTS)
 
-    stmt = (
+    # Security: tenant-scoped users take precedence over super_admins.
+    # A same-named tenant user must prevent super_admin fallback to stop
+    # privilege escalation via username collision.
+    stmt_tenant = (
         select(User)
-        .outerjoin(Madrasa, Madrasa.id == User.madrasa_id)
+        .join(Madrasa, Madrasa.id == User.madrasa_id)
         .where(
             User.username == payload.username,
             User.status == UserStatus.active,
-            or_(User.role == UserRole.super_admin, Madrasa.slug == tenant.slug),
+            Madrasa.slug == tenant.slug,
         )
     )
-    result = await session.execute(stmt)
+    result = await session.execute(stmt_tenant)
     candidates = result.scalars().all()
+
+    if not candidates:
+        stmt_sa = (
+            select(User)
+            .where(
+                User.username == payload.username,
+                User.status == UserStatus.active,
+                User.role == UserRole.super_admin,
+            )
+        )
+        result = await session.execute(stmt_sa)
+        candidates = result.scalars().all()
+
     user = None
     for candidate in candidates:
         if await verify_password(payload.password, candidate.password_hash):

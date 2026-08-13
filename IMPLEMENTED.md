@@ -3,6 +3,25 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-14 — Critical Auth Fix + WhatsApp Credentials Link
+
+**Security Fix — Login Privilege Escalation (CRITICAL):**
+- Fixed a vulnerability where a donor (or any tenant user) could log in as a super_admin by using a colliding username and the admin's password.
+- Root cause: the login query included super_admins in every tenant's candidate set, and the password-match loop returned the first hash match regardless of tenant scope.
+- Fix: tenant-scoped users are now queried first; super_admins are only checked as fallback when no tenant user exists with that username. This prevents any cross-role escalation via username collision.
+- Files: `backend/app/modules/auth/routes.py` (lines 114-162)
+
+**WhatsApp Credentials Link Fix:**
+- Fixed missing set-password link in donor WhatsApp messages. The seeded `credentials` message template only included `{name}` and `{username}` — no `{setup_link}`.
+- Updated `backend/seed_full.py` template to match the correct `bootstrap.py` template with full setup link.
+- Fixed relative URL being sent to WhatsApp (unclickable). Frontend now converts `/set-password?token=...` to an absolute URL before dispatching.
+- Files: `backend/seed_full.py` (line 447), `app/src/components/app/people/PersonDetail.tsx` (lines 59-84, 683-697)
+
+**Remaining:** Existing deployments need to update the `credentials` template in their database — bootstrap will not overwrite an existing template. Run:
+```sql
+UPDATE message_templates SET content = '{"en": "Assalamu Alaikum,\nPortal access for {student_name}.\nUsername: {username}\nSet your password (valid 24h): {setup_link}\n— {madrasa_name}", "ur": "السلام علیکم،\n{student_name} کے پورٹل تک رسائی۔\nصارف نام: {username}\nاپنا پاس ورڈ مقرر کریں (24 گھنٹے کارآمد): {setup_link}\n— {madrasa_name}"}' WHERE code = 'credentials';
+```
+
 ## 2026-08-13 — PWA Offline Attendance Outbox
 
 **Fix:**

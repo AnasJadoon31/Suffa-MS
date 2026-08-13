@@ -71,10 +71,13 @@ async function sendCredentialsToWhatsApp({
 }) {
   try {
     const credentials = await fetcher();
+    const setupUrl = credentials.set_password_url.startsWith("http")
+      ? credentials.set_password_url
+      : new URL(credentials.set_password_url, window.location.origin).toString();
     const result = await peopleMutations.sendCredentialsToWhatsApp({
       subject_type: subjectType,
       subject_id: subjectId,
-      set_password_url: credentials.set_password_url,
+      set_password_url: setupUrl,
       phone_number: phoneNumber || undefined,
     });
     toast.success(`${t("Credentials sent on WhatsApp")} +${result.normalised_number}`);
@@ -684,10 +687,13 @@ export function DonorDetailSheet({
     if (!donor) return;
     try {
       const credentials = await peopleMutations.donorCredentialsLink(donor.id);
+      const setupUrl = credentials.set_password_url.startsWith("http")
+        ? credentials.set_password_url
+        : new URL(credentials.set_password_url, window.location.origin).toString();
       const result = await peopleMutations.sendCredentialsToWhatsApp({
         subject_type: "donor",
         subject_id: donor.id,
-        set_password_url: credentials.set_password_url,
+        set_password_url: setupUrl,
         phone_number: donorPhone || undefined,
       });
       toast.success(`${t("Credentials sent on WhatsApp")} +${result.normalised_number}`);
