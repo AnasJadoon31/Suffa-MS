@@ -10,15 +10,20 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app/AppShell";
+import { FilterBar } from "@/components/app/FilterBar";
 import {
   Card,
+  CustomDropdown,
   EmptyState,
+  Field,
   Pill,
   SectionTitle,
   SkeletonList,
   StatCard,
+  TextInput,
 } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
 import { isTenantWorkspace } from "@/lib/mms/workspace";
@@ -363,10 +368,38 @@ function CheckInCard({
 
 function DonorView({ data, error, isLoading }: { data?: DonorFinanceProfile; error?: unknown; isLoading?: boolean }) {
   const { t } = useTranslation();
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+
+  const categories = useMemo(() => {
+    if (!data?.donations) return [];
+    const map = new Map<string, string>();
+    for (const d of data.donations) {
+      if (d.category_id && !map.has(d.category_id)) {
+        map.set(d.category_id, d.category_name ?? d.category_id);
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [data]);
+
+  const filtered = useMemo(() => {
+    if (!data?.donations) return [];
+    return data.donations.filter((d) => {
+      if (categoryId && d.category_id !== categoryId) return false;
+      if (dateFrom && d.donation_date < dateFrom) return false;
+      if (dateTo && d.donation_date > dateTo) return false;
+      return true;
+    });
+  }, [data, dateFrom, dateTo, categoryId]);
+
+  const total = filtered.reduce((sum: number, d: { amount?: number }) => sum + Number(d.amount ?? 0), 0);
+  const activeCount = [dateFrom, dateTo, categoryId].filter(Boolean).length;
+
   if (isLoading) return <SkeletonList rows={3} />;
   if (error) return <EmptyState title={t("Couldn't load donor data")} hint={t("Please try again or contact support.")} />;
   if (!data) return <EmptyState title={t("No donor data")} hint={t("Your donation history will appear here.")} />;
-  const total = data.donations.reduce((sum: number, d: { amount?: number }) => sum + Number(d.amount ?? 0), 0);
+
   return (
     <>
       <StatCard
@@ -374,12 +407,31 @@ function DonorView({ data, error, isLoading }: { data?: DonorFinanceProfile; err
         label={t("Total donations")}
         value={total.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
       />
+      <FilterBar
+        activeCount={activeCount}
+        onClear={() => { setDateFrom(""); setDateTo(""); setCategoryId(""); }}
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label={t("From")}>
+            <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </Field>
+          <Field label={t("To")}>
+            <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </Field>
+          <Field label={t("Category")} className="sm:col-span-2">
+            <CustomDropdown value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <option value="">{t("All categories")}</option>
+              {categories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+            </CustomDropdown>
+          </Field>
+        </div>
+      </FilterBar>
       <SectionTitle>{t("Donation history")}</SectionTitle>
-      {data.donations.length === 0 ? (
-        <EmptyState title={t("No donations yet")} hint={t("Your contributions will appear here.")} />
+      {filtered.length === 0 ? (
+        <EmptyState title={t("No donations match filters")} hint={t("Try adjusting your date or category filter.")} />
       ) : (
         <div className="space-y-2.5">
-          {data.donations.map((d) => (
+          {filtered.map((d) => (
             <Card key={d.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">
               <div className="min-w-0">
                 <p className="font-semibold">{d.category_name ?? d.category_id}</p>
