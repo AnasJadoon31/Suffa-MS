@@ -117,16 +117,19 @@ async def student_finance_profile(
     )
 
 
-@router.get("/profiles/donors/{donor_id}", response_model=DonorFinanceProfile)
-async def donor_finance_profile(
-    donor_id: UUID,
-    current_user: User = Depends(require_permission("finance.reports.view")),
+@router.get("/profiles/donors/me", response_model=DonorFinanceProfile)
+async def my_donor_profile(
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> DonorFinanceProfile:
-    donor = await session.get(Donor, donor_id)
+    if current_user.role != UserRole.donor:
+        raise HTTPException(status_code=403, detail="Only donors can access this endpoint")
+    donor = (
+        await session.execute(select(Donor).where(Donor.user_id == current_user.id))
+    ).scalar_one_or_none()
     if donor is None or donor.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Donor not found")
+        raise HTTPException(status_code=404, detail="Donor profile not found")
     donations = (
         await session.execute(
             select(Donation)
@@ -142,19 +145,16 @@ async def donor_finance_profile(
     )
 
 
-@router.get("/profiles/donors/me", response_model=DonorFinanceProfile)
-async def my_donor_profile(
-    current_user: User = Depends(get_current_user),
+@router.get("/profiles/donors/{donor_id}", response_model=DonorFinanceProfile)
+async def donor_finance_profile(
+    donor_id: UUID,
+    current_user: User = Depends(require_permission("finance.reports.view")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> DonorFinanceProfile:
-    if current_user.role != UserRole.donor:
-        raise HTTPException(status_code=403, detail="Only donors can access this endpoint")
-    donor = (
-        await session.execute(select(Donor).where(Donor.user_id == current_user.id))
-    ).scalar_one_or_none()
+    donor = await session.get(Donor, donor_id)
     if donor is None or donor.madrasa_id != madrasa.id:
-        raise HTTPException(status_code=404, detail="Donor profile not found")
+        raise HTTPException(status_code=404, detail="Donor not found")
     donations = (
         await session.execute(
             select(Donation)
