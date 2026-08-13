@@ -14,7 +14,7 @@ from app.core.pdf import load_report_branding, render_receipt_pdf
 from app.db.session import get_session
 from app.modules.academics.models import AcademicSession, Enrollment, Madrasa
 from app.modules.auth.models import User, UserRole
-from app.modules.auth.service import UsernameTakenError, provision_login
+from app.modules.auth.service import UsernameTakenError, provision_login, reissue_set_password_link
 from app.modules.finance.models import Donation, Donor, Payment, PaymentCategory, SalaryPayment, SalaryRecord
 from app.modules.finance.schemas import (
     DonationCreate,
@@ -335,6 +335,7 @@ async def share_payment_receipt(
         template_code="receipt",
         language=language,
         variables={
+            "name": context["payer_name"],
             "payer_name": context["payer_name"],
             "amount": f"{context['amount']} {context['currency']}",
             "category": context["category_name"],
@@ -419,6 +420,24 @@ async def update_donor(
     await session.commit()
     await session.refresh(donor)
     return DonorRead.model_validate(donor)
+
+
+@router.post("/donors/{donor_id}/credentials-link")
+async def donor_credentials_link(
+    donor_id: UUID,
+    current_user: User = Depends(require_permission("finance.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    donor = await session.get(Donor, donor_id)
+    if donor is None or donor.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Donor not found")
+    user = await session.get(User, donor.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Linked user account not found")
+    url = reissue_set_password_link(session, madrasa_id=madrasa.id, actor_id=current_user.id, user=user)
+    await session.commit()
+    return {"username": user.username, "set_password_url": url}
 
 
 @router.get("/donors", response_model=list[DonorRead])
@@ -539,6 +558,7 @@ async def share_donation_receipt(
         template_code="receipt",
         language="ur",
         variables={
+            "name": donor.name,
             "payer_name": donor.name,
             "amount": f"{context['amount']} {context['currency']}",
             "category": context["category_name"],

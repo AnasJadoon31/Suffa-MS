@@ -10,7 +10,7 @@ export function useOutboxSync(): { pending: number; syncing: boolean; flush: () 
 
   const refreshCount = useCallback(async () => {
     const count = await outboxCount();
-    setPending(count);
+    setPending((prev) => (prev === count ? prev : count));
   }, []);
 
   const flush = useCallback(async () => {

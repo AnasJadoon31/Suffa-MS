@@ -1144,8 +1144,14 @@ export const peopleMutations = {
         { username },
       )
       .then((r) => r.data),
+  donorCredentialsLink: (donorId: string) =>
+    api
+      .post<{ username: string; set_password_url: string }>(
+        `/api/v1/finance/donors/${donorId}/credentials-link`,
+      )
+      .then((r) => r.data),
   sendCredentialsToWhatsApp: (payload: {
-    subject_type: "student" | "teacher" | "guardian";
+    subject_type: "student" | "teacher" | "guardian" | "donor";
     subject_id: string;
     set_password_url: string;
     phone_number?: string;

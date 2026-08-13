@@ -130,12 +130,18 @@
 
   html {
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
   }
 
   h1,
@@ -145,6 +151,19 @@
   .font-display {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .truncate,
+  .line-clamp-2 {
+    min-width: 0;
+  }
+
+  @media (max-width: 380px) {
+    .truncate {
+      max-width: 120px;
+    }
   }
 
   [dir="rtl"] body {
@@ -192,6 +211,34 @@
   }
 }
 
+/* Auto-fit text to prevent clipping on narrow (PWA) screens */
+@utility fit-text {
+  font-size: clamp(0.6rem, 2.2cqi + 0.1rem, 0.875rem);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Prevent overflow clipping in flex/grid children */
+:is(.card-surface, [class*="Card"], [class*="card-"]) > :is(div, span, p, button, a) {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 380px) {
+  button,
+  .font-display {
+    letter-spacing: -0.01em;
+  }
+
+  [class*="font-extrabold"],
+  [class*="font-bold"] {
+    font-size: clamp(0.7rem, 3cqi, 0.95rem);
+  }
+}
+
 /* Safe-area helpers for installed (standalone) PWA usage */
 @utility pt-safe {
   padding-top: max(env(safe-area-inset-top), 0px);
@@ -232,4 +279,34 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
+}
+
+@utility text-shrink {
+  font-size: clamp(0.625rem, 2.5cqi, 0.875rem);
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@utility text-fluid {
+  font-size: clamp(0.75rem, 2.5vw + 0.25rem, 1rem);
+}
+
+@utility no-clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+@media (max-width: 380px) {
+  :root {
+    --radius: 0.75rem;
+  }
+
+  html {
+    font-size: 14px;
+  }
 }

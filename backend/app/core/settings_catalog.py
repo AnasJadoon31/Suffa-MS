@@ -42,6 +42,8 @@ CATALOG: tuple[SettingDef, ...] = (
     SettingDef("finance.receipt_footer", "finance", "string", "", "Receipt footer text"),
     # Portal.
     SettingDef("portal.default_language", "portal", "language", "ur", "Default language"),
+    SettingDef("portal.students_can_login", "portal", "bool", "true", "Allow students to log in and view their dashboard"),
+    SettingDef("portal.guardians_can_login", "portal", "bool", "true", "Allow guardians to log in and view their children's dashboard"),
     SettingDef("portal.donors_can_login", "portal", "bool", "false", "Allow donors to log in and view donation history"),
 )
 

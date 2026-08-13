@@ -33,6 +33,7 @@ from app.modules.messaging.schemas import (
     WhatsAppPairingResponse,
     WhatsAppQrResponse,
 )
+from app.modules.finance.models import Donor
 from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 
 router = APIRouter()
@@ -844,6 +845,16 @@ async def send_credentials(
         phone, recipient_type, recipient_id, language = await _student_credentials_recipient(
             session, student, payload.phone_number
         )
+    elif payload.subject_type == "donor":
+        donor = await session.get(Donor, payload.subject_id)
+        if donor is None or donor.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Donor not found")
+        user = await session.get(User, donor.user_id)
+        subject_name = donor.name
+        phone = _recipient_phone(donor.default_phone_number or donor.contact, payload.phone_number)
+        language = "ur"
+        recipient_type = "donor"
+        recipient_id = donor.id
     else:
         guardian = await session.get(Guardian, payload.subject_id)
         if guardian is None or guardian.madrasa_id != madrasa.id:
@@ -865,6 +876,7 @@ async def send_credentials(
         template_code="credentials",
         language=language,
         variables={
+            "name": subject_name,
             "student_name": subject_name,
             "username": user.username,
             "setup_link": payload.set_password_url,

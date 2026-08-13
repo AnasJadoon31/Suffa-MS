@@ -1,8 +1,9 @@
-import { Download, MessageCircle } from "lucide-react";
+import { Download } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Card, EmptyState, SkeletonList, ManagedSheet } from "@/components/app/Primitives";
+import { MessageSendButton } from "@/components/app/MessageSendButton";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { financeApi, financeMutations } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
@@ -79,13 +80,10 @@ export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClo
                     >
                       <Download className="h-4 w-4" />
                     </button>
-                    <button
-                      aria-label={t("Send receipt via WhatsApp")}
-                      onClick={() => void sendReceipt(d.id)}
-                      className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent-foreground"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </button>
+                    <MessageSendButton
+                      ariaLabel={t("Send receipt via WhatsApp")}
+                      onSend={() => sendReceipt(d.id)}
+                    />
                   </Card>
                 ))}
               </div>

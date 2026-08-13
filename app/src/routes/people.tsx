@@ -191,11 +191,21 @@ function PeoplePage() {
           ? await peopleMutations.studentCredentialsLink(id)
           : tab === "teachers"
             ? await peopleMutations.teacherCredentialsLink(id)
-            : await peopleMutations.guardianCredentialsLink(id);
-      await navigator.clipboard.writeText(data.set_password_url);
+            : tab === "donors"
+              ? await peopleMutations.donorCredentialsLink(id)
+              : await peopleMutations.guardianCredentialsLink(id);
+      const link = data.set_password_url.startsWith("http")
+        ? data.set_password_url
+        : new URL(data.set_password_url, window.location.origin).toString();
+      const supportsNativeShare = typeof navigator.share === "function" && navigator.maxTouchPoints > 0;
+      if (supportsNativeShare) {
+        await navigator.share({ title: "Suffa MS Login", text: `Login link for ${data.username}`, url: link });
+        return;
+      }
+      await navigator.clipboard.writeText(link);
       toast.success(`Link copied for ${data.username}`);
-    } catch {
-      toast.error("Failed to generate credentials link");
+    } catch (error) {
+      if ((error as DOMException)?.name !== "AbortError") toast.error("Failed to generate credentials link");
     }
   };
 
@@ -338,7 +348,7 @@ function PeoplePage() {
                   {record["current_class"] ? ` · ${String(record["current_class"])}` : ""}
                 </p>
               </button>
-              {canManage && tab !== "donors" ? (
+              {canManage ? (
                 <button
                   aria-label="Copy credentials link"
                   onClick={() => credentials(id)}

@@ -64,6 +64,26 @@ async def _donor_portal_enabled(session: AsyncSession, madrasa_id) -> bool:
     return value == "true"
 
 
+async def _student_portal_enabled(session: AsyncSession, madrasa_id) -> bool:
+    value = await session.scalar(
+        select(MadrasaSetting.value).where(
+            MadrasaSetting.madrasa_id == madrasa_id,
+            MadrasaSetting.key == "portal.students_can_login",
+        )
+    )
+    return value == "true"
+
+
+async def _guardian_portal_enabled(session: AsyncSession, madrasa_id) -> bool:
+    value = await session.scalar(
+        select(MadrasaSetting.value).where(
+            MadrasaSetting.madrasa_id == madrasa_id,
+            MadrasaSetting.key == "portal.guardians_can_login",
+        )
+    )
+    return value == "true"
+
+
 async def _session_lifetime_minutes(session: AsyncSession, user: User) -> int:
     """Per-role idle-timeout setting (security.idle_timeout_minutes_<role> in
     the settings catalogue) becomes the access token's fixed lifetime — the
@@ -127,6 +147,10 @@ async def login(
 
     if user.role == UserRole.donor and user.madrasa_id is not None and not await _donor_portal_enabled(session, user.madrasa_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Donor portal access is disabled by this madrasa")
+    if user.role == UserRole.student and user.madrasa_id is not None and not await _student_portal_enabled(session, user.madrasa_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student portal access is disabled by this madrasa")
+    if user.role == UserRole.guardian and user.madrasa_id is not None and not await _guardian_portal_enabled(session, user.madrasa_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Guardian portal access is disabled by this madrasa")
 
     await set_rls_context(session, user)
     await clear_failures(lockout_key)

@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
-import { Download, HandCoins, MessageCircle, Plus, Receipt, Wallet } from "lucide-react";
+import { Download, HandCoins, Plus, Receipt, Wallet } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
 import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
+import { MessageSendButton } from "@/components/app/MessageSendButton";
 import {
   ActionButton,
   Card,
@@ -674,13 +675,10 @@ function Row({
         <span />
       )}
       {onSendReceipt ? (
-        <button
-          aria-label={t("Send receipt via WhatsApp")}
-          onClick={onSendReceipt}
-          className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent-foreground"
-        >
-          <MessageCircle className="h-4 w-4" />
-        </button>
+        <MessageSendButton
+          ariaLabel={t("Send receipt via WhatsApp")}
+          onSend={onSendReceipt}
+        />
       ) : (
         <span />
       )}

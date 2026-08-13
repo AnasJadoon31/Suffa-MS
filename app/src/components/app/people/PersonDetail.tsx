@@ -1,10 +1,11 @@
-import { ArrowLeft, Copy, Download, Image, MessageCircle, ShieldOff, UserRound, ArrowRight } from "lucide-react";
+import { ArrowLeft, Copy, Download, Image, ShieldOff, UserRound, ArrowRight } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 
 import { ActionButton, Pill, ManagedSheet, ActionBar, CustomDropdown, SearchableSelect, Field, SectionTitle } from "@/components/app/Primitives";
+import { WhatsAppSendAction } from "@/components/app/WhatsAppSendAction";
 import { StudentForm } from "./StudentForm";
 import { TeacherForm } from "./TeacherForm";
 import { GuardianForm } from "./GuardianForm";
@@ -316,11 +317,9 @@ export function StudentDetailSheet({
           </div>
         ) : null}
         <ActionBar className="mt-2">
-          <ActionButton
-            className="w-full"
-            variant="soft"
+          <WhatsAppSendAction
             disabled={credentialPhoneOptions.length === 0}
-            onClick={() =>
+            onSend={() =>
               sendCredentialsToWhatsApp({
                 subjectType: "student",
                 subjectId: student.id,
@@ -330,8 +329,8 @@ export function StudentDetailSheet({
               })
             }
           >
-            <MessageCircle className="h-4 w-4" /> {t("Send via WhatsApp")}
-          </ActionButton>
+            {t("Send via WhatsApp")}
+          </WhatsAppSendAction>
         </ActionBar>
         {credentialPhoneOptions.length === 0 ? (
           <p className="mt-1 text-xs text-muted-foreground">
@@ -513,10 +512,8 @@ export function TeacherDetailSheet({
             <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
         </ActionBar>
         <ActionBar className="mt-2">
-          <ActionButton
-            className="w-full"
-            variant="soft"
-            onClick={() =>
+          <WhatsAppSendAction
+            onSend={() =>
               sendCredentialsToWhatsApp({
                 subjectType: "teacher",
                 subjectId: teacher.id,
@@ -526,8 +523,8 @@ export function TeacherDetailSheet({
               })
             }
           >
-            <MessageCircle className="h-4 w-4" /> {t("Send via WhatsApp")}
-          </ActionButton>
+            {t("Send via WhatsApp")}
+          </WhatsAppSendAction>
         </ActionBar>
         {teacher.status === "active" ? (
           confirmDeactivate ? (
@@ -638,10 +635,8 @@ export function GuardianDetailSheet({
           </div>
         ) : null}
         <ActionBar className="mt-2">
-          <ActionButton
-            className="w-full"
-            variant="soft"
-            onClick={() =>
+          <WhatsAppSendAction
+            onSend={() =>
               sendCredentialsToWhatsApp({
                 subjectType: "guardian",
                 subjectId: guardian.id,
@@ -651,8 +646,8 @@ export function GuardianDetailSheet({
               })
             }
           >
-            <MessageCircle className="h-4 w-4" /> {t("Send via WhatsApp")}
-          </ActionButton>
+            {t("Send via WhatsApp")}
+          </WhatsAppSendAction>
         </ActionBar>
         <GuardianForm guardian={guardian} open={editOpen} onOpenChange={setEditOpen} />
     </ManagedSheet>
@@ -681,6 +676,25 @@ export function DonorDetailSheet({
     (sum, donation) => sum + Number(donation.amount ?? 0),
     0,
   );
+
+  const donorPhone = donor?.default_phone_number || donor?.contact;
+  const hasDonorLogin = Boolean(donor?.user_id);
+
+  async function sendDonorCredentials() {
+    if (!donor) return;
+    try {
+      const credentials = await peopleMutations.donorCredentialsLink(donor.id);
+      const result = await peopleMutations.sendCredentialsToWhatsApp({
+        subject_type: "donor",
+        subject_id: donor.id,
+        set_password_url: credentials.set_password_url,
+        phone_number: donorPhone || undefined,
+      });
+      toast.success(`${t("Credentials sent on WhatsApp")} +${result.normalised_number}`);
+    } catch (error) {
+      toast.error(apiErrorMessage(error, t("Failed to send credentials on WhatsApp")));
+    }
+  }
 
   if (!donor) return null;
 
@@ -723,6 +737,24 @@ export function DonorDetailSheet({
           <ArrowRight className="h-4 w-4" /> {t("View donation history")}
         </ActionButton>
       </ActionBar>
+      {hasDonorLogin ? (
+        <ActionBar className="mt-2">
+          <ActionButton
+            className="flex-1"
+            variant="soft"
+            onClick={() => copyCredentialsLink(() => peopleMutations.donorCredentialsLink(donor.id), t)}
+          >
+            <Copy className="h-4 w-4" /> {t("Credentials link")}
+          </ActionButton>
+        </ActionBar>
+      ) : null}
+      {hasDonorLogin && donorPhone ? (
+        <ActionBar className="mt-2">
+          <WhatsAppSendAction onSend={() => sendDonorCredentials()}>
+            {t("Send via WhatsApp")}
+          </WhatsAppSendAction>
+        </ActionBar>
+      ) : null}
       <DonorForm donor={donor} open={editOpen} onOpenChange={setEditOpen} />
     </ManagedSheet>
   );

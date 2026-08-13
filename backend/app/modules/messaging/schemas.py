@@ -55,7 +55,7 @@ class SendReportRequest(BaseModel):
 
 
 class SendCredentialsRequest(BaseModel):
-    subject_type: str = Field(pattern="^(student|teacher|guardian)$")
+    subject_type: str = Field(pattern="^(student|teacher|guardian|donor)$")
     subject_id: UUID  # student_profiles.id, teacher_profiles.id, or guardians.id
     set_password_url: str
     phone_number: PakistanPhone | None = None
