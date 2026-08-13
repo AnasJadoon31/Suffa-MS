@@ -145,12 +145,17 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if user.role == UserRole.donor and user.madrasa_id is not None and not await _donor_portal_enabled(session, user.madrasa_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Donor portal access is disabled by this madrasa")
-    if user.role == UserRole.student and user.madrasa_id is not None and not await _student_portal_enabled(session, user.madrasa_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student portal access is disabled by this madrasa")
-    if user.role == UserRole.guardian and user.madrasa_id is not None and not await _guardian_portal_enabled(session, user.madrasa_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Guardian portal access is disabled by this madrasa")
+    try:
+        if user.role == UserRole.donor and user.madrasa_id is not None and not await _donor_portal_enabled(session, user.madrasa_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Donor portal access is disabled by this madrasa")
+        if user.role == UserRole.student and user.madrasa_id is not None and not await _student_portal_enabled(session, user.madrasa_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student portal access is disabled by this madrasa")
+        if user.role == UserRole.guardian and user.madrasa_id is not None and not await _guardian_portal_enabled(session, user.madrasa_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Guardian portal access is disabled by this madrasa")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
 
     await set_rls_context(session, user)
     await clear_failures(lockout_key)
