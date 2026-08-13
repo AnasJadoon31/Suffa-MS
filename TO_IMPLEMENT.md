@@ -15,6 +15,15 @@ they do not close or weaken the new July 23 requirements.
   - Resolve the remaining feature-specific follow-ups below and add focused regression coverage for the high-risk flows.
 - Completion rule: do not describe the app as production-ready until these release blockers and the open items below are verified end to end.
 
+## 2026-08-11 — Plain Teacher Flow Regression (Resolved)
+
+- Tested account: `TCH-0004` in tenant `suffa`; verified from the database as `teacher`, not a principal delegate, with zero custom role assignments and 70 active timetable slots.
+- Working: login, teacher dashboard, My Timetable class drill-down, My Attendance history/check-in surface, My Assessments class → section → course → exam drill-down, Leave, My Profile, Announcements, Resources, teacher-scoped timetable API, own attendance APIs, own assignments API, results matrix API, and server-side rejection of program/timetable creation without a grant.
+- Resolved: My Assessments Marking now loads only the roster and marks for the teacher's active timetable class, section, and course. Unscoped roster reads remain `403`; unscoped mark reads are rejected.
+- Resolved: navigation and direct routes apply the plain-teacher allowlist. Management routes are hidden and redirect to the relevant self-service screen or dashboard rather than producing `403` screens.
+- Resolved: global assignment reads and assignment management for an unprivileged teacher are restricted to that teacher's own assignments. The global route redirects teachers to `/my-assessments`.
+- Verification evidence: focused live API sweep and Playwright desktop/mobile journeys on 2026-08-11. Final screenshot: `/tmp/teacher-flow-fixed.png`.
+
 ## Documentation Maintenance
 
 - Keep `README.md` deployment commands, environment variables, service URLs, and operational notes synchronized whenever the Docker stack, authentication boundary, storage integration, or messaging lifecycle changes.

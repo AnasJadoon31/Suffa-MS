@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 
 import { AppShell } from "@/components/app/AppShell";
 import { SectionTitle } from "@/components/app/Primitives";
-import { navGroups } from "@/lib/mms/nav";
+import { isNavItemVisible, navGroups } from "@/lib/mms/nav";
 import { useAuth } from "@/lib/mms/auth";
 import { isTenantWorkspace } from "@/lib/mms/workspace";
 import { useTranslation } from "react-i18next";
@@ -27,7 +27,7 @@ function MorePage() {
     const { t } = useTranslation();
   const { user, hasFeature } = useAuth();
   const groups = navGroups
-    .map((group) => ({ ...group, items: group.items.filter((item) => (item.to !== "/platform" || (user?.role === "super_admin" && !isTenantWorkspace(user.role))) && (!item.feature || (user?.role === "super_admin" && !isTenantWorkspace(user.role)) || hasFeature(item.feature))) }))
+    .map((group) => ({ ...group, items: group.items.filter((item) => isNavItemVisible(item, user?.role, hasFeature)) }))
     .filter((group) => group.items.length);
   return (
     <AppShell title={t("More")} subtitle={t("Every module in one place")}>

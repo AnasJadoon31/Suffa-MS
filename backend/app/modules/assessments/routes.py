@@ -249,6 +249,21 @@ async def _require_student_course_scope(
         raise HTTPException(status_code=403, detail="Student is not in your timetable section")
 
 
+async def _require_assignment_owner_or_manager(
+    session: AsyncSession,
+    current_user: User,
+    assignment: Assignment,
+) -> None:
+    """Teachers may manage only assignments they created themselves."""
+    if current_user.role != UserRole.teacher:
+        return
+    if await user_has_permission(current_user, "assignments.manage_all", session):
+        return
+    teacher = await _teacher_profile(session, current_user)
+    if teacher is None or assignment.created_by_id != teacher.id:
+        raise HTTPException(status_code=403, detail="You can only manage your own assignments")
+
+
 # ------------------------------------------------------------------- Assignments
 
 async def _enforce_assignment_limit(
@@ -569,6 +584,8 @@ async def list_assignments(
         current_user, "assignments.view_all", session
     ):
         should_scope_to_teacher = True
+        if teacher is not None:
+            stmt = stmt.where(Assignment.created_by_id == teacher.id)
     if mine_only and teacher is None and current_user.role != UserRole.student:
         response.headers["X-Total-Count"] = "0"
         return []
@@ -713,6 +730,7 @@ async def list_assignment_submission_status(
     session: AsyncSession = Depends(get_session),
 ) -> list[AssignmentSubmissionStatusRead]:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
+    await _require_assignment_owner_or_manager(session, current_user, assignment)
     await _require_class_course_scope(
         session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
         section_id=assignment.section_id, bypass_permission="assignments.view_all",
@@ -742,6 +760,7 @@ async def get_assignment(
     if student is not None:
         await _require_student_assignment_access(session, current_user, madrasa.id, assignment)
     else:
+        await _require_assignment_owner_or_manager(session, current_user, assignment)
         if (
             not await _user_is_admin(current_user, session)
             and current_user.role != UserRole.teacher
@@ -765,6 +784,7 @@ async def update_assignment(
     session: AsyncSession = Depends(get_session),
 ) -> AssignmentRead:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
+    await _require_assignment_owner_or_manager(session, current_user, assignment)
     await _require_class_course_scope(
         session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
         section_id=assignment.section_id, bypass_permission="assignments.manage_all"
@@ -806,6 +826,7 @@ async def delete_assignment(
     whole_batch: bool = False,
 ) -> dict[str, int | str]:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
+    await _require_assignment_owner_or_manager(session, current_user, assignment)
     await _require_class_course_scope(
         session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
         section_id=assignment.section_id, bypass_permission="assignments.manage_all"
@@ -909,6 +930,7 @@ async def list_submissions(
     offset: int = Query(default=0, ge=0),
 ) -> list[SubmissionRead]:
     assignment = await _get_assignment_or_404(session, assignment_id, madrasa.id)
+    await _require_assignment_owner_or_manager(session, current_user, assignment)
     await _require_class_course_scope(
         session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
         section_id=assignment.section_id, bypass_permission="assignments.view_all"
@@ -945,6 +967,7 @@ async def grade_submission(
     if submission is None:
         raise HTTPException(status_code=404, detail="Submission not found")
     assignment = await _get_assignment_or_404(session, submission.assignment_id, madrasa.id)
+    await _require_assignment_owner_or_manager(session, current_user, assignment)
     await _require_class_course_scope(
         session, current_user, madrasa.id, assignment.class_id, assignment.course_id,
         section_id=assignment.section_id, bypass_permission="assignments.manage_all"
@@ -1447,16 +1470,47 @@ async def enter_mark(
 @router.get("/marks", response_model=list[MarkRead])
 async def list_marks(
     response: Response,
-    current_user: User = Depends(require_permission("assessments.marks.enter")),
+    current_user: User = Depends(require_assessment_staff("assessments.marks.enter")),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     exam_type_id: UUID | None = None,
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[MarkRead]:
     stmt = select(Mark)
     if exam_type_id:
         stmt = stmt.where(Mark.exam_type_id == exam_type_id)
+    if current_user.role == UserRole.teacher:
+        if exam_type_id is None or class_id is None or section_id is None:
+            raise HTTPException(status_code=400, detail="Teacher mark access requires exam, class, and section")
+        exam_type = await session.get(ExamType, exam_type_id)
+        if exam_type is None or exam_type.madrasa_id != madrasa.id:
+            raise HTTPException(status_code=404, detail="Exam type not found")
+        if exam_type.class_id is not None and exam_type.class_id != class_id:
+            raise HTTPException(status_code=403, detail="Exam type is not assigned to this class")
+        await _require_class_course_scope(
+            session,
+            current_user,
+            madrasa.id,
+            class_id,
+            exam_type.course_id,
+            section_id=section_id,
+            force_teacher_scope=True,
+        )
+        active_session_id = await _active_session_id(session, madrasa.id)
+        stmt = stmt.where(
+            Mark.student_id.in_(
+                select(Enrollment.student_id).where(
+                    Enrollment.madrasa_id == madrasa.id,
+                    Enrollment.session_id == active_session_id,
+                    Enrollment.class_id == class_id,
+                    Enrollment.section_id == section_id,
+                    Enrollment.ended_on.is_(None),
+                )
+            )
+        )
     rows = await paginate_scalars(
         session, stmt.order_by(Mark.created_at, Mark.id), limit=limit, offset=offset, response=response
     )

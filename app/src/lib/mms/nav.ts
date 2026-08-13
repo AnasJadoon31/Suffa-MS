@@ -24,6 +24,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { isTenantWorkspace } from "./workspace";
 
 export interface NavItem {
   to: string;
@@ -131,6 +132,42 @@ export const allNavItems: NavItem[] = [
   ...operationsNav,
   ...adminNav,
 ];
+
+const teacherVisiblePaths = new Set([
+  "/dashboard",
+  "/my-attendance",
+  "/my-assessments",
+  "/my-timetable",
+  "/resources",
+  "/announcements",
+  "/leave",
+  "/me",
+]);
+
+const teacherRouteRedirects: Record<string, string> = {
+  "/attendance": "/my-attendance",
+  "/timetable": "/my-timetable",
+  "/assignments": "/my-assessments",
+  "/results": "/my-assessments",
+  "/examination": "/my-assessments",
+};
+
+export function isNavItemVisible(
+  item: Pick<NavItem, "feature" | "to">,
+  role: string | undefined,
+  hasFeature: (key: string) => boolean,
+): boolean {
+  if (item.to === "/platform") return role === "super_admin" && !isTenantWorkspace(role);
+  if (role === "teacher") {
+    return teacherVisiblePaths.has(item.to) && (!item.feature || hasFeature(item.feature));
+  }
+  return !item.feature || (role === "super_admin" && !isTenantWorkspace(role)) || hasFeature(item.feature);
+}
+
+export function teacherRouteRedirect(pathname: string, role: string | undefined): string | null {
+  if (role !== "teacher" || teacherVisiblePaths.has(pathname)) return null;
+  return teacherRouteRedirects[pathname] ?? "/dashboard";
+}
 
 export function featureForPath(pathname: string): string | undefined {
   return allNavItems.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))?.feature;

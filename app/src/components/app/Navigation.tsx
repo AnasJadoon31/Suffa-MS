@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/mms/auth";
-import { navGroups, type NavItem } from "@/lib/mms/nav";
+import { isNavItemVisible, navGroups, type NavItem } from "@/lib/mms/nav";
 import { isTenantWorkspace } from "@/lib/mms/workspace";
 import { filesApi } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
@@ -17,11 +17,6 @@ const tabs = [
   { to: "/more", label: "More", icon: LayoutGrid },
 ] as const;
 
-function canShow(item: Pick<NavItem, "feature" | "to">, role: string | undefined, hasFeature: (key: string) => boolean) {
-  if (item.to === "/platform") return role === "super_admin" && !isTenantWorkspace(role);
-  return !item.feature || (role === "super_admin" && !isTenantWorkspace(role)) || hasFeature(item.feature);
-}
-
 function useActive() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (to: string) => pathname === to || pathname.startsWith(`${to}/`);
@@ -31,7 +26,9 @@ export function BottomNav() {
     const { t } = useTranslation();
   const isActive = useActive();
   const { user, hasFeature } = useAuth();
-  const visibleTabs = tabs.filter((tab) => canShow(tab, user?.role, hasFeature));
+  const visibleTabs = tabs
+    .map((tab) => user?.role === "teacher" && tab.to === "/attendance" ? { ...tab, to: "/my-attendance" } : tab)
+    .filter((tab) => isNavItemVisible(tab, user?.role, hasFeature));
 
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur-md lg:hidden">
@@ -97,7 +94,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const isActive = useActive();
   const groups = user?.role === "super_admin" && !isTenantWorkspace(user.role)
     ? navGroups.map((group) => ({ ...group, items: group.items.filter((item) => item.to === "/platform" || item.to === "/me") })).filter((group) => group.items.length)
-    : navGroups.map((group) => ({ ...group, items: group.items.filter((item) => canShow(item, user?.role, hasFeature)) })).filter((group) => group.items.length);
+    : navGroups.map((group) => ({ ...group, items: group.items.filter((item) => isNavItemVisible(item, user?.role, hasFeature)) })).filter((group) => group.items.length);
   return (
     <div className="space-y-5">
       {groups.map((group) => (

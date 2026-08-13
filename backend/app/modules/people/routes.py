@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select, exc, or_ as sqlalchemy_or, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import _user_is_admin, get_current_madrasa, get_current_user, require_permission
+from app.core.dependencies import _user_is_admin, get_current_madrasa, get_current_user, require_permission, user_has_permission
 from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
+from app.core.teaching_scope import teacher_teaches
 from app.db.session import get_session
 from app.modules.academics.models import AcademicClass, AcademicSession, Enrollment, Madrasa, Program, Section
 from app.modules.auth.models import User, UserRole
@@ -529,7 +530,7 @@ async def create_student(
 @router.get("/students", response_model=list[StudentRead])
 async def list_students(
     response: Response,
-    current_user: User = Depends(require_permission("students.view")),
+    current_user: User = Depends(get_current_user),
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
     search: str | None = Query(default=None, description="Match against name or admission number"),
@@ -538,6 +539,30 @@ async def list_students(
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[StudentRead]:
+    can_view_students = await user_has_permission(current_user, "students.view", session)
+    if not can_view_students:
+        if current_user.role != UserRole.teacher or section_id is None:
+            raise HTTPException(status_code=403, detail="Missing permission: students.view")
+        teacher = await session.scalar(
+            select(TeacherProfile).where(
+                TeacherProfile.user_id == current_user.id,
+                TeacherProfile.madrasa_id == madrasa.id,
+            )
+        )
+        active_session_id = await session.scalar(
+            select(AcademicSession.id).where(
+                AcademicSession.madrasa_id == madrasa.id,
+                AcademicSession.is_active.is_(True),
+            )
+        )
+        if teacher is None or active_session_id is None or not await teacher_teaches(
+            session,
+            madrasa_id=madrasa.id,
+            teacher_id=teacher.id,
+            session_id=active_session_id,
+            section_id=section_id,
+        ):
+            raise HTTPException(status_code=403, detail="Students are limited to your timetable sections")
     stmt = select(StudentProfile).where(StudentProfile.madrasa_id == madrasa.id)
     if search:
         like = f"%{search}%"

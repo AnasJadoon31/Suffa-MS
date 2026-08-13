@@ -3,6 +3,29 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-11 — Plain Teacher Scope and Marking
+
+**Fix:**
+- Restored marking for a teacher with no delegated role: assigned exam roster and mark reads are now authorized from the active timetable's class, section, and course scope.
+- Restricted roster access for unprivileged teachers to an explicitly requested section they teach; unscoped student lists remain forbidden.
+- Restricted unprivileged teachers to their own created assignments for API reads and assignment management.
+- Added a central teacher navigation and direct-route boundary. Teachers see only self-service and shared screens, while global Attendance, Timetable, Assessments, Results, Examination, and management URLs redirect to the appropriate self-service screen or dashboard.
+
+**Files:**
+- `backend/app/modules/assessments/routes.py`
+- `backend/app/modules/people/routes.py`
+- `app/src/lib/mms/nav.ts`
+- `app/src/components/app/AppShell.tsx`
+- `app/src/components/app/Navigation.tsx`
+- `app/src/routes/more.tsx`
+
+**Verification:**
+- `python -m py_compile app/modules/assessments/routes.py app/modules/people/routes.py`
+- `npm run build`
+- Rebuilt the backend and confirmed `/healthz`.
+- Playwright plain-teacher journey: marking displays the assigned students with no API failures; desktop navigation contains no administrative screens; tested direct management URLs redirect correctly.
+- Live API scope check: roster and marks for the assigned class/section return `200`; unscoped roster returns `403`; unscoped mark reads return `400`; a different teacher's assignment detail returns `403`.
+
 ## 2026-08-11 — Project README
 
 **Documentation:**
