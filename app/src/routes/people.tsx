@@ -31,8 +31,8 @@ import { filesApi, financeMutations, peopleMutations, type Donor } from "@/lib/m
 
 export const Route = createFileRoute("/people")({
   validateSearch: (search: Record<string, unknown>) => ({
-    tab: (search.tab as string) || undefined,
-    section_id: (search.section_id as string) || undefined,
+    tab: (search["tab"] as string) || undefined,
+    section_id: (search["section_id"] as string) || undefined,
   }),
   head: () => ({
     meta: [
@@ -116,12 +116,12 @@ function PeoplePage() {
     queryKey: ["people", tab, search],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
-      const params: Record<string, unknown> = {
+      const params = {
         search: search.trim() || undefined,
         limit: PAGE_SIZE,
         offset: pageParam as number,
+        section_id: sectionId && tab === "students" ? sectionId : undefined,
       };
-      if (sectionId && tab === "students") params.section_id = sectionId;
       if (tab === "students")
         return { kind: "students" as const, page: await peopleApi.listStudentsPage(params) };
       if (tab === "teachers")
@@ -302,7 +302,7 @@ function PeoplePage() {
               {tab === "students" ? (
                 <StudentAvatar
                   student={person as Student}
-                  onOpen={() => navigate({ to: "/people/$studentId", params: { studentId: id } })}
+                  onOpen={() => navigate({ to: "/people/$studentId", params: { studentId: id }, search: { tab: undefined as string | undefined, section_id: undefined as string | undefined } })}
                 />
               ) : (
                 <button
@@ -321,7 +321,7 @@ function PeoplePage() {
                 type="button"
                 className="min-w-0 text-left ltr:text-left rtl:text-right"
                 onClick={() => {
-                  if (tab === "students") navigate({ to: "/people/$studentId", params: { studentId: id } });
+                  if (tab === "students") navigate({ to: "/people/$studentId", params: { studentId: id }, search: { tab: undefined as string | undefined, section_id: undefined as string | undefined } });
                   else if (tab === "teachers") setDetailTeacherId(id);
                   else if (tab === "guardians") setDetailGuardianId(id);
                   else if (tab === "donors") setDetailDonorId(id);

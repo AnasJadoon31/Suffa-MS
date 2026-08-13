@@ -24,8 +24,8 @@ function AdmissionProfilePage() {
     queryFn: () => peopleMutations.getStudent(application.data!.converted_student_id!),
     enabled: Boolean(application.data?.converted_student_id),
   });
-  const photoKey = typeof application.data?.extra_data?.student_profile_picture === "string"
-    ? application.data.extra_data.student_profile_picture
+  const photoKey = typeof application.data?.extra_data?.["student_profile_picture"] === "string"
+    ? application.data.extra_data["student_profile_picture"]
     : "";
   const photo = useQuery({
     queryKey: ["admission-photo", photoKey],

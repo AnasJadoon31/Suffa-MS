@@ -142,6 +142,34 @@ async def donor_finance_profile(
     )
 
 
+@router.get("/profiles/donors/me", response_model=DonorFinanceProfile)
+async def my_donor_profile(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> DonorFinanceProfile:
+    if current_user.role != UserRole.donor:
+        raise HTTPException(status_code=403, detail="Only donors can access this endpoint")
+    donor = (
+        await session.execute(select(Donor).where(Donor.user_id == current_user.id))
+    ).scalar_one_or_none()
+    if donor is None or donor.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Donor profile not found")
+    donations = (
+        await session.execute(
+            select(Donation)
+            .where(Donation.madrasa_id == madrasa.id, Donation.donor_id == donor.id)
+            .order_by(Donation.donation_date.desc())
+        )
+    ).scalars().all()
+    return DonorFinanceProfile(
+        id=donor.id,
+        name=donor.name,
+        contact=donor.contact,
+        donations=await _donation_reads(session, list(donations)),
+    )
+
+
 async def _receipt_context(
     session: AsyncSession, madrasa: Madrasa, *, kind: str, row: Payment | Donation, payer_name: str
 ) -> dict[str, str]:
@@ -416,7 +444,10 @@ async def update_donor(
     if payload.name is not None: donor.name = payload.name
     if payload.contact is not None or payload.phone_list is not None or payload.default_phone_number is not None:
         phones, default_phone = _donor_contacts(payload.phone_list if payload.phone_list is not None else donor.phone_list, payload.contact or donor.contact, payload.default_phone_number or donor.default_phone_number)
-        donor.phone_list, donor.default_phone_number, donor.contact = phones, default_phone, default_phone or donor.contact
+        donor.phone_list = phones
+        donor.default_phone_number = default_phone
+        if payload.contact is not None:
+            donor.contact = payload.contact
     await session.commit()
     await session.refresh(donor)
     return DonorRead.model_validate(donor)

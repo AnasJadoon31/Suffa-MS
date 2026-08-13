@@ -107,7 +107,7 @@ function TeacherAttendance() {
           {history.data?.map((entry) => (
             <div key={entry.id} className="grid grid-cols-4 gap-1 border-b border-border py-1 text-xs">
               <span>{entry.attendance_date}</span>
-              <Pill tone={entry.status === "present" ? "success" : "error"}>{t(entry.status)}</Pill>
+              <Pill tone={entry.status === "present" ? "success" : "destructive"}>{t(entry.status)}</Pill>
               <span>{entry.check_in?.slice(0, 5) ?? "—"}</span>
               <span>{entry.check_out?.slice(0, 5) ?? "—"}</span>
             </div>
@@ -163,7 +163,7 @@ function StudentAttendance() {
                   <span className="font-semibold">{t("Date")}</span>
                   <span>{entry.attendance_date}</span>
                   <span className="font-semibold">{t("Status")}</span>
-                  <Pill tone={entry.status === "present" ? "success" : "error"}>
+                  <Pill tone={entry.status === "present" ? "success" : "destructive"}>
                     {t(entry.status)}
                   </Pill>
                   {entry.marked_by?.display_name ? (

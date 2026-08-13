@@ -18,6 +18,6 @@ function StudentProfilePage() {
   return <AppShell title="Student profile" subtitle="Student record">
     {student.isLoading ? <SkeletonList rows={6} /> : null}
     {student.isError || !student.data ? <EmptyState title="Student not found" /> : null}
-    {student.data ? <StudentDetailSheet student={student.data} open page onOpenChange={() => navigate({ to: "/people" })} /> : null}
+    {student.data ? <StudentDetailSheet student={student.data} open page onOpenChange={() => navigate({ to: "/people", search: { tab: undefined as string | undefined, section_id: undefined as string | undefined } })} /> : null}
   </AppShell>;
 }

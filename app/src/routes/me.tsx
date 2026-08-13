@@ -82,11 +82,11 @@ function MePage() {
   useEffect(() => {
     const profile = personProfile.data?.profile as Record<string, unknown> | undefined;
     if (!profile) return;
-    setPersonName(String(profile.name ?? "")); setPersonAddress(String(profile.address ?? ""));
-    setPersonCnic(String(profile.cnic ?? profile.b_form_number ?? "")); setPersonDob(String(profile.date_of_birth ?? ""));
-    const phones = Array.isArray(profile.phone_list) && profile.phone_list.length ? profile.phone_list.map(String) : [String(profile.default_phone_number ?? profile.phone ?? profile.phone_numbers ?? "+92")];
-    setPersonPhones(phones); setPersonDefaultPhone(String(profile.default_phone_number ?? phones[0]));
-    setAdmissionAnswers((profile.admission_record as { answers?: Record<string, unknown> } | undefined)?.answers ?? {});
+    setPersonName(String(profile["name"] ?? "")); setPersonAddress(String(profile["address"] ?? ""));
+    setPersonCnic(String(profile["cnic"] ?? profile["b_form_number"] ?? "")); setPersonDob(String(profile["date_of_birth"] ?? ""));
+    const phones = Array.isArray(profile["phone_list"]) && (profile["phone_list"] as unknown[]).length ? (profile["phone_list"] as string[]).map(String) : [String(profile["default_phone_number"] ?? profile["phone"] ?? profile["phone_numbers"] ?? "+92")];
+    setPersonPhones(phones); setPersonDefaultPhone(String(profile["default_phone_number"] ?? phones[0]));
+    setAdmissionAnswers((profile["admission_record"] as { answers?: Record<string, unknown> } | undefined)?.answers ?? {});
   }, [personProfile.data]);
 
   const savePersonProfile = useMutation({ mutationFn: () => peopleApi.updateMyProfile(personProfile.data?.profile_type === "guardian" ? { name: personName, address: personAddress, cnic: personCnic, phone_list: personPhones.filter((phone) => phone.length > 3), default_phone_number: personDefaultPhone } : { name: personName, date_of_birth: personDob || undefined, b_form_number: personCnic, address: personAddress, phone_list: personPhones.filter((phone) => phone.length > 3), default_phone_number: personDefaultPhone, admission_answers: admissionAnswers }), onSuccess: () => { toast.success("Profile updated"); void client.invalidateQueries({ queryKey: ["my-person-profile"] }); } });

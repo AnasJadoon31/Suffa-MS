@@ -5,7 +5,7 @@ export function MessageSendButton({
   onSend,
   ariaLabel,
 }: {
-  onSend: () => Promise<unknown>;
+  onSend: () => void | Promise<unknown>;
   ariaLabel: string;
 }) {
   const [sending, setSending] = useState(false);

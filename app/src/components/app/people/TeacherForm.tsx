@@ -9,7 +9,7 @@ import { PhoneNumbersField } from "./PhoneNumbersField";
 import { peopleMutations, type TeacherDetail } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
-import { maskBForm } from "@/lib/masks";
+import { maskBForm, maskPhone } from "@/lib/masks";
 
 export function TeacherForm({
   teacher,

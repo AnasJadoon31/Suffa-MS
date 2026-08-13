@@ -141,6 +141,8 @@ async def dashboard(
         return await _student_dashboard(session, madrasa, current_user, dashboard_session_id)
     if current_user.role == UserRole.parent:
         return await _parent_dashboard(session, madrasa, current_user, dashboard_session_id)
+    if current_user.role == UserRole.donor:
+        return {"role": "donor", "donor_id": str(current_user.id)}
     return await _principal_dashboard(session, madrasa)
 
 

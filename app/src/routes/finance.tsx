@@ -27,8 +27,8 @@ import { financeApi, financeMutations } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 export const Route = createFileRoute("/finance")({
   validateSearch: (search: Record<string, unknown>) => ({
-    tab: (search.tab as string) || undefined,
-    donor_id: (search.donor_id as string) || undefined,
+    tab: (search["tab"] as string) || undefined,
+    donor_id: (search["donor_id"] as string) || undefined,
   }),
   head: () => ({
     meta: [

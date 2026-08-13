@@ -585,6 +585,8 @@ export const financeApi = {
     api.get<StudentFinanceProfile>(`/api/v1/finance/profiles/students/${id}`).then((r) => r.data),
   donorProfile: (id: string) =>
     api.get<DonorFinanceProfile>(`/api/v1/finance/profiles/donors/${id}`).then((r) => r.data),
+  myDonorProfile: () =>
+    api.get<DonorFinanceProfile>("/api/v1/finance/profiles/donors/me").then((r) => r.data),
   mySalary: () => api.get<MySalary>("/api/v1/finance/salary/me").then((r) => r.data),
 };
 
@@ -962,6 +964,8 @@ export interface StudentDetail {
   b_form_number?: string | null;
   address?: string | null;
   phone?: string | null;
+  phone_list?: string[];
+  default_phone_number?: string | null;
   is_independent?: boolean;
   preferred_language?: string;
   notes?: string | null;
@@ -973,6 +977,8 @@ export interface StudentDetail {
     program_name: string;
     class_name: string;
     section_name: string;
+    class_id?: string;
+    section_id?: string;
     started_on: string;
   } | null;
   admission_record?: {

@@ -11,7 +11,7 @@ import { TeacherForm } from "./TeacherForm";
 import { GuardianForm } from "./GuardianForm";
 import { DonorForm } from "./DonorForm";
 import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
-import { academicsExtraApi, filesApi } from "@/lib/mms/more-endpoints";
+import { academicsExtraApi, filesApi, financeApi } from "@/lib/mms/more-endpoints";
 import { api, apiErrorMessage } from "@/lib/mms/api";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -672,11 +672,11 @@ export function DonorDetailSheet({
 
   const profile = useQuery({
     queryKey: ["donor-profile", donor?.id],
-    queryFn: () => (donor ? financeMutations.donorProfile(donor.id) : Promise.reject()),
+    queryFn: () => (donor ? financeApi.donorProfile(donor.id) : Promise.reject()),
     enabled: Boolean(donor),
   });
   const donationTotal = (profile.data?.donations ?? []).reduce(
-    (sum, donation) => sum + Number(donation.amount ?? 0),
+    (sum: number, donation: { amount?: number }) => sum + Number(donation.amount ?? 0),
     0,
   );
 

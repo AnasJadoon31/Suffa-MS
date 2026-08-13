@@ -22,6 +22,7 @@ import {
 import { AdmissionFormEditorSheet } from "@/components/app/admissions/AdmissionFormEditorSheet";
 import { useAuth } from "@/lib/mms/auth";
 import {
+  academicsExtraApi,
   filesApi,
   opsApi,
   type AdmissionApplication,
@@ -48,8 +49,8 @@ const FILTERS = ["all", "pending", "accepted", "rejected"] as const;
 const emptyExtra = { search: "" };
 
 function ApplicationAvatar({ application }: { application: AdmissionApplication }) {
-  const pictureKey = typeof application.extra_data?.student_profile_picture === "string"
-    ? application.extra_data.student_profile_picture
+  const pictureKey = typeof application.extra_data?.["student_profile_picture"] === "string"
+    ? application.extra_data["student_profile_picture"]
     : "";
   const picture = useQuery({
     queryKey: ["admission-photo", pictureKey],

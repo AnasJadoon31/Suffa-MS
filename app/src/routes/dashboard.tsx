@@ -30,6 +30,7 @@ import {
   type StudentDashboard,
   type TeacherDashboard,
 } from "@/lib/mms/endpoints";
+import { financeApi, type DonorFinanceProfile } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/dashboard")({
@@ -63,6 +64,12 @@ function DashboardPage() {
     enabled: Boolean(user) && (user?.role !== "super_admin" || isTenantWorkspace(user.role)),
   });
 
+  const donorProfile = useQuery({
+    queryKey: ["donor-profile"],
+    queryFn: () => financeApi.myDonorProfile(),
+    enabled: Boolean(user) && user?.role === "donor",
+  });
+
   const data = dashboard.data;
 
   if (user?.role === "super_admin" && !isTenantWorkspace(user.role)) return <Navigate to="/platform" replace />;
@@ -86,9 +93,10 @@ function DashboardPage() {
 
       {data?.role === "principal" ? <PrincipalView data={data as PrincipalDashboard} /> : null}
       {data?.role === "teacher" && !user?.is_principal_delegate ? <TeacherView data={data as TeacherDashboard} /> : null}
-      {data?.role === "teacher" && user?.is_principal_delegate ? <PrincipalView data={data as PrincipalDashboard} /> : null}
+      {data?.role === "teacher" && user?.is_principal_delegate ? <PrincipalView data={data as unknown as PrincipalDashboard} /> : null}
       {data?.role === "student" ? <StudentView data={data as StudentDashboard} /> : null}
-      {data && !["principal", "teacher", "student"].includes(data.role) ? <FallbackView /> : null}
+      {data?.role === "donor" ? <DonorView data={donorProfile.data} /> : null}
+      {data && !["principal", "teacher", "student", "donor"].includes(data.role) ? <FallbackView /> : null}
     </AppShell>
   );
 }
@@ -349,5 +357,38 @@ function CheckInCard({
         {current.check_in ? "Check out" : "Check in"}
       </button>
     </Card>
+  );
+}
+
+function DonorView({ data }: { data?: DonorFinanceProfile }) {
+  const { t } = useTranslation();
+  if (!data) return <SkeletonList rows={3} />;
+  const total = data.donations.reduce((sum, d) => sum + d.amount, 0);
+  return (
+    <>
+      <StatCard
+        icon={Wallet}
+        label={t("Total donations")}
+        value={total.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
+      />
+      <SectionTitle>{t("Donation history")}</SectionTitle>
+      {data.donations.length === 0 ? (
+        <EmptyState title={t("No donations yet")} hint={t("Your contributions will appear here.")} />
+      ) : (
+        <div className="space-y-2.5">
+          {data.donations.map((d) => (
+            <Card key={d.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+              <div className="min-w-0">
+                <p className="font-semibold">{d.category_name ?? d.category_id}</p>
+                <p className="text-xs text-muted-foreground">{d.donation_date}</p>
+              </div>
+              <span className="font-display text-lg font-extrabold text-primary">
+                {d.amount.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
+              </span>
+            </Card>
+          ))}
+        </div>
+      )}
+    </>
   );
 }

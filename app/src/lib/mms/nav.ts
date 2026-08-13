@@ -144,6 +144,11 @@ const teacherVisiblePaths = new Set([
   "/me",
 ]);
 
+const donorVisiblePaths = new Set([
+  "/dashboard",
+  "/me",
+]);
+
 const teacherRouteRedirects: Record<string, string> = {
   "/attendance": "/my-attendance",
   "/timetable": "/my-timetable",
@@ -160,6 +165,9 @@ export function isNavItemVisible(
   if (item.to === "/platform") return role === "super_admin" && !isTenantWorkspace(role);
   if (role === "teacher") {
     return teacherVisiblePaths.has(item.to) && (!item.feature || hasFeature(item.feature));
+  }
+  if (role === "donor") {
+    return donorVisiblePaths.has(item.to);
   }
   return !item.feature || (role === "super_admin" && !isTenantWorkspace(role)) || hasFeature(item.feature);
 }

@@ -67,7 +67,7 @@ function PublicAdmissionPage() {
       return;
     }
 
-    const independent = answers.student_is_independent === true;
+    const independent = answers["student_is_independent"] === true;
     const visibleFields = fields.filter((field) => isPublicFieldVisible(field, independent));
 
     const missing = visibleFields.find((field) => {
@@ -150,7 +150,7 @@ function PublicAdmissionPage() {
                 ))}
               </CustomDropdown>
             </label>
-            {fields.filter((field) => isPublicFieldVisible(field, answers.student_is_independent === true)).map((field) => (
+            {fields.filter((field) => isPublicFieldVisible(field, answers["student_is_independent"] === true)).map((field) => (
               <AdmissionField
                 key={field.key}
                 field={field}

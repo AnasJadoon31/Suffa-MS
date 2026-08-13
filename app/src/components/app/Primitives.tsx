@@ -11,9 +11,9 @@ export function Card({ className, children }: { className?: string; children: Re
   return <div className={cn("card-surface p-4", className)}>{children}</div>;
 }
 
-export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function SectionTitle({ children, action, className }: { children: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <div className="mb-3 mt-6 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 first:mt-0">
+    <div className={className ? `mb-3 mt-6 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 first:mt-0 ${className}` : "mb-3 mt-6 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 first:mt-0"}>
       <h2 className="truncate font-display text-sm font-extrabold uppercase tracking-[0.14em] text-muted-foreground rtl:font-bold rtl:tracking-normal rtl:leading-relaxed">
         {children}
       </h2>
@@ -140,9 +140,9 @@ export function ActionButton({
   );
 }
 
-export function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <label className="block space-y-1.5">
+    <label className={className ? `block space-y-1.5 ${className}` : "block space-y-1.5"}>
       <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.14em] text-muted-foreground rtl:text-xs rtl:font-bold rtl:tracking-normal rtl:leading-relaxed">
         {label}
       </span>
@@ -242,11 +242,11 @@ function extractSelectOptions(children: ReactNode): { value: string; label: stri
   React.Children.forEach(children, (child) => {
     if (!React.isValidElement(child) || child.type !== "option") return;
     const props = child.props as Record<string, unknown>;
-    if (props.value !== undefined && props.value !== null && props.value !== "") {
+    if (props["value"] !== undefined && props["value"] !== null && props["value"] !== "") {
       opts.push({
-        value: String(props.value),
-        label: String(props.children ?? props.value),
-        disabled: Boolean(props.disabled),
+        value: String(props["value"]),
+        label: String(props["children"] ?? props["value"]),
+        disabled: Boolean(props["disabled"]),
       });
     }
   });
@@ -293,7 +293,7 @@ export function CustomDropdown(props: React.SelectHTMLAttributes<HTMLSelectEleme
         rest.onChange?.(syntheticEvent);
       }}
       options={options}
-      placeholder={rest.placeholder || rest["aria-label"] || undefined}
+      placeholder={(rest as Record<string, unknown>)["placeholder"] as string || rest["aria-label"] || undefined}
       className={className}
     />
   );

@@ -8,7 +8,7 @@ import { ActionButton, Card, EmptyState, Pill, SectionTitle, SkeletonList } from
 import { reportingApi } from "@/lib/mms/endpoints";
 
 export const Route = createFileRoute("/incomplete-profiles")({
-  validateSearch: (search: Record<string, unknown>) => ({ type: search.type === "guardian" ? "guardian" as const : "student" as const }),
+  validateSearch: (search: Record<string, unknown>) => ({ type: search["type"] === "guardian" ? "guardian" as const : "student" as const }),
   component: IncompleteProfilesPage,
 });
 
