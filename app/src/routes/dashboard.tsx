@@ -68,6 +68,7 @@ function DashboardPage() {
     queryKey: ["donor-profile"],
     queryFn: () => financeApi.myDonorProfile(),
     enabled: Boolean(user) && user?.role === "donor",
+    retry: false,
   });
 
   const data = dashboard.data;
@@ -95,7 +96,7 @@ function DashboardPage() {
       {data?.role === "teacher" && !user?.is_principal_delegate ? <TeacherView data={data as TeacherDashboard} /> : null}
       {data?.role === "teacher" && user?.is_principal_delegate ? <PrincipalView data={data as unknown as PrincipalDashboard} /> : null}
       {data?.role === "student" ? <StudentView data={data as StudentDashboard} /> : null}
-      {data?.role === "donor" ? <DonorView data={donorProfile.data} /> : null}
+      {data?.role === "donor" ? <DonorView data={donorProfile.data} error={donorProfile.error} isLoading={donorProfile.isLoading} /> : null}
       {data && !["principal", "teacher", "student", "donor"].includes(data.role) ? <FallbackView /> : null}
     </AppShell>
   );
@@ -360,10 +361,12 @@ function CheckInCard({
   );
 }
 
-function DonorView({ data }: { data?: DonorFinanceProfile }) {
+function DonorView({ data, error, isLoading }: { data?: DonorFinanceProfile; error?: unknown; isLoading?: boolean }) {
   const { t } = useTranslation();
-  if (!data) return <SkeletonList rows={3} />;
-  const total = data.donations.reduce((sum, d) => sum + d.amount, 0);
+  if (isLoading) return <SkeletonList rows={3} />;
+  if (error) return <EmptyState title={t("Couldn't load donor data")} hint={t("Please try again or contact support.")} />;
+  if (!data) return <EmptyState title={t("No donor data")} hint={t("Your donation history will appear here.")} />;
+  const total = data.donations.reduce((sum: number, d: { amount?: number }) => sum + Number(d.amount ?? 0), 0);
   return (
     <>
       <StatCard
