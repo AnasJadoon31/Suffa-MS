@@ -4,7 +4,8 @@ ARG VITE_API_BASE
 ENV VITE_API_BASE=$VITE_API_BASE
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 COPY package*.json ./
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 

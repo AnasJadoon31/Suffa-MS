@@ -62,8 +62,6 @@ services:
     networks:
       - default
       - coolify
-    ports:
-      - "8001:8000"
     labels:
       - "traefik.docker.network=coolify"
     restart: unless-stopped
