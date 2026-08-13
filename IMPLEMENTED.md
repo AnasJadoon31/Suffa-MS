@@ -3,6 +3,34 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-13 — PWA Offline Attendance Outbox
+
+**Fix:**
+- Added a full offline data layer: Dexie IndexedDB database with an outbox queue for attendance entries and a roster cache table.
+- Attendance saves now succeed offline — entries are queued in IndexedDB and the UI confirms "Saved offline — N marks will sync when online".
+- Automatic sync: a `useOutboxSync` hook flushes the queue whenever the connection returns (online event listener + polling fallback).
+- Added Workbox NetworkFirst caching for roster and timetable API responses so they load offline after first fetch.
+- Updated `PwaLayer` to show a gold status bar with pending sync count and spinner while syncing.
+
+**Files:**
+- `app/src/lib/mms/db.ts` — Dexie database (outbox + rosterCache tables)
+- `app/src/lib/mms/outbox.ts` — outbox API (enqueue, flush, count, retry)
+- `app/src/lib/mms/useOnlineStatus.ts` — online/offline detection hook
+- `app/src/lib/mms/useOutboxSync.ts` — auto-flush outbox on reconnect
+- `app/src/routes/attendance.tsx` — save mutation writes to outbox when offline
+- `app/src/components/app/PwaLayer.tsx` — sync status bar
+- `app/vite.config.ts` — Workbox NetworkFirst caching for roster + timetable APIs
+- `app/src/i18n/locales/en.json` — "Save offline" key
+- `app/src/i18n/locales/ur.json` — "Save offline" key
+
+**Verification:**
+- `npm run build` — passes with no errors or warnings
+- Dexie bundles correctly (132 KB), service worker generates with Workbox
+
+**Limitations:**
+- Background Sync API (push-triggered sync from SW) not yet implemented — sync only fires while the app tab is open.
+- Override (history correction) mutations still require online — not yet routed through the outbox.
+
 ## 2026-08-11 — Plain Teacher Scope and Marking
 
 **Fix:**

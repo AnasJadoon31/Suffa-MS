@@ -1,7 +1,8 @@
-import { Download, WifiOff, X } from "lucide-react";
+import { Download, RefreshCw, WifiOff, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { registerServiceWorker } from "@/lib/mms/pwa";
+import { useOutboxSync } from "@/lib/mms/useOutboxSync";
 import { useTranslation } from "react-i18next";
 
 type InstallPromptEvent = Event & {
@@ -14,6 +15,7 @@ export function PwaLayer() {
   const [offline, setOffline] = useState(false);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
   const [hidden, setHidden] = useState(false);
+  const { pending, syncing } = useOutboxSync();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -45,6 +47,10 @@ export function PwaLayer() {
         <div className="fixed inset-x-0 top-0 z-[70] flex items-center justify-center gap-2 bg-foreground/90 px-4 py-2 text-xs font-bold uppercase tracking-wide text-background">
           <WifiOff className="h-3.5 w-3.5" />
           {t("Offline — showing saved data")}</div>
+      ) : pending > 0 ? (
+        <div className="fixed inset-x-0 top-0 z-[70] flex items-center justify-center gap-2 bg-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-accent-foreground">
+          <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? `Syncing ${pending}...` : `${pending} pending sync`}</div>
       ) : null}
 
       {installEvent && !hidden ? (

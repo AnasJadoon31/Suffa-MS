@@ -46,6 +46,26 @@ export default defineConfig({
                 expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 },
               },
             },
+            {
+              urlPattern: ({ url, sameOrigin }) =>
+                sameOrigin && url.pathname.startsWith("/api/v1/attendance/classes"),
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "suffa-roster-cache",
+                networkTimeoutSeconds: 5,
+                expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
+              },
+            },
+            {
+              urlPattern: ({ url, sameOrigin }) =>
+                sameOrigin && url.pathname.startsWith("/api/v1/operations/timetable"),
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "suffa-timetable-cache",
+                networkTimeoutSeconds: 5,
+                expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 },
+              },
+            },
           ],
         },
       }),

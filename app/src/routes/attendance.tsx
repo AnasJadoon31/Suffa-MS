@@ -51,6 +51,8 @@ import {
   type TeacherAttendanceLogEntry,
 } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
+import { enqueueEntry } from "@/lib/mms/outbox";
+import { useOnlineStatus } from "@/lib/mms/useOnlineStatus";
 import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/attendance")({
@@ -392,6 +394,8 @@ function AttendanceBoard() {
 
   const effectiveSlotId = slotId || roster.data?.timetable_slot?.id || undefined;
 
+  const online = useOnlineStatus();
+
   const save = useMutation({
     mutationFn: async () => {
       const data = roster.data;
@@ -410,13 +414,31 @@ function AttendanceBoard() {
         idempotency_key: `${subjectId}:${data.session_id}:${attendanceDate}:${effectiveSlotId ?? "general"}`,
       }));
       if (!entries.length) throw new Error("Nothing to submit");
-      return attendanceApi.sync(entries);
+      if (!online) {
+        for (const entry of entries) {
+          await enqueueEntry(entry);
+        }
+        return { offline: true, count: entries.length };
+      }
+      try {
+        const result = await attendanceApi.sync(entries);
+        return { offline: false, result };
+      } catch {
+        for (const entry of entries) {
+          await enqueueEntry(entry);
+        }
+        return { offline: true, count: entries.length };
+      }
     },
-    onSuccess: (result) => {
-      const locked = result.locked?.length ?? 0;
-      toast.success(
-        locked ? `Saved — ${locked} entr${locked === 1 ? "y" : "ies"} locked` : "Attendance saved",
-      );
+    onSuccess: (res) => {
+      if ("offline" in res && res.offline) {
+        toast.success(`Saved offline — ${res.count} mark${res.count === 1 ? "" : "s"} will sync when online`);
+      } else if (!res.offline && res.result) {
+        const locked = res.result.locked?.length ?? 0;
+        toast.success(
+          locked ? `Saved — ${locked} entr${locked === 1 ? "y" : "ies"} locked` : "Attendance saved",
+        );
+      }
       setEditing(false);
       setMarks({});
       void queryClient.invalidateQueries({ queryKey: ["attendance-class-history"] });
@@ -860,7 +882,7 @@ function AttendanceBoard() {
                         className="gradient-emerald mx-auto flex w-full max-w-lg items-center justify-center gap-2 rounded-2xl py-3.5 font-display font-extrabold text-primary-foreground shadow-[var(--shadow-raised)] active:scale-[0.99] disabled:opacity-60"
                       >
                         {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                        {t("Save")}{Object.keys(marks).length} {t("mark")}{Object.keys(marks).length === 1 ? "" : "s"}
+                        {!online ? `${t("Save offline")} ·` : null}{t("Save")}{Object.keys(marks).length} {t("mark")}{Object.keys(marks).length === 1 ? "" : "s"}
                       </button>
                     </div>
                   ) : null}

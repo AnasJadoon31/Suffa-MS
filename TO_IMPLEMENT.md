@@ -5,6 +5,13 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-13 — PWA Offline Follow-Up
+
+- Implement Background Sync API so the outbox flushes even when the app tab is closed (SW `sync` event → replay queued entries).
+- Route attendance override (history correction) mutations through the outbox so they also work offline.
+- Cache the class list response (`/api/v1/attendance/classes`) NetworkFirst so the class picker loads offline.
+- Add an "Offline data" indicator in the settings or profile showing pending outbox count and last sync time.
+
 ## 2026-08-11 — Current Completion and Release Readiness
 
 - Current assessment: approximately 70% functionally complete and 45% production-ready. Core workflows are implemented across people, academics, attendance, admissions, assessments, finance, messaging, sessions, tenant administration, and the super-admin platform.
