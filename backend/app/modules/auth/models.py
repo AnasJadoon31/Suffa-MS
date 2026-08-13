@@ -34,6 +34,7 @@ class User(Base, IdMixin, TimestampMixin):
     # NULL for super admins, who operate at platform scope, above any tenant.
     madrasa_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("madaris.id"), index=True, nullable=True)
     username: Mapped[str] = mapped_column(String(80), index=True)
+    name: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole))
     preferred_language: Mapped[str] = mapped_column(String(8), default="en")

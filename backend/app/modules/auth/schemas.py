@@ -26,6 +26,7 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     username: str
+    name: str | None = None
     role: str
     status: str
     preferred_language: str

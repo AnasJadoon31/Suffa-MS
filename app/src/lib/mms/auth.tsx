@@ -15,6 +15,7 @@ import i18n from "@/i18n";
 export interface MmsUser {
   id: string;
   username: string;
+  name?: string | null;
   role: string;
   status: string;
   preferred_language: string;

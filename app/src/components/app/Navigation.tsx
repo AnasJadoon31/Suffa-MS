@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { CalendarCheck2, Home, LayoutGrid, LogOut, Menu, Users } from "lucide-react";
+import { CalendarCheck2, Home, LayoutGrid, LogOut, Menu, User, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -15,6 +15,7 @@ const tabs = [
   { to: "/attendance", label: "Attendance", icon: CalendarCheck2, feature: "attendance" },
   { to: "/people", label: "People", icon: Users },
   { to: "/more", label: "More", icon: LayoutGrid },
+  { to: "/me", label: "Profile", icon: User, roles: ["donor"] },
 ] as const;
 
 function useActive() {
@@ -28,7 +29,12 @@ export function BottomNav() {
   const { user, hasFeature } = useAuth();
   const visibleTabs = tabs
     .map((tab) => user?.role === "teacher" && tab.to === "/attendance" ? { ...tab, to: "/my-attendance" } : tab)
-    .filter((tab) => isNavItemVisible(tab, user?.role, hasFeature));
+    .filter((tab) => {
+      if ("roles" in tab && tab.roles) {
+        return user?.role && tab.roles.includes(user.role);
+      }
+      return isNavItemVisible(tab, user?.role, hasFeature);
+    });
 
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur-md lg:hidden">
@@ -80,7 +86,7 @@ function BrandBlock() {
           {isPlatform ? "Suffa MS Platform" : madrasa?.name ?? "Suffa MS"}
         </p>
         <p className="truncate text-xs text-muted-foreground">
-          {user?.username ?? ""}
+          {user?.name || user?.username || ""}
           {user?.role ? ` · ${user.role.replace("_", " ")}` : ""}
         </p>
       </div>

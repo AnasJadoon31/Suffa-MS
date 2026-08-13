@@ -101,7 +101,7 @@ async def seed():
 
         # ---- Users & Profiles ----
         # Admin
-        admin_u = User(id=uid("u-admin"), madrasa_id=MID, username="admin", password_hash=hashed, role=UserRole.principal, status=UserStatus.active, created_at=NOW, updated_at=NOW)
+        admin_u = User(id=uid("u-admin"), madrasa_id=MID, username="admin", name="Admin Sahib", password_hash=hashed, role=UserRole.principal, status=UserStatus.active, created_at=NOW, updated_at=NOW)
         db.add(admin_u)
         await db.flush()
         admin_tp = TeacherProfile(id=uid("tp-admin"), madrasa_id=MID, user_id=admin_u.id, employee_code="ADMIN", name="Admin Sahib", status="active", whatsapp_number="+923001111111", join_date=date(2020,1,1), is_principal_delegate=True, created_at=NOW, updated_at=NOW)
@@ -113,7 +113,7 @@ async def seed():
         t_users, t_profiles = [], []
         for i, tn in enumerate(teacher_names):
             code = f"TCH-{i+1:04d}"
-            u = User(id=uid(f"u-t{i}"), madrasa_id=MID, username=code, password_hash=hashed, role=UserRole.teacher, status=UserStatus.active, created_at=NOW, updated_at=NOW)
+            u = User(id=uid(f"u-t{i}"), madrasa_id=MID, username=code, name=tn, password_hash=hashed, role=UserRole.teacher, status=UserStatus.active, created_at=NOW, updated_at=NOW)
             t_users.append(u); db.add(u)
             await db.flush()
             tp = TeacherProfile(id=uid(f"tp-{i}"), madrasa_id=MID, user_id=u.id, employee_code=code, name=tn, status="active", whatsapp_number=f"+92300{1000000+i}", join_date=date(2020,6,1), cnic=f"35202-{1234567+i:07d}-{i%10}", qualifications=["MA Islamic Studies","Hafiz","Mufti","PhD Arabic","MPhil Urdu"][i], created_at=NOW, updated_at=NOW)
@@ -128,7 +128,7 @@ async def seed():
         students_by_section = {}
         for i, (sn, sc) in enumerate(zip(students, s_class)):
             adm = f"ADM-{i+1:04d}"
-            u = User(id=uid(f"u-s{i}"), madrasa_id=MID, username=adm, password_hash=hashed, role=UserRole.student, status=UserStatus.active, created_at=NOW, updated_at=NOW)
+            u = User(id=uid(f"u-s{i}"), madrasa_id=MID, username=adm, name=sn, password_hash=hashed, role=UserRole.student, status=UserStatus.active, created_at=NOW, updated_at=NOW)
             db.add(u); await db.flush()
             is_independent = i in {10, 11}
             sp = StudentProfile(
@@ -168,7 +168,7 @@ async def seed():
         guardians = [("Haji Muhammad Siddique","father","+923001111222"),("Bashir Ahmad","father","+923001111333"),("Naseem Akhtar","uncle","+923001111444")]
         g_profiles = []
         for i,(gn,gr,gp) in enumerate(guardians):
-            u = User(id=uid(f"u-g{i}"), madrasa_id=MID, username=f"GR-{i+1:04d}", password_hash=hashed, role=UserRole.parent, status=UserStatus.active, created_at=NOW, updated_at=NOW)
+            u = User(id=uid(f"u-g{i}"), madrasa_id=MID, username=f"GR-{i+1:04d}", name=gn, password_hash=hashed, role=UserRole.parent, status=UserStatus.active, created_at=NOW, updated_at=NOW)
             db.add(u); await db.flush()
             g = Guardian(
                 id=uid(f"guard-{i}"),
@@ -206,7 +206,7 @@ async def seed():
         donors = [("Chaudhry Aslam","+923009876543"),("Haji Anwar","+923009876544"),("Sheikh Rasheed","+923009876545")]
         d_profiles = []
         for i,(dn,dc) in enumerate(donors):
-            u = User(id=uid(f"u-d{i}"), madrasa_id=MID, username=f"DN-{i+1:04d}", password_hash=hashed, role=UserRole.donor, status=UserStatus.active, created_at=NOW, updated_at=NOW)
+            u = User(id=uid(f"u-d{i}"), madrasa_id=MID, username=f"DN-{i+1:04d}", name=dn, password_hash=hashed, role=UserRole.donor, status=UserStatus.active, created_at=NOW, updated_at=NOW)
             db.add(u); await db.flush()
             d = Donor(id=uid(f"donor-{i}"), madrasa_id=MID, user_id=u.id, name=dn, contact=dc, created_at=NOW, updated_at=NOW)
             d_profiles.append(d); db.add(d)

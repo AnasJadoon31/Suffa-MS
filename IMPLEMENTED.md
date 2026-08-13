@@ -3,6 +3,18 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-14 — User Display Name
+
+- Added `name` column to `users` table (nullable) so the user's human-readable name can be shown alongside the username.
+- Backend: `UserRead` now exposes `name`; the `/me` endpoint populates it from the linked profile (Teacher/Student/Guardian/Donor) based on role.
+- Sidebar: shows the user's name (fallback to username) under the madrasa name instead of the username.
+- My Profile: shows name first, then username below, then role/status tags.
+- Seed script: all seeded users now carry a `name`.
+- Migration: `backend/alembic/versions/iss3_029_user_name.py`
+- Files: `backend/app/modules/auth/models.py`, `backend/app/modules/auth/schemas.py`, `backend/app/modules/auth/routes.py`, `backend/seed_full.py`, `app/src/lib/mms/auth.tsx`, `app/src/components/app/Navigation.tsx`, `app/src/routes/me.tsx`
+- Verified: `cd app && npm run build`; backend imports OK. Backend test failures pre-existing (unchanged by this work).
+- Notes: existing users created before this migration will have `name = NULL`; the UI falls back to username until the name is set manually or via re-seed.
+
 ## 2026-08-14 — Critical Auth Fix + WhatsApp Credentials Link
 
 **Security Fix — Login Privilege Escalation (CRITICAL):**

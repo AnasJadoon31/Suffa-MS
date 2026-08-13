@@ -27,7 +27,8 @@ from app.modules.auth.models import User, UserPermission, UserRole, UserStatus, 
 from app.modules.auth.service import UsernameTakenError, provision_login, set_password_token_version
 from app.modules.academics.models import AcademicClass, AcademicSession, Madrasa, Section
 from app.modules.operations.models import MadrasaSetting, TimetableSlot
-from app.modules.people.models import TeacherProfile
+from app.modules.people.models import TeacherProfile, StudentProfile, Guardian
+from app.modules.finance.models import Donor
 from app.modules.auth.schemas import (
     ChangePasswordRequest,
     LoginRequest,
@@ -226,8 +227,27 @@ async def get_me(
             .limit(1)
         ) is not None
 
+    profile_name: str | None = None
+    if current_user.role in (UserRole.teacher, UserRole.principal):
+        profile_name = await session.scalar(
+            select(TeacherProfile.name).where(TeacherProfile.user_id == current_user.id)
+        )
+    elif current_user.role == UserRole.student:
+        profile_name = await session.scalar(
+            select(StudentProfile.name).where(StudentProfile.user_id == current_user.id)
+        )
+    elif current_user.role == UserRole.parent:
+        profile_name = await session.scalar(
+            select(Guardian.name).where(Guardian.user_id == current_user.id)
+        )
+    elif current_user.role == UserRole.donor:
+        profile_name = await session.scalar(
+            select(Donor.name).where(Donor.user_id == current_user.id)
+        )
+
     user_read = UserRead.model_validate(current_user)
     user_read.is_principal_delegate = is_delegate
+    user_read.name = profile_name
 
     branding = {key: value for key, value in profile_rows}
     madrasa_read = MadrasaRead.model_validate(madrasa)

@@ -53,10 +53,11 @@ function MePage() {
     document.documentElement.classList.toggle("dark", next);
   };
 
+  const isDonor = user?.role === "donor";
   const sessions = useQuery({
     queryKey: ["sessions"],
     queryFn: () => academicsApi.listSessions(),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && !isDonor,
   });
 
   const [language, setLanguage] = useState(user?.preferred_language ?? "en");
@@ -111,9 +112,11 @@ function MePage() {
     mutationFn: async () =>
       authApi.updateMe({
         preferred_language: language,
-        ...(selectedSessionId
-          ? { selected_session_id: selectedSessionId }
-          : { clear_selected_session: true }),
+        ...(!isDonor
+          ? (selectedSessionId
+            ? { selected_session_id: selectedSessionId }
+            : { clear_selected_session: true })
+          : {}),
       }),
     onSuccess: async () => {
       await refresh();
@@ -148,10 +151,11 @@ function MePage() {
     <AppShell title={t("My Profile")} subtitle={user?.role === "super_admin" ? t("Suffa MS Platform") : madrasa?.name ?? "Suffa MS"}>
       <Card className="flex items-center gap-3">
         <span className="gradient-emerald grid h-14 w-14 shrink-0 place-items-center rounded-2xl font-display text-xl font-extrabold text-primary-foreground">
-          {user?.username?.slice(0, 1).toUpperCase()}
+          {(user?.name || user?.username)?.slice(0, 1).toUpperCase()}
         </span>
         <div className="min-w-0">
-          <p className="truncate font-display text-lg font-extrabold">{user?.username}</p>
+          <p className="truncate font-display text-lg font-extrabold">{user?.name || user?.username}</p>
+          <p className="truncate text-sm text-muted-foreground">{user?.name ? user.username : null}</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             <Pill tone="gold">{user?.role?.replace("_", " ")}</Pill>
             <Pill tone={user?.status === "active" ? "success" : "muted"}>{user?.status}</Pill>
@@ -170,7 +174,7 @@ function MePage() {
           label={t("Permissions")}
           value={`${permissions.length} granted`}
         />
-        <Row icon={<Globe className="h-4 w-4" />} label={t("Session")} value={activeSessionLabel} />
+        {!isDonor ? <Row icon={<Globe className="h-4 w-4" />} label={t("Session")} value={activeSessionLabel} /> : null}
       </div>
 
       {personProfile.data ? <><SectionTitle>{t("Personal profile")}</SectionTitle><Card className="space-y-3 p-3.5"><Field label={t("Full name")}><TextInput value={personName} onChange={(event) => setPersonName(event.target.value)} /></Field>{personProfile.data.profile_type === "student" ? <><Field label={t("Date of birth")}><TextInput type="date" value={personDob} onChange={(event) => setPersonDob(event.target.value)} /></Field><Field label={t("B-Form number")}><TextInput value={personCnic} onChange={(event) => setPersonCnic(event.target.value)} /></Field></> : <Field label={t("CNIC")}><TextInput value={personCnic} onChange={(event) => setPersonCnic(event.target.value)} /></Field>}{(personProfile.data.profile_type === "guardian" || Boolean((personProfile.data.profile as any).is_independent)) ? <><Field label={t("Address")}><TextInput value={personAddress} onChange={(event) => setPersonAddress(event.target.value)} /></Field><Field label={t("Phone number(s)")}><PhoneNumbersField numbers={personPhones} defaultNumber={personDefaultPhone} onChange={(numbers, defaultNumber) => { setPersonPhones(numbers); setPersonDefaultPhone(defaultNumber); }} /></Field></> : <p className="text-sm text-muted-foreground">Contact details are managed by your guardian.</p>}{personProfile.data.profile_type === "student" && (personProfile.data.profile as any).admission_record ? <AdmissionAnswerFields fields={((personProfile.data.profile as any).admission_record.fields_definition ?? []).filter((field: any) => !field.built_in && !field.key.startsWith("guardian_"))} answers={admissionAnswers} onChange={setAdmissionAnswers} /> : null}<ActionButton onClick={() => savePersonProfile.mutate()} disabled={savePersonProfile.isPending} className="w-full">{t("Save profile")}</ActionButton></Card></> : null}
@@ -184,7 +188,7 @@ function MePage() {
           </CustomDropdown>
         </Field>
 
-        {canChooseSession ? (
+        {!isDonor && canChooseSession ? (
           <Field label={t("Academic session")}>
             <CustomDropdown
               value={selectedSessionId}
@@ -205,7 +209,7 @@ function MePage() {
           </Field>
         ) : null}
 
-        {isViewingReadOnlySession ? (
+        {!isDonor && isViewingReadOnlySession ? (
           <div className="space-y-1.5 rounded-xl bg-accent-soft p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-extrabold">{t("Read-only session")}</p>
