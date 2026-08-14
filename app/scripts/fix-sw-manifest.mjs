@@ -4,9 +4,13 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const logFile = resolve(root, ".output/fix-sw-debug.log");
-const log = (msg) => appendFileSync(logFile, msg + "\n");
+const logFile = "/tmp/sw-debug.log";
+const log = (msg) => {
+  try { appendFileSync(logFile, msg + "\n"); } catch(e) { /* ignore */ }
+};
 log("SCRIPT STARTED");
+log("cwd = " + process.cwd());
+log("__dirname = " + __dirname);
 
 const publicDir = resolve(root, ".output/public");
 const assetsDir = resolve(publicDir, "assets");
@@ -14,6 +18,7 @@ const swPath = resolve(publicDir, "sw-v3.js");
 const manifestPath = resolve(root, ".output/server/index.mjs");
 
 // ── Step 1: Generate the app shell index.html ──────────────────────────────
+log("root = " + root);
 log("publicDir = " + publicDir);
 log("assetsDir = " + assetsDir);
 log("swPath = " + swPath);
