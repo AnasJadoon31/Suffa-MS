@@ -1,5 +1,5 @@
 /** Guarded service-worker registration. Offline support only runs on the published site. */
-const SW_URL = "/sw.js";
+const SW_URL = "/sw-v2.js";
 
 function isBlockedHost(hostname: string): boolean {
   return (
@@ -14,7 +14,9 @@ function isBlockedHost(hostname: string): boolean {
   );
 }
 
-async function unregisterAppWorker(): Promise<void> {
+async function unregisterOldWorkers(): Promise<void> {
+  // Remove the legacy pass-through SW and any previous SW so the new one
+  // (sw-v2.js) fully controls fetches.
   const registrations = await window.navigator.serviceWorker.getRegistrations();
   await Promise.allSettled(
     registrations
@@ -24,7 +26,7 @@ async function unregisterAppWorker(): Promise<void> {
           registration.waiting?.scriptURL ??
           registration.installing?.scriptURL ??
           "";
-        return url.endsWith(SW_URL);
+        return url.includes("/sw.js") || url.endsWith(SW_URL);
       })
       .map((registration) => registration.unregister()),
   );
@@ -40,11 +42,16 @@ export function registerServiceWorker(): void {
     new URLSearchParams(window.location.search).get("sw") === "off";
 
   if (refuse) {
-    void unregisterAppWorker().catch(() => undefined);
+    void unregisterOldWorkers().catch(() => undefined);
     return;
   }
 
-  void window.navigator.serviceWorker
-    .register(SW_URL, { scope: "/" })
-    .catch(() => undefined);
+  // Remove legacy pass-through SW first, then register the new one.
+  void unregisterOldWorkers()
+    .catch(() => undefined)
+    .finally(() => {
+      void window.navigator.serviceWorker
+        .register(SW_URL, { scope: "/" })
+        .catch(() => undefined);
+    });
 }

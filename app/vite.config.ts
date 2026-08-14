@@ -10,6 +10,11 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   nitro: {
     preset: "node-server",
+    routeRules: {
+      "/sw-v2.js": { headers: { "Cache-Control": "no-cache, no-store, must-revalidate" } },
+      "/workbox-*.js": { headers: { "Cache-Control": "no-cache, no-store, must-revalidate" } },
+      "/manifest.webmanifest": { headers: { "Cache-Control": "no-cache" } },
+    },
   },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
@@ -22,7 +27,7 @@ export default defineConfig({
         strategies: "generateSW",
         registerType: "autoUpdate",
         injectRegister: null,
-        filename: "sw.js",
+        filename: "sw-v2.js",
         devOptions: { enabled: false },
         manifest: false,
         outDir: ".output/public",
