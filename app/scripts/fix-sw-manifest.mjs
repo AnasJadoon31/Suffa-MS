@@ -14,14 +14,25 @@ let swCode = readFileSync(swPath, 'utf-8');
 // The generateSW step in some build environments drops the navigateFallback
 // NavigationRoute; patch it in if missing.
 if (!swCode.includes('NavigationRoute')) {
-  const navFallback = `s.registerRoute(new s.NavigationRoute(s.createHandlerBoundToURL("/index.html"),{denylist:[/^\\/~oauth/,/^\\/api\\//]}));`;
-  // Insert right after precacheAndRoute
-  swCode = swCode.replace(
-    /(precacheAndRoute\([^)]+\);)/,
-    `$1${navFallback}`,
-  );
-  writeFileSync(swPath, swCode);
-  console.log('Patched NavigationRoute into sw-v3.js');
+  // Find the full precacheAndRoute(...) call (handles nested brackets)
+  const startIdx = swCode.indexOf('precacheAndRoute(');
+  if (startIdx !== -1) {
+    let depth = 0;
+    let endIdx = startIdx;
+    for (let i = startIdx; i < swCode.length; i++) {
+      if (swCode[i] === '(') depth++;
+      else if (swCode[i] === ')') {
+        depth--;
+        if (depth === 0) { endIdx = i; break; }
+      }
+    }
+    const before = swCode.slice(0, endIdx + 1);
+    const after = swCode.slice(endIdx + 1);
+    const navFallback = `,s.registerRoute(new s.NavigationRoute(s.createHandlerBoundToURL("/index.html"),{denylist:[/^\\/~oauth/,/^\\/api\\//]}))`;
+    swCode = before + navFallback + after;
+    writeFileSync(swPath, swCode);
+    console.log('Patched NavigationRoute into sw-v3.js');
+  }
 }
 
 const swStat = readFileSync(swPath);
