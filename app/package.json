@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "dev:host": "vite dev --host 0.0.0.0",
-    "build": "vite build; node ./scripts/fix-sw-manifest.mjs",
+    "build": "vite build; python3 ./scripts/fix-sw.py",
     "build:dev": "vite build --mode development",
     "preview": "vite preview --host 0.0.0.0",
     "lint": "eslint .",
