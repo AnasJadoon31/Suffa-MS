@@ -3,6 +3,13 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-14 — Fix PWA offline loading
+
+- Implemented: Added `navigateFallback: null` to vite-plugin-pwa workbox config so the service worker no longer registers a `NavigationRoute` that tries to serve a precached `index.html`. The app is SSR (TanStack Start + nitro) with no static `index.html` in the build output, so the broken route caused every offline navigation to fail with the browser's default offline error page.
+- Files: `app/vite.config.ts`
+- Verified: `npm run build` — generated `sw.js` no longer contains `NavigationRoute` or `createHandlerBoundToURL`. The `NetworkFirst` route for navigation (cache name `suffa-pages`) remains active and will serve cached SSR HTML on return visits after an initial online load.
+- Notes: First-ever offline visit still requires a prior online visit to cache the shell. Authenticated users returning offline will see cached pages; API calls fail gracefully via existing error handling in `auth.tsx`.
+
 ## 2026-08-14 — User Display Name
 
 - Added `name` column to `users` table (nullable) so the user's human-readable name can be shown alongside the username.
