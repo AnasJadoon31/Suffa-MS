@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,13 +11,18 @@ const swPath = resolve(publicDir, "sw-v3.js");
 const manifestPath = resolve(root, ".output/server/index.mjs");
 
 // ── Step 1: Generate the app shell index.html ──────────────────────────────
-try {
-  const assetFiles = readdirSync(assetsDir);
-  const mainJs = assetFiles.find((f) => f.startsWith("index-") && f.endsWith(".js"));
-  const cssFiles = assetFiles.filter((f) => f.endsWith(".css"));
-  const jsTags = mainJs ? `<script type="module" src="/assets/${mainJs}" crossorigin></script>` : "";
-  const cssTags = cssFiles.map((f) => `<link rel="stylesheet" href="/assets/${f}" />`).join("\n    ");
-  const html = `<!DOCTYPE html>
+console.log("DEBUG: publicDir =", publicDir);
+console.log("DEBUG: assetsDir =", assetsDir);
+console.log("DEBUG: swPath =", swPath);
+console.log("DEBUG: assets exists?", existsSync(assetsDir));
+const assetFiles = readdirSync(assetsDir);
+console.log("DEBUG: assetFiles count =", assetFiles.length);
+const mainJs = assetFiles.find((f) => f.startsWith("index-") && f.endsWith(".js"));
+const cssFiles = assetFiles.filter((f) => f.endsWith(".css"));
+console.log("DEBUG: mainJs =", mainJs, "cssFiles =", cssFiles.length);
+const jsTags = mainJs ? `<script type="module" src="/assets/${mainJs}" crossorigin></script>` : "";
+const cssTags = cssFiles.map((f) => `<link rel="stylesheet" href="/assets/${f}" />`).join("\n    ");
+const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -31,28 +36,30 @@ try {
   ${jsTags}
 </body>
 </html>`;
-  writeFileSync(resolve(publicDir, "index.html"), html);
-  console.log("Generated app shell index.html");
-} catch (e) {
-  console.warn("Failed to generate app shell:", e);
-}
+writeFileSync(resolve(publicDir, "index.html"), html);
+console.log("Generated app shell index.html");
 
 // ── Step 2: Patch the service worker ───────────────────────────────────────
 let swCode = readFileSync(swPath, "utf-8");
+console.log("DEBUG: swCode length =", swCode.length);
+console.log("DEBUG: has NavigationRoute?", swCode.includes("NavigationRoute"));
+console.log("DEBUG: has index.html?", swCode.includes("index.html"));
 
 // 2a. Add index.html to precache if missing
 if (!swCode.includes('"index.html"') && !swCode.includes("index.html")) {
-  // Find the precache array and add index.html as first entry
   swCode = swCode.replace(
     /(precacheAndRoute\(\[)({url:")/,
     `$1{url:"index.html",revision:null},$2`,
   );
   console.log("Added index.html to precache");
+} else {
+  console.log("index.html already in SW");
 }
 
 // 2b. Add NavigationRoute if missing
 if (!swCode.includes("NavigationRoute")) {
   const startIdx = swCode.indexOf("precacheAndRoute(");
+  console.log("DEBUG: precacheAndRoute at", startIdx);
   if (startIdx !== -1) {
     let depth = 0;
     let endIdx = startIdx;
@@ -69,6 +76,8 @@ if (!swCode.includes("NavigationRoute")) {
     swCode = before + navFallback + after;
     console.log("Patched NavigationRoute into sw-v3.js");
   }
+} else {
+  console.log("NavigationRoute already present");
 }
 
 writeFileSync(swPath, swCode);
