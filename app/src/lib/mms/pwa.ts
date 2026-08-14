@@ -44,5 +44,24 @@ export function registerServiceWorker(): void {
     return;
   }
 
-  void window.navigator.serviceWorker.register(SW_URL, { scope: "/" }).catch(() => undefined);
+  void window.navigator.serviceWorker
+    .register(SW_URL, { scope: "/" })
+    .then((registration) => {
+      // Force new SW to activate immediately, replacing any old pass-through SW
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+      }
+      registration.addEventListener("updatefound", () => {
+        const newWorker = registration.installing;
+        if (newWorker) {
+          newWorker.addEventListener("statechange", () => {
+            if (newWorker.state === "activated") {
+              // New SW took over — reload to ensure it controls all fetches
+              window.location.reload();
+            }
+          });
+        }
+      });
+    })
+    .catch(() => undefined);
 }

@@ -37,7 +37,7 @@ export default defineConfig({
               handler: "NetworkFirst",
               options: {
                 cacheName: "suffa-pages",
-                networkTimeoutSeconds: 3,
+                networkTimeoutSeconds: 2,
                 expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
               },
             },
@@ -53,12 +53,19 @@ export default defineConfig({
             },
             {
               urlPattern: ({ url }) => url.pathname.startsWith("/api/v1/"),
-              handler: "NetworkFirst",
+              handler: "StaleWhileRevalidate",
               options: {
                 cacheName: "suffa-api-cache",
-                networkTimeoutSeconds: 3,
                 expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
                 cacheableResponse: { statuses: [0, 200] },
+                plugins: [
+                  {
+                    cacheWillUpdate: async ({ response }) => {
+                      if (response.status === 200) return response;
+                      return null;
+                    },
+                  },
+                ],
               },
             },
           ],
