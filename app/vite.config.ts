@@ -79,7 +79,6 @@ export default defineConfig({
   },
   vite: {
     plugins: [
-      generateAppShell(),
       VitePWA({
         strategies: "generateSW",
         registerType: "autoUpdate",
@@ -93,6 +92,9 @@ export default defineConfig({
           globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico,webmanifest}"],
           navigateFallback: "/index.html",
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
+          additionalManifestEntries: [
+            { url: "/index.html", revision: null },
+          ],
           runtimeCaching: [
             {
               urlPattern: ({ request }) => request.mode === "navigate",
