@@ -1,6 +1,8 @@
 import axios, { AxiosError } from "axios";
 import { toast } from "sonner";
 import { isTenantWorkspace } from "./workspace";
+import { enqueueMutation, isMutationRequest } from "./mutationQueue";
+import { isOnline } from "./useOnlineStatus";
 
 export const API_BASE =
   (import.meta.env["VITE_API_BASE"] as string | undefined) ?? "http://localhost:8001";
@@ -108,9 +110,29 @@ export function apiErrorMessage(error: unknown, fallback = "Something went wrong
 const MUTATION_METHODS = new Set(["post", "put", "patch", "delete"]);
 const QUIET_PATHS = ["/api/v1/auth/token"];
 
+api.interceptors.request.use((config) => {
+  const method = config.method?.toLowerCase();
+  if (isMutationRequest(method) && !isOnline()) {
+    // Offline: queue the mutation instead of making the network request
+    const url = config.url ?? "";
+    const data = config.data ?? null;
+    void enqueueMutation(method!, url, data).then(() => {
+      toast.success("Saved offline — will sync when online");
+    });
+    // Abort the request by rejecting with a special marker
+    return Promise.reject({ __OFFLINE_QUEUED__: true, url });
+  }
+  return config;
+});
+
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  (error: AxiosError & { __OFFLINE_QUEUED__?: boolean }) => {
+    if (error.__OFFLINE_QUEUED__) {
+      // Mutation was queued offline — not a real error
+      return Promise.resolve({ data: { queued: true } }) as unknown;
+    }
+
     const method = error.config?.method?.toLowerCase();
     const url = error.config?.url ?? "";
     const isQuiet = QUIET_PATHS.some((path) => url.includes(path));

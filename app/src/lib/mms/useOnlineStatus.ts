@@ -1,18 +1,31 @@
 import { useEffect, useState } from "react";
 
+let _online = typeof window === "undefined" ? true : window.navigator.onLine;
+const _listeners: Array<(online: boolean) => void> = [];
+
+function _setOnline(online: boolean) {
+  if (_online === online) return;
+  _online = online;
+  _listeners.forEach((fn) => fn(online));
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => _setOnline(true));
+  window.addEventListener("offline", () => _setOnline(false));
+}
+
+export function isOnline(): boolean {
+  return _online;
+}
+
 export function useOnlineStatus(): boolean {
-  const [online, setOnline] = useState(() =>
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
+  const [online, setOnline] = useState(_online);
 
   useEffect(() => {
-    const goOnline = () => setOnline(true);
-    const goOffline = () => setOnline(false);
-    window.addEventListener("online", goOnline);
-    window.addEventListener("offline", goOffline);
+    _listeners.push(setOnline);
     return () => {
-      window.removeEventListener("online", goOnline);
-      window.removeEventListener("offline", goOffline);
+      const idx = _listeners.indexOf(setOnline);
+      if (idx >= 0) _listeners.splice(idx, 1);
     };
   }, []);
 

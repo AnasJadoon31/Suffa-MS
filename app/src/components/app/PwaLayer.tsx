@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { registerServiceWorker } from "@/lib/mms/pwa";
 import { useOutboxSync } from "@/lib/mms/useOutboxSync";
+import { useMutationSync } from "@/lib/mms/useMutationSync";
 import { useTranslation } from "react-i18next";
 
 type InstallPromptEvent = Event & {
@@ -16,6 +17,7 @@ export function PwaLayer() {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
   const [hidden, setHidden] = useState(false);
   const { pending, syncing } = useOutboxSync();
+  const { pending: pendingMutations, syncing: syncingMutations } = useMutationSync();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -44,13 +46,18 @@ export function PwaLayer() {
   return (
     <>
       {offline ? (
-        <div className="fixed inset-x-0 top-0 z-[70] flex items-center justify-center gap-2 bg-foreground/90 px-4 py-2 text-xs font-bold uppercase tracking-wide text-background">
-          <WifiOff className="h-3.5 w-3.5" />
-          {t("Offline — showing saved data")}</div>
-      ) : pending > 0 ? (
-        <div className="fixed inset-x-0 top-0 z-[70] flex items-center justify-center gap-2 bg-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-accent-foreground">
-          <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? `Syncing ${pending}...` : `${pending} pending sync`}</div>
+         <div className="fixed inset-x-0 top-0 z-[70] flex items-center justify-center gap-2 bg-foreground/90 px-4 py-2 text-xs font-bold uppercase tracking-wide text-background">
+           <WifiOff className="h-3.5 w-3.5" />
+           {t("Offline — showing saved data")}
+           {pendingMutations > 0 ? ` · ${pendingMutations} action${pendingMutations > 1 ? "s" : ""} queued` : ""}
+         </div>
+      ) : pending > 0 || pendingMutations > 0 ? (
+         <div className="fixed inset-x-0 top-0 z-[70] flex items-center justify-center gap-2 bg-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-accent-foreground">
+           <RefreshCw className={`h-3.5 w-3.5 ${syncing || syncingMutations ? "animate-spin" : ""}`} />
+           {syncing || syncingMutations
+             ? `Syncing ${pending + pendingMutations}...`
+             : `${pending + pendingMutations} pending sync`}
+         </div>
       ) : null}
 
       {installEvent && !hidden ? (
