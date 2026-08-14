@@ -4,11 +4,6 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const logs = [];
-const log = (msg) => { logs.push(msg); };
-log("SCRIPT STARTED");
-log("cwd = " + process.cwd());
-log("__dirname = " + __dirname);
 
 const publicDir = resolve(root, ".output/public");
 const assetsDir = resolve(publicDir, "assets");
@@ -16,16 +11,9 @@ const swPath = resolve(publicDir, "sw-v3.js");
 const manifestPath = resolve(root, ".output/server/index.mjs");
 
 // ── Step 1: Generate the app shell index.html ──────────────────────────────
-log("root = " + root);
-log("publicDir = " + publicDir);
-log("assetsDir = " + assetsDir);
-log("swPath = " + swPath);
-log("assets exists? " + existsSync(assetsDir));
 const assetFiles = readdirSync(assetsDir);
-log("assetFiles count = " + assetFiles.length);
 const mainJs = assetFiles.find((f) => f.startsWith("index-") && f.endsWith(".js"));
 const cssFiles = assetFiles.filter((f) => f.endsWith(".css"));
-log("mainJs = " + mainJs + " cssFiles = " + cssFiles.length);
 const jsTags = mainJs ? `<script type="module" src="/assets/${mainJs}" crossorigin></script>` : "";
 const cssTags = cssFiles.map((f) => `<link rel="stylesheet" href="/assets/${f}" />`).join("\n    ");
 const html = `<!DOCTYPE html>
@@ -43,13 +31,10 @@ const html = `<!DOCTYPE html>
 </body>
 </html>`;
 writeFileSync(resolve(publicDir, "index.html"), html);
-log("Generated app shell index.html");
+console.log("Generated app shell index.html");
 
 // ── Step 2: Patch the service worker ───────────────────────────────────────
 let swCode = readFileSync(swPath, "utf-8");
-log("swCode length = " + swCode.length);
-log("has NavigationRoute? " + swCode.includes("NavigationRoute"));
-log("has index.html? " + swCode.includes("index.html"));
 
 // 2a. Add index.html to precache if missing
 if (!swCode.includes('"index.html"') && !swCode.includes("index.html")) {
@@ -57,15 +42,14 @@ if (!swCode.includes('"index.html"') && !swCode.includes("index.html")) {
     /(precacheAndRoute\(\[)({url:")/,
     `$1{url:"index.html",revision:null},$2`,
   );
-  log("Added index.html to precache");
+  console.log("Added index.html to precache");
 } else {
-  log("index.html already in SW");
+  console.log("index.html already in SW");
 }
 
 // 2b. Add NavigationRoute if missing
 if (!swCode.includes("NavigationRoute")) {
   const startIdx = swCode.indexOf("precacheAndRoute(");
-  log("precacheAndRoute at " + startIdx);
   if (startIdx !== -1) {
     let depth = 0;
     let endIdx = startIdx;
@@ -80,10 +64,10 @@ if (!swCode.includes("NavigationRoute")) {
     const after = swCode.slice(endIdx + 1);
     const navFallback = ',s.registerRoute(new s.NavigationRoute(s.createHandlerBoundToURL("/index.html"),{denylist:[/^\\/~oauth/,/^\\/api\\//]}))';
     swCode = before + navFallback + after;
-    log("Patched NavigationRoute into sw-v3.js");
+    console.log("Patched NavigationRoute into sw-v3.js");
   }
 } else {
-  log("NavigationRoute already present");
+  console.log("NavigationRoute already present");
 }
 
 writeFileSync(swPath, swCode);
@@ -100,17 +84,10 @@ if (match) {
   if (oldSize !== actualSize) {
     manifest = manifest.replace(sizeRegex, `$1${actualSize}`);
     writeFileSync(manifestPath, manifest);
-    log("Fixed sw-v3.js manifest size: " + oldSize + " → " + actualSize);
+    console.log(`Fixed sw-v3.js manifest size: ${oldSize} → ${actualSize}`);
   } else {
-    log("sw-v3.js manifest size already correct: " + actualSize);
+    console.log(`sw-v3.js manifest size already correct: ${actualSize}`);
   }
 } else {
-  log("WARN: Could not find sw-v3.js entry in manifest");
-}
-log("SCRIPT COMPLETED");
-// Write all logs to a file that will be copied to the runner image
-try {
-  writeFileSync(resolve(publicDir, "sw-debug.log"), logs.join("\n") + "\n");
-} catch(e) {
-  // ignore
+  console.warn("Could not find sw-v3.js entry in manifest");
 }
