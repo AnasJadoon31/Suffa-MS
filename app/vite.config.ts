@@ -91,7 +91,7 @@ export default defineConfig({
       },
     },
     plugins: [
-      VitePWA({
+        clientOnlyPWA({
         strategies: "generateSW",
         registerType: "autoUpdate",
         injectRegister: null,
@@ -104,9 +104,6 @@ export default defineConfig({
           globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico,webmanifest}"],
           navigateFallback: "/index.html",
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
-          additionalManifestEntries: [
-            { url: "/index.html", revision: null },
-          ],
           runtimeCaching: [
             {
               urlPattern: ({ request }) => request.mode === "navigate",
