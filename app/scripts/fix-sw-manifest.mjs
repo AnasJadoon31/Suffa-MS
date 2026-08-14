@@ -8,12 +8,28 @@ const root = resolve(__dirname, '..');
 const swPath = resolve(root, '.output/public/sw-v3.js');
 const manifestPath = resolve(root, '.output/server/index.mjs');
 
+let swCode = readFileSync(swPath, 'utf-8');
+
+// Fix 1: Ensure NavigationRoute for offline app shell fallback.
+// The generateSW step in some build environments drops the navigateFallback
+// NavigationRoute; patch it in if missing.
+if (!swCode.includes('NavigationRoute')) {
+  const navFallback = `s.registerRoute(new s.NavigationRoute(s.createHandlerBoundToURL("/index.html"),{denylist:[/^\\/~oauth/,/^\\/api\\//]}));`;
+  // Insert right after precacheAndRoute
+  swCode = swCode.replace(
+    /(precacheAndRoute\([^)]+\);)/,
+    `$1${navFallback}`,
+  );
+  writeFileSync(swPath, swCode);
+  console.log('Patched NavigationRoute into sw-v3.js');
+}
+
 const swStat = readFileSync(swPath);
 const actualSize = swStat.length;
 
 let manifest = readFileSync(manifestPath, 'utf-8');
 
-// Replace the stale size for sw-v3.js in the Nitro asset manifest
+// Fix 2: Replace the stale size for sw-v3.js in the Nitro asset manifest
 const sizeRegex = /("\/sw-v3\.js":\s*\{[^}]*"size":\s*)(\d+)/;
 const match = manifest.match(sizeRegex);
 if (match) {
