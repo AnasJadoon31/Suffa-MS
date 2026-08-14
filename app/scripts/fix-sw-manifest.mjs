@@ -1,13 +1,11 @@
-import { readFileSync, writeFileSync, readdirSync, existsSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const logFile = "/tmp/sw-debug.log";
-const log = (msg) => {
-  try { appendFileSync(logFile, msg + "\n"); } catch(e) { /* ignore */ }
-};
+const logs = [];
+const log = (msg) => { logs.push(msg); };
 log("SCRIPT STARTED");
 log("cwd = " + process.cwd());
 log("__dirname = " + __dirname);
@@ -110,3 +108,10 @@ if (match) {
   log("WARN: Could not find sw-v3.js entry in manifest");
 }
 log("SCRIPT COMPLETED");
+// Write all logs at once at the end
+try {
+  writeFileSync("/tmp/sw-debug.log", logs.join("\n") + "\n");
+  console.error("SW_DEBUG: " + logs.join(" | "));
+} catch(e) {
+  console.error("SW_DEBUG_WRITE_FAILED: " + e);
+}
