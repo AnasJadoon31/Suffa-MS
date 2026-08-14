@@ -29,13 +29,17 @@ export default defineConfig({
         workbox: {
           globDirectory: ".output/public",
           globPatterns: ["**/*.{js,css,woff2,png,svg,ico,webmanifest}"],
-          navigateFallback: "/index.html",
+          navigateFallback: null,
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
           runtimeCaching: [
             {
               urlPattern: ({ request, sameOrigin }) => sameOrigin && request.mode === "navigate",
               handler: "NetworkFirst",
-              options: { cacheName: "suffa-pages", networkTimeoutSeconds: 5 },
+              options: {
+                cacheName: "suffa-pages",
+                networkTimeoutSeconds: 3,
+                expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              },
             },
             {
               urlPattern: ({ request, sameOrigin }) =>
@@ -52,8 +56,9 @@ export default defineConfig({
               handler: "NetworkFirst",
               options: {
                 cacheName: "suffa-api-cache",
-                networkTimeoutSeconds: 5,
-                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
+                networkTimeoutSeconds: 3,
+                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
+                cacheableResponse: { statuses: [0, 200] },
               },
             },
           ],
