@@ -137,31 +137,23 @@ async def login(
     result = await session.execute(stmt_tenant)
     candidates = result.scalars().all()
 
-    stmt_sa = (
-        select(User)
-        .where(
-            User.username == payload.username,
-            User.status == UserStatus.active,
-            User.role == UserRole.super_admin,
+    if not candidates:
+        stmt_sa = (
+            select(User)
+            .where(
+                User.username == payload.username,
+                User.status == UserStatus.active,
+                User.role == UserRole.super_admin,
+            )
         )
-    )
-    result = await session.execute(stmt_sa)
-    sa_candidates = result.scalars().all()
+        result = await session.execute(stmt_sa)
+        candidates = result.scalars().all()
 
-    # Tenant users are tried first; super_admin is only checked if no tenant
-    # user's password matched. This stops a tenant user named "admin" from
-    # blocking the super_admin login while still giving tenant users priority.
     user = None
     for candidate in candidates:
         if await verify_password(payload.password, candidate.password_hash):
             user = candidate
             break
-
-    if user is None:
-        for candidate in sa_candidates:
-            if await verify_password(payload.password, candidate.password_hash):
-                user = candidate
-                break
 
     if user is None:
         await record_failure(lockout_key, LOGIN_LOCKOUT_SECONDS)
