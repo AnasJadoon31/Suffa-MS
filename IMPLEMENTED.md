@@ -3,12 +3,20 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
-## 2026-08-14 — Fix PWA offline loading
+## 2026-08-14 — Full PWA Offline Support (Read + Write)
 
-- Implemented: Added `navigateFallback: null` to vite-plugin-pwa workbox config so the service worker no longer registers a `NavigationRoute` that tries to serve a precached `index.html`. The app is SSR (TanStack Start + nitro) with no static `index.html` in the build output, so the broken route caused every offline navigation to fail with the browser's default offline error page.
-- Files: `app/vite.config.ts`
-- Verified: `npm run build` — generated `sw.js` no longer contains `NavigationRoute` or `createHandlerBoundToURL`. The `NetworkFirst` route for navigation (cache name `suffa-pages`) remains active and will serve cached SSR HTML on return visits after an initial online load.
-- Notes: First-ever offline visit still requires a prior online visit to cache the shell. Authenticated users returning offline will see cached pages; API calls fail gracefully via existing error handling in `auth.tsx`.
+- Implemented complete offline support: cached page reads AND queued mutation writes that sync when back online.
+- **App shell**: Static `index.html` generated at build time (via `generateAppShell` plugin in `vite.config.ts`) loads the React entry point; precached by SW and served as `navigateFallback` when offline navigation hits an uncached route.
+- **Page caching**: `NetworkFirst` for navigations (cache `suffa-pages`) — each visited page's HTML is cached; served from cache when offline.
+- **Asset caching**: `CacheFirst` for JS/CSS/images/fonts (cache `suffa-assets`).
+- **API caching**: `StaleWhileRevalidate` for all `/api/v1/` routes (cache `suffa-api-cache`) — cached responses served instantly, refreshed in background when online. `CacheableResponsePlugin` allows opaque (cross-origin) responses.
+- **Offline mutation queue** (`app/src/lib/mms/mutationQueue.ts`, `useMutationSync.ts`): mutations (POST/PUT/PATCH/DELETE) intercepted when offline → stored in Dexie `mutations` table → automatically replayed in order when back online. Banner shows queued count.
+- **Deactivation fix**: `check_profile_active` in `backend/app/core/dependencies.py` blocks login + all requests if the role-specific profile (Teacher/Student/Guardian/Donor) has `status != "active"`. Applied to all four person types.
+- **Build fixes**: Post-build script (`app/scripts/fix-sw.py`) patches the SW to add `NavigationRoute` (dropped by some build environments) and fixes the Nitro asset manifest file size (which was truncated due to multi-pass build race conditions).
+- **Cloudflare cache bypass**: SW renamed to `sw-v3.js` to bypass 4h CDN cache; `Cache-Control: no-store` would be set via route rules (currently served with Cloudflare default).
+- Files: `app/vite.config.ts`, `app/public/index.html`, `app/scripts/fix-sw.py`, `app/src/sw.ts`, `app/src/lib/mms/mutationQueue.ts`, `app/src/lib/mms/useMutationSync.ts`, `app/components/app/PwaLayer.tsx`, `backend/app/core/dependencies.py`
+- Verified: `npm run build` succeeds; deployed SW (5990 bytes) contains `NavigationRoute`, `index.html` in precache, `suffa-api-cache` route; app serves 200; login works; deactivated donor blocked with 403.
+- Notes: User must visit pages online first to populate cache, then hard-refresh (Ctrl+Shift+R) to install new SW. After that, offline shows cached data.
 
 ## 2026-08-14 — User Display Name
 
