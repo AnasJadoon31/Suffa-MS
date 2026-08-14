@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 
-const swPath = resolve(root, 'app/.output/public/sw-v3.js');
-const manifestPath = resolve(root, 'app/.output/server/index.mjs');
+const swPath = resolve(root, '.output/public/sw-v3.js');
+const manifestPath = resolve(root, '.output/server/index.mjs');
 
 const swStat = readFileSync(swPath);
 const actualSize = swStat.length;
