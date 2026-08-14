@@ -108,10 +108,9 @@ if (match) {
   log("WARN: Could not find sw-v3.js entry in manifest");
 }
 log("SCRIPT COMPLETED");
-// Write all logs at once at the end
+// Write all logs to a file that will be copied to the runner image
 try {
-  writeFileSync("/tmp/sw-debug.log", logs.join("\n") + "\n");
-  console.error("SW_DEBUG: " + logs.join(" | "));
+  writeFileSync(resolve(publicDir, "sw-debug.log"), logs.join("\n") + "\n");
 } catch(e) {
-  console.error("SW_DEBUG_WRITE_FAILED: " + e);
+  // ignore
 }
