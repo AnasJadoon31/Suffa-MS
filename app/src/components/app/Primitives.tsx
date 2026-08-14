@@ -362,11 +362,11 @@ export function ManagedSheet({
         side="bottom"
         className="max-h-[88vh] overflow-y-auto rounded-t-3xl border-border bg-card px-4 pb-8 pt-5"
       >
-        <SheetTitle
-          className={cn("font-display text-lg font-extrabold", subtitle ? "mb-1" : "mb-4")}
-        >
-          {title}
-        </SheetTitle>
+         <SheetTitle
+           className={cn("font-display text-lg font-extrabold [overflow-wrap:anywhere]", subtitle ? "mb-1" : "mb-4")}
+         >
+           {title}
+         </SheetTitle>
         {subtitle ? <div className="mb-3">{subtitle}</div> : null}
         {children}
       </SheetContent>

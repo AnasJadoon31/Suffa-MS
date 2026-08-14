@@ -199,7 +199,7 @@ export function StudentDetailSheet({
       photoUrl={photoQuery.data}
       onPhotoClick={() => setPhotoOpen(true)}
       subtitle={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Pill tone={student.status === "active" ? "success" : "muted"}>{student.status}</Pill>
           <span className="text-xs text-muted-foreground">{student.admission_number}</span>
         </div>
@@ -417,7 +417,7 @@ export function StudentDetailContainer({
 }) {
   if (!page) return <ManagedSheet open={open} onOpenChange={(next) => !next && onBack()} title={title} subtitle={subtitle}>{children}</ManagedSheet>;
   const initials = title.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-  return <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 sm:px-6"><div className="flex items-start gap-3"><button type="button" aria-label="Back" onClick={onBack} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted"><ArrowLeft className="h-5 w-5" /></button>{photoUrl ? <button type="button" onClick={onPhotoClick} aria-label="View profile picture" className="grid h-12 w-12 shrink-0 cursor-zoom-in place-items-center overflow-hidden rounded-full bg-primary-soft text-primary" title="View profile picture"><img src={photoUrl} alt="" className="h-full w-full object-cover" /></button> : <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-primary-soft text-primary" title="Profile picture"><UserRound className="h-5 w-5" /><span className="sr-only">{initials || "Student"}</span></div>}<div className="min-w-0"><h1 className="truncate font-display text-xl font-extrabold">{title}</h1>{subtitle}</div></div><div className="rounded-2xl border border-border bg-card p-4 shadow-sm">{children}</div></div>;
+  return <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 sm:px-6"><div className="flex items-start gap-3"><button type="button" aria-label="Back" onClick={onBack} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted"><ArrowLeft className="h-5 w-5" /></button>{photoUrl ? <button type="button" onClick={onPhotoClick} aria-label="View profile picture" className="grid h-12 w-12 shrink-0 cursor-zoom-in place-items-center overflow-hidden rounded-full bg-primary-soft text-primary" title="View profile picture"><img src={photoUrl} alt="" className="h-full w-full object-cover" /></button> : <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-primary-soft text-primary" title="Profile picture"><UserRound className="h-5 w-5" /><span className="sr-only">{initials || "Student"}</span></div>}<div className="min-w-0 [overflow-wrap:anywhere]"><h1 className="font-display text-xl font-extrabold [overflow-wrap:anywhere]">{title}</h1>{subtitle}</div></div><div className="rounded-2xl border border-border bg-card p-4 shadow-sm">{children}</div></div>;
 }
 
 export function TeacherDetailSheet({
@@ -472,7 +472,7 @@ export function TeacherDetailSheet({
       onOpenChange={onOpenChange}
       title={teacher.name}
       subtitle={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Pill tone={teacher.status === "active" ? "success" : "muted"}>{teacher.status}</Pill>
           <span className="text-xs text-muted-foreground">{teacher.employee_code}</span>
         </div>
@@ -633,7 +633,7 @@ export function GuardianDetailSheet({
       onOpenChange={onOpenChange}
       title={guardian.name}
       subtitle={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Pill tone="muted">{guardian.relationship}</Pill>
         </div>
       }
@@ -798,7 +798,7 @@ export function DonorDetailSheet({
       onOpenChange={onOpenChange}
       title={donor.name}
       subtitle={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Pill tone={donor.status === "active" ? "success" : "muted"}>{donor.status}</Pill>
           {donor.username ? (
             <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent-foreground">

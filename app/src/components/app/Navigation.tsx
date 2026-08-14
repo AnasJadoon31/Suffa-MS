@@ -31,7 +31,7 @@ export function BottomNav() {
     .map((tab) => user?.role === "teacher" && tab.to === "/attendance" ? { ...tab, to: "/my-attendance" } : tab)
     .filter((tab) => {
       if ("roles" in tab && tab.roles) {
-        return user?.role && tab.roles.includes(user.role);
+        return user?.role !== undefined && (tab.roles as readonly string[]).includes(user.role);
       }
       return isNavItemVisible(tab, user?.role, hasFeature);
     });
@@ -82,11 +82,11 @@ function BrandBlock() {
         {!isPlatform && logo.data ? <img src={logo.data} alt="" className="h-full w-full object-contain" /> : (isPlatform ? "P" : madrasa?.name ?? "S").slice(0, 1).toUpperCase()}
       </span>
       <div className="min-w-0">
-        <p className="truncate font-display text-base font-extrabold">
+         <p className="font-display text-base font-extrabold [overflow-wrap:anywhere]">
           {isPlatform ? "Suffa MS Platform" : madrasa?.name ?? "Suffa MS"}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {user?.name || user?.username || ""}
+         <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+          {(user?.name || user?.username) ?? ""}
           {user?.role ? ` · ${user.role.replace("_", " ")}` : ""}
         </p>
       </div>
