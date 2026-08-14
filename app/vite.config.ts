@@ -14,17 +14,23 @@ function generateAppShell(): Plugin {
   return {
     name: "generate-app-shell",
     apply: "build",
-    enforce: "post",
-    writeBundle() {
-      const publicDir = resolve(".output/public");
-      const assetsDir = resolve(publicDir, "assets");
-      try {
-        const assetFiles = readdirSync(assetsDir);
-        const mainJs = assetFiles.find((f) => f.startsWith("index-") && f.endsWith(".js"));
-        const cssFiles = assetFiles.filter((f) => f.endsWith(".css"));
-        const jsTags = mainJs ? `<script type="module" src="/assets/${mainJs}" crossorigin></script>` : "";
-        const cssTags = cssFiles.map((f) => `<link rel="stylesheet" href="/assets/${f}" />`).join("\n    ");
-        const html = `<!DOCTYPE html>
+    enforce: "pre",
+    generateBundle(_options, bundle) {
+      // Find the main entry chunk and CSS from the client bundle
+      let mainJs = "";
+      const cssFiles: string[] = [];
+      for (const [fileName, chunk] of Object.entries(bundle)) {
+        if (chunk.type === "chunk") {
+          if (chunk.isEntry && fileName.startsWith("index-")) {
+            mainJs = fileName;
+          }
+        } else if (chunk.type === "asset" && fileName.endsWith(".css")) {
+          cssFiles.push(fileName);
+        }
+      }
+      const jsTags = mainJs ? `<script type="module" src="/${mainJs}" crossorigin></script>` : "";
+      const cssTags = cssFiles.map((f) => `<link rel="stylesheet" href="/${f}" />`).join("\n    ");
+      const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -38,11 +44,8 @@ function generateAppShell(): Plugin {
   ${jsTags}
 </body>
 </html>`;
-        writeFileSync(resolve(publicDir, "index.html"), html);
-        console.log("Generated app shell index.html");
-      } catch (e) {
-        console.warn("Failed to generate app shell:", e);
-      }
+      this.emitFile({ type: "asset", fileName: "index.html", source: html });
+      console.log("Generated app shell index.html");
     },
   };
 }

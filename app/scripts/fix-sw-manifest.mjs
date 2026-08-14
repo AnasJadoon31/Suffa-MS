@@ -13,9 +13,11 @@ let swCode = readFileSync(swPath, 'utf-8');
 // Fix 1: Ensure NavigationRoute for offline app shell fallback.
 // The generateSW step in some build environments drops the navigateFallback
 // NavigationRoute; patch it in if missing.
+console.log('NavigationRoute present:', swCode.includes('NavigationRoute'));
 if (!swCode.includes('NavigationRoute')) {
   // Find the full precacheAndRoute(...) call (handles nested brackets)
   const startIdx = swCode.indexOf('precacheAndRoute(');
+  console.log('precacheAndRoute found at:', startIdx);
   if (startIdx !== -1) {
     let depth = 0;
     let endIdx = startIdx;
