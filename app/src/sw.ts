@@ -9,15 +9,18 @@ import { CacheableResponsePlugin } from "workbox-cacheable-response";
 
 cleanupOutdatedCaches();
 
-const entries = self.__WB_MANIFEST;
-precacheAndRoute(entries);
+// Precache all assets (injected by vite-plugin-pwa at build time)
+precacheAndRoute(self.__WB_MANIFEST);
 
-const appShell = "/index.html";
-const navigationRoute = new NavigationRoute(createHandlerBoundToURL(appShell), {
-  denylist: [/^\/~oauth/, /^\/api\//],
-});
+// App shell fallback: when offline and no cached page exists, serve the shell
+const shellUrl = "/index.html";
+const navigationRoute = new NavigationRoute(
+  createHandlerBoundToURL(shellUrl),
+  { denylist: [/^\/~oauth/, /^\/api\//] },
+);
 registerRoute(navigationRoute);
 
+// Cache visited pages (NetworkFirst)
 registerRoute(
   ({ request }) => request.mode === "navigate",
   new NetworkFirst({
@@ -27,6 +30,7 @@ registerRoute(
   }),
 );
 
+// Cache static assets (CacheFirst)
 registerRoute(
   ({ request }) =>
     ["style", "script", "worker", "font", "image"].includes(request.destination),
@@ -36,6 +40,7 @@ registerRoute(
   }),
 );
 
+// Cache API responses (StaleWhileRevalidate)
 registerRoute(
   /\/api\/v1\//,
   new StaleWhileRevalidate({
@@ -47,15 +52,6 @@ registerRoute(
   }),
 );
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open("suffa-pages").then((cache) =>
-      cache.add(new Request(appShell, { cache: "reload" })).catch(() => undefined),
-    ),
-  );
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
-});
+// Force the new SW to take over immediately
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
