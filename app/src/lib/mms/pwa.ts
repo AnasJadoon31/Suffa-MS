@@ -1,5 +1,5 @@
 /** Guarded service-worker registration. Offline support only runs on the published site. */
-const SW_URL = "/sw-v2.js";
+const SW_URL = "/sw-v3.js";
 
 function isBlockedHost(hostname: string): boolean {
   return (
@@ -15,8 +15,8 @@ function isBlockedHost(hostname: string): boolean {
 }
 
 async function unregisterOldWorkers(): Promise<void> {
-  // Remove the legacy pass-through SW and any previous SW so the new one
-  // (sw-v2.js) fully controls fetches.
+  // Remove any previous SW (legacy pass-through /sw.js or older sw-v*.js)
+  // so the current one fully controls fetches.
   const registrations = await window.navigator.serviceWorker.getRegistrations();
   await Promise.allSettled(
     registrations
@@ -26,7 +26,7 @@ async function unregisterOldWorkers(): Promise<void> {
           registration.waiting?.scriptURL ??
           registration.installing?.scriptURL ??
           "";
-        return url.includes("/sw.js") || url.endsWith(SW_URL);
+        return url.includes("/sw") && !url.includes("/sw-v3.js");
       })
       .map((registration) => registration.unregister()),
   );

@@ -11,7 +11,7 @@ export default defineConfig({
   nitro: {
     preset: "node-server",
     routeRules: {
-      "/sw-v2.js": { headers: { "Cache-Control": "no-cache, no-store, must-revalidate" } },
+      "/sw-v3.js": { headers: { "Cache-Control": "no-cache, no-store, must-revalidate" } },
       "/workbox-*.js": { headers: { "Cache-Control": "no-cache, no-store, must-revalidate" } },
       "/manifest.webmanifest": { headers: { "Cache-Control": "no-cache" } },
     },
@@ -27,7 +27,7 @@ export default defineConfig({
         strategies: "generateSW",
         registerType: "autoUpdate",
         injectRegister: null,
-        filename: "sw-v2.js",
+        filename: "sw-v3.js",
         devOptions: { enabled: false },
         manifest: false,
         outDir: ".output/public",
