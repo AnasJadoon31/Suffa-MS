@@ -71,10 +71,59 @@ else
   echo "NavigationRoute already present"
 fi
 
-# Step 3: Fix manifest size
-echo "Fixing manifest size..."
-ACTUAL_SIZE=$(wc -c < "$SW_PATH" | tr -d ' ')
-sed -i.bak "s/\"size\":[[:space:]]*[0-9]*/\"size\": $ACTUAL_SIZE/" "$MANIFEST_PATH" && rm -f "$MANIFEST_PATH.bak"
-echo "Fixed manifest size to $ACTUAL_SIZE"
+# Step 3: Fix manifest sizes — the SSR build pass reads public assets before
+# the client build finishes writing them, so every asset ends up with the same
+# stale size. Walk the public assets and correct each entry individually.
+echo "Fixing manifest sizes..."
+node -e "
+const fs = require('fs');
+const path = require('path');
+const manifest = '$(pwd)/$MANIFEST_PATH';
+const assetsDir = '$(pwd)/$ASSETS_DIR';
+let code = fs.readFileSync(manifest, 'utf8');
+const files = fs.readdirSync(assetsDir);
+let fixed = 0;
+for (const f of files) {
+  const filePath = path.join(assetsDir, f);
+  const size = fs.statSync(filePath).size;
+  const escaped = f.replace(/[.*+?^\${}()|[\]\\\\]/g, '\\\\$&');
+  const re = new RegExp('(\"/assets/' + escaped + '\"[\\\\s\\\\S]*?\"size\":\\\\s*)(\\\\d+)', 'm');
+  if (re.test(code)) {
+    code = code.replace(re, '\$1' + size);
+    fixed++;
+  }
+}
+fs.writeFileSync(manifest, code);
+console.log('Fixed ' + fixed + ' asset sizes in manifest');
+"
+
+# Step 4: Patch Nitro's static handler so it does NOT serve index.html
+# for "/" (the bare SPA shell). TanStack Start's SSR handler must own
+# "/" — otherwise the server returns the static shell and TanStack
+# Router's client hydration throws "Invariant failed".
+echo "Patching static handler to skip index.html for root path..."
+cat > /tmp/patch-static.js << 'JSEOF'
+const fs = require('fs');
+const manifest = process.argv[2];
+let code = fs.readFileSync(manifest, 'utf8');
+
+// The static handler serves index.html when id resolves to "/index.html".
+// Inject a guard: if original pathname is "/", skip and let SSR handle it.
+const marker = 'if (encodings.length > 1) event.res.headers.append("Vary", "Accept-Encoding");';
+const guard = 'if (event.url.pathname === "/" && (id === "/" || id === "/index.html")) { return; }';
+const sentinel = '/* patch-static-skip-root */';
+
+if (code.includes(sentinel)) {
+  console.log('Static handler already patched');
+} else if (code.includes(marker)) {
+  code = code.replace(marker, guard + '\n' + sentinel + '\n' + marker);
+  fs.writeFileSync(manifest, code);
+  console.log('Patched static handler');
+} else {
+  console.log('WARNING: could not find patch marker');
+}
+JSEOF
+node /tmp/patch-static.js "$(pwd)/$MANIFEST_PATH"
+rm -f /tmp/patch-static.js
 
 echo "=== Post-build fix complete ==="

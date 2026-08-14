@@ -3,6 +3,27 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-14 — Fix: White screen + Invariant failed (Cloudflare + Nitro routing)
+
+- **White screen root cause**: (1) Nitro SSR build pass reads `public/assets` before the client build finishes writing them, embedding a stale `size: 6024` for ALL assets in the server manifest. (2) Cloudflare CDN cached the truncated `index-CSOJobjL.js` with `max-age=31536000, immutable`.
+- **"Invariant failed" root cause**: Nitro's static middleware serves `index.html` (the bare SPA shell) for `/` BEFORE the TanStack Start SSR handler runs. The client receives static HTML without `$_TSR` hydration data, so TanStack Router throws "Invariant failed".
+- **Fixes in `app/scripts/fix-sw.sh`**:
+  - Step 3: Per-asset size correction (replaced broken global `sed` that set every asset to the SW file's size).
+  - Step 4: Patched Nitro's static handler to skip serving `index.html` when `event.url.pathname === "/"`, letting SSR own the route.
+- **Fix in `app/vite.config.ts` + `fix-sw.sh`**: Entry JS referenced as `/assets/index-CSOJobjL.js?v=2` to bypass Cloudflare's cached truncated version.
+- Files: `app/scripts/fix-sw.sh`, `app/vite.config.ts`
+- Verified: `https://app-suffa.anas31.qzz.io/` returns SSR HTML with `$_TSR`; `/dashboard` returns 200; JS serves 283903 bytes.
+- Notes: Without Cloudflare API token, CDN cache purge isn't possible — `?v=2` query param bypasses stale cache. Increment if Cloudflare serves stale content again.
+
+## 2026-08-14 — Fix: White screen from truncated JS bundle (Cloudflare + Nitro race)
+
+- **Root cause**: Two compounding bugs: (1) Nitro SSR build pass reads `public/assets` before the client build finishes writing them, embedding a stale `size: 6024` in the asset manifest for ALL assets. The server sends `Content-Length: 6024`, truncating responses. (2) Cloudflare CDN cached the truncated `index-CSOJobjL.js` with `max-age=31536000, immutable` — no API access to purge.
+- **Fix 1** (`app/scripts/fix-sw.sh` Step 3): replaced global `sed` size patch (which set every asset to the SW file's size) with a per-asset Node script that walks `public/assets`, stats each file, and corrects its individual `size` in the Nitro manifest.
+- **Fix 2** (`app/vite.config.ts` + `app/scripts/fix-sw.sh`): entry JS referenced as `/assets/index-CSOJobjL.js?v=2` in `index.html` so Cloudflare treats it as a new uncached resource (HTML has `cf-cache-status: DYNAMIC`, always fresh).
+- Files: `app/scripts/fix-sw.sh`, `app/vite.config.ts`
+- Verified: `npm run build` succeeds; deployed `index.html` references `?v=2`; `https://app-suffa.anas31.qzz.io/assets/index-CSOJobjL.js?v=2` serves 283903 bytes (HTTP 200).
+- Notes: Without Cloudflare API token, CDN cache can't be purged — cache-busting query param is the workaround. If CF cache ever serves stale content again, increment the query version.
+
 ## 2026-08-14 — Full PWA Offline Support (Read + Write)
 
 - Implemented complete offline support: cached page reads AND queued mutation writes that sync when back online.

@@ -28,7 +28,7 @@ function generateAppShell(): Plugin {
           cssFiles.push(fileName);
         }
       }
-      const jsTags = mainJs ? `<script type="module" src="/${mainJs}" crossorigin></script>` : "";
+      const jsTags = mainJs ? `<script type="module" src="/${mainJs}?v=2" crossorigin></script>` : "";
       const cssTags = cssFiles.map((f) => `<link rel="stylesheet" href="/${f}" />`).join("\n    ");
       const html = `<!DOCTYPE html>
 <html lang="en">
@@ -78,6 +78,18 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    build: {
+      rollupOptions: {
+        output: {
+          // Force new filenames (rc1) so Cloudflare treats them as new
+          // resources — the CDN cached the old build's assets truncated to
+          // 6024 bytes (stale Nitro manifest) with immutable 1-year TTL.
+          entryFileNames: `assets/[name]-[hash]-rc1.js`,
+          chunkFileNames: `assets/[name]-[hash]-rc1.js`,
+          assetFileNames: `assets/[name]-[hash]-rc1.[ext]`,
+        },
+      },
+    },
     plugins: [
       VitePWA({
         strategies: "generateSW",
