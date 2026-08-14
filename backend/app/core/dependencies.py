@@ -15,11 +15,27 @@ from app.core.permissions import registry
 from app.db.session import get_session
 from app.modules.auth.models import User, UserPermission, UserRole
 from app.modules.academics.models import Madrasa, AcademicSession
-from app.modules.people.models import TeacherProfile
+from app.modules.people.models import TeacherProfile, StudentProfile, Guardian
+from app.modules.finance.models import Donor
 from app.modules.platform.models import MadrasaFeature
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="api/auth/token", auto_error=False)
+
+
+async def check_profile_active(session: AsyncSession, user: User) -> None:
+    """Reject if the user's role-specific profile has been deactivated."""
+    profile_status: str | None = None
+    if user.role == UserRole.donor:
+        profile_status = await session.scalar(select(Donor.status).where(Donor.user_id == user.id))
+    elif user.role == UserRole.student:
+        profile_status = await session.scalar(select(StudentProfile.status).where(StudentProfile.user_id == user.id))
+    elif user.role in (UserRole.teacher, UserRole.principal):
+        profile_status = await session.scalar(select(TeacherProfile.status).where(TeacherProfile.user_id == user.id))
+    elif user.role == UserRole.parent:
+        profile_status = await session.scalar(select(Guardian.status).where(Guardian.user_id == user.id))
+    if profile_status is not None and profile_status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account deactivated")
 
 
 async def set_rls_context(session: AsyncSession, user: User) -> None:
@@ -128,6 +144,7 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
+    await check_profile_active(session, user)
     await set_rls_context(session, user)
     await ensure_request_context_writable(request, user, session)
     return user

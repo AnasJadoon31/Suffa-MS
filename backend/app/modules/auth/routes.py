@@ -16,6 +16,7 @@ from app.core.settings_catalog import CATALOG_BY_KEY
 from app.core.tenancy import TenantContext, get_tenant
 from app.core.dependencies import (
     _user_is_admin,
+    check_profile_active,
     get_current_user,
     get_current_madrasa,
     get_enabled_features,
@@ -174,6 +175,7 @@ async def login(
     except Exception:
         pass
 
+    await check_profile_active(session, user)
     await set_rls_context(session, user)
     await clear_failures(lockout_key)
     minutes = await _session_lifetime_minutes(session, user)

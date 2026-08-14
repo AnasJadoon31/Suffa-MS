@@ -184,6 +184,7 @@ class GuardianRead(BaseModel):
     user_id: UUID | None = None
     username: str | None = None
     name: str
+    status: str
     relationship: str
     phone_numbers: str
     phone_list: list[str] = Field(default_factory=list)

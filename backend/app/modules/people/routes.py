@@ -364,6 +364,20 @@ async def deactivate_teacher(
     return TeacherRead.model_validate(teacher)
 
 
+@router.post("/teachers/{teacher_id}/reactivate", response_model=TeacherRead)
+async def reactivate_teacher(
+    teacher_id: UUID,
+    current_user: User = Depends(require_permission("teachers.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> TeacherRead:
+    teacher = await _get_or_404(session, TeacherProfile, teacher_id, madrasa.id)
+    teacher.status = "active"
+    await session.commit()
+    await session.refresh(teacher)
+    return TeacherRead.model_validate(teacher)
+
+
 @router.post("/teachers/{teacher_id}/credentials-link")
 async def reissue_teacher_credentials(
     teacher_id: UUID,
@@ -686,6 +700,20 @@ async def deactivate_student(
     return await _student_read(session, student)
 
 
+@router.post("/students/{student_id}/reactivate", response_model=StudentRead)
+async def reactivate_student(
+    student_id: UUID,
+    current_user: User = Depends(require_permission("students.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> StudentRead:
+    student = await _get_or_404(session, StudentProfile, student_id, madrasa.id)
+    student.status = "active"
+    await session.commit()
+    await session.refresh(student)
+    return await _student_read(session, student)
+
+
 @router.post("/students/{student_id}/credentials-link")
 async def reissue_student_credentials(
     student_id: UUID,
@@ -773,6 +801,34 @@ async def update_guardian(
         guardian.phone_list, guardian.default_phone_number, guardian.phone_numbers = numbers, default, default or guardian.phone_numbers
     if payload.cnic is not None: guardian.cnic = payload.cnic
     if payload.address is not None: guardian.address = payload.address
+    await session.commit()
+    await session.refresh(guardian)
+    return GuardianRead.model_validate(guardian)
+
+
+@router.post("/guardians/{guardian_id}/deactivate", response_model=GuardianRead)
+async def deactivate_guardian(
+    guardian_id: UUID,
+    current_user: User = Depends(require_permission("students.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> GuardianRead:
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+    guardian.status = "inactive"
+    await session.commit()
+    await session.refresh(guardian)
+    return GuardianRead.model_validate(guardian)
+
+
+@router.post("/guardians/{guardian_id}/reactivate", response_model=GuardianRead)
+async def reactivate_guardian(
+    guardian_id: UUID,
+    current_user: User = Depends(require_permission("students.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> GuardianRead:
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+    guardian.status = "active"
     await session.commit()
     await session.refresh(guardian)
     return GuardianRead.model_validate(guardian)

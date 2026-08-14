@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, Download, Image, ShieldOff, UserRound, ArrowRight } from "lucide-react";
+import { ArrowLeft, Copy, Download, Image, ShieldCheck, ShieldOff, UserRound, ArrowRight } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -110,6 +110,7 @@ export function StudentDetailSheet({
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [confirmReactivate, setConfirmReactivate] = useState(false);
   const [credentialPhone, setCredentialPhone] = useState("");
   const [photoOpen, setPhotoOpen] = useState(false);
 
@@ -177,6 +178,13 @@ export function StudentDetailSheet({
   async function deactivate() {
     await peopleMutations.deactivateStudent(student!.id);
     toast.success("Student deactivated");
+    void client.invalidateQueries({ queryKey: ["people"] });
+    onOpenChange(false);
+  }
+
+  async function reactivate() {
+    await peopleMutations.reactivateStudent(student!.id);
+    toast.success("Student reactivated");
     void client.invalidateQueries({ queryKey: ["people"] });
     onOpenChange(false);
   }
@@ -358,7 +366,23 @@ export function StudentDetailSheet({
                 <ShieldOff className="h-4 w-4" /> {t("Deactivate")}</ActionButton>
             </ActionBar>
           )
-        ) : null}
+        ) : confirmReactivate ? (
+          <ActionBar className="mt-2">
+            <ActionButton variant="success" className="flex-1" onClick={reactivate}>
+              <ShieldCheck className="h-4 w-4" /> {t("Confirm reactivate")}</ActionButton>
+            <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmReactivate(false)}>
+              {t("Cancel")}</ActionButton>
+          </ActionBar>
+        ) : (
+          <ActionBar className="mt-2">
+            <ActionButton
+              variant="success"
+              className="w-full"
+              onClick={() => setConfirmReactivate(true)}
+            >
+              <ShieldCheck className="h-4 w-4" /> {t("Reactivate")}</ActionButton>
+          </ActionBar>
+        )}
 
         <StudentForm student={student} open={editOpen} onOpenChange={setEditOpen} />
     </StudentDetailContainer>
@@ -409,6 +433,7 @@ export function TeacherDetailSheet({
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [confirmReactivate, setConfirmReactivate] = useState(false);
   const [credentialPhone, setCredentialPhone] = useState("");
 
   const roles = useQuery({
@@ -430,6 +455,13 @@ export function TeacherDetailSheet({
   async function deactivate() {
     await peopleMutations.deactivateTeacher(teacher!.id);
     toast.success("Teacher deactivated");
+    void client.invalidateQueries({ queryKey: ["people"] });
+    onOpenChange(false);
+  }
+
+  async function reactivate() {
+    await peopleMutations.reactivateTeacher(teacher!.id);
+    toast.success("Teacher reactivated");
     void client.invalidateQueries({ queryKey: ["people"] });
     onOpenChange(false);
   }
@@ -547,7 +579,23 @@ export function TeacherDetailSheet({
                 <ShieldOff className="h-4 w-4" /> {t("Deactivate")}</ActionButton>
             </ActionBar>
           )
-        ) : null}
+        ) : confirmReactivate ? (
+          <ActionBar className="mt-2">
+            <ActionButton variant="success" className="flex-1" onClick={reactivate}>
+              <ShieldCheck className="h-4 w-4" /> {t("Confirm reactivate")}</ActionButton>
+            <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmReactivate(false)}>
+              {t("Cancel")}</ActionButton>
+          </ActionBar>
+        ) : (
+          <ActionBar className="mt-2">
+            <ActionButton
+              variant="success"
+              className="w-full"
+              onClick={() => setConfirmReactivate(true)}
+            >
+              <ShieldCheck className="h-4 w-4" /> {t("Reactivate")}</ActionButton>
+          </ActionBar>
+        )}
         <TeacherForm teacher={teacher} open={editOpen} onOpenChange={setEditOpen} />
     </ManagedSheet>
   );
@@ -565,6 +613,8 @@ export function GuardianDetailSheet({
   const { t } = useTranslation();
   const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [confirmReactivate, setConfirmReactivate] = useState(false);
   const [credentialPhone, setCredentialPhone] = useState("");
 
   const studentsQuery = useQuery({
@@ -652,6 +702,41 @@ export function GuardianDetailSheet({
             {t("Send via WhatsApp")}
           </WhatsAppSendAction>
         </ActionBar>
+        {guardian.status === "active" ? (
+          confirmDeactivate ? (
+            <ActionBar className="mt-2">
+              <ActionButton variant="danger" className="flex-1" onClick={async () => { await peopleMutations.deactivateGuardian(guardian.id); toast.success("Guardian deactivated"); void client.invalidateQueries({ queryKey: ["people"] }); onOpenChange(false); }}>
+                <ShieldOff className="h-4 w-4" /> {t("Confirm deactivate")}</ActionButton>
+              <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmDeactivate(false)}>
+                {t("Cancel")}</ActionButton>
+            </ActionBar>
+          ) : (
+            <ActionBar className="mt-2">
+              <ActionButton
+                variant="danger"
+                className="w-full"
+                onClick={() => setConfirmDeactivate(true)}
+              >
+                <ShieldOff className="h-4 w-4" /> {t("Deactivate")}</ActionButton>
+            </ActionBar>
+          )
+        ) : confirmReactivate ? (
+          <ActionBar className="mt-2">
+            <ActionButton variant="success" className="flex-1" onClick={async () => { await peopleMutations.reactivateGuardian(guardian.id); toast.success("Guardian reactivated"); void client.invalidateQueries({ queryKey: ["people"] }); onOpenChange(false); }}>
+              <ShieldCheck className="h-4 w-4" /> {t("Confirm reactivate")}</ActionButton>
+            <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmReactivate(false)}>
+              {t("Cancel")}</ActionButton>
+          </ActionBar>
+        ) : (
+          <ActionBar className="mt-2">
+            <ActionButton
+              variant="success"
+              className="w-full"
+              onClick={() => setConfirmReactivate(true)}
+            >
+              <ShieldCheck className="h-4 w-4" /> {t("Reactivate")}</ActionButton>
+          </ActionBar>
+        )}
         <GuardianForm guardian={guardian} open={editOpen} onOpenChange={setEditOpen} />
     </ManagedSheet>
   );
@@ -668,7 +753,10 @@ export function DonorDetailSheet({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const client = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [confirmReactivate, setConfirmReactivate] = useState(false);
 
   const profile = useQuery({
     queryKey: ["donor-profile", donor?.id],
@@ -711,7 +799,7 @@ export function DonorDetailSheet({
       title={donor.name}
       subtitle={
         <div className="flex items-center gap-2">
-          <Pill tone="success">{t("Active")}</Pill>
+          <Pill tone={donor.status === "active" ? "success" : "muted"}>{donor.status}</Pill>
           {donor.username ? (
             <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent-foreground">
               {donor.username}
@@ -761,6 +849,41 @@ export function DonorDetailSheet({
           </WhatsAppSendAction>
         </ActionBar>
       ) : null}
+      {donor.status === "active" ? (
+        confirmDeactivate ? (
+          <ActionBar className="mt-2">
+            <ActionButton variant="danger" className="flex-1" onClick={async () => { await financeMutations.deactivateDonor(donor.id); toast.success("Donor deactivated"); void client.invalidateQueries({ queryKey: ["people"] }); onOpenChange(false); }}>
+              <ShieldOff className="h-4 w-4" /> {t("Confirm deactivate")}</ActionButton>
+            <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmDeactivate(false)}>
+              {t("Cancel")}</ActionButton>
+          </ActionBar>
+        ) : (
+          <ActionBar className="mt-2">
+            <ActionButton
+              variant="danger"
+              className="w-full"
+              onClick={() => setConfirmDeactivate(true)}
+            >
+              <ShieldOff className="h-4 w-4" /> {t("Deactivate")}</ActionButton>
+          </ActionBar>
+        )
+      ) : confirmReactivate ? (
+        <ActionBar className="mt-2">
+          <ActionButton variant="success" className="flex-1" onClick={async () => { await financeMutations.reactivateDonor(donor.id); toast.success("Donor reactivated"); void client.invalidateQueries({ queryKey: ["people"] }); onOpenChange(false); }}>
+            <ShieldCheck className="h-4 w-4" /> {t("Confirm reactivate")}</ActionButton>
+          <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmReactivate(false)}>
+            {t("Cancel")}</ActionButton>
+        </ActionBar>
+      ) : (
+        <ActionBar className="mt-2">
+          <ActionButton
+            variant="success"
+            className="w-full"
+            onClick={() => setConfirmReactivate(true)}
+          >
+            <ShieldCheck className="h-4 w-4" /> {t("Reactivate")}</ActionButton>
+        </ActionBar>
+      )}
       <DonorForm donor={donor} open={editOpen} onOpenChange={setEditOpen} />
     </ManagedSheet>
   );

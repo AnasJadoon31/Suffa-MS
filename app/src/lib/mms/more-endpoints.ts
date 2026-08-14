@@ -647,6 +647,7 @@ export interface Donor {
   user_id: string | null;
   username: string | null;
   name: string;
+  status: string;
   contact: string;
   phone_list?: string[];
   default_phone_number?: string | null;
@@ -853,6 +854,11 @@ export const financeMutations = {
     api.post<Donor>("/api/v1/finance/donors", payload).then((r) => r.data),
   updateDonor: (id: string, payload: { name?: string; contact?: string; phone_list?: string[]; default_phone_number?: string }) =>
     api.put<Donor>(`/api/v1/finance/donors/${id}`, payload).then((r) => r.data),
+  deactivateDonor: (id: string) =>
+    api.post(`/api/v1/finance/donors/${id}/deactivate`).then((r) => r.data),
+  reactivateDonor: (id: string) =>
+    api.post(`/api/v1/finance/donors/${id}/reactivate`).then((r) => r.data),
+
   createPayment: (payload: {
     student_id: string;
     category_id: string;
@@ -1012,6 +1018,7 @@ export interface GuardianDetail {
   id: string;
   user_id: string | null;
   name: string;
+  status: string;
   relationship: string;
   phone_numbers: string;
   phone_list?: string[];
@@ -1063,6 +1070,8 @@ export const peopleMutations = {
   ) => api.put<StudentDetail>(`/api/v1/people/students/${id}`, payload).then((r) => r.data),
   deactivateStudent: (id: string) =>
     api.post(`/api/v1/people/students/${id}/deactivate`).then((r) => r.data),
+  reactivateStudent: (id: string) =>
+    api.post(`/api/v1/people/students/${id}/reactivate`).then((r) => r.data),
 
   createTeacher: (payload: {
     username: string;
@@ -1096,6 +1105,8 @@ export const peopleMutations = {
   ) => api.put<TeacherDetail>(`/api/v1/people/teachers/${id}`, payload).then((r) => r.data),
   deactivateTeacher: (id: string) =>
     api.post(`/api/v1/people/teachers/${id}/deactivate`).then((r) => r.data),
+  reactivateTeacher: (id: string) =>
+    api.post(`/api/v1/people/teachers/${id}/reactivate`).then((r) => r.data),
 
   createGuardian: (payload: {
     name: string;
@@ -1121,6 +1132,10 @@ export const peopleMutations = {
       preferred_language?: string;
     },
   ) => api.put<GuardianDetail>(`/api/v1/people/guardians/${id}`, payload).then((r) => r.data),
+  deactivateGuardian: (id: string) =>
+    api.post(`/api/v1/people/guardians/${id}/deactivate`).then((r) => r.data),
+  reactivateGuardian: (id: string) =>
+    api.post(`/api/v1/people/guardians/${id}/reactivate`).then((r) => r.data),
 
   guardianStudents: (guardianId: string) =>
     getAllPages<StudentDetail>(`/api/v1/people/guardians/${guardianId}/students`),

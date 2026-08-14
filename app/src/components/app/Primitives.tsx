@@ -114,7 +114,7 @@ export function ActionButton({
   children: ReactNode;
   onClick?: () => void;
   type?: "button" | "submit";
-  variant?: "primary" | "soft" | "danger" | "ghost";
+  variant?: "primary" | "soft" | "danger" | "success" | "ghost";
   disabled?: boolean;
   className?: string;
 }) {
@@ -122,6 +122,7 @@ export function ActionButton({
     primary: "gradient-emerald text-primary-foreground shadow-[var(--shadow-raised)]",
     soft: "bg-muted text-foreground",
     danger: "bg-destructive/10 text-destructive",
+    success: "bg-[oklch(0.72_0.15_158)] text-black shadow-[var(--shadow-raised)]",
     ghost: "text-primary",
   } as const;
   return (

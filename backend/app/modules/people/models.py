@@ -82,6 +82,7 @@ class Guardian(Base, IdMixin, TenantMixin, TimestampMixin):
     # Set once the guardian is provisioned a portal login (role=parent, B7-k).
     user_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(24), default="active")
     relationship: Mapped[str] = mapped_column(String(80))
     phone_numbers: Mapped[str] = mapped_column(Text)
     phone_list: Mapped[list] = mapped_column(PortableJSONB, default=list)

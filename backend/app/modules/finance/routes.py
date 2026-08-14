@@ -453,6 +453,38 @@ async def update_donor(
     return DonorRead.model_validate(donor)
 
 
+@router.post("/donors/{donor_id}/deactivate", response_model=DonorRead)
+async def deactivate_donor(
+    donor_id: UUID,
+    current_user: User = Depends(require_permission("finance.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> DonorRead:
+    donor = await session.get(Donor, donor_id)
+    if donor is None or donor.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Donor not found")
+    donor.status = "inactive"
+    await session.commit()
+    await session.refresh(donor)
+    return DonorRead.model_validate(donor)
+
+
+@router.post("/donors/{donor_id}/reactivate", response_model=DonorRead)
+async def reactivate_donor(
+    donor_id: UUID,
+    current_user: User = Depends(require_permission("finance.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> DonorRead:
+    donor = await session.get(Donor, donor_id)
+    if donor is None or donor.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Donor not found")
+    donor.status = "active"
+    await session.commit()
+    await session.refresh(donor)
+    return DonorRead.model_validate(donor)
+
+
 @router.post("/donors/{donor_id}/credentials-link")
 async def donor_credentials_link(
     donor_id: UUID,

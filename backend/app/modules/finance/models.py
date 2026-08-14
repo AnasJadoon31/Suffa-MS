@@ -31,6 +31,7 @@ class Donor(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "donors"
 
     name: Mapped[str] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(24), default="active")
     contact: Mapped[str] = mapped_column(String(80))
     phone_list: Mapped[list] = mapped_column(PortableJSONB, default=list)
     default_phone_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
