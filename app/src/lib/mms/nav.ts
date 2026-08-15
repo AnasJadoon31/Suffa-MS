@@ -154,6 +154,7 @@ const guardianVisiblePaths = new Set([
   "/timetable",
   "/resources",
   "/assignments",
+  "/attendance",
   "/announcements",
   "/me",
 ]);

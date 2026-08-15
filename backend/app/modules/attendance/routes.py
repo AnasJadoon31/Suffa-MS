@@ -1128,7 +1128,8 @@ async def attendance_student_history(
     if academic_class is None or academic_class.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    if current_user.role == "parent":
+    is_parent = current_user.role == "parent"
+    if is_parent:
         is_guardian = (
             await session.execute(
                 select(StudentGuardian.id)
@@ -1149,7 +1150,7 @@ async def attendance_student_history(
         await _assert_can_mark_section(
             current_user, session, madrasa.id, active_session.id, class_id, section_id
         )
-    elif not await _has_global_student_attendance_access(current_user, session):
+    elif not is_parent and not await _has_global_student_attendance_access(current_user, session):
         raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SECTION_REQUIRED)
 
     effective_start = start_date or active_session.gregorian_start

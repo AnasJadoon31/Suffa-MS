@@ -105,8 +105,9 @@ function ParentAttendance() {
     queryKey: ["dashboard"],
     queryFn: () => reportingApi.dashboard(),
   });
+  const [expanded, setExpanded] = useState<string | null>(null);
   const data = dashboard.data;
-  
+
   if (dashboard.isLoading) return <AppShell title={t("Attendance")}><SkeletonList rows={4} /></AppShell>;
   if (dashboard.isError) return <AppShell title={t("Attendance")}><EmptyState title={t("Attendance unavailable")} /></AppShell>;
 
@@ -115,17 +116,51 @@ function ParentAttendance() {
 
   return (
     <AppShell title={t("Attendance")}>
-      <div className="space-y-8">
-        {children.map((child: any) => (
-          <MyStudentAttendance 
-            key={child.id} 
-            child={{ 
-              id: child.id, 
-              name: child.name, 
-              classId: child.class_id 
-            }} 
-          />
-        ))}
+      <div className="space-y-2.5">
+        {children.map((child: any) => {
+          const isOpen = expanded === child.id;
+          const classId = child.current_class?.id ?? child.class_id;
+          if (!classId) {
+            return (
+              <Card key={child.id} className="p-3.5">
+                <p className="font-display text-sm font-extrabold">{child.name}</p>
+                <p className="text-xs text-muted-foreground">{t("No class assigned")}</p>
+              </Card>
+            );
+          }
+          return (
+            <Card key={child.id} className="overflow-hidden p-0">
+              <button
+                onClick={() => setExpanded(isOpen ? null : child.id)}
+                className="flex w-full items-center justify-between gap-3 p-3.5 text-left"
+              >
+                <div className="min-w-0">
+                  <p className="font-display text-sm font-extrabold">{child.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {[child.class_name, child.section_name].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                    isOpen && "rotate-180",
+                  )}
+                />
+              </button>
+              <div className={cn("border-t border-border", !isOpen && "hidden")}>
+                <div className="px-3.5 pb-3.5 pt-2">
+                  <MyStudentAttendance
+                    child={{
+                      id: child.id,
+                      name: child.name,
+                      classId,
+                    }}
+                  />
+                </div>
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </AppShell>
   );
@@ -1325,11 +1360,12 @@ function MyStudentAttendance({ child }: { child?: { id: string; name: string; cl
     const { t } = useTranslation();
   const [month, setMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
+  const isGuardianView = Boolean(child);
 
   const history = useQuery({
     queryKey: ["my-attendance", child?.id, month.getFullYear(), month.getMonth()],
-    queryFn: () => child 
-      ? attendanceApi.studentHistory(child.classId, child.id, monthRange(month)) 
+    queryFn: () => child
+      ? attendanceApi.studentHistory(child.classId, child.id, monthRange(month))
       : attendanceApi.myStudentHistory(monthRange(month)),
     retry: false,
   });
@@ -1377,14 +1413,18 @@ function MyStudentAttendance({ child }: { child?: { id: string; name: string; cl
           <AttendanceCalendar
             month={month}
             onMonthChange={setMonth}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
+            selectedDate={isGuardianView ? null : selectedDate}
+            onSelectDate={isGuardianView ? () => {} : setSelectedDate}
             mode="student"
             studentDayStatus={statuses}
           />
 
-          <SectionTitle>{selectedDate}</SectionTitle>
-          <DayEntries entries={dayEntries} />
+          {!isGuardianView ? (
+            <>
+              <SectionTitle>{selectedDate}</SectionTitle>
+              <DayEntries entries={dayEntries} />
+            </>
+          ) : null}
         </>
       ) : null}
     </>
@@ -1392,9 +1432,8 @@ function MyStudentAttendance({ child }: { child?: { id: string; name: string; cl
 
   if (child) {
     return (
-      <div className="rounded-2xl border bg-card p-4">
-        <h3 className="mb-1 font-display text-lg font-bold">{child.name}</h3>
-        <p className="mb-4 text-sm text-muted-foreground">
+      <div>
+        <p className="mb-3 text-sm text-muted-foreground">
           {history.data ? `${history.data.class_name} · ${history.data.session_name}` : t("Monthly record")}
         </p>
         {content}
