@@ -3,7 +3,7 @@ declare const self: ServiceWorkerGlobalScope;
 
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from "workbox-precaching";
 import { registerRoute, NavigationRoute } from "workbox-routing";
-import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
+import { CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { CacheableResponsePlugin } from "workbox-cacheable-response";
 
@@ -19,16 +19,6 @@ const navigationRoute = new NavigationRoute(
   { denylist: [/^\/~oauth/, /^\/api\//] },
 );
 registerRoute(navigationRoute);
-
-// Cache visited pages (NetworkFirst)
-registerRoute(
-  ({ request }) => request.mode === "navigate",
-  new NetworkFirst({
-    cacheName: "suffa-pages",
-    networkTimeoutSeconds: 3,
-    plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 })],
-  }),
-);
 
 // Cache static assets (CacheFirst)
 registerRoute(

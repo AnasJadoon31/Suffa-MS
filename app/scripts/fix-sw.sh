@@ -97,6 +97,24 @@ fs.writeFileSync(manifest, code);
 console.log('Fixed ' + fixed + ' asset sizes in manifest');
 "
 
+# Step 3b: Fix sw-v3.js manifest size (it lives in public/, not assets/)
+node -e "
+const fs = require('fs');
+const manifest = '$(pwd)/$MANIFEST_PATH';
+const swPath = '$(pwd)/$SW_PATH';
+const actualSize = fs.statSync(swPath).size;
+let code = fs.readFileSync(manifest, 'utf8');
+const re = new RegExp('(\"/sw-v3\\.js\"[\\\\s\\\\S]*?\"size\":\\\\s*)(\\\\d+)', 'm');
+if (re.test(code)) {
+  const oldSize = code.match(re)[2];
+  code = code.replace(re, '\$1' + actualSize);
+  fs.writeFileSync(manifest, code);
+  console.log('Fixed sw-v3.js manifest size: ' + oldSize + ' -> ' + actualSize);
+} else {
+  console.log('WARNING: could not find sw-v3.js in manifest');
+}
+"
+
 # Step 4: Patch Nitro's static handler so it does NOT serve index.html
 # for "/" (the bare SPA shell). TanStack Start's SSR handler must own
 # "/" — otherwise the server returns the static shell and TanStack

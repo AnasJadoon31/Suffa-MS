@@ -106,15 +106,6 @@ export default defineConfig({
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
           runtimeCaching: [
             {
-              urlPattern: ({ request }) => request.mode === "navigate",
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "suffa-pages",
-                networkTimeoutSeconds: 3,
-                expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
-              },
-            },
-            {
               urlPattern: ({ request }) =>
                 ["style", "script", "worker", "font", "image"].includes(request.destination),
               handler: "CacheFirst",

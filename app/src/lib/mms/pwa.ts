@@ -52,6 +52,11 @@ export function registerServiceWorker(): void {
     .finally(() => {
       void window.navigator.serviceWorker
         .register(SW_URL, { scope: "/" })
-        .catch(() => undefined);
+        .then((registration) => {
+          console.log("SW registered:", registration.scope);
+        })
+        .catch((error) => {
+          console.error("SW registration failed:", error);
+        });
     });
 }
