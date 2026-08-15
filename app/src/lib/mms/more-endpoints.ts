@@ -101,6 +101,14 @@ export interface Assignment {
   submitted_at?: string | null;
 }
 
+export interface ParentAssignmentView {
+  id: string;
+  name: string;
+  class_name: string | null;
+  section_name: string | null;
+  assignments: Assignment[];
+}
+
 export interface CourseResult {
   course_id: string;
   raw_score: number | null;
@@ -536,6 +544,7 @@ export const assessmentsApi = {
     date_to?: string;
     sort?: "due_date" | "created_at" | "title" | "teacher";
   }) => getAllPages<Assignment>("/api/v1/assessments/assignments", params as Record<string, unknown>),
+  parentView: () => api.get<ParentAssignmentView[]>("/api/v1/assessments/assignments/parent-view").then((r) => r.data),
   myResult: (sessionId: string) =>
     api.get<SessionResult>("/api/v1/assessments/results/me", { params: { session_id: sessionId } }).then((r) => r.data),
   resultsMatrix: (params: { class_id?: string; section_id?: string; session_id?: string }) =>

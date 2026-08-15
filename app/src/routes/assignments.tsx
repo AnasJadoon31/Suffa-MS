@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   Download,
   Edit2,
   Eye,
@@ -36,6 +37,7 @@ import {
   assessmentsMutations,
   filesApi,
   type Assignment,
+  type ParentAssignmentView,
   type Submission,
   uploadFile,
 } from "@/lib/mms/more-endpoints";
@@ -73,6 +75,7 @@ function AssignmentsPage() {
   const { user } = useAuth();
   const client = useQueryClient();
   const isStudent = user?.role === "student";
+  const isGuardian = user?.role === "parent";
   const canManage =
     user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate || user?.role === "teacher";
   const [tab, setTab] = useState<"assignments" | "marking" | "results">("assignments");
@@ -81,6 +84,8 @@ function AssignmentsPage() {
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [expandedChild, setExpandedChild] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const classes = useQuery({
     queryKey: ["classes"],
@@ -115,6 +120,12 @@ function AssignmentsPage() {
   const query = useQuery({
     queryKey: ["assignments", params],
     queryFn: () => assessmentsApi.listAssignments(params),
+  });
+
+  const parentView = useQuery({
+    queryKey: ["assignments", "parent-view"],
+    queryFn: () => assessmentsApi.parentView(),
+    enabled: isGuardian,
   });
 
   const items = query.data ?? [];
@@ -200,7 +211,7 @@ function AssignmentsPage() {
 
   return (
     <AppShell
-      title={t("Assessments")}
+      title={isGuardian ? t("Assignments") : t("Assessments")}
       subtitle={`${items.length} total`}
       right={
         canManage && tab === "assignments" ? (
@@ -273,24 +284,36 @@ function AssignmentsPage() {
         ) : undefined
       }
     >
-      <div className="mb-3 grid grid-cols-3 gap-1.5 rounded-2xl bg-muted p-1">
-        {(["assignments", "marking", "results"] as const).map((key) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={cn(
-              "rounded-xl py-2 text-[0.66rem] font-bold uppercase",
-              tab === key ? "bg-card text-primary shadow-sm" : "text-muted-foreground",
-            )}
-          >
-            {key === "assignments" ? t("Assignments") : key === "marking" ? t("Marking") : t("Results")}
-          </button>
-        ))}
-      </div>
+      {!isGuardian ? (
+        <div className="mb-3 grid grid-cols-3 gap-1.5 rounded-2xl bg-muted p-1">
+          {(["assignments", "marking", "results"] as const).map((key) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={cn(
+                "rounded-xl py-2 text-[0.66rem] font-bold uppercase",
+                tab === key ? "bg-card text-primary shadow-sm" : "text-muted-foreground",
+              )}
+            >
+              {key === "assignments" ? t("Assignments") : key === "marking" ? t("Marking") : t("Results")}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {tab === "marking" ? <MarkingView canManage={canManage} /> : null}
       {tab === "results" ? <ResultsView canManage={canManage} /> : null}
-      {tab === "assignments" ? (
+      {tab === "assignments" && isGuardian ? (
+        <GuardianAssignmentsView
+          data={parentView.data ?? []}
+          isLoading={parentView.isLoading}
+          search={search}
+          onSearch={setSearch}
+          expandedChild={expandedChild}
+          onToggleExpand={setExpandedChild}
+        />
+      ) : null}
+      {tab === "assignments" && !isGuardian ? (
         <>
       <FilterBar activeCount={activeCount} onClear={() => setFilters(emptyFilters)}>
         {canManage ? (
@@ -506,6 +529,137 @@ function AssignmentsPage() {
         </>
       ) : null}
     </AppShell>
+  );
+}
+
+function GuardianAssignmentsView({
+  data,
+  isLoading,
+  search,
+  onSearch,
+  expandedChild,
+  onToggleExpand,
+}: {
+  data: ParentAssignmentView[];
+  isLoading: boolean;
+  search: string;
+  onSearch: (value: string) => void;
+  expandedChild: string | null;
+  onToggleExpand: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return data;
+    const q = search.trim().toLowerCase();
+    return data
+      .map((child) => ({
+        ...child,
+        assignments: child.assignments.filter(
+          (a) =>
+            a.title.toLowerCase().includes(q) ||
+            a.course_name?.toLowerCase().includes(q) ||
+            a.class_name?.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((child) => child.assignments.length > 0);
+  }, [data, search]);
+
+  if (isLoading) return <SkeletonList rows={5} />;
+  if (data.length === 0) {
+    return <EmptyState title={t("No assignments")} hint="New tasks will show up here." />;
+  }
+
+  return (
+    <>
+      <Field label={t("Search assignments")} className="mb-4">
+        <TextInput
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          placeholder={t("Type a title, course or class…")}
+        />
+      </Field>
+
+      <div className="space-y-2.5">
+        {filtered.map((child) => {
+          const isOpen = expandedChild === child.id;
+          const submittedCount = child.assignments.filter((a) => a.submitted_at).length;
+          const total = child.assignments.length;
+          return (
+            <Card key={child.id} className="overflow-hidden p-0">
+              <button
+                onClick={() => onToggleExpand(expandedChild === child.id ? null : child.id)}
+                className="flex w-full items-center justify-between gap-3 p-3.5 text-left"
+              >
+                <div className="min-w-0">
+                  <p className="font-display text-sm font-extrabold">{child.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {[child.class_name, child.section_name].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Pill tone={submittedCount === total ? "success" : "muted"}>
+                    {submittedCount}/{total}
+                  </Pill>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform",
+                      isOpen && "rotate-180",
+                    )}
+                  />
+                </div>
+              </button>
+              {isOpen ? (
+                <div className="border-t border-border px-3.5 pb-3.5 pt-2">
+                  <div className="space-y-2.5">
+                    {child.assignments.map((item) => {
+                      const overdue = new Date(item.due_date) < new Date() && !item.submitted_at;
+                      return (
+                        <Card key={item.id} className="space-y-2 p-3.5">
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate font-display text-base font-extrabold">{item.title}</p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {[item.course_name, item.class_name, item.section_name]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            </div>
+                            {item.submitted_at ? (
+                              <Pill tone="success">{t("Submitted")}</Pill>
+                            ) : (
+                              <Pill tone={overdue ? "destructive" : "muted"}>
+                                {overdue ? "Overdue" : "Open"}
+                              </Pill>
+                            )}
+                          </div>
+                          <p className="line-clamp-3 whitespace-pre-line text-sm text-muted-foreground">
+                            {item.instructions}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5">
+                              <CalendarDays className="h-3.5 w-3.5" />
+                              {new Date(item.due_date).toLocaleDateString()}
+                            </span>
+                            {item.max_marks != null ? <span>{t("Max")}{item.max_marks}</span> : null}
+                            {item.submission_mark != null ? (
+                              <span className="inline-flex items-center gap-1.5 font-bold text-success">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {item.submission_mark}
+                              </span>
+                            ) : null}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </Card>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

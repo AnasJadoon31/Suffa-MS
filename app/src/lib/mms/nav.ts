@@ -50,9 +50,9 @@ export const primaryNav: NavItem[] = [
 export const academicNav: NavItem[] = [
   {
     to: "/assignments",
-    label: "Assessments",
+    label: "Assignments",
     icon: ClipboardList,
-    description: "Madrasa assessments and submissions",
+    description: "Madrasa assignments and submissions",
     feature: "assessments",
   },
   { to: "/results", label: "Results", icon: Trophy, description: "Marks and grade bands", feature: "assessments" },
@@ -153,6 +153,7 @@ const guardianVisiblePaths = new Set([
   "/dashboard",
   "/timetable",
   "/resources",
+  "/assignments",
   "/announcements",
   "/me",
 ]);

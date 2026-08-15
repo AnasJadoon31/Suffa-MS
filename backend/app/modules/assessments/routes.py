@@ -55,7 +55,7 @@ from app.modules.assessments.schemas import (
     SubmissionRead,
 )
 from app.modules.auth.models import User, UserRole
-from app.modules.people.models import StudentProfile, TeacherProfile
+from app.modules.people.models import Guardian, StudentGuardian, StudentProfile, TeacherProfile
 
 router = APIRouter()
 
@@ -665,6 +665,83 @@ async def list_assignments(
         student_id=student.id if student is not None else None,
         section_name_overrides=section_name_overrides,
     )
+
+
+@router.get("/assignments/parent-view")
+async def parent_assignments(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    if current_user.role != UserRole.parent:
+        raise HTTPException(status_code=403, detail="Parent access only")
+    guardian = (
+        await session.execute(
+            select(Guardian).where(
+                Guardian.user_id == current_user.id,
+                Guardian.madrasa_id == madrasa.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if guardian is None:
+        return []
+    children = (
+        await session.execute(
+            select(StudentProfile)
+            .join(StudentGuardian, StudentGuardian.student_id == StudentProfile.id)
+            .where(
+                StudentGuardian.guardian_id == guardian.id,
+                StudentGuardian.madrasa_id == madrasa.id,
+                StudentProfile.madrasa_id == madrasa.id,
+            )
+            .order_by(StudentProfile.name)
+        )
+    ).scalars().all()
+    if not children:
+        return []
+    active_session_id = await _active_session_id(session, madrasa.id)
+    child_ids = [s.id for s in children]
+    enrollments = (
+        await session.execute(
+            select(Enrollment).where(
+                Enrollment.madrasa_id == madrasa.id,
+                Enrollment.student_id.in_(child_ids),
+                Enrollment.session_id == active_session_id,
+                Enrollment.ended_on.is_(None),
+            )
+        )
+    ).scalars().all()
+    enrollment_by_student = {e.student_id: e for e in enrollments}
+    all_class_ids = list({e.class_id for e in enrollments})
+    all_section_ids = list({e.section_id for e in enrollments if e.section_id})
+    class_names = dict(
+        (await session.execute(select(AcademicClass.id, AcademicClass.name).where(AcademicClass.id.in_(all_class_ids)))).all()
+    ) if all_class_ids else {}
+    section_names = dict(
+        (await session.execute(select(Section.id, Section.name).where(Section.id.in_(all_section_ids)))).all()
+    ) if all_section_ids else {}
+    result: list[dict] = []
+    for child in children:
+        enrollment = enrollment_by_student.get(child.id)
+        if enrollment is None:
+            result.append({"id": str(child.id), "name": child.name, "class_name": None, "section_name": None, "assignments": []})
+            continue
+        stmt = select(Assignment).where(
+            Assignment.madrasa_id == madrasa.id,
+            Assignment.class_id == enrollment.class_id,
+            (Assignment.section_id.is_(None)) | (Assignment.section_id == enrollment.section_id),
+        )
+        rows = list((await session.execute(stmt.order_by(Assignment.due_date))).scalars().all())
+        rows = [row for row in rows if not row.target_student_ids or str(child.id) in row.target_student_ids]
+        reads = await _assignment_reads(session, madrasa.id, rows, student_id=child.id)
+        result.append({
+            "id": str(child.id),
+            "name": child.name,
+            "class_name": class_names.get(enrollment.class_id),
+            "section_name": section_names.get(enrollment.section_id) if enrollment.section_id else None,
+            "assignments": [a.model_dump() if hasattr(a, "model_dump") else a for a in reads],
+        })
+    return result
 
 
 async def _assignment_submission_status_rows(
