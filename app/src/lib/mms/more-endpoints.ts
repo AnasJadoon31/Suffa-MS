@@ -75,6 +75,7 @@ export interface ResourceItem {
   created_by_id: string;
   owner_name: string | null;
   created_at: string;
+  visibility_scope?: Record<string, unknown>;
 }
 
 export interface Assignment {

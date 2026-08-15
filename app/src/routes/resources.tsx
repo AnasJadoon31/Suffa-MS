@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, Edit2, FileText, Trash2, Upload, Video } from "lucide-react";
+import { ChevronDown, Download, Edit2, FileText, Trash2, Upload, Video } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -18,7 +18,7 @@ import {
 } from "@/components/app/Primitives";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/mms/auth";
-import { academicsApi } from "@/lib/mms/endpoints";
+import { academicsApi, reportingApi, type ParentDashboard } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import {
   academicsExtraApi,
@@ -53,9 +53,12 @@ function ResourcesPage() {
   const client = useQueryClient();
   const canManage =
     user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate || user?.role === "teacher";
+  const isGuardian = user?.role === "parent";
 
   const [categoryId, setCategoryId] = useState<string>("");
   const [extra, setExtra] = useState(emptyExtra);
+  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const categories = useQuery({
     queryKey: ["resource-categories"],
@@ -81,6 +84,12 @@ function ResourcesPage() {
   const resources = useQuery({
     queryKey: ["resources", params],
     queryFn: () => opsApi.listResources(params),
+  });
+
+  const dashboard = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: () => reportingApi.dashboard(),
+    enabled: isGuardian,
   });
 
   const items = resources.data ?? [];
@@ -137,6 +146,63 @@ function ResourcesPage() {
       }),
   });
 
+  const children = useMemo(() => {
+    if (!isGuardian) return [];
+    const data = dashboard.data as ParentDashboard | undefined;
+    return data?.children ?? [];
+  }, [isGuardian, dashboard.data]);
+
+  const grouped = useMemo(() => {
+    if (!isGuardian) return null;
+    const filtered = search.trim()
+      ? items.filter((item) =>
+          item.title.toLowerCase().includes(search.trim().toLowerCase()) ||
+          item.description?.toLowerCase().includes(search.trim().toLowerCase()),
+        )
+      : items;
+
+    const childGroups: { id: string; name: string; items: ResourceItem[] }[] = [];
+    const globalItems: ResourceItem[] = [];
+
+    for (const child of children) {
+      const classId = child.current_class?.id;
+      const sectionId = child.current_class?.section_id;
+      const childResources = filtered.filter((item) => {
+        const scope = item.visibility_scope;
+        if (!scope) return false;
+        if (scope.all) return false;
+        const scopeClasses = (scope.classes as string[]) ?? [];
+        const scopeSections = (scope.sections as string[]) ?? [];
+        if (classId && scopeClasses.includes(classId)) return true;
+        if (sectionId && scopeSections.includes(sectionId)) return true;
+        return false;
+      });
+      if (childResources.length > 0) {
+        childGroups.push({ id: child.id, name: child.name, items: childResources });
+      }
+    }
+
+    for (const item of filtered) {
+      const scope = item.visibility_scope;
+      if (!scope) {
+        globalItems.push(item);
+        continue;
+      }
+      if (scope.all) {
+        globalItems.push(item);
+        continue;
+      }
+      const scopeClasses = (scope.classes as string[]) ?? [];
+      const scopeSections = (scope.sections as string[]) ?? [];
+      const scopeCourses = (scope.courses as string[]) ?? [];
+      if (scopeClasses.length === 0 && scopeSections.length === 0 && scopeCourses.length === 0) {
+        globalItems.push(item);
+      }
+    }
+
+    return { childGroups, globalItems };
+  }, [isGuardian, items, children, search]);
+
   return (
     <AppShell
       title={t("Resources")}
@@ -176,130 +242,156 @@ function ResourcesPage() {
         ) : undefined
       }
     >
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-        <Chip active={categoryId === ""} onClick={() => setCategoryId("")} label={t("All")} />
-        {(categories.data ?? []).map((category) => (
-          <Chip
-            key={category.id}
-            active={categoryId === category.id}
-            onClick={() => setCategoryId(category.id)}
-            label={category.name}
-          />
-        ))}
-      </div>
-
-      <FilterBar
-        activeCount={activeCount}
-        onClear={() => {
-          setExtra(emptyExtra);
-        }}
-      >
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t("Class")}>
-            <CustomDropdown
-              value={extra.classId}
-              onChange={(e) => setExtra((f) => ({ ...f, classId: e.target.value, sectionId: "" }))}
-            >
-              <option value="">{t("All classes")}</option>
-              {(classes.data ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </CustomDropdown>
+      {isGuardian ? (
+        <>
+          <Field label={t("Search resources")} className="mb-4">
+            <TextInput
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("Type a title or description…")}
+            />
           </Field>
-          <Field label={t("Section")}>
-            <CustomDropdown
-              value={extra.sectionId}
-              disabled={!extra.classId}
-              onChange={(e) => setExtra((f) => ({ ...f, sectionId: e.target.value }))}
-            >
-              <option value="">{t("All sections")}</option>
-              {(sections.data ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </CustomDropdown>
-          </Field>
-        </div>
-        <label className="flex items-center gap-2 text-sm font-semibold">
-          <input
-            type="checkbox"
-            checked={extra.mineOnly}
-            onChange={(e) => setExtra((f) => ({ ...f, mineOnly: e.target.checked }))}
-            className="h-4 w-4 rounded border-border"
-          />
-          {t("Mine only")}</label>
-      </FilterBar>
 
-      {resources.isLoading ? <SkeletonList rows={5} /> : null}
-      {!resources.isLoading && items.length === 0 ? (
-        <EmptyState title={t("No resources yet")} hint="Teachers can share notes and videos here." />
-      ) : null}
+          {resources.isLoading || dashboard.isLoading ? <SkeletonList rows={5} /> : null}
+          {!resources.isLoading && !dashboard.isLoading && items.length === 0 ? (
+            <EmptyState title={t("No resources yet")} hint="Teachers can share notes and videos here." />
+          ) : null}
 
-      <div className="space-y-2.5">
-        {items.map((item) => (
-          <Card
-            key={item.id}
-            className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 p-3.5"
-          >
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-              {item.video_url ? <Video className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{item.title}</p>
-              {item.description ? (
-                <p className="line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
-              ) : null}
-              <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">
-                {item.owner_name ?? "Shared"} · {new Date(item.created_at).toLocaleDateString()}
-              </p>
-              {item.video_url ? (
-                <a
-                  href={item.video_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 inline-block text-sm font-bold text-primary underline underline-offset-4"
-                >
-                  {t("Watch")}</a>
-              ) : null}
-              {item.file_key ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const url = await filesApi.presignDownload(item.file_key!);
-                    window.open(url, "_blank", "noopener,noreferrer");
-                  }}
-                  className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-primary underline underline-offset-4"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {t("Open file")}</button>
+          {grouped ? (
+            <div className="space-y-2.5">
+              {grouped.childGroups.map((group) => {
+                const isOpen = expanded === group.id;
+                return (
+                  <Card key={group.id} className="overflow-hidden p-0">
+                    <button
+                      onClick={() => setExpanded(isOpen ? null : group.id)}
+                      className="flex w-full items-center justify-between gap-3 p-3.5 text-left"
+                    >
+                      <span className="font-display text-sm font-extrabold">{group.name}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                          isOpen && "rotate-180",
+                        )}
+                      />
+                    </button>
+                    {isOpen ? (
+                      <div className="border-t border-border px-3.5 pb-3.5 pt-2">
+                        <div className="space-y-2.5">
+                          {group.items.map((item) => (
+                            <ResourceCard key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </Card>
+                );
+              })}
+
+              {grouped.globalItems.length > 0 ? (
+                (() => {
+                  const isOpen = expanded === "global";
+                  return (
+                    <Card className="overflow-hidden p-0">
+                      <button
+                        onClick={() => setExpanded(isOpen ? null : "global")}
+                        className="flex w-full items-center justify-between gap-3 p-3.5 text-left"
+                      >
+                        <span className="font-display text-sm font-extrabold">{t("General")}</span>
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                            isOpen && "rotate-180",
+                          )}
+                        />
+                      </button>
+                      {isOpen ? (
+                        <div className="border-t border-border px-3.5 pb-3.5 pt-2">
+                          <div className="space-y-2.5">
+                            {grouped.globalItems.map((item) => (
+                              <ResourceCard key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </Card>
+                  );
+                })()
               ) : null}
             </div>
-            {canManage ? (
-              <div className="flex gap-2">
-                <button
-                  aria-label="Edit resource"
-                  onClick={() => setEditing(item)}
-                  className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary"
+          ) : null}
+        </>
+      ) : (
+        <>
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+            <Chip active={categoryId === ""} onClick={() => setCategoryId("")} label={t("All")} />
+            {(categories.data ?? []).map((category) => (
+              <Chip
+                key={category.id}
+                active={categoryId === category.id}
+                onClick={() => setCategoryId(category.id)}
+                label={category.name}
+              />
+            ))}
+          </div>
+
+          <FilterBar
+            activeCount={activeCount}
+            onClear={() => {
+              setExtra(emptyExtra);
+            }}
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t("Class")}>
+                <CustomDropdown
+                  value={extra.classId}
+                  onChange={(e) => setExtra((f) => ({ ...f, classId: e.target.value, sectionId: "" }))}
                 >
-                  <Edit2 className="h-4 w-4" />
-                </button>
-                <button
-                  aria-label="Delete resource"
-                  onClick={() => remove.mutate(item.id)}
-                  className="grid h-9 w-9 place-items-center rounded-xl bg-destructive/10 text-destructive"
+                  <option value="">{t("All classes")}</option>
+                  {(classes.data ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </CustomDropdown>
+              </Field>
+              <Field label={t("Section")}>
+                <CustomDropdown
+                  value={extra.sectionId}
+                  disabled={!extra.classId}
+                  onChange={(e) => setExtra((f) => ({ ...f, sectionId: e.target.value }))}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <span />
-            )}
-          </Card>
-        ))}
-      </div>
+                  <option value="">{t("All sections")}</option>
+                  {(sections.data ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </CustomDropdown>
+              </Field>
+            </div>
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={extra.mineOnly}
+                onChange={(e) => setExtra((f) => ({ ...f, mineOnly: e.target.checked }))}
+                className="h-4 w-4 rounded border-border"
+              />
+              {t("Mine only")}</label>
+          </FilterBar>
+
+          {resources.isLoading ? <SkeletonList rows={5} /> : null}
+          {!resources.isLoading && items.length === 0 ? (
+            <EmptyState title={t("No resources yet")} hint="Teachers can share notes and videos here." />
+          ) : null}
+
+          <div className="space-y-2.5">
+            {items.map((item) => (
+              <ResourceCard key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
+            ))}
+          </div>
+        </>
+      )}
 
       {editing ? (
         <EditResourceSheet
@@ -309,6 +401,69 @@ function ResourcesPage() {
         />
       ) : null}
     </AppShell>
+  );
+}
+
+function ResourceCard({ item, canManage, onEdit, onDelete }: { item: ResourceItem; canManage: boolean; onEdit: () => void; onDelete: () => void }) {
+    const { t } = useTranslation();
+  return (
+    <Card
+      className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 p-3.5"
+    >
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+        {item.video_url ? <Video className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate font-semibold">{item.title}</p>
+        {item.description ? (
+          <p className="line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+        ) : null}
+        <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">
+          {item.owner_name ?? "Shared"} · {new Date(item.created_at).toLocaleDateString()}
+        </p>
+        {item.video_url ? (
+          <a
+            href={item.video_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 inline-block text-sm font-bold text-primary underline underline-offset-4"
+          >
+            {t("Watch")}</a>
+        ) : null}
+        {item.file_key ? (
+          <button
+            type="button"
+            onClick={async () => {
+              const url = await filesApi.presignDownload(item.file_key!);
+              window.open(url, "_blank", "noopener,noreferrer");
+            }}
+            className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-primary underline underline-offset-4"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {t("Open file")}</button>
+        ) : null}
+      </div>
+      {canManage ? (
+        <div className="flex gap-2">
+          <button
+            aria-label="Edit resource"
+            onClick={onEdit}
+            className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary"
+          >
+            <Edit2 className="h-4 w-4" />
+          </button>
+          <button
+            aria-label="Delete resource"
+            onClick={onDelete}
+            className="grid h-9 w-9 place-items-center rounded-xl bg-destructive/10 text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <span />
+      )}
+    </Card>
   );
 }
 
