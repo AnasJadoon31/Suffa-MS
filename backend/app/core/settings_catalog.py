@@ -34,6 +34,8 @@ CATALOG: tuple[SettingDef, ...] = (
     SettingDef("security.idle_timeout_minutes_student", "security", "int", "30", "Idle timeout — student (minutes)"),
     # Academics.
     SettingDef("academics.show_hijri_dates", "academics", "bool", "true", "Show Hijri dates"),
+    SettingDef("academics.self_contained_enabled", "academics", "bool", "false", "Enable self-contained classrooms"),
+    SettingDef("academics.self_contained_programs", "academics", "json", "[]", "Self-contained classroom programs"),
     # Attendance.
     SettingDef("attendance.lock_time", "attendance", "string", "23:59", "Attendance lock time"),
     SettingDef("attendance.school_days", "attendance", "weekday_multi", "[0,1,2,3,4,5]", "School days"),
@@ -82,6 +84,13 @@ def validate_setting(key: str, value: str) -> None:
             days.add(item)
         if len(days) != len(parsed):
             raise ValueError(f"Setting {key} must not contain duplicate weekdays")
+    elif definition.type == "json":
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            raise ValueError(f"Setting {key} must be valid JSON")
+        if not isinstance(parsed, list):
+            raise ValueError(f"Setting {key} must be a JSON array")
     elif definition.type == "language":
         if value not in ("en", "ur"):
             raise ValueError(f"Setting {key} must be 'en' or 'ur'")

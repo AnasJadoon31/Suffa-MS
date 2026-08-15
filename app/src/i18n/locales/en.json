@@ -658,5 +658,13 @@
   "Units (optional)": "Units (optional)",
   "Creates N sub-exams each with equal weightage": "Creates N sub-exams each with equal weightage",
   "units": "units",
-  "Units": "Units"
+  "Units": "Units",
+  "Self-Contained Classrooms": "Self-Contained Classrooms",
+  "Self-contained classrooms": "Self-contained classrooms",
+  "Programs marked self-contained take one daily attendance in the morning instead of per-course attendance": "Programs marked self-contained take one daily attendance in the morning instead of per-course attendance",
+  "Enable self-contained classrooms to select which programs use daily attendance": "Enable self-contained classrooms to select which programs use daily attendance",
+  "Enable self-contained classrooms": "Enable self-contained classrooms",
+  "No programs created yet. Add programs in Academics first.": "No programs created yet. Add programs in Academics first.",
+  "Could not save self-contained programs": "Could not save self-contained programs",
+  "Self-contained classroom — one daily attendance in the morning": "Self-contained classroom — one daily attendance in the morning"
 }

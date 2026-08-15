@@ -65,6 +65,8 @@ class AttendanceSectionRead(BaseModel):
 class AttendanceClassRead(BaseModel):
     id: UUID
     name: str
+    program_id: UUID | None = None
+    self_contained: bool = False
     course_names: list[str] = Field(default_factory=list)
     courses: list["AttendanceCourseRead"] = Field(default_factory=list)
     student_count: int = 0

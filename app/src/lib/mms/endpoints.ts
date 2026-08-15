@@ -119,6 +119,8 @@ export type AttendanceStatus = "present" | "absent" | "leave";
 export interface AttendanceClassOption {
   id: string;
   name: string;
+  program_id?: string | null;
+  self_contained?: boolean;
   courses: { id: string; name: string }[];
   student_count: number;
   sections: { id: string; name: string; student_count: number }[];

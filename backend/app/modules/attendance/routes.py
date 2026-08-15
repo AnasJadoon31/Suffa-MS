@@ -89,6 +89,52 @@ def _parse_school_day_indexes(value: str | None) -> frozenset[int]:
     return frozenset(days) if days else DEFAULT_SCHOOL_DAY_INDEXES
 
 
+async def _self_contained_program_ids(session: AsyncSession, madrasa_id: UUID) -> set[str]:
+    enabled = (
+        await session.execute(
+            select(MadrasaSetting.value).where(
+                MadrasaSetting.madrasa_id == madrasa_id,
+                MadrasaSetting.key == "academics.self_contained_enabled",
+            )
+        )
+    ).scalar_one_or_none()
+    if enabled != "true":
+        return set()
+    value = (
+        await session.execute(
+            select(MadrasaSetting.value).where(
+                MadrasaSetting.madrasa_id == madrasa_id,
+                MadrasaSetting.key == "academics.self_contained_programs",
+            )
+        )
+    ).scalar_one_or_none()
+    if not value:
+        return set()
+    try:
+        return set(json.loads(value))
+    except (json.JSONDecodeError, TypeError):
+        return set()
+
+
+async def _is_self_contained_class(
+    session: AsyncSession,
+    madrasa_id: UUID,
+    class_id: UUID,
+) -> bool:
+    program_id = (
+        await session.execute(
+            select(AcademicClass.program_id).where(
+                AcademicClass.id == class_id,
+                AcademicClass.madrasa_id == madrasa_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if program_id is None:
+        return False
+    programs = await _self_contained_program_ids(session, madrasa_id)
+    return str(program_id) in programs
+
+
 async def _school_day_indexes(session: AsyncSession, madrasa_id: UUID) -> frozenset[int]:
     value = (
         await session.execute(
@@ -396,7 +442,7 @@ async def attendance_classes(
     is_global = await _has_global_student_attendance_access(current_user, session)
     assigned_course_ids: set[UUID] = set()
     assigned_section_ids: set[UUID] | None = None
-    class_stmt = select(AcademicClass.id, AcademicClass.name).where(AcademicClass.madrasa_id == madrasa.id)
+    class_stmt = select(AcademicClass.id, AcademicClass.name, AcademicClass.program_id).where(AcademicClass.madrasa_id == madrasa.id)
 
     if not is_global:
         teacher_id = await _current_teacher_id(current_user, session, madrasa.id)
@@ -518,16 +564,19 @@ async def attendance_classes(
         course_names[class_id].append(course_name)
         courses[class_id].append({"id": course_id, "name": course_name})
 
+    self_contained_programs = await _self_contained_program_ids(session, madrasa.id)
     return paginate_sequence([
         AttendanceClassRead(
             id=class_id,
             name=class_name,
+            program_id=program_id,
+            self_contained=program_id is not None and str(program_id) in self_contained_programs,
             course_names=course_names[class_id],
             courses=courses[class_id],
             student_count=sum(section.student_count for section in sections_by_class[class_id]),
             sections=sections_by_class[class_id],
         )
-        for class_id, class_name in class_rows
+        for class_id, class_name, program_id in class_rows
     ], limit=limit, offset=offset, response=response)
 
 
@@ -550,6 +599,8 @@ async def attendance_class_roster(
     if academic_class is None or academic_class.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Class not found")
 
+    self_contained = await _is_self_contained_class(session, madrasa.id, class_id)
+
     section = None
     if timetable_slot_id is not None and course_id is None:
         raise HTTPException(status_code=422, detail="course_id is required when timetable_slot_id is provided")
@@ -560,8 +611,10 @@ async def attendance_class_roster(
         await _assert_can_mark_section(
             current_user, session, madrasa.id, active_session.id, class_id, section_id
         )
-    elif not await _has_global_student_attendance_access(current_user, session):
+    elif not self_contained and not await _has_global_student_attendance_access(current_user, session):
         raise HTTPException(status_code=403, detail=ErrorCode.ATTENDANCE_SECTION_REQUIRED)
+    elif self_contained and course_id is None and timetable_slot_id is None:
+        raise HTTPException(status_code=422, detail="section_id is required for self-contained classroom attendance")
 
     course = None
     timetable_slot = None

@@ -52,6 +52,7 @@ import {
 } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import { enqueueEntry } from "@/lib/mms/outbox";
+import { opsApi } from "@/lib/mms/more-endpoints";
 import { useOnlineStatus } from "@/lib/mms/useOnlineStatus";
 import { useTranslation } from "react-i18next";
 
@@ -218,8 +219,32 @@ function AttendanceBoard() {
     retry: false,
   });
 
+  const selfContainedSetting = useQuery({
+    queryKey: ["setting-self-contained-enabled"],
+    queryFn: async () => {
+      const catalog = await opsApi.listSettingsCatalog();
+      const enabled = catalog.find((s) => s.key === "academics.self_contained_enabled");
+      const programs = catalog.find((s) => s.key === "academics.self_contained_programs");
+      const programIds = new Set<string>();
+      if (programs?.value) {
+        try {
+          const parsed = JSON.parse(programs.value);
+          if (Array.isArray(parsed)) parsed.forEach((id: string) => programIds.add(id));
+        } catch { /* ignore */ }
+      }
+      return { enabled: enabled?.value === "true", programIds };
+    },
+    staleTime: 60_000,
+  });
+
   const selectedClass = classes.data?.find((item) => item.id === classId) ?? null;
   const selectedSection = selectedClass?.sections.find((item) => item.id === sectionId) ?? null;
+
+  const selectedClassProgramId = selectedClass?.program_id ?? null;
+  const isSelfContainedClass =
+    selfContainedSetting.data?.enabled === true &&
+    selectedClassProgramId !== null &&
+    selfContainedSetting.data?.programIds.has(selectedClassProgramId);
 
   const slots = useQuery({
     queryKey: ["attendance-slots", classId, sectionId, user?.role],
@@ -265,9 +290,12 @@ function AttendanceBoard() {
   }, [slotId, todaysSlots]);
 
   const roster = useQuery({
-    queryKey: ["attendance-roster", classId, sectionId, courseId, slotId],
-    queryFn: () => attendanceApi.classRoster(classId!, sectionId ?? "", courseId, slotId),
-    enabled: Boolean(classId && sectionId && courseId),
+    queryKey: ["attendance-roster", classId, sectionId, courseId, slotId, isSelfContainedClass],
+    queryFn: () =>
+      isSelfContainedClass
+        ? attendanceApi.classRoster(classId!, sectionId ?? "", undefined, undefined)
+        : attendanceApi.classRoster(classId!, sectionId ?? "", courseId, slotId),
+    enabled: Boolean(classId && sectionId && (isSelfContainedClass || courseId)),
     retry: false,
   });
 
@@ -277,6 +305,7 @@ function AttendanceBoard() {
       classId,
       sectionId,
       courseId,
+      isSelfContainedClass,
       month.getFullYear(),
       month.getMonth(),
     ],
@@ -284,9 +313,9 @@ function AttendanceBoard() {
       attendanceApi.classHistory(classId!, {
         ...monthRange(month),
         ...(sectionId ? { section_id: sectionId } : {}),
-        ...(courseId ? { course_id: courseId } : {}),
+        ...(courseId && !isSelfContainedClass ? { course_id: courseId } : {}),
       }),
-    enabled: Boolean(classId && sectionId && courseId),
+    enabled: Boolean(classId && sectionId && (isSelfContainedClass || courseId)),
     retry: false,
   });
 
@@ -441,12 +470,12 @@ function AttendanceBoard() {
         subject_type: "student",
         subject_id: subjectId,
         session_id: data.session_id,
-        course_id: data.course?.id ?? courseId,
-        timetable_slot_id: effectiveSlotId,
+        course_id: isSelfContainedClass ? undefined : (data.course?.id ?? courseId),
+        timetable_slot_id: isSelfContainedClass ? undefined : effectiveSlotId,
         attendance_date: attendanceDate,
         status,
         captured_at: capturedAt,
-        idempotency_key: `${subjectId}:${data.session_id}:${attendanceDate}:${effectiveSlotId ?? "general"}`,
+        idempotency_key: `${subjectId}:${data.session_id}:${attendanceDate}:${isSelfContainedClass ? "general" : (effectiveSlotId ?? "general")}`,
       }));
       if (!entries.length) throw new Error("Nothing to submit");
       if (!online) {
@@ -676,47 +705,53 @@ function AttendanceBoard() {
         <ArrowLeft className="h-3.5 w-3.5" />
         {t("Classes")}</button>
 
-      <div className="space-y-2.5">
-        <Select
-          label={t("Course")}
-          value={courseId}
-          onChange={(value) => {
-            setCourseId(value);
-            setSlotId("");
-            setMarks({});
-            setEditing(false);
-          }}
-          options={[
-            { value: "", label: "Select course" },
-            ...courseOptions.map((course) => ({ value: course.id, label: course.name })),
-          ]}
-        />
-        {todaysSlots.length > 1 ? (
+      {isSelfContainedClass ? (
+        <div className="rounded-xl border border-primary/30 bg-primary-soft/30 px-3 py-2.5 text-xs text-primary">
+          {t("Self-contained classroom — one daily attendance in the morning")}
+        </div>
+      ) : (
+        <div className="space-y-2.5">
           <Select
-            label={t("Period")}
-            value={slotId}
+            label={t("Course")}
+            value={courseId}
             onChange={(value) => {
-              setSlotId(value);
+              setCourseId(value);
+              setSlotId("");
               setMarks({});
+              setEditing(false);
             }}
             options={[
-              { value: "", label: "Select period" },
-              ...todaysSlots.map((slot) => ({
-                value: slot.id,
-                label: `Period ${slot.period} · ${formatTime(slot.start_time)}-${formatTime(slot.end_time)}`,
-              })),
+              { value: "", label: "Select course" },
+              ...courseOptions.map((course) => ({ value: course.id, label: course.name })),
             ]}
           />
-        ) : null}
-      </div>
+          {todaysSlots.length > 1 ? (
+            <Select
+              label={t("Period")}
+              value={slotId}
+              onChange={(value) => {
+                setSlotId(value);
+                setMarks({});
+              }}
+              options={[
+                { value: "", label: "Select period" },
+                ...todaysSlots.map((slot) => ({
+                  value: slot.id,
+                  label: `Period ${slot.period} · ${formatTime(slot.start_time)}-${formatTime(slot.end_time)}`,
+                })),
+              ]}
+            />
+          ) : null}
+        </div>
+      )}
 
-      {!courseId ? (
+      {!isSelfContainedClass && !courseId ? (
         <div className="mt-4">
           <EmptyState title={t("Pick a course")} hint="Attendance is recorded per course and period." />
         </div>
       ) : null}
 
-      {courseId ? (
+      {isSelfContainedClass || courseId ? (
         <>
           <div className="mt-4 grid grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1">
             {(["calendar", "history"] as const).map((key) => (

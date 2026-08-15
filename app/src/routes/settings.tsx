@@ -14,7 +14,7 @@ import {
   TextInput,
 } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
-import { filesApi, opsApi, opsMutations, type TypedMadrasaSetting, uploadFile } from "@/lib/mms/more-endpoints";
+import { academicsExtraApi, filesApi, opsApi, opsMutations, type Program, type TypedMadrasaSetting, uploadFile } from "@/lib/mms/more-endpoints";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { useTranslation } from "react-i18next";
 
@@ -83,13 +83,17 @@ function SettingsPage() {
           <div key={category}>
             <SectionTitle>{t(category)}</SectionTitle>
             <div className="space-y-2">
-              {entries.map((setting) => (
-                <SettingRow key={setting.key} setting={setting} canManage={canManage} />
-              ))}
+              {entries
+                .filter((setting) => setting.type !== "json")
+                .map((setting) => (
+                  <SettingRow key={setting.key} setting={setting} canManage={canManage} />
+                ))}
             </div>
           </div>
         ))}
       </div>
+
+      <SelfContainedSection canManage={canManage} settings={settings.data ?? []} />
     </AppShell>
   );
 }
@@ -558,5 +562,107 @@ function SettingRow({
         <span />
       )}
     </Card>
+  );
+}
+
+function SelfContainedSection({ canManage, settings }: { canManage: boolean; settings: TypedMadrasaSetting[] }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+
+  const enabledSetting = settings.find((s) => s.key === "academics.self_contained_enabled");
+  const programsSetting = settings.find((s) => s.key === "academics.self_contained_programs");
+  const enabled = enabledSetting?.value === "true";
+
+  const programs = useQuery({
+    queryKey: ["programs-list"],
+    queryFn: () => academicsExtraApi.listPrograms(),
+    staleTime: 60_000,
+  });
+
+  const selectedIds = useMemo(() => {
+    try {
+      const parsed = JSON.parse(programsSetting?.value ?? "[]");
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      return new Set<string>();
+    }
+  }, [programsSetting?.value]);
+
+  const savePrograms = useMutation({
+    mutationFn: (ids: string[]) => opsMutations.updateSetting("academics.self_contained_programs", JSON.stringify(ids)),
+    onSuccess: () => {
+      toast.success(t("Setting saved"));
+      void client.invalidateQueries({ queryKey: ["settings-catalog"] });
+    },
+    onError: (error) => toast.error(apiErrorMessage(error, t("Could not save self-contained programs"))),
+  });
+
+  const toggleProgram = (programId: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(programId)) next.delete(programId);
+    else next.add(programId);
+    savePrograms.mutate(Array.from(next));
+  };
+
+  return (
+    <>
+      <SectionTitle>{t("Self-Contained Classrooms")}</SectionTitle>
+      <Card className="space-y-3 p-3.5">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+            <Settings2 className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <span className="block truncate text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground">
+              {t("Self-contained classrooms")}
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              {t("Programs marked self-contained take one daily attendance in the morning instead of per-course attendance")}
+            </span>
+          </div>
+          <span className={["inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-bold", enabled ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"].join(" ")}>
+            {enabled ? t("Enabled") : t("Disabled")}
+          </span>
+        </div>
+
+        {enabled ? (
+          programs.isLoading ? (
+            <SkeletonList rows={2} />
+          ) : programs.data && programs.data.length > 0 ? (
+            <div className="space-y-1">
+              {programs.data.map((program: Program) => {
+                const isActive = selectedIds.has(program.id);
+                return (
+                  <button
+                    key={program.id}
+                    type="button"
+                    disabled={!canManage || savePrograms.isPending}
+                    onClick={() => toggleProgram(program.id)}
+                    className={[
+                      "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition disabled:opacity-50",
+                      isActive ? "border-primary bg-primary-soft/40" : "border-border bg-background",
+                    ].join(" ")}
+                  >
+                    <span className={[
+                      "grid h-5 w-5 shrink-0 place-items-center rounded-md border transition",
+                      isActive ? "border-primary bg-primary text-primary-foreground" : "border-border",
+                    ].join(" ")}>
+                      {isActive ? <Check className="h-3 w-3" /> : null}
+                    </span>
+                    <span className={["truncate font-medium", isActive ? "text-primary" : "text-foreground"].join(" ")}>
+                      {program.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">{t("No programs created yet. Add programs in Academics first.")}</p>
+          )
+        ) : (
+          <p className="text-xs text-muted-foreground">{t("Enable self-contained classrooms above to select which programs use daily attendance.")}</p>
+        )}
+      </Card>
+    </>
   );
 }

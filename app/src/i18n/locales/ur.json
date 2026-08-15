@@ -686,5 +686,13 @@
   "Units (optional)": "یونٹس (اختیاری)",
   "Creates N sub-exams each with equal weightage": "ہر ایک کے برابر وزن کے ساتھ N ذیلی امتحانات بناتا ہے",
   "units": "یونٹس",
-  "Units": "یونٹس"
+  "Units": "یونٹس",
+  "Self-Contained Classrooms": "خود مختصر کلاس رومز",
+  "Self-contained classrooms": "خود مختصر کلاس رومز",
+  "Programs marked self-contained take one daily attendance in the morning instead of per-course attendance": "خود مختصر پروگراموں میں صبح ایک روزانہ حاضری لی جاتی ہے بجائے ہر کورس کی حاضری کے",
+  "Enable self-contained classrooms to select which programs use daily attendance": "روزانہ حاضری استعمال کرنے والے پروگرام منتخب کرنے کے لیے خود مختصر کلاس رومز فعال کریں",
+  "Enable self-contained classrooms": "خود مختصر کلاس رومز فعال کریں",
+  "No programs created yet. Add programs in Academics first.": "ابھی تک کوئی پروگرام نہیں بنایا گیا۔ پہلے اکیڈمکس میں پروگرام شامل کریں۔",
+  "Could not save self-contained programs": "خود مختصر پروگرام محفوظ نہیں ہو سکے",
+  "Self-contained classroom — one daily attendance in the morning": "خود مختصر کلاس روم — صبح ایک روزانہ حاضری"
 }

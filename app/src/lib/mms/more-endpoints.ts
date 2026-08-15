@@ -270,7 +270,7 @@ export interface MadrasaSetting {
 export interface TypedMadrasaSetting {
   key: string;
   category: string;
-  type: "string" | "int" | "bool" | "file" | "secret" | "weekday_multi" | "language";
+  type: "string" | "int" | "bool" | "file" | "secret" | "weekday_multi" | "language" | "json";
   label: string;
   value: string;
 }
