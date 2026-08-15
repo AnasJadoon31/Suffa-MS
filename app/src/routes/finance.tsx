@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
-import { Download, HandCoins, Plus, Receipt, Wallet } from "lucide-react";
+import { ChevronDown, Download, HandCoins, Plus, Receipt, Wallet } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -13,6 +13,7 @@ import {
   Card,
   EmptyState,
   Field,
+  Pill,
   SectionTitle,
   CustomDropdown,
   SkeletonList,
@@ -21,7 +22,7 @@ import {
 } from "@/components/app/Primitives";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/mms/auth";
-import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
+import { academicsApi, peopleApi, reportingApi, type ParentDashboard } from "@/lib/mms/endpoints";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { financeApi, financeMutations } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
@@ -50,13 +51,117 @@ function money(amount: number, currency?: string) {
   return `${currency ?? "PKR"} ${Number(amount ?? 0).toLocaleString()}`;
 }
 
+function GuardianFinanceView() {
+  const { t } = useTranslation();
+  const dashboard = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: () => reportingApi.dashboard(),
+  });
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  if (dashboard.isLoading) {
+    return <AppShell title={t("Finance")}><SkeletonList rows={4} /></AppShell>;
+  }
+
+  if (dashboard.isError || !dashboard.data) {
+    return <AppShell title={t("Finance")}><EmptyState title={dashboard.error?.message || t("Couldn't load finance data")} /></AppShell>;
+  }
+
+  const children = (dashboard.data as ParentDashboard | undefined)?.children ?? [];
+  if (children.length === 0) {
+    return <AppShell title={t("Finance")}><EmptyState title={t("No children found")} /></AppShell>;
+  }
+
+  return (
+    <AppShell title={t("Finance")}>
+      <div className="space-y-2.5">
+        {children.map((child) => {
+          const isOpen = expanded === child.id;
+          const totals = child.fee_summary?.totals ?? [];
+          const payments = child.payments ?? [];
+          return (
+            <Card key={child.id} className="overflow-hidden p-0">
+              <button
+                onClick={() => setExpanded(isOpen ? null : child.id)}
+                className="flex w-full items-center justify-between gap-3 p-3.5 text-left"
+              >
+                <div className="min-w-0">
+                  <p className="font-display text-sm font-extrabold">{child.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {[child.class_name, child.section_name].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {totals.length > 0 ? (
+                    <Pill tone="success">{totals.map((tot) => `${tot.currency} ${tot.amount.toLocaleString()}`).join(" · ")}</Pill>
+                  ) : (
+                    <Pill tone="muted">{t("No payments")}</Pill>
+                  )}
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform",
+                      isOpen && "rotate-180",
+                    )}
+                  />
+                </div>
+              </button>
+              <div className={cn("border-t border-border", !isOpen && "hidden")}>
+                <div className="px-3.5 pb-3.5 pt-2">
+                  {totals.length > 0 ? (
+                    <Card className="mb-3 grid grid-cols-2 gap-3">
+                      {totals.map((tot) => (
+                        <div key={tot.currency}>
+                          <p className="text-[0.68rem] font-bold uppercase tracking-widest text-muted-foreground">{tot.currency}</p>
+                          <p className="font-display text-xl font-extrabold">{tot.amount.toLocaleString()}</p>
+                        </div>
+                      ))}
+                    </Card>
+                  ) : (
+                    <Card className="mb-3 p-3">
+                      <p className="text-sm text-muted-foreground">{t("No payment records")}</p>
+                    </Card>
+                  )}
+                  {payments.length > 0 ? (
+                    <>
+                      <SectionTitle>{t("Payment history")}</SectionTitle>
+                      <div className="space-y-2">
+                        {payments.map((p) => (
+                          <Card key={p.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold">{p.category}</p>
+                              <p className="text-xs text-muted-foreground">{p.payment_date}</p>
+                            </div>
+                            <span className="font-display text-sm font-extrabold text-success">
+                              {p.currency} {p.amount.toLocaleString()}
+                            </span>
+                          </Card>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </AppShell>
+  );
+}
+
 function FinancePage() {
+    const { user } = useAuth();
+  const isGuardian = user?.role === "parent";
+
+  if (isGuardian) {
+    return <GuardianFinanceView />;
+  }
+
     const { t } = useTranslation();
-  const { user } = useAuth();
-  const client = useQueryClient();
   const search = useSearch({ from: "/finance" });
   const canManage = user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate;
   const isTeacher = user?.role === "teacher";
+  const client = useQueryClient();
   const [tab, setTab] = useState<Tab>((search.tab as Tab) || "overview");
   const today = new Date().toISOString().slice(0, 10);
 
