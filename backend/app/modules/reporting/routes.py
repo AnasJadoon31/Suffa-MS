@@ -162,10 +162,10 @@ async def _parent_dashboard(
                 Guardian.madrasa_id == madrasa.id,
                 StudentProfile.madrasa_id == madrasa.id,
             )
-            .distinct()
             .order_by(StudentProfile.name, StudentProfile.id)
         )
     ).scalars().all()
+    children = list({s.id: s for s in children}.values())
 
     child_dashboards: list[dict[str, object]] = []
     for student in children:

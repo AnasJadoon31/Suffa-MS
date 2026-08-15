@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { cn } from "@/lib/utils";
+
 import { AppShell } from "@/components/app/AppShell";
 import { FilterBar } from "@/components/app/FilterBar";
 import {
@@ -31,6 +33,7 @@ import {
   academicsApi,
   attendanceApi,
   reportingApi,
+  type ParentDashboard,
   type PrincipalDashboard,
   type StudentDashboard,
   type TeacherDashboard,
@@ -102,42 +105,110 @@ function DashboardPage() {
       {data?.role === "teacher" && user?.is_principal_delegate ? <PrincipalView data={data as unknown as PrincipalDashboard} /> : null}
       {data?.role === "student" ? <StudentView data={data as StudentDashboard} /> : null}
       {data?.role === "donor" ? <DonorView data={donorProfile.data} error={donorProfile.error} isLoading={donorProfile.isLoading} /> : null}
-      {data && !["principal", "teacher", "student", "donor"].includes(data.role) ? <FallbackView /> : null}
+      {data?.role === "parent" ? <GuardianView data={data as ParentDashboard} /> : null}
     </AppShell>
   );
 }
 
-function FallbackView() {
-    const { t } = useTranslation();
-  const shortcuts = [
-    { to: "/attendance", label: "Attendance", hint: "Check daily records and history" },
-    { to: "/forms", label: "Forms", hint: "Open active form workflows" },
-    { to: "/announcements", label: "Announcements", hint: "See current notices" },
-    { to: "/me", label: "My Profile", hint: "Manage your account and session" },
-  ];
+function GuardianView({ data }: { data: ParentDashboard }) {
+  const { t } = useTranslation();
+  const [activeChild, setActiveChild] = useState(0);
+  const child = data.children[activeChild];
+
+  if (!child) {
+    return <EmptyState title={t("No linked students")} hint="No students are linked to your account yet." />;
+  }
+
+  const values = Object.values(child.my_attendance ?? {});
+  const present = values.filter((s) => s === "present").length;
+  const rate = values.length ? Math.round((present / values.length) * 100) : 0;
 
   return (
     <>
-      <EmptyState
-        title={t("Portal ready")}
-        hint="Your role does not have a custom home card yet, but the core routes are available."
-      />
-      <SectionTitle>{t("Shortcuts")}</SectionTitle>
-      <div className="space-y-2.5">
-        {shortcuts.map((shortcut) => (
-          <Card key={shortcut.to} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">
-            <div className="min-w-0">
-              <p className="font-semibold">{shortcut.label}</p>
-              <p className="text-xs text-muted-foreground">{shortcut.hint}</p>
-            </div>
-            <Link
-              to={shortcut.to}
-              className="rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
+      {data.children.length > 1 ? (
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {data.children.map((c, i) => (
+            <button
+              key={c.id}
+              onClick={() => setActiveChild(i)}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1.5 text-xs font-bold",
+                i === activeChild ? "gradient-emerald text-primary-foreground" : "bg-muted text-muted-foreground",
+              )}
             >
-              {t("Open")}</Link>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <Card className="gradient-emerald border-0 text-primary-foreground">
+        <p className="text-[0.68rem] font-bold uppercase tracking-widest text-primary-foreground/70">
+          {child.name} · {t("Attendance")}
+        </p>
+        <p className="mt-1 font-display text-4xl font-extrabold">{rate}%</p>
+        <p className="mt-1 text-xs text-primary-foreground/70">
+          {present} {t("present of")}{values.length} {t("recorded days")}
+        </p>
+      </Card>
+
+      {child.current_class ? (
+        <>
+          <SectionTitle>{t("Class")}</SectionTitle>
+          <Card className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+              <GraduationCap className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-display text-base font-bold">{child.current_class.name}</p>
+              {child.current_class.section_name ? (
+                <p className="truncate text-xs text-muted-foreground">{child.current_class.section_name}</p>
+              ) : null}
+            </div>
           </Card>
-        ))}
-      </div>
+        </>
+      ) : null}
+
+      <SectionTitle>{t("Today's periods")}</SectionTitle>
+      <TimetableStrip entries={child.today_timetable ?? []} />
+
+      <SectionTitle>{t("Due assignments")}</SectionTitle>
+      {child.due_assignments?.length ? (
+        <div className="space-y-2.5">
+          {child.due_assignments.map((a) => (
+            <Card key={a.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{a.title}</p>
+                <p className="text-xs text-muted-foreground">{t("Due")}{a.due_date?.slice(0, 10)}</p>
+              </div>
+              <Pill tone={a.submitted ? "success" : "warning"}>
+                {a.submitted ? "Submitted" : "Pending"}
+              </Pill>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title={t("Nothing due right now")} />
+      )}
+
+      {child.fee_summary?.totals?.length ? (
+        <>
+          <SectionTitle>{t("Fee summary")}</SectionTitle>
+          <div className="grid grid-cols-1 gap-2.5">
+            {child.fee_summary.totals.map((total) => (
+              <Card key={total.currency} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+                <div className="min-w-0">
+                  <p className="font-semibold">{total.currency}</p>
+                  <p className="text-xs text-muted-foreground">{t("Total paid")}</p>
+                </div>
+                <span className="font-display text-lg font-extrabold text-primary">
+                  {total.amount.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
+                </span>
+              </Card>
+            ))}
+          </div>
+        </>
+      ) : null}
     </>
   );
 }

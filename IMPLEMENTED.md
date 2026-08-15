@@ -3,6 +3,14 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-15 — Fix: Guardian portal leaking all assignments + admin sidebar
+
+- **Sidebar leak**: `isNavItemVisible` in `nav.ts` had no guardian branch, so guardians fell through to the default return and saw every non-feature-gated nav item (same as admin). Added `guardianVisiblePaths` allowlist: `/dashboard`, `/timetable`, `/resources`, `/announcements`, `/me`.
+- **Assignments leak**: Guardians could navigate directly to `/assignments` and see all assignments (unscoped). Added `guardianRouteRedirect` that redirects any non-allowlisted route to `/dashboard`, applied in `AppShell.tsx` alongside the existing teacher redirect.
+- Files: `app/src/lib/mms/nav.ts`, `app/src/components/app/AppShell.tsx`
+- Verified: `npm run build` succeeds.
+- Notes: Guardians have no dedicated assignments/grades view for their wards yet — they're blocked from the management view but have no read-only replacement.
+
 ## 2026-08-14 — Fix: White screen + Invariant failed (Cloudflare + Nitro routing)
 
 - **White screen root cause**: (1) Nitro SSR build pass reads `public/assets` before the client build finishes writing them, embedding a stale `size: 6024` for ALL assets in the server manifest. (2) Cloudflare CDN cached the truncated `index-CSOJobjL.js` with `max-age=31536000, immutable`.

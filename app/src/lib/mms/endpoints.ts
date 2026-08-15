@@ -309,6 +309,8 @@ export interface TimetableSlot {
   section_name?: string | null;
   course_name?: string | null;
   teacher_name?: string | null;
+  student_id?: string | null;
+  student_name?: string | null;
 }
 
 export const operationsApi = {
@@ -370,11 +372,27 @@ export interface StudentDashboard {
   resources: { id: string; title: string }[];
   announcements?: { id: string; title: string; body: string }[];
 }
+export interface ParentDashboardChild {
+  id: string;
+  name: string;
+  admission_number: string | null;
+  current_class: { id: string; name: string; section_id: string | null; section_name: string | null } | null;
+  my_attendance: Record<string, string>;
+  today_timetable: { period: number; start_time: string; end_time: string }[];
+  due_assignments: { id: string; title: string; due_date: string; submitted?: boolean }[];
+  latest_result: { course_results: { course_id: string; course_name: string; grade: string }[] } | null;
+  fee_summary: { totals: { currency: string; amount: number }[] };
+  payments: { id: string; category: string; amount: number; currency: string; payment_date: string }[];
+}
+export interface ParentDashboard {
+  role: "parent";
+  children: ParentDashboardChild[];
+}
 export type DashboardData =
   | PrincipalDashboard
   | TeacherDashboard
   | StudentDashboard
-  | ({ role: string } & Record<string, unknown>);
+  | ParentDashboard;
 
 export const reportingApi = {
   dashboard: () => api.get<DashboardData>("/api/v1/reporting/dashboard").then((r) => r.data),

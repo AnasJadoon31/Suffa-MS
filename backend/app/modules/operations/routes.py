@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import and_, delete, func, or_, select, text, update
+from sqlalchemy import and_, delete, func, literal, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -668,6 +668,60 @@ async def my_timetable(
             TimetableSlot.class_id == enrollment.class_id,
             TimetableSlot.section_id == enrollment.section_id,
         )
+    elif current_user.role == UserRole.parent:
+        children = (
+            await session.execute(
+                select(StudentProfile)
+                .join(StudentGuardian, StudentGuardian.student_id == StudentProfile.id)
+                .join(Guardian, Guardian.id == StudentGuardian.guardian_id)
+                .where(
+                    Guardian.user_id == current_user.id,
+                    Guardian.madrasa_id == madrasa.id,
+                    StudentProfile.madrasa_id == madrasa.id,
+                )
+            )
+        ).scalars().all()
+        if not children:
+            return []
+        child_ids = [s.id for s in children]
+        child_names = {s.id: s.name for s in children}
+        enrollments = (
+            await session.execute(
+                select(Enrollment).where(
+                    Enrollment.madrasa_id == madrasa.id,
+                    Enrollment.student_id.in_(child_ids),
+                    Enrollment.session_id == context_session.id,
+                    Enrollment.ended_on.is_(None),
+                )
+            )
+        ).scalars().all()
+        if not enrollments:
+            return []
+        enrollment_by_student = {e.student_id: e for e in enrollments}
+        stmt = select(TimetableSlot).where(
+            TimetableSlot.madrasa_id == madrasa.id,
+            (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
+            or_(*[
+                and_(
+                    TimetableSlot.class_id == enrollment_by_student[sid].class_id,
+                    TimetableSlot.section_id == enrollment_by_student[sid].section_id,
+                )
+                for sid in child_ids
+                if sid in enrollment_by_student
+            ]) if any(sid in enrollment_by_student for sid in child_ids) else literal(False)
+        )
+        rows = list(await paginate_scalars(
+            session, stmt.order_by(TimetableSlot.day_of_week, TimetableSlot.period), limit=limit, offset=offset, response=response
+        ))
+        enriched = await _enriched_timetable_slots(session, madrasa.id, rows)
+        for row in enriched:
+            for sid in child_ids:
+                enrollment = enrollment_by_student.get(sid)
+                if enrollment and row.class_id == enrollment.class_id and row.section_id == enrollment.section_id:
+                    row.student_id = sid
+                    row.student_name = child_names[sid]
+                    break
+        return enriched
     else:
         profile = (
             await session.execute(select(TeacherProfile).where(

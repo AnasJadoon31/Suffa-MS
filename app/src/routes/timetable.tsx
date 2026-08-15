@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CalendarDays,
+  ChevronDown,
   Clock,
   FileDown,
   LayoutGrid,
@@ -65,7 +66,8 @@ function TimetablePage() {
     const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const isTeacher = user?.role === "teacher";
-  const isStudentish = user?.role === "student" || user?.role === "guardian";
+  const isGuardian = user?.role === "parent";
+  const isStudentish = user?.role === "student" || isGuardian;
   const canManage = hasPermission("timetable.manage");
   const canBrowseAll = !isStudentish;
 
@@ -85,45 +87,51 @@ function TimetablePage() {
 
   return (
     <AppShell title={t("Timetable")} subtitle={t("Weekly periods and schedules")}>
-      <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <div
-          className="grid min-w-0 gap-1 rounded-2xl bg-muted p-1"
-          style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
-        >
-          {tabs.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setTab(item.key)}
-              title={t(item.label)}
-              className={cn(
-                "flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 py-2 text-[0.7rem] font-bold transition-colors",
-                tab === item.key
-                  ? "gradient-emerald text-primary-foreground shadow-[var(--shadow-raised)]"
-                  : "text-muted-foreground",
-              )}
+      {isGuardian ? (
+        <GuardianTimetableView />
+      ) : (
+        <>
+          <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <div
+              className="grid min-w-0 gap-1 rounded-2xl bg-muted p-1"
+              style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0,1fr))` }}
             >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span className="hidden truncate sm:inline">{t(item.label)}</span>
-            </button>
-          ))}
-        </div>
+              {tabs.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setTab(item.key)}
+                  title={t(item.label)}
+                  className={cn(
+                    "flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 py-2 text-[0.7rem] font-bold transition-colors",
+                    tab === item.key
+                      ? "gradient-emerald text-primary-foreground shadow-[var(--shadow-raised)]"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="hidden truncate sm:inline">{t(item.label)}</span>
+                </button>
+              ))}
+            </div>
 
-        {canManage ? (
-          <button
-            onClick={() => void timetableApi.exportPdf()}
-            aria-label="Export timetable PDF"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-muted text-muted-foreground"
-          >
-            <FileDown className="h-4 w-4" />
-          </button>
-        ) : null}
-      </div>
+            {canManage ? (
+              <button
+                onClick={() => void timetableApi.exportPdf()}
+                aria-label="Export timetable PDF"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-muted text-muted-foreground"
+              >
+                <FileDown className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
 
-      {tab === "mine" ? <MineView /> : null}
-      {tab === "grid" ? <GridView lockToOwn={isTeacher} /> : null}
-      {tab === "list" ? <ListView canManage={canManage} /> : null}
-      {tab === "teachers" ? <ByTeacherView /> : null}
-      {tab === "import" ? <ImportView /> : null}
+          {tab === "mine" ? <MineView /> : null}
+          {tab === "grid" ? <GridView lockToOwn={isTeacher} /> : null}
+          {tab === "list" ? <ListView canManage={canManage} /> : null}
+          {tab === "teachers" ? <ByTeacherView /> : null}
+          {tab === "import" ? <ImportView /> : null}
+        </>
+      )}
     </AppShell>
   );
 }
@@ -187,6 +195,112 @@ function SlotRow({ slot, onDelete }: { slot: TimetableSlot; onDelete?: () => voi
         ) : null}
       </div>
     </Card>
+  );
+}
+
+/* --------------------------------------------------------- guardian view */
+
+function GuardianTimetableView() {
+    const { t } = useTranslation();
+  const query = useQuery({
+    queryKey: ["timetable", "me"],
+    queryFn: () => operationsApi.listMyTimetable(),
+  });
+
+  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const slots = query.data ?? [];
+
+  const childNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const slot of slots) {
+      if (slot.student_id && slot.student_name) {
+        map.set(slot.student_id, slot.student_name);
+      }
+    }
+    return map;
+  }, [slots]);
+
+  const filteredSlots = useMemo(() => {
+    if (!search.trim()) return slots;
+    const q = search.trim().toLowerCase();
+    return slots.filter(
+      (slot) => slot.student_name?.toLowerCase().includes(q) || slot.class_name?.toLowerCase().includes(q),
+    );
+  }, [slots, search]);
+
+  const grouped = useMemo(() => {
+    const byChild = new Map<string, { id: string; name: string; slots: TimetableSlot[] }>();
+    for (const slot of filteredSlots) {
+      const id = slot.student_id ?? "unknown";
+      const name = slot.student_name ?? childNames.get(id) ?? "Student";
+      const entry = byChild.get(id) ?? { id, name, slots: [] };
+      entry.slots.push(slot);
+      byChild.set(id, entry);
+    }
+    return [...byChild.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredSlots, childNames]);
+
+  if (query.isLoading) return <SkeletonList rows={6} />;
+
+  if (slots.length === 0) {
+    return <EmptyState title={t("No timetable found")} hint="Your children's timetables will appear once published." />;
+  }
+
+  return (
+    <>
+      <Field label={t("Search child")} className="mb-4">
+        <TextInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("Type a name…")}
+        />
+      </Field>
+
+      <div className="space-y-2.5">
+        {grouped.map((child) => {
+          const isOpen = expanded === child.id;
+          return (
+            <Card key={child.id} className="overflow-hidden p-0">
+              <button
+                onClick={() => setExpanded(isOpen ? null : child.id)}
+                className="flex w-full items-center justify-between gap-3 p-3.5 text-left"
+              >
+                <span className="font-display text-sm font-extrabold">{child.name}</span>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                    isOpen && "rotate-180",
+                  )}
+                />
+              </button>
+              {isOpen ? (
+                <div className="border-t border-border px-3.5 pb-3.5 pt-2">
+                  {DAYS.map((day, index) => {
+                    const daySlots = child.slots
+                      .filter((slot) => Number(slot.day_of_week) === index)
+                      .sort((a, b) => a.period - b.period);
+                    if (daySlots.length === 0) return null;
+                    return (
+                      <div key={day} className="mt-2">
+                        <p className="mb-1.5 px-1 text-[0.65rem] font-bold uppercase tracking-wide text-muted-foreground">
+                          {day}
+                        </p>
+                        <div className="space-y-2">
+                          {daySlots.map((slot) => (
+                            <SlotRow key={slot.id} slot={slot} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </Card>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

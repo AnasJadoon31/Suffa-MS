@@ -55,6 +55,9 @@ class TimetableSlotRead(BaseModel):
     section_name: str | None = None
     course_name: str | None = None
     teacher_name: str | None = None
+    # Populated for parent / guardian roles so slots can be grouped by child.
+    student_id: UUID | None = None
+    student_name: str | None = None
 
 
 class TimetableImportRow(BaseModel):

@@ -149,6 +149,14 @@ const donorVisiblePaths = new Set([
   "/me",
 ]);
 
+const guardianVisiblePaths = new Set([
+  "/dashboard",
+  "/timetable",
+  "/resources",
+  "/announcements",
+  "/me",
+]);
+
 const teacherRouteRedirects: Record<string, string> = {
   "/attendance": "/my-attendance",
   "/timetable": "/my-timetable",
@@ -169,12 +177,20 @@ export function isNavItemVisible(
   if (role === "donor") {
     return donorVisiblePaths.has(item.to);
   }
+  if (role === "parent") {
+    return guardianVisiblePaths.has(item.to) && (!item.feature || hasFeature(item.feature));
+  }
   return !item.feature || (role === "super_admin" && !isTenantWorkspace(role)) || hasFeature(item.feature);
 }
 
 export function teacherRouteRedirect(pathname: string, role: string | undefined): string | null {
   if (role !== "teacher" || teacherVisiblePaths.has(pathname)) return null;
   return teacherRouteRedirects[pathname] ?? "/dashboard";
+}
+
+export function guardianRouteRedirect(pathname: string, role: string | undefined): string | null {
+  if (role !== "parent" || guardianVisiblePaths.has(pathname)) return null;
+  return "/dashboard";
 }
 
 export function featureForPath(pathname: string): string | undefined {

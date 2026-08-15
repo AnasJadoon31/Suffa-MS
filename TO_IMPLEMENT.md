@@ -5,6 +5,12 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-15 — Guardian wards' data views
+
+- Build a guardian-specific assignments/grades view (read-only, scoped to their wards) so guardians can see ward progress after being blocked from the management view.
+- Build a guardian-specific attendance view (read-only, scoped to their wards).
+- Consider a guardian-specific dashboard showing ward summary cards.
+
 ## 2026-08-13 — PWA Offline Follow-Up
 
 - Implement Background Sync API so the outbox flushes even when the app tab is closed (SW `sync` event → replay queued entries).
