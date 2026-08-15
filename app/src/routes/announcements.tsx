@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Edit2, Megaphone, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, Edit2, Megaphone, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app/AppShell";
 import { FilterBar } from "@/components/app/FilterBar";
@@ -14,7 +14,8 @@ import { Card, EmptyState, Field, Pill, CustomDropdown, SkeletonList, TextInput 
 import { RichText } from "@/components/app/RichText";
 import { useAuth } from "@/lib/mms/auth";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
-import { opsApi, opsMutations } from "@/lib/mms/more-endpoints";
+import { opsApi, opsMutations, type Announcement } from "@/lib/mms/more-endpoints";
+import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/announcements")({
@@ -41,12 +42,14 @@ function AnnouncementsPage() {
     user?.is_principal_delegate ||
     user?.role === "super_admin" ||
     hasPermission("announcements.manage");
+  const isGuardian = user?.role === "parent";
 
   const [audienceFilter, setAudienceFilter] = useState<"all" | "teachers" | "students">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
   const activeCount =
     (audienceFilter !== "all" ? 1 : 0) +
     (categoryFilter.trim() ? 1 : 0) +
@@ -63,7 +66,7 @@ function AnnouncementsPage() {
   };
 
   const filterParams = {
-    ...(audienceFilter !== "all" ? { audience: audienceFilter } : {}),
+    ...(isGuardian ? {} : (audienceFilter !== "all" ? { audience: audienceFilter } : {})),
     ...(categoryFilter.trim() ? { category: categoryFilter.trim() } : {}),
     ...(search.trim() ? { q: search.trim() } : {}),
     ...(dateFrom ? { date_from: dateFrom } : {}),
@@ -140,97 +143,241 @@ function AnnouncementsPage() {
         ) : undefined
       }
     >
-      <FilterBar
-        search={{ value: search, onChange: setSearch, placeholder: t("Search announcements…") }}
-        activeCount={activeCount}
-        onClear={clearFilters}
-      >
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-          <Field label={t("Audience")}>
-            <CustomDropdown
-              value={audienceFilter}
-              onChange={(e) => setAudienceFilter(e.target.value as typeof audienceFilter)}
-            >
-              <option value="all">{t("All")}</option>
-              <option value="teachers">{t("Teachers")}</option>
-              <option value="students">{t("Students")}</option>
-            </CustomDropdown>
-          </Field>
-          <Field label={t("Category")}>
+      {isGuardian ? (
+        <>
+          <Field label={t("Search announcements")} className="mb-4">
             <TextInput
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              placeholder={t("Any")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("Search announcements…")}
             />
           </Field>
-          <Field label={t("From")}>
-            <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          </Field>
-          <Field label={t("To")}>
-            <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          </Field>
-        </div>
-      </FilterBar>
-
-      {query.isLoading ? <SkeletonList rows={4} /> : null}
-      {!query.isLoading && items.length === 0 ? (
-        <EmptyState title={t("Nothing announced yet")} hint="New notices will appear here." />
-      ) : null}
-
-      <div className="space-y-2.5">
-        {items.map((item) => (
-          <Card key={item.id} className="space-y-2 p-4">
-            <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-foreground">
-                <Megaphone className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="font-display text-base font-extrabold leading-snug">{item.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(item.publish_at ?? item.created_at).toLocaleString()}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                {item.category ? <Pill tone="gold">{item.category}</Pill> : null}
-                <Pill>{audienceLabel(item.audience_scope)}</Pill>
-              </div>
-            </div>
-            <RichText html={item.body} />
-            <div className="flex items-center gap-3">
-              {item.attachment_link ? (
-                <a
-                  href={item.attachment_link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm font-bold text-primary underline underline-offset-4"
+          <GuardianAnnouncementsView
+            items={items}
+            isLoading={query.isLoading}
+            search={search}
+            expanded={expanded}
+            onToggleExpand={setExpanded}
+            canManage={canManage}
+            onEdit={setEditing}
+            onDelete={(id) => remove.mutate(id)}
+          />
+        </>
+      ) : (
+        <>
+          <FilterBar
+            search={{ value: search, onChange: setSearch, placeholder: t("Search announcements…") }}
+            activeCount={activeCount}
+            onClear={clearFilters}
+          >
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <Field label={t("Audience")}>
+                <CustomDropdown
+                  value={audienceFilter}
+                  onChange={(e) => setAudienceFilter(e.target.value as typeof audienceFilter)}
                 >
-                  {t("Open attachment")}</a>
-              ) : null}
-              {canManage ? (
-                <div className="ml-auto flex items-center gap-2">
-                  <button
-                    onClick={() => setEditing(item)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
-                  >
-                    <Edit2 className="h-3.5 w-3.5" />
-                    {t("Edit")}</button>
-                  <button
-                    onClick={() => remove.mutate(item.id)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    {t("Delete")}</button>
-                </div>
-              ) : null}
+                  <option value="all">{t("All")}</option>
+                  <option value="teachers">{t("Teachers")}</option>
+                  <option value="students">{t("Students")}</option>
+                </CustomDropdown>
+              </Field>
+              <Field label={t("Category")}>
+                <TextInput
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  placeholder={t("Any")}
+                />
+              </Field>
+              <Field label={t("From")}>
+                <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              </Field>
+              <Field label={t("To")}>
+                <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              </Field>
             </div>
-          </Card>
-        ))}
-      </div>
+          </FilterBar>
+
+          {query.isLoading ? <SkeletonList rows={4} /> : null}
+          {!query.isLoading && items.length === 0 ? (
+            <EmptyState title={t("Nothing announced yet")} hint="New notices will appear here." />
+          ) : null}
+
+          <div className="space-y-2.5">
+            {items.map((item) => (
+              <AnnouncementCard key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
+            ))}
+          </div>
+        </>
+      )}
 
       {editing ? (
         <EditAnnouncementSheet announcement={editing} onClose={() => setEditing(null)} />
       ) : null}
     </AppShell>
+  );
+}
+
+function GuardianAnnouncementsView({
+  items,
+  isLoading,
+  search,
+  expanded,
+  onToggleExpand,
+  canManage,
+  onEdit,
+  onDelete,
+}: {
+  items: Announcement[];
+  isLoading: boolean;
+  search: string;
+  expanded: string | null;
+  onToggleExpand: (id: string | null) => void;
+  canManage: boolean;
+  onEdit: (item: Announcement) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return items;
+    const q = search.trim().toLowerCase();
+    return items.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) ||
+        item.body?.toLowerCase().includes(q) ||
+        item.category?.toLowerCase().includes(q),
+    );
+  }, [items, search]);
+
+  const guardianItems = useMemo(
+    () => filtered.filter((item) => {
+      const scope = item.audience_scope;
+      if (scope?.all) return true;
+      const roles = scope?.roles ?? [];
+      return roles.includes("parent");
+    }),
+    [filtered],
+  );
+
+  const studentItems = useMemo(
+    () => filtered.filter((item) => {
+      const scope = item.audience_scope;
+      if (scope?.all) return true;
+      const roles = scope?.roles ?? [];
+      return roles.includes("student");
+    }),
+    [filtered],
+  );
+
+  if (isLoading) return <SkeletonList rows={4} />;
+  if (items.length === 0) {
+    return <EmptyState title={t("Nothing announced yet")} hint="New notices will appear here." />;
+  }
+
+  const groups = [
+    { id: "guardian", label: t("For Guardians"), items: guardianItems },
+    { id: "student", label: t("For Students"), items: studentItems },
+  ].filter((g) => g.items.length > 0);
+
+  return (
+    <div className="space-y-2.5">
+      {groups.map((group) => {
+        const isOpen = expanded === group.id;
+        return (
+          <Card key={group.id} className="overflow-hidden p-0">
+            <button
+              onClick={() => onToggleExpand(isOpen ? null : group.id)}
+              className="flex w-full items-center justify-between gap-3 p-3.5 text-left"
+            >
+              <span className="font-display text-sm font-extrabold">{group.label}</span>
+              <div className="flex shrink-0 items-center gap-2">
+                <Pill tone="muted">{group.items.length}</Pill>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 text-muted-foreground transition-transform",
+                    isOpen && "rotate-180",
+                  )}
+                />
+              </div>
+            </button>
+            {isOpen ? (
+              <div className="border-t border-border px-3.5 pb-3.5 pt-2">
+                <div className="space-y-2.5">
+                  {group.items.map((item) => (
+                    <AnnouncementCard key={item.id} item={item} canManage={canManage} onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function AnnouncementCard({
+  item,
+  canManage,
+  onEdit,
+  onDelete,
+}: {
+  item: Announcement;
+  canManage: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  const audienceLabel = (scope: { all?: boolean; roles?: string[] }) => {
+    if (scope?.all || !scope?.roles?.length) return t("All");
+    return scope.roles.map((role) => t(role === "teachers" || role === "teacher" ? "Teachers" : role === "students" || role === "student" ? "Students" : "Guardians")).join(", ");
+  };
+  return (
+    <Card className="space-y-2 p-4">
+      <div className="flex items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-foreground">
+          <Megaphone className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-base font-extrabold leading-snug">{item.title}</p>
+          <p className="text-xs text-muted-foreground">
+            {new Date(item.publish_at ?? item.created_at).toLocaleString()}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          {item.category ? <Pill tone="gold">{item.category}</Pill> : null}
+          <Pill>{audienceLabel(item.audience_scope)}</Pill>
+        </div>
+      </div>
+      <RichText html={item.body} />
+      <div className="flex items-center gap-3">
+        {item.attachment_link ? (
+          <a
+            href={item.attachment_link}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm font-bold text-primary underline underline-offset-4"
+          >
+            {t("Open attachment")}</a>
+        ) : null}
+        {canManage ? (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={onEdit}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+              {t("Edit")}</button>
+            <button
+              onClick={onDelete}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {t("Delete")}</button>
+          </div>
+        ) : null}
+      </div>
+    </Card>
   );
 }
 
