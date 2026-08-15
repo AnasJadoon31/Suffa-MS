@@ -20,7 +20,7 @@ export function PhoneNumbersField({
   return (
     <div className="space-y-2">
       {rows.map((number, index) => (
-        <div className="flex items-center gap-2" key={`${index}-${number}`}>
+          <div className="flex items-center gap-2" key={index}>
           <TextInput value={number} maxLength={15} onChange={(event) => update(index, event.target.value)} />
           <button type="button" aria-label="Use as default phone" title="Use as default phone" onClick={() => onChange(rows, number)} className={"grid h-10 w-10 shrink-0 place-items-center rounded-md " + (defaultNumber === number ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}><Star size={16} /></button>
           {rows.length > 1 ? <button type="button" aria-label="Remove phone" title="Remove phone" onClick={() => { const next = rows.filter((_, row) => row !== index); onChange(next, defaultNumber === number ? (next[0] ?? "") : (defaultNumber ?? next[0] ?? "")); }} className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-rose-50 text-rose-700"><Trash2 size={16} /></button> : null}
