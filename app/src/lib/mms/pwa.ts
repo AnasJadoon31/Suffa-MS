@@ -1,5 +1,5 @@
 /** Guarded service-worker registration. Offline support only runs on the published site. */
-const SW_URL = "/sw-v3.js";
+const SW_URL = "/sw-v4.js";
 
 function isBlockedHost(hostname: string): boolean {
   return (
@@ -26,7 +26,7 @@ async function unregisterOldWorkers(): Promise<void> {
           registration.waiting?.scriptURL ??
           registration.installing?.scriptURL ??
           "";
-        return url.includes("/sw") && !url.includes("/sw-v3.js");
+        return url.includes("/sw") && !url.includes("/sw-v4.js");
       })
       .map((registration) => registration.unregister()),
   );

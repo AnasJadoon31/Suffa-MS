@@ -7,7 +7,7 @@ const root = resolve(__dirname, "..");
 
 const publicDir = resolve(root, ".output/public");
 const assetsDir = resolve(publicDir, "assets");
-const swPath = resolve(publicDir, "sw-v3.js");
+const swPath = resolve(publicDir, "sw-v4.js");
 const manifestPath = resolve(root, ".output/server/index.mjs");
 
 // ── Step 1: Generate the app shell index.html ──────────────────────────────
@@ -64,7 +64,7 @@ if (!swCode.includes("NavigationRoute")) {
     const after = swCode.slice(endIdx + 1);
     const navFallback = ',s.registerRoute(new s.NavigationRoute(s.createHandlerBoundToURL("/index.html"),{denylist:[/^\\/~oauth/,/^\\/api\\//]}))';
     swCode = before + navFallback + after;
-    console.log("Patched NavigationRoute into sw-v3.js");
+    console.log("Patched NavigationRoute into sw-v4.js");
   }
 } else {
   console.log("NavigationRoute already present");
@@ -77,17 +77,17 @@ const swStat = readFileSync(swPath);
 const actualSize = swStat.length;
 
 let manifest = readFileSync(manifestPath, "utf-8");
-const sizeRegex = /("\/sw-v3\.js":\s*\{[^}]*"size":\s*)(\d+)/;
+const sizeRegex = /("\/sw-v4\.js":\s*\{[^}]*"size":\s*)(\d+)/;
 const match = manifest.match(sizeRegex);
 if (match) {
   const oldSize = Number(match[2]);
   if (oldSize !== actualSize) {
     manifest = manifest.replace(sizeRegex, `$1${actualSize}`);
     writeFileSync(manifestPath, manifest);
-    console.log(`Fixed sw-v3.js manifest size: ${oldSize} → ${actualSize}`);
+    console.log(`Fixed sw-v4.js manifest size: ${oldSize} → ${actualSize}`);
   } else {
-    console.log(`sw-v3.js manifest size already correct: ${actualSize}`);
+    console.log(`sw-v4.js manifest size already correct: ${actualSize}`);
   }
 } else {
-  console.warn("Could not find sw-v3.js entry in manifest");
+  console.warn("Could not find sw-v4.js entry in manifest");
 }

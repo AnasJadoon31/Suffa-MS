@@ -95,7 +95,7 @@ export default defineConfig({
         strategies: "generateSW",
         registerType: "autoUpdate",
         injectRegister: null,
-        filename: "sw-v3.js",
+        filename: "sw-v4.js",
         devOptions: { enabled: false },
         manifest: false,
         outDir: ".output/public",
