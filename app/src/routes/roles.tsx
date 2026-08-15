@@ -44,13 +44,20 @@ function RolesPage() {
   const [name, setName] = useState("");
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [editingRole, setEditingRole] = useState<PermissionRole | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const resetForm = () => {
+    setEditingRole(null);
+    setName("");
+    setSelectedCodes([]);
+  };
 
   const create = useMutation({
     mutationFn: () => rolesApi.create({ name: name.trim(), permission_codes: selectedCodes }),
     onSuccess: () => {
       toast.success("Role created");
-      setName("");
-      setSelectedCodes([]);
+      resetForm();
+      setSheetOpen(false);
       void client.invalidateQueries({ queryKey: ["roles"] });
     },
   });
@@ -65,9 +72,8 @@ function RolesPage() {
     },
     onSuccess: () => {
       toast.success("Role updated");
-      setEditingRole(null);
-      setName("");
-      setSelectedCodes([]);
+      resetForm();
+      setSheetOpen(false);
       void client.invalidateQueries({ queryKey: ["roles"] });
     },
   });
@@ -90,12 +96,14 @@ function RolesPage() {
             title={editingRole ? "Edit role" : "New role"}
             triggerLabel="Add"
             submitLabel={editingRole ? "Save" : "Create"}
+            open={sheetOpen}
+            onOpenChange={(next) => {
+              setSheetOpen(next);
+              if (!next) resetForm();
+            }}
             onSubmit={async () => {
               if (editingRole) await update.mutateAsync();
               else await create.mutateAsync();
-              setEditingRole(null);
-              setName("");
-              setSelectedCodes([]);
             }}
           >
             <Field label={t("Role name *")}>
@@ -124,7 +132,7 @@ function RolesPage() {
         {roles.data?.map((role) => (
           <Card key={role.id} className="p-3.5">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0" onClick={() => { if (canManage) { setEditingRole(role); setName(role.name); setSelectedCodes(role.permission_codes); } }}>
+              <div className="min-w-0" onClick={() => { if (canManage) { setEditingRole(role); setName(role.name); setSelectedCodes(role.permission_codes); setSheetOpen(true); } }}>
                 <p className="font-semibold">{role.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {role.permission_codes.length} permissions · {role.user_count} users
@@ -133,7 +141,7 @@ function RolesPage() {
               {canManage ? (
                 <div className="flex gap-1">
                   <button
-                    onClick={() => { setEditingRole(role); setName(role.name); setSelectedCodes(role.permission_codes); }}
+                    onClick={() => { setEditingRole(role); setName(role.name); setSelectedCodes(role.permission_codes); setSheetOpen(true); }}
                     className="rounded-lg bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary"
                   >
                     Edit

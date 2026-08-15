@@ -296,7 +296,11 @@ function AttendanceBoard() {
         ? attendanceApi.classRoster(classId!, sectionId ?? "", undefined, undefined)
         : attendanceApi.classRoster(classId!, sectionId ?? "", courseId, slotId),
     enabled: Boolean(classId && sectionId && (isSelfContainedClass || courseId)),
-    retry: false,
+    retry: (failureCount, error) => {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 409) return false;
+      return failureCount < 2;
+    },
   });
 
   const history = useQuery({
@@ -456,7 +460,9 @@ function AttendanceBoard() {
     );
   }, [roster.data, search]);
 
-  const effectiveSlotId = slotId || roster.data?.timetable_slot?.id || undefined;
+  const rosterErrorStatus = (roster.error as { response?: { status?: number } } | null)?.response?.status;
+  const multiplePeriods = todaysSlots.length > 1 || rosterErrorStatus === 409;
+  const effectiveSlotId = slotId || undefined;
 
   const online = useOnlineStatus();
 
@@ -464,6 +470,7 @@ function AttendanceBoard() {
     mutationFn: async () => {
       const data = roster.data;
       if (!data) throw new Error("Roster not loaded");
+      if (multiplePeriods && !slotId) throw new Error("Select a period before saving");
       const capturedAt = new Date().toISOString();
       const attendanceDate = capturedAt.slice(0, 10);
       const entries: AttendanceSyncEntry[] = Object.entries(marks).map(([subjectId, status]) => ({

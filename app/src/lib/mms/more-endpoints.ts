@@ -1032,6 +1032,7 @@ export interface TeacherDetail {
 export interface GuardianDetail {
   id: string;
   user_id: string | null;
+  username?: string | null;
   name: string;
   status: string;
   relationship: string;

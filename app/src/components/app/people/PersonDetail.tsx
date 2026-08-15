@@ -635,6 +635,11 @@ export function GuardianDetailSheet({
       subtitle={
         <div className="flex flex-wrap items-center gap-2">
           <Pill tone="muted">{guardian.relationship}</Pill>
+          {guardian.username ? (
+            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent-foreground">
+              {guardian.username}
+            </span>
+          ) : null}
         </div>
       }
     >
