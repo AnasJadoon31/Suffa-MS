@@ -6,16 +6,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ProgramCreate(BaseModel):
     name: str
+    default_portal_enabled: bool = True
 
 class ProgramRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
+    default_portal_enabled: bool = True
     created_at: datetime
 
 
 class ProgramUpdate(BaseModel):
     name: str | None = None
+    default_portal_enabled: bool | None = None
 
 
 class AcademicClassRead(BaseModel):

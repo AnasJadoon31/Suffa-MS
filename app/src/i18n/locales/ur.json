@@ -694,5 +694,16 @@
   "Enable self-contained classrooms": "خود مختصر کلاس رومز فعال کریں",
   "No programs created yet. Add programs in Academics first.": "ابھی تک کوئی پروگرام نہیں بنایا گیا۔ پہلے اکیڈمکس میں پروگرام شامل کریں۔",
   "Could not save self-contained programs": "خود مختصر پروگرام محفوظ نہیں ہو سکے",
-  "Self-contained classroom — one daily attendance in the morning": "خود مختصر کلاس روم — صبح ایک روزانہ حاضری"
+  "Self-contained classroom — one daily attendance in the morning": "خود مختصر کلاس روم — صبح ایک روزانہ حاضری",
+  "Edit program": "پروگرام میں ترمیم کریں",
+  "Enable student portal": "طلباء کا پورٹل فعال کریں",
+  "When disabled, students in this program will not have portal access. Guardians will get login access instead.": "غیر فعال ہونے پر، اس پروگرام کے طلباء کو پورٹل تک رسائی نہیں ملے گیے سرپرستوں کو لاگ ان رسائی ملے گی۔",
+  "Delete program?": "پروگرام حذف کریں؟",
+  "A program can only be deleted when it has no classes or enrollments.": "پروگرام صرف اس وقت حذف کیا جا سکتا ہے جب اس میں کوئی کلاس یا انرولمنٹ نہ ہو۔",
+  "Delete program": "پروگرام حذف کریں",
+  "Portal disabled": "پورٹل غیر فعال",
+  "Program updated": "پروگرام اپ ڈیٹ ہو گیا",
+  "Could not update program": "پروگرام اپ ڈیٹ نہیں ہو سکا",
+  "Program deleted": "پروگرام حذف ہو گیا",
+  "Could not delete program": "پروگرام حذف نہیں ہو سکا"
 }

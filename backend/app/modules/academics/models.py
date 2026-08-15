@@ -27,6 +27,7 @@ class Program(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "programs"
 
     name: Mapped[str] = mapped_column(String(160))
+    default_portal_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class AcademicClass(Base, IdMixin, TenantMixin, TimestampMixin):

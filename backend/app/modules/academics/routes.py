@@ -128,7 +128,9 @@ async def update_program(
     
     if payload.name is not None:
         program.name = payload.name
-        
+    if payload.default_portal_enabled is not None:
+        program.default_portal_enabled = payload.default_portal_enabled
+
     await session.commit()
     await session.refresh(program)
     return ProgramRead.model_validate(program)
@@ -757,13 +759,17 @@ async def enroll_student(
             )
             session.add(enrollment)
 
-    # B7-k: a class with portal access switched off means its students don't
-    # get their own portal login — instead their guardians do. We never
-    # silently re-enable a student's portal on a later move (that could have
-    # been an explicit admin choice for other reasons); we only ever act when
-    # the target class says "no student portal".
+    # B7-k: a class or program with portal access switched off means its
+    # students don't get their own portal login — instead their guardians do.
+    # We never silently re-enable a student's portal on a later move (that
+    # could have been an explicit admin choice for other reasons); we only
+    # ever act when the target class or program says "no student portal".
+    program = await session.get(Program, payload.program_id)
+    portal_disabled = not academic_class.default_portal_enabled or (
+        program is not None and not program.default_portal_enabled
+    )
     guardian_logins: list[dict[str, str]] = []
-    if not academic_class.default_portal_enabled:
+    if portal_disabled:
         student_user = await session.get(User, student.user_id)
         if student_user is not None:
             student_user.portal_enabled = False

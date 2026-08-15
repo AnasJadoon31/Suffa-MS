@@ -666,5 +666,16 @@
   "Enable self-contained classrooms": "Enable self-contained classrooms",
   "No programs created yet. Add programs in Academics first.": "No programs created yet. Add programs in Academics first.",
   "Could not save self-contained programs": "Could not save self-contained programs",
-  "Self-contained classroom — one daily attendance in the morning": "Self-contained classroom — one daily attendance in the morning"
+  "Self-contained classroom — one daily attendance in the morning": "Self-contained classroom — one daily attendance in the morning",
+  "Edit program": "Edit program",
+  "Enable student portal": "Enable student portal",
+  "When disabled, students in this program will not have portal access. Guardians will get login access instead.": "When disabled, students in this program will not have portal access. Guardians will get login access instead.",
+  "Delete program?": "Delete program?",
+  "A program can only be deleted when it has no classes or enrollments.": "A program can only be deleted when it has no classes or enrollments.",
+  "Delete program": "Delete program",
+  "Portal disabled": "Portal disabled",
+  "Program updated": "Program updated",
+  "Could not update program": "Could not update program",
+  "Program deleted": "Program deleted",
+  "Could not delete program": "Could not delete program"
 }

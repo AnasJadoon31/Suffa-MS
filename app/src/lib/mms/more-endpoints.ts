@@ -14,6 +14,7 @@ export interface Scope {
 export interface Program {
   id: string;
   name: string;
+  default_portal_enabled?: boolean;
   created_at?: string;
 }
 export interface Course {
@@ -896,8 +897,12 @@ export const financeMutations = {
 };
 
 export const academicsMutations = {
-  createProgram: (name: string) =>
-    api.post<Program>("/api/v1/academics/programs", { name }).then((r) => r.data),
+  createProgram: (payload: { name: string; default_portal_enabled?: boolean }) =>
+    api.post<Program>("/api/v1/academics/programs", payload).then((r) => r.data),
+  updateProgram: (id: string, payload: { name?: string; default_portal_enabled?: boolean }) =>
+    api.put<Program>(`/api/v1/academics/programs/${id}`, payload).then((r) => r.data),
+  deleteProgram: (id: string) =>
+    api.delete(`/api/v1/academics/programs/${id}`).then((r) => r.data),
   createClass: (payload: { program_id: string; name: string }) =>
     api.post("/api/v1/academics/classes", payload).then((r) => r.data),
   createSection: (classId: string, name: string) =>

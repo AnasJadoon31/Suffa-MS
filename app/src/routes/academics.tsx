@@ -93,6 +93,10 @@ function AcademicsPage() {
   const [editingCourse, setEditingCourse] = useState<{ id: string; name: string } | null>(null);
   const [courseName, setCourseName] = useState("");
   const [deleteCourseId, setDeleteCourseId] = useState<string | null>(null);
+  const [editingProgram, setEditingProgram] = useState<{ id: string; name: string; default_portal_enabled: boolean } | null>(null);
+  const [editProgramName, setEditProgramName] = useState("");
+  const [editProgramPortal, setEditProgramPortal] = useState(true);
+  const [deleteProgramId, setDeleteProgramId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!editingSession) return;
@@ -104,6 +108,13 @@ function AcademicsPage() {
   useEffect(() => {
     if (editingCourse) setCourseName(editingCourse.name);
   }, [editingCourse]);
+
+  useEffect(() => {
+    if (editingProgram) {
+      setEditProgramName(editingProgram.name);
+      setEditProgramPortal(editingProgram.default_portal_enabled);
+    }
+  }, [editingProgram]);
 
   const filteredPrograms = useMemo(() => {
     const term = programSearch.trim().toLowerCase();
@@ -248,7 +259,7 @@ function AcademicsPage() {
           start_date: start,
           end_date: end,
         });
-      if (tab === "programs") return academicsMutations.createProgram(name.trim());
+      if (tab === "programs") return academicsMutations.createProgram({ name: name.trim(), default_portal_enabled: true });
       if (tab === "classes")
         return academicsMutations.createClass({ program_id: programId, name: name.trim() });
       return academicsMutations.createCourse(name.trim());
@@ -312,6 +323,33 @@ function AcademicsPage() {
       await client.invalidateQueries({ queryKey: ["class-courses"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update course"),
+  });
+
+  const updateProgram = useMutation({
+    mutationFn: () => {
+      if (!editingProgram) throw new Error("Select a program first");
+      return academicsMutations.updateProgram(editingProgram.id, {
+        name: editProgramName.trim(),
+        default_portal_enabled: editProgramPortal,
+      });
+    },
+    onSuccess: async () => {
+      toast.success("Program updated");
+      setEditingProgram(null);
+      await client.invalidateQueries({ queryKey: ["programs"] });
+      await client.invalidateQueries({ queryKey: ["classes"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update program"),
+  });
+
+  const deleteProgram = useMutation({
+    mutationFn: (id: string) => academicsMutations.deleteProgram(id),
+    onSuccess: async () => {
+      toast.success("Program deleted");
+      setDeleteProgramId(null);
+      await client.invalidateQueries({ queryKey: ["programs"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not delete program"),
   });
 
   const deleteCourse = useMutation({
@@ -588,6 +626,54 @@ function AcademicsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <FormSheet
+        title={t("Edit program")}
+        submitLabel={t("Save changes")}
+        open={Boolean(editingProgram)}
+        onOpenChange={(open) => {
+          if (!open) setEditingProgram(null);
+        }}
+        onSubmit={() => updateProgram.mutateAsync()}
+      >
+        <Field label={t("Name")}>
+          <TextInput required value={editProgramName} onChange={(event) => setEditProgramName(event.target.value)} />
+        </Field>
+        <label className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2.5 text-sm">
+          <input
+            type="checkbox"
+            checked={editProgramPortal}
+            onChange={(event) => setEditProgramPortal(event.target.checked)}
+            className="h-4 w-4 shrink-0"
+          />
+          <span className="min-w-0">
+            <span className="block font-semibold">{t("Enable student portal")}</span>
+            <span className="block text-xs text-muted-foreground">
+              {t("When disabled, students in this program will not have portal access. Guardians will get login access instead.")}
+            </span>
+          </span>
+        </label>
+      </FormSheet>
+
+      <AlertDialog open={Boolean(deleteProgramId)} onOpenChange={(open) => !open && setDeleteProgramId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Delete program?")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("A program can only be deleted when it has no classes or enrollments.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteProgramId && deleteProgram.mutate(deleteProgramId)}
+            >
+              {t("Delete program")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {!loading && tab === "programs" ? (
         <div className="space-y-2">
           <TextInput
@@ -602,6 +688,13 @@ function AcademicsPage() {
               icon: <Layers className="h-5 w-5" />,
               title: program.name,
               subtitle: "Program",
+              pill: program.default_portal_enabled === false ? t("Portal disabled") : undefined,
+              actions: canManage
+                ? [
+                    { label: t("Edit"), onClick: () => setEditingProgram({ id: program.id, name: program.name, default_portal_enabled: program.default_portal_enabled ?? true }), variant: "soft" as const },
+                    { label: t("Delete"), onClick: () => setDeleteProgramId(program.id), variant: "danger" as const },
+                  ]
+                : undefined,
             }))}
           />
           {filteredPrograms.length === 0 ? <EmptyState title={t("Nothing here yet")} /> : null}
