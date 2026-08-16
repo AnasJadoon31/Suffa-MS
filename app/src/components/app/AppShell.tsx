@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 
 import { BottomNav, DesktopSidebar, TopBar } from "./Navigation";
 import { useAuth } from "@/lib/mms/auth";
-import { featureForPath, guardianRouteRedirect, teacherRouteRedirect } from "@/lib/mms/nav";
+import { featureForPath, guardianRouteRedirect, studentRouteRedirect, teacherRouteRedirect } from "@/lib/mms/nav";
 import { isTenantWorkspace } from "@/lib/mms/workspace";
 
 export function AppShell({
@@ -25,6 +25,7 @@ export function AppShell({
   const featureDisabled = Boolean(feature && !hasFeature(feature) && !(user?.role === "super_admin" && !isTenantWorkspace(user.role)));
   const teacherRedirect = teacherRouteRedirect(pathname, user?.role);
   const guardianRedirect = guardianRouteRedirect(pathname, user?.role);
+  const studentRedirect = studentRouteRedirect(pathname, user?.role);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) void navigate({ to: "/" });
@@ -40,6 +41,7 @@ export function AppShell({
 
   if (teacherRedirect) return <Navigate to={teacherRedirect} replace />;
   if (guardianRedirect) return <Navigate to={guardianRedirect} replace />;
+  if (studentRedirect) return <Navigate to={studentRedirect} replace />;
   if (featureDisabled) return <Navigate to="/dashboard" replace />;
 
   return (

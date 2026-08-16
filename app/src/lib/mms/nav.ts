@@ -182,6 +182,18 @@ const guardianVisiblePaths = new Set([
   "/me",
 ]);
 
+const studentVisiblePaths = new Set([
+  "/dashboard",
+  "/my-attendance",
+  "/my-assessments",
+  "/my-timetable",
+  "/daily-reports",
+  "/resources",
+  "/announcements",
+  "/results",
+  "/me",
+]);
+
 const teacherRouteRedirects: Record<string, string> = {
   "/attendance": "/my-attendance",
   "/timetable": "/my-timetable",
@@ -205,6 +217,9 @@ export function isNavItemVisible(
   if (role === "parent") {
     return guardianVisiblePaths.has(item.to) && (!item.feature || hasFeature(item.feature));
   }
+  if (role === "student") {
+    return studentVisiblePaths.has(item.to) && (!item.feature || hasFeature(item.feature));
+  }
   return !item.feature || (role === "super_admin" && !isTenantWorkspace(role)) || hasFeature(item.feature);
 }
 
@@ -216,6 +231,19 @@ export function teacherRouteRedirect(pathname: string, role: string | undefined)
 export function guardianRouteRedirect(pathname: string, role: string | undefined): string | null {
   if (role !== "parent" || guardianVisiblePaths.has(pathname)) return null;
   return "/dashboard";
+}
+
+const studentRouteRedirects: Record<string, string> = {
+  "/attendance": "/my-attendance",
+  "/timetable": "/my-timetable",
+  "/assignments": "/my-assessments",
+  "/results": "/my-assessments",
+  "/examination": "/my-assessments",
+};
+
+export function studentRouteRedirect(pathname: string, role: string | undefined): string | null {
+  if (role !== "student" || studentVisiblePaths.has(pathname)) return null;
+  return studentRouteRedirects[pathname] ?? "/dashboard";
 }
 
 export function featureForPath(pathname: string): string | undefined {

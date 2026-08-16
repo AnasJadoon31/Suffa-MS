@@ -28,7 +28,7 @@ export function BottomNav() {
   const isActive = useActive();
   const { user, hasFeature } = useAuth();
   const visibleTabs = tabs
-    .map((tab) => user?.role === "teacher" && tab.to === "/attendance" ? { ...tab, to: "/my-attendance" } : tab)
+    .map((tab) => (user?.role === "teacher" || user?.role === "student") && tab.to === "/attendance" ? { ...tab, to: "/my-attendance" } : tab)
     .filter((tab) => {
       if ("roles" in tab && tab.roles) {
         return user?.role !== undefined && (tab.roles as readonly string[]).includes(user.role);
