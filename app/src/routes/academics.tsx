@@ -50,10 +50,12 @@ function DailyReportFieldRow({
   field,
   onChange,
   onRemove,
+  hasDuplicateKey,
 }: {
   field: { id: string; key: string; label: string; type: string; required: boolean; options: string[]; enabled: boolean };
   onChange: (field: { id: string; key: string; label: string; type: string; required: boolean; options: string[]; enabled: boolean }) => void;
   onRemove: () => void;
+  hasDuplicateKey: boolean;
 }) {
   const { t } = useTranslation();
   const [optionsText, setOptionsText] = useState(field.options.join(", "));
@@ -63,7 +65,7 @@ function DailyReportFieldRow({
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <TextInput
           value={field.label}
-          onChange={(e) => onChange({ ...field, label: e.target.value, key: e.target.value.toLowerCase().replace(/\s+/g, "_").slice(0, 64) })}
+          onChange={(e) => onChange({ ...field, label: e.target.value })}
           placeholder={t("Field label")}
         />
         <select
@@ -81,6 +83,17 @@ function DailyReportFieldRow({
             <option key={tp} value={tp}>{tp}</option>
           ))}
         </select>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-semibold text-muted-foreground">{t("Field key")}</label>
+        <TextInput
+          value={field.key}
+          onChange={(e) => onChange({ ...field, key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })}
+          placeholder={t("unique_field_key")}
+        />
+        {hasDuplicateKey ? (
+          <p className="mt-1 text-xs text-destructive">{t("This key is duplicated. Each field must have a unique key.")}</p>
+        ) : null}
       </div>
       {["radio", "checkbox_group", "dropdown"].includes(field.type) ? (
         <Field label={t("Options (comma-separated)")}>
@@ -184,11 +197,19 @@ function DailyReportConfigDialog({
                     field={field}
                     onChange={(updated) => setFields(fields.map((f) => (f.id === updated.id ? updated : f)))}
                     onRemove={() => setFields(fields.filter((f) => f.id !== field.id))}
+                    hasDuplicateKey={fields.some((f) => f.id !== field.id && f.key === field.key)}
                   />
                 ))}
                 <button
                   className="flex items-center gap-1.5 self-start rounded-xl border border-dashed border-border px-3 py-2 text-xs font-semibold text-muted-foreground"
-                  onClick={() => setFields([...fields, { id: crypto.randomUUID(), key: "", label: "", type: "text", required: false, options: [], enabled: true }])}
+                  onClick={() => {
+                    const baseKey = `field_${fields.length + 1}`;
+                    let key = baseKey;
+                    let n = 1;
+                    const existing = new Set(fields.map((f) => f.key));
+                    while (existing.has(key)) { key = `${baseKey}_${++n}`; }
+                    setFields([...fields, { id: crypto.randomUUID(), key, label: "", type: "text", required: false, options: [], enabled: true }]);
+                  }}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {t("Add field")}

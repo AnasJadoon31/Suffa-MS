@@ -1741,14 +1741,25 @@ async def _exam_types_for_result_scope(
         )
     )).scalars().all())
     if class_components:
-        return class_components
-    return list((await session.execute(
+        return _dedupe_exam_types(class_components)
+    return _dedupe_exam_types(list((await session.execute(
         select(ExamType).where(
             ExamType.madrasa_id == madrasa_id,
             ExamType.course_id == course_id,
             ExamType.class_id.is_(None),
         )
-    )).scalars().all())
+    )).scalars().all()))
+
+
+def _dedupe_exam_types(types: list[ExamType]) -> list[ExamType]:
+    """Deduplicate exam types by name, keeping the first occurrence."""
+    seen: set[str] = set()
+    deduped: list[ExamType] = []
+    for et in types:
+        if et.name not in seen:
+            seen.add(et.name)
+            deduped.append(et)
+    return deduped
 
 
 async def _compute_course_result(

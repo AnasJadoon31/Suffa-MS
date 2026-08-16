@@ -3,6 +3,19 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-16 — Fix: Duplicate exam columns in Results tab
+
+- **What**: Results tab showed Mid Term/Final Term/Assignments repeated 3× because `_exam_types_for_result_scope` returned duplicate `ExamType` rows from the DB.
+- **File**: `backend/app/modules/assessments/routes.py` — added `_dedupe_exam_types()` helper, applied to both class-level and course-level fallback queries.
+- **Verified**: Backend import check passes.
+
+## 2026-08-16 — Fix: Daily Report fields auto-filling each other
+
+- **What**: Typing in one Daily Report field populated all others because field `key` was auto-derived from label on every keystroke, causing key collisions.
+- **File**: `app/src/routes/academics.tsx` — decoupled `key` from `label`, added dedicated "Field key" input, duplicate-key warning, and unique default keys for new fields.
+- **Verified**: `cd app && npm run build` passes.
+- **Note**: Existing configs with duplicate keys must be re-saved with unique keys.
+
 ## 2026-08-16 — Feature: Daily Reports under Academics in sidebar
 
 - **What**: Moved "Daily Reports" from its own sidebar group into the "Academics" group so it appears alongside Assignments, Results, Examination, Academics, and Resources.
