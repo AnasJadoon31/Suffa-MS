@@ -1264,6 +1264,9 @@ async def seed():
             ("attendance.school_days", "[0,1,2,3,4,5]"),
             ("madrasa.currency", "PKR"),
             ("madrasa.session_start", "2026-06-01"),
+            ("portal.students_can_login", "true"),
+            ("portal.guardians_can_login", "true"),
+            ("portal.donors_can_login", "false"),
         ]
         for i, (key, val) in enumerate(settings_data):
             db.add(MadrasaSetting(
