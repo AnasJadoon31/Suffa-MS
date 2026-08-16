@@ -2,12 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { FilePickerField } from "@/components/app/FilePickerField";
 import { FormSheet } from "@/components/app/FormSheet";
 import { Field, CustomDropdown, TextArea, TextInput } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
 import { reportingApi } from "@/lib/mms/endpoints";
-import { formsApi, type FormDef } from "@/lib/mms/more-endpoints";
-import { maskPhone } from "@/lib/masks";
+import { formsApi, type FormDef, uploadFile } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 
 interface Ward {
@@ -31,6 +31,7 @@ export function FillFormSheet({
   const isGuardian = user?.role === "parent" || user?.role === "guardian";
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [wardId, setWardId] = useState("");
+  const [uploading, setUploading] = useState<string | null>(null);
 
   const wardsQuery = useQuery({
     queryKey: ["forms", "wards"],
@@ -201,12 +202,44 @@ export function FillFormSheet({
             </div>
           );
         }
+        if (field.type === "file" || field.type === "image") {
+          const fileValue = answers[field.key] as string | undefined;
+          return (
+            <FilePickerField
+              key={field.key}
+              label={label}
+              fileName={uploading === field.key ? "Uploading..." : fileValue}
+              accept={field.type === "image" ? "image/*" : undefined}
+              onChange={(file) => {
+                if (!file) return;
+                setUploading(field.key);
+                uploadFile(file, field.type === "image" ? "form-images" : "form-files")
+                  .then((objectKey) => setAnswers((a) => ({ ...a, [field.key]: objectKey })))
+                  .catch((err) => toast.error(err instanceof Error ? err.message : "Upload failed"))
+                  .finally(() => setUploading(null));
+              }}
+            />
+          );
+        }
+        if (field.type === "boolean") {
+          return (
+            <div key={field.key} className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                checked={Boolean(answers[field.key])}
+                onChange={(e) => setAnswers((a) => ({ ...a, [field.key]: e.target.checked }))}
+                className="h-4 w-4 rounded border-border accent-primary"
+              />
+              <span className="text-sm font-semibold">{field.label}</span>
+            </div>
+          );
+        }
         return (
           <Field key={field.key} label={label}>
             <TextInput
               required={field.required}
-                value={(answers[field.key] as string) ?? "+92"}
-                onChange={(e) => setAnswers((a) => ({ ...a, [field.key]: maskPhone(e.target.value) }))}
+              value={(answers[field.key] as string) ?? ""}
+              onChange={(e) => setAnswers((a) => ({ ...a, [field.key]: e.target.value }))}
             />
           </Field>
         );

@@ -3,6 +3,7 @@
 from datetime import date
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.core.phone import normalize_pakistan_phone
 from app.modules.operations.schemas import FormFieldDefinition
@@ -46,14 +47,20 @@ REMOVED_BUILT_IN_ADMISSION_FIELD_KEYS = {
 }
 
 
-def normalize_admission_fields(fields_definition: list) -> list[dict]:
+def normalize_admission_fields(fields_definition: list, answers: dict | None = None) -> list[dict]:
     incoming = {
         str(field.get("key") or ""): field
         for field in fields_definition
         if isinstance(field, dict)
     }
     normalized: list[dict] = []
+    answers = answers or {}
+    has_builtin = any(key in incoming for key in BUILT_IN_ADMISSION_FIELDS) or any(
+        key in answers for key in BUILT_IN_ADMISSION_FIELDS
+    )
     for key, defaults in BUILT_IN_ADMISSION_FIELDS.items():
+        if not has_builtin:
+            continue
         incoming.pop(key, None)
         normalized.append({
             "key": key,
@@ -70,14 +77,17 @@ def normalize_admission_fields(fields_definition: list) -> list[dict]:
         key = str(field.get("key") or "")
         if key in BUILT_IN_ADMISSION_FIELDS or key in REMOVED_BUILT_IN_ADMISSION_FIELD_KEYS:
             continue
-        normalized.append(FormFieldDefinition.model_validate(field).model_dump())
+        try:
+            normalized.append(FormFieldDefinition.model_validate(field).model_dump())
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=f"Invalid form field definition: {key or field.get('label')}") from error
     return normalized
 
 
-def enabled_admission_fields(fields_definition: list) -> list[FormFieldDefinition]:
+def enabled_admission_fields(fields_definition: list, answers: dict | None = None) -> list[FormFieldDefinition]:
     return [
         field
-        for field in (FormFieldDefinition.model_validate(item) for item in normalize_admission_fields(fields_definition))
+        for field in (FormFieldDefinition.model_validate(item) for item in normalize_admission_fields(fields_definition, answers))
         if field.enabled
     ]
 
@@ -146,7 +156,7 @@ def validate_admission_answers(fields_definition: list, answers: dict, *, requir
     for key in REMOVED_BUILT_IN_ADMISSION_FIELD_KEYS:
         answers.pop(key, None)
 
-    fields = enabled_admission_fields(fields_definition)
+    fields = enabled_admission_fields(fields_definition, answers)
     answer_fields = {field.key: field for field in fields if field.type != "label"}
     unknown_keys = sorted(set(answers) - set(answer_fields) - {"guardians"})
     if unknown_keys:

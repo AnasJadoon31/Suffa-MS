@@ -3,6 +3,16 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-16 — Fix: Non-admission form submission 500 error
+
+- **What**: Non-admission forms (created via the Forms tab) returned "Internal server error" on submission because `normalize_admission_fields` always injected built-in admission fields (student_name, guardian_name, etc.) into any form's validation, even when the form had nothing to do with admissions. Required built-in fields missing from the response triggered 422; malformed field definitions in the DB triggered `pydantic.ValidationError` which propagated as a 500.
+- **Files**: `backend/app/modules/operations/admissions.py`
+  - `normalize_admission_fields` now takes an optional `answers` param and only adds built-in admission fields when the form definition OR the answers actually contain built-in keys.
+  - `enabled_admission_fields` forwards `answers` to the normalizer.
+  - `validate_admission_answers` passes `answers` through.
+  - `FormFieldDefinition.model_validate` failures are caught and returned as 422 instead of 500.
+- **Verified**: `tests/test_admission_conversion.py` — same 6 pass / 6 fail as before the fix (all 6 failures are pre-existing and unrelated).
+
 ## 2026-08-16 — Redesign: Guardian Portal Dashboard
 
 - **What**: Redesigned the guardian dashboard with a horizontal swipe carousel for children, "My Children" heading, no outer scrollbar, full-replacement detail view per child, and profile-completion warning banner.

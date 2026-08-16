@@ -10,8 +10,12 @@ import {
   SkeletonList,
   TextInput,
 } from "@/components/app/Primitives";
-import { formsApi, type FormDef, type FormResponse } from "@/lib/mms/more-endpoints";
+import { filesApi, formsApi, type FormDef, type FormResponse } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
+
+function isFileValue(value: unknown): value is string {
+  return typeof value === "string" && value.startsWith("madrasas/");
+}
 
 function toCsv(rows: FormResponse[], forms: FormDef[]): string {
   const columns = ["Form", "Respondent", "Role", "Ward", "Submitted at", "Answers"];
@@ -141,7 +145,19 @@ export function ResponsesPanel({ forms }: { forms: FormDef[] }) {
                         {key}
                       </dt>
                       <dd className="text-sm">
-                        {Array.isArray(value) ? value.join(", ") : String(value)}
+                        {isFileValue(value) ? (
+                          <button
+                            type="button"
+                            onClick={() => void filesApi.presignDownload(value).then((url) => window.open(url, "_blank"))}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary"
+                          >
+                            <Download className="h-3.5 w-3.5" /> {t("Download")}
+                          </button>
+                        ) : Array.isArray(value) ? (
+                          value.join(", ")
+                        ) : (
+                          String(value)
+                        )}
                       </dd>
                     </div>
                   ))}
