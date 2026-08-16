@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Navigate, createFileRoute } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   BookOpen,
   CalendarClock,
   ClipboardList,
@@ -10,7 +11,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -113,6 +114,11 @@ function DashboardPage() {
 function GuardianView({ data }: { data: ParentDashboard }) {
   const { t } = useTranslation();
   const [activeChild, setActiveChild] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+  const startX = useRef(0);
+  const startScroll = useRef(0);
+
   const child = data.children[activeChild];
 
   if (!child) {
@@ -123,93 +129,175 @@ function GuardianView({ data }: { data: ParentDashboard }) {
   const present = values.filter((s) => s === "present").length;
   const rate = values.length ? Math.round((present / values.length) * 100) : 0;
 
+  const snapTo = (index: number) => {
+    const clamped = Math.max(0, Math.min(index, data.children.length - 1));
+    setActiveChild(clamped);
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (data.children.length <= 1) return;
+    dragging.current = true;
+    startX.current = e.clientX;
+    startScroll.current = trackRef.current?.scrollLeft ?? 0;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragging.current || !trackRef.current) return;
+    const dx = e.clientX - startX.current;
+    trackRef.current.scrollLeft = startScroll.current - dx;
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (!dragging.current || !trackRef.current) return;
+    dragging.current = false;
+    (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    const cardWidth = trackRef.current.querySelector("[data-child-card]")?.clientWidth ?? 140;
+    const gap = 12;
+    const index = Math.round(trackRef.current.scrollLeft / (cardWidth + gap));
+    snapTo(index);
+    trackRef.current.scrollTo({ left: index * (cardWidth + gap), behavior: "smooth" });
+  };
+
   return (
-    <>
-      {data.children.length > 1 ? (
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {data.children.map((c, i) => (
-            <button
-              key={c.id}
-              onClick={() => setActiveChild(i)}
-              className={cn(
-                "shrink-0 rounded-full px-3 py-1.5 text-xs font-bold",
-                i === activeChild ? "gradient-emerald text-primary-foreground" : "bg-muted text-muted-foreground",
-              )}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      ) : null}
+    <div className="flex h-[calc(100vh-7rem)] flex-col lg:h-[calc(100vh-5rem)]">
+      <h2 className="mb-3 font-display text-sm font-extrabold uppercase tracking-[0.14em] text-muted-foreground rtl:font-bold rtl:tracking-normal rtl:leading-relaxed">
+        {t("My Children")}
+      </h2>
 
-      <Card className="gradient-emerald border-0 text-primary-foreground">
-        <p className="text-[0.68rem] font-bold uppercase tracking-widest text-primary-foreground/70">
-          {child.name} · {t("Attendance")}
-        </p>
-        <p className="mt-1 font-display text-4xl font-extrabold">{rate}%</p>
-        <p className="mt-1 text-xs text-primary-foreground/70">
-          {present} {t("present of")}{values.length} {t("recorded days")}
-        </p>
-      </Card>
-
-      {child.current_class ? (
-        <>
-          <SectionTitle>{t("Class")}</SectionTitle>
-          <Card className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-              <GraduationCap className="h-5 w-5" />
+      <div
+        ref={trackRef}
+        className="no-scrollbar mb-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ touchAction: "pan-y" }}
+      >
+        {data.children.map((c, i) => (
+          <div
+            key={c.id}
+            data-child-card
+            onClick={() => !dragging.current && snapTo(i)}
+            className={cn(
+              "flex w-32 shrink-0 snap-center flex-col items-center gap-2 rounded-2xl border p-3 transition-all",
+              i === activeChild
+                ? "gradient-emerald border-transparent text-primary-foreground shadow-lg"
+                : "card-surface text-foreground",
+            )}
+          >
+            <span className={cn(
+              "grid h-12 w-12 place-items-center rounded-full text-lg font-display font-extrabold",
+              i === activeChild ? "bg-primary-foreground/20" : "bg-primary-soft text-primary",
+            )}>
+              {c.name.charAt(0).toUpperCase()}
             </span>
-            <div className="min-w-0">
-              <p className="truncate font-display text-base font-bold">{child.current_class.name}</p>
-              {child.current_class.section_name ? (
-                <p className="truncate text-xs text-muted-foreground">{child.current_class.section_name}</p>
-              ) : null}
+            <span className="w-center truncate text-center text-xs font-bold">{c.name}</span>
+            {c.admission_number ? (
+              <span className={cn(
+                "text-[0.6rem]",
+                i === activeChild ? "text-primary-foreground/70" : "text-muted-foreground",
+              )}>
+                #{c.admission_number}
+              </span>
+            ) : null}
+            {!c.profile_complete ? (
+              <span className={cn(
+                "flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[0.55rem] font-bold uppercase tracking-wide",
+                i === activeChild ? "bg-warning text-warning-foreground" : "bg-warning/15 text-warning-foreground",
+              )}>
+                <AlertTriangle className="h-2.5 w-2.5" />
+                {t("Incomplete")}
+              </span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="-mx-4 flex-1 overflow-y-auto px-4 pb-2">
+        {!child.profile_complete ? (
+          <Card className="mb-3 border-warning/30 bg-warning/10">
+            <div className="flex items-start gap-2.5">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-warning/20 text-warning-foreground">
+                <AlertTriangle className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-warning-foreground">{t("Profile incomplete")}</p>
+                <p className="mt-0.5 text-[0.7rem] text-muted-foreground">
+                  {child.missing_fields.join(", ")}
+                </p>
+              </div>
             </div>
           </Card>
-        </>
-      ) : null}
+        ) : null}
 
-      <SectionTitle>{t("Today's periods")}</SectionTitle>
-      <TimetableStrip entries={child.today_timetable ?? []} />
+        <Card className="gradient-emerald border-0 text-primary-foreground">
+          <p className="text-[0.68rem] font-bold uppercase tracking-widest text-primary-foreground/70">
+            {child.name} · {t("Attendance")}
+          </p>
+          <p className="mt-1 font-display text-4xl font-extrabold">{rate}%</p>
+          <p className="mt-1 text-xs text-primary-foreground/70">
+            {present} {t("present of")} {values.length} {t("recorded days")}
+          </p>
+        </Card>
 
-      <SectionTitle>{t("Due assignments")}</SectionTitle>
-      {child.due_assignments?.length ? (
-        <div className="space-y-2.5">
-          {child.due_assignments.map((a) => (
-            <Card key={a.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+        {child.current_class ? (
+          <>
+            <SectionTitle>{t("Class")}</SectionTitle>
+            <Card className="flex items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+                <GraduationCap className="h-5 w-5" />
+              </span>
               <div className="min-w-0">
-                <p className="truncate font-semibold">{a.title}</p>
-                <p className="text-xs text-muted-foreground">{t("Due")}{a.due_date?.slice(0, 10)}</p>
+                <p className="truncate font-display text-base font-bold">{child.current_class.name}</p>
+                {child.current_class.section_name ? (
+                  <p className="truncate text-xs text-muted-foreground">{child.current_class.section_name}</p>
+                ) : null}
               </div>
-              <Pill tone={a.submitted ? "success" : "warning"}>
-                {a.submitted ? "Submitted" : "Pending"}
-              </Pill>
             </Card>
-          ))}
-        </div>
-      ) : (
-        <EmptyState title={t("Nothing due right now")} />
-      )}
+          </>
+        ) : null}
 
-      {child.fee_summary?.totals?.length ? (
-        <>
-          <SectionTitle>{t("Fee summary")}</SectionTitle>
-          <div className="grid grid-cols-1 gap-2.5">
-            {child.fee_summary.totals.map((total) => (
-              <Card key={total.currency} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+        <SectionTitle>{t("Today's periods")}</SectionTitle>
+        <TimetableStrip entries={child.today_timetable ?? []} />
+
+        <SectionTitle>{t("Due assignments")}</SectionTitle>
+        {(child.due_assignments?.filter((a) => !a.submitted).length) ? (
+          <div className="space-y-2.5">
+            {child.due_assignments.filter((a) => !a.submitted).map((a) => (
+              <Card key={a.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold">{total.currency}</p>
-                  <p className="text-xs text-muted-foreground">{t("Total paid")}</p>
+                  <p className="truncate font-semibold">{a.title}</p>
+                  <p className="text-xs text-muted-foreground">{t("Due")} {a.due_date?.slice(0, 10)}</p>
                 </div>
-                <span className="font-display text-lg font-extrabold text-primary">
-                  {total.amount.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
-                </span>
+                <Pill tone="warning">{t("Pending")}</Pill>
               </Card>
             ))}
           </div>
-        </>
-      ) : null}
-    </>
+        ) : (
+          <EmptyState title={t("Nothing due right now")} />
+        )}
+
+        {child.fee_summary?.totals?.length ? (
+          <>
+            <SectionTitle>{t("Fee summary")}</SectionTitle>
+            <div className="grid grid-cols-1 gap-2.5">
+              {child.fee_summary.totals.map((total) => (
+                <Card key={total.currency} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3.5">
+                  <div className="min-w-0">
+                    <p className="font-semibold">{total.currency}</p>
+                    <p className="text-xs text-muted-foreground">{t("Total paid")}</p>
+                  </div>
+                  <span className="font-display text-lg font-extrabold text-primary">
+                    {total.amount.toLocaleString("en-PK", { minimumFractionDigits: 2 })}
+                  </span>
+                </Card>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

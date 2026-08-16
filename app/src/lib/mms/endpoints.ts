@@ -385,6 +385,8 @@ export interface ParentDashboardChild {
   latest_result: { course_results: { course_id: string; course_name: string; grade: string }[] } | null;
   fee_summary: { totals: { currency: string; amount: number }[] };
   payments: { id: string; category: string; amount: number; currency: string; payment_date: string }[];
+  profile_complete: boolean;
+  missing_fields: string[];
 }
 export interface ParentDashboard {
   role: "parent";

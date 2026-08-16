@@ -679,5 +679,10 @@
   "Program updated": "Program updated",
   "Could not update program": "Could not update program",
   "Program deleted": "Program deleted",
-  "Could not delete program": "Could not delete program"
+  "Could not delete program": "Could not delete program",
+  "Fee summary": "Fee summary",
+  "Total paid": "Total paid",
+  "My Children": "My Children",
+  "Profile incomplete": "Profile incomplete",
+  "Incomplete": "Incomplete"
 }

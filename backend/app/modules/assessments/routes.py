@@ -726,12 +726,16 @@ async def parent_assignments(
         if enrollment is None:
             result.append({"id": str(child.id), "name": child.name, "class_name": None, "section_name": None, "assignments": []})
             continue
-        stmt = select(Assignment).where(
-            Assignment.madrasa_id == madrasa.id,
-            Assignment.class_id == enrollment.class_id,
-            (Assignment.section_id.is_(None)) | (Assignment.section_id == enrollment.section_id),
-        )
-        rows = list((await session.execute(stmt.order_by(Assignment.due_date))).scalars().all())
+        rows = (
+            await session.execute(
+                select(Assignment)
+                .where(
+                    Assignment.madrasa_id == madrasa.id,
+                    Assignment.class_id == enrollment.class_id,
+                )
+                .order_by(Assignment.due_date)
+            )
+        ).scalars().all()
         rows = [row for row in rows if not row.target_student_ids or str(child.id) in row.target_student_ids]
         reads = await _assignment_reads(session, madrasa.id, rows, student_id=child.id)
         result.append({

@@ -56,6 +56,31 @@ def _missing_required_answers(record: StudentAdmissionRecord | None) -> list[str
     return missing
 
 
+async def _student_missing_fields(
+    session: AsyncSession,
+    student_id: UUID,
+) -> list[str]:
+    record = await session.scalar(
+        select(StudentAdmissionRecord).where(StudentAdmissionRecord.student_id == student_id)
+    )
+    missing = _missing_required_answers(record)
+    student = await session.get(StudentProfile, student_id)
+    if student and not student.b_form_number:
+        missing.append("B-Form / CNIC")
+    if student and student.is_independent:
+        if not student.default_phone_number:
+            missing.append("Phone")
+        if not student.address:
+            missing.append("Address")
+    elif student:
+        link_count = await session.scalar(
+            select(func.count()).where(StudentGuardian.student_id == student_id)
+        )
+        if not link_count:
+            missing.append("Guardian")
+    return missing
+
+
 async def _incomplete_profiles(session: AsyncSession, madrasa_id: UUID) -> list[dict[str, object]]:
     records = {
         record.student_id: record
@@ -218,6 +243,7 @@ async def _parent_dashboard(
         payment_totals: dict[str, float] = {}
         for payment, _category_name in payment_rows:
             payment_totals[payment.currency] = payment_totals.get(payment.currency, 0) + float(payment.amount)
+        missing_fields = await _student_missing_fields(session, student.id)
         child_dashboards.append(
             {
                 "id": str(student.id),
@@ -232,6 +258,8 @@ async def _parent_dashboard(
                     ],
                 },
                 "payments": payments,
+                "profile_complete": not missing_fields,
+                "missing_fields": missing_fields,
             }
         )
     return {

@@ -3,6 +3,17 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-16 — Redesign: Guardian Portal Dashboard
+
+- **What**: Redesigned the guardian dashboard with a horizontal swipe carousel for children, "My Children" heading, no outer scrollbar, full-replacement detail view per child, and profile-completion warning banner.
+- **Files**:
+  - `app/src/routes/dashboard.tsx` — Rewrote `GuardianView`: fixed-height layout with drag-to-swipe carousel (pointer events with snap), selected child's info replaces in scrollable inner panel.
+  - `app/src/lib/mms/endpoints.ts` — Added `profile_complete: boolean` and `missing_fields: string[]` to `ParentDashboardChild`.
+  - `backend/app/modules/reporting/routes.py` — Added `_student_missing_fields` helper; parent dashboard now returns `profile_complete` and `missing_fields` per child.
+  - `app/src/i18n/locales/en.json`, `app/src/i18n/locales/ur.json` — Added "My Children", "Profile incomplete", "Incomplete", "Fee summary", "Total paid".
+- **Layout**: Outer container is `h-[calc(100vh-7rem)]` with no overflow; the detail panel inside is the only scrollable region. Carousel uses `no-scrollbar` utility for hidden scrollbar.
+- **Verified**: Frontend `tsc --noEmit` passes (no new errors); backend imports OK.
+
 ## 2026-08-15 — Feature: Guardian attendance course selection for non-self-contained programs
 
 - **What**: When a guardian's child is enrolled in a program that is NOT self-contained, the attendance view now requires selecting a course before showing the attendance calendar. After selection, a course label with "Change course" button is shown above the attendance so it's always clear which course the attendance is for. Self-contained programs skip course selection and show attendance directly.
