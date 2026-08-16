@@ -100,7 +100,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const isActive = useActive();
   const groups = user?.role === "super_admin" && !isTenantWorkspace(user.role)
     ? navGroups.map((group) => ({ ...group, items: group.items.filter((item) => item.to === "/platform" || item.to === "/me") })).filter((group) => group.items.length)
-    : navGroups.map((group) => ({ ...group, items: group.items.filter((item) => isNavItemVisible(item, user?.role, hasFeature)) })).filter((group) => group.items.length);
+    : navGroups.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => (item.visible?.(user) ?? true) && isNavItemVisible(item, user?.role, hasFeature)),
+      })).filter((group) => group.items.length);
   return (
     <div className="space-y-5">
       {groups.map((group) => (

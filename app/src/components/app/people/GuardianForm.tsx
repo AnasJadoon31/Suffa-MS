@@ -31,6 +31,7 @@ export function GuardianForm({
   const [defaultPhone, setDefaultPhone] = useState(guardian?.default_phone_number ?? phones[0] ?? "+92");
   const [cnic, setCnic] = useState(guardian?.cnic ?? "");
   const [address, setAddress] = useState(guardian?.address ?? "");
+  const [isDonor, setIsDonor] = useState(guardian?.is_donor ?? false);
   const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
 
   async function handleSubmit() {
@@ -54,6 +55,11 @@ export function GuardianForm({
         cnic: cnic.trim() || undefined,
         address: address.trim() || undefined,
       });
+      if (isDonor && !guardian.is_donor) {
+        await peopleMutations.markGuardianAsDonor(guardian.id);
+      } else if (!isDonor && guardian.is_donor) {
+        await peopleMutations.unmarkGuardianAsDonor(guardian.id);
+      }
       toast.success("Guardian updated");
     } else {
       await peopleMutations.createGuardian({
@@ -118,6 +124,20 @@ export function GuardianForm({
           onChange={(e) => setAddress(e.target.value)}
         />
       </Field>
+      {isEdit ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-border p-3">
+          <input
+            id="guardian-form-donor"
+            type="checkbox"
+            checked={isDonor}
+            onChange={(e) => setIsDonor(e.target.checked)}
+            className="h-4 w-4 accent-primary"
+          />
+          <label htmlFor="guardian-form-donor" className="cursor-pointer text-sm font-semibold">
+            {t("Mark as Donor")}
+          </label>
+        </div>
+      ) : null}
       {!isEdit ? (
         <MultiPicker
           label={t("Students")}

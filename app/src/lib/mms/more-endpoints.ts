@@ -1055,6 +1055,7 @@ export interface GuardianDetail {
   default_phone_number?: string | null;
   cnic?: string | null;
   address?: string | null;
+  is_donor?: boolean;
   preferred_language?: string;
 }
 
@@ -1166,6 +1167,10 @@ export const peopleMutations = {
     api.post(`/api/v1/people/guardians/${id}/deactivate`).then((r) => r.data),
   reactivateGuardian: (id: string) =>
     api.post(`/api/v1/people/guardians/${id}/reactivate`).then((r) => r.data),
+  markGuardianAsDonor: (id: string) =>
+    api.post<GuardianDetail>(`/api/v1/people/guardians/${id}/mark-as-donor`).then((r) => r.data),
+  unmarkGuardianAsDonor: (id: string) =>
+    api.post<GuardianDetail>(`/api/v1/people/guardians/${id}/unmark-donor`).then((r) => r.data),
 
   guardianStudents: (guardianId: string) =>
     getAllPages<StudentDetail>(`/api/v1/people/guardians/${guardianId}/students`),

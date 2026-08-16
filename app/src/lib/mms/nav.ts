@@ -7,6 +7,7 @@ import {
   FileBarChart2,
   FileText,
   GraduationCap,
+  HandHeart,
   Home,
   Layers,
   Library,
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { isTenantWorkspace } from "./workspace";
+import type { MmsUser } from "./auth";
 
 export interface NavItem {
   to: string;
@@ -32,6 +34,7 @@ export interface NavItem {
   icon: LucideIcon;
   description: string;
   feature?: string;
+  visible?: (user: MmsUser | null) => boolean;
 }
 
 export const primaryNav: NavItem[] = [
@@ -106,6 +109,13 @@ export const myNav: NavItem[] = [
     icon: Table2,
     description: "Your weekly class schedule",
   },
+  {
+    to: "/donations",
+    label: "Donations",
+    icon: HandHeart,
+    description: "Your donation history",
+    visible: (user) => user?.role === "parent" && user?.is_donor === true,
+  },
 ];
 
 export const adminNav: NavItem[] = [
@@ -158,6 +168,7 @@ const guardianVisiblePaths = new Set([
   "/attendance",
   "/finance",
   "/announcements",
+  "/donations",
   "/me",
 ]);
 

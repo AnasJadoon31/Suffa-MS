@@ -31,6 +31,7 @@ class UserRead(BaseModel):
     status: str
     preferred_language: str
     is_principal_delegate: bool = False
+    is_donor: bool = False
     selected_session_id: UUID | None = None
     created_at: datetime
 

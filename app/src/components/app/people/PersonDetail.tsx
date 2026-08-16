@@ -640,6 +640,7 @@ export function GuardianDetailSheet({
               {guardian.username}
             </span>
           ) : null}
+          {guardian.is_donor ? <Pill tone="success">{t("Donor")}</Pill> : null}
         </div>
       }
     >
@@ -666,7 +667,7 @@ export function GuardianDetailSheet({
           />
         </div>
 
-        <ActionBar>
+         <ActionBar>
           <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
             {t("Edit")}</ActionButton>
           <ActionButton

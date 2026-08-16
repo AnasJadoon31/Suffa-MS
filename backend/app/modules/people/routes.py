@@ -10,6 +10,7 @@ from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
 from app.core.teaching_scope import teacher_teaches
 from app.db.session import get_session
 from app.modules.academics.models import AcademicClass, AcademicSession, Enrollment, Madrasa, Program, Section
+from app.modules.finance.models import Donor
 from app.modules.auth.models import User, UserRole
 from app.modules.auth.service import UsernameTakenError, provision_login, reissue_set_password_link
 from app.modules.auth.username_service import generate_unique_username, preview_username
@@ -870,6 +871,84 @@ async def guardian_credentials_link(
     guardian.user_id = user.id
     await session.commit()
     return {"username": user.username, "set_password_url": url}
+
+
+async def _next_donor_code(session: AsyncSession, madrasa_id: UUID) -> str:
+    existing = (
+        await session.execute(
+            select(User.username).where(
+                User.madrasa_id == madrasa_id,
+                User.role == UserRole.donor,
+                User.username.like("DN-%"),
+            )
+        )
+    ).scalars().all()
+    max_suffix = 0
+    for code in existing:
+        suffix = str(code).removeprefix("DN-")
+        if suffix.isdigit():
+            max_suffix = max(max_suffix, int(suffix))
+    return f"DN-{max_suffix + 1:04d}"
+
+
+@router.post("/guardians/{guardian_id}/mark-as-donor", response_model=GuardianRead)
+async def mark_guardian_as_donor(
+    guardian_id: UUID,
+    current_user: User = Depends(require_permission("students.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> GuardianRead:
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+    if not guardian.is_donor:
+        phones, default_phone = _contacts(guardian.phone_list, guardian.phone_numbers, guardian.default_phone_number)
+        donor = Donor(
+            madrasa_id=madrasa.id,
+            name=guardian.name,
+            contact=default_phone or guardian.phone_numbers,
+            phone_list=phones,
+            default_phone_number=default_phone,
+            guardian_id=guardian.id,
+        )
+        session.add(donor)
+        await session.flush()
+
+        donor_username = await _next_donor_code(session, madrasa.id)
+        try:
+            user, _ = await provision_login(
+                session,
+                madrasa_id=madrasa.id,
+                actor_id=current_user.id,
+                username=donor_username,
+                role=UserRole.donor,
+                preferred_language=guardian.preferred_language,
+            )
+        except UsernameTakenError:
+            raise HTTPException(status_code=500, detail="Failed to generate unique donor username")
+        donor.user_id = user.id
+        guardian.is_donor = True
+        await session.commit()
+        await session.refresh(guardian)
+    return GuardianRead.model_validate(guardian)
+
+
+@router.post("/guardians/{guardian_id}/unmark-donor", response_model=GuardianRead)
+async def unmark_guardian_as_donor(
+    guardian_id: UUID,
+    current_user: User = Depends(require_permission("students.edit")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> GuardianRead:
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+    if guardian.is_donor:
+        donors = (
+            await session.execute(select(Donor).where(Donor.guardian_id == guardian.id))
+        ).scalars().all()
+        for donor in donors:
+            donor.status = "inactive"
+        guardian.is_donor = False
+        await session.commit()
+        await session.refresh(guardian)
+    return GuardianRead.model_validate(guardian)
 
 
 @router.get("/guardians", response_model=list[GuardianRead])

@@ -20,6 +20,7 @@ export interface MmsUser {
   status: string;
   preferred_language: string;
   is_principal_delegate: boolean;
+  is_donor: boolean;
   selected_session_id: string | null;
   has_teaching_assignment: boolean;
 }

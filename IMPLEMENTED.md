@@ -3,6 +3,29 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-16 — Feature: Mark Guardian as Donor
+
+- **What**: Guardians can now be marked as Donors from their profile. A marked guardian gets a linked Donor record, a separate donor portal login (DN-XXXX), a Donations menu in their sidebar, and can view their own donation history.
+- **Files**:
+  - `backend/app/modules/people/models.py` — added `is_donor` boolean column to `Guardian`.
+  - `backend/app/modules/finance/models.py` — added `guardian_id` FK to `Donor`.
+  - `backend/app/modules/people/schemas.py` — added `is_donor` to `GuardianRead`.
+  - `backend/app/modules/finance/schemas.py` — added `guardian_id` to `DonorRead`.
+  - `backend/app/modules/auth/schemas.py` — added `is_donor` to `UserRead`.
+  - `backend/app/modules/auth/routes.py` — `get_me` now populates `is_donor` for parent-role users.
+  - `backend/app/modules/people/routes.py` — added `POST /guardians/{id}/mark-as-donor` (creates Donor + provisions DN-XXXX login) and `POST /guardians/{id}/unmark-donor` (deactivates donor, keeps record).
+  - `backend/app/modules/finance/routes.py` — `/profiles/donors/me` now also resolves donor for parent-role users with `is_donor=True`.
+  - `app/src/lib/mms/auth.tsx` — added `is_donor` to `MmsUser`.
+  - `app/src/lib/mms/more-endpoints.ts` — added `markGuardianAsDonor` / `unmarkGuardianAsDonor` mutations and `is_donor` to `GuardianDetail`.
+  - `app/src/lib/mms/nav.ts` — added Donations nav item (visible only to `parent`+`is_donor`); added `/donations` to `guardianVisiblePaths`; extended `NavItem` with optional `visible` callback.
+  - `app/src/components/app/people/PersonDetail.tsx` — added "Mark as Donor" checkbox to `GuardianDetailSheet`.
+  - `app/src/components/app/people/GuardianForm.tsx` — added "Mark as Donor" checkbox in edit mode.
+  - `app/src/routes/donations.tsx` — new self-service route showing the guardian's donation history.
+  - `app/src/i18n/locales/en.json` & `ur.json` — added "Mark as Donor" translation.
+  - `backend/alembic/versions/iss3_033_guardian_donor_link.py` — migration adding `is_donor` and `guardian_id` columns.
+- **Verified**: Frontend build passes (`cd app && npm run build`); all backend route modules import cleanly.
+- **Notes**: A guardian logged in with their donor username (DN-XXXX, role=donor) sees only donations via the donor dashboard. The same guardian logged in with their guardian username (GR-XXXX, role=parent) sees children details plus the Donations sidebar entry. Unmarking deactivates the donor user login but preserves the Donor record and donation history.
+
 ## 2026-08-16 — Feature: Guardian Results under Academics
 
 - **What**: Added a "Results" entry under Academics in the guardian sidebar. Lists all guardian's children in an accordion (same pattern as Assignments). Expanding a child shows session selector + course breakdown with expandable exam marks.

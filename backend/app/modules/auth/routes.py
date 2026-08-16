@@ -247,8 +247,15 @@ async def get_me(
             select(Donor.name).where(Donor.user_id == current_user.id)
         )
 
+    is_donor = False
+    if current_user.role == UserRole.parent:
+        is_donor = await session.scalar(
+            select(Guardian.is_donor).where(Guardian.user_id == current_user.id)
+        ) or False
+
     user_read = UserRead.model_validate(current_user)
     user_read.is_principal_delegate = is_delegate
+    user_read.is_donor = is_donor
     user_read.name = profile_name
 
     branding = {key: value for key, value in profile_rows}

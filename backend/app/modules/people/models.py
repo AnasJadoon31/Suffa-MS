@@ -90,6 +90,7 @@ class Guardian(Base, IdMixin, TenantMixin, TimestampMixin):
     cnic: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     preferred_language: Mapped[str] = mapped_column(String(8), default="ur")
+    is_donor: Mapped[bool] = mapped_column(Boolean, default=False)
 
     username: Mapped[Optional[str]] = column_property(
         select(User.username).where(User.id == user_id).correlate_except(User).scalar_subquery()

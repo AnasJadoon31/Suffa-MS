@@ -123,11 +123,25 @@ async def my_donor_profile(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> DonorFinanceProfile:
-    if current_user.role != UserRole.donor:
-        raise HTTPException(status_code=403, detail="Only donors can access this endpoint")
-    donor = (
-        await session.execute(select(Donor).where(Donor.user_id == current_user.id))
-    ).scalar_one_or_none()
+    from app.modules.people.models import Guardian
+
+    donor = None
+    if current_user.role == UserRole.donor:
+        donor = (
+            await session.execute(select(Donor).where(Donor.user_id == current_user.id))
+        ).scalar_one_or_none()
+    elif current_user.role == UserRole.parent:
+        guardian = (
+            await session.execute(
+                select(Guardian).where(Guardian.user_id == current_user.id, Guardian.is_donor.is_(True))
+            )
+        ).scalar_one_or_none()
+        if guardian is not None:
+            donor = (
+                await session.execute(select(Donor).where(Donor.guardian_id == guardian.id))
+            ).scalar_one_or_none()
+    else:
+        raise HTTPException(status_code=403, detail="Only donors and donor-guardians can access this endpoint")
     if donor is None or donor.madrasa_id != madrasa.id:
         raise HTTPException(status_code=404, detail="Donor profile not found")
     donations = (

@@ -61,6 +61,7 @@ class DonorRead(BaseModel):
     contact: str
     phone_list: list[str] = Field(default_factory=list)
     default_phone_number: str | None = None
+    guardian_id: UUID | None = None
 
 
 class DonationCreate(BaseModel):

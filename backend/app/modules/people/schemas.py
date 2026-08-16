@@ -191,6 +191,7 @@ class GuardianRead(BaseModel):
     default_phone_number: str | None = None
     cnic: str | None = None
     address: str | None = None
+    is_donor: bool = False
     created_at: datetime
 
 

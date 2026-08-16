@@ -36,6 +36,7 @@ class Donor(Base, IdMixin, TenantMixin, TimestampMixin):
     phone_list: Mapped[list] = mapped_column(PortableJSONB, default=list)
     default_phone_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     user_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    guardian_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("guardians.id"), nullable=True, index=True)
 
     username: Mapped[Optional[str]] = column_property(
         select(User.username).where(User.id == user_id).correlate_except(User).scalar_subquery()
