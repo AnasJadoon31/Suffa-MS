@@ -16,10 +16,10 @@ import { useTranslation } from "react-i18next";
 import { AppShell } from "@/components/app/AppShell";
 import { Card, EmptyState, Field, Pill, SectionTitle, SkeletonList, TextInput } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
-import { operationsApi, type TimetableSlot } from "@/lib/mms/endpoints";
+import { academicsApi, operationsApi, peopleApi, type TimetableSlot } from "@/lib/mms/endpoints";
 import {
+  academicsExtraApi,
   dailyReportApi,
-  peopleApi,
   type DailyReportConfig,
   type DailyReportEntry,
   type DailyReportFieldDefinition,
@@ -46,7 +46,7 @@ export const Route = createFileRoute("/daily-reports")({
 function DailyReportsPage() {
   const { user } = useAuth();
 
-  if (user?.role === "teacher") return <TeacherDailyReports />;
+  if (["teacher", "principal", "super_admin"].includes(user?.role ?? "")) return <TeacherDailyReports />;
   if (user?.role === "student") return <StudentDailyReports />;
   if (user?.role === "parent") return <GuardianDailyReports />;
   return <EmptyState title="Daily reports are not available for your role." />;
@@ -64,23 +64,42 @@ function TeacherDailyReports() {
   const [search, setSearch] = useState("");
   const [studentValues, setStudentValues] = useState<Record<string, Record<string, unknown>>>({});
   const [savedFlash, setSavedFlash] = useState(false);
+  const isAdmin = ["principal", "super_admin"].includes(user?.role ?? "");
 
   const myTimetable = useQuery({
     queryKey: ["my-timetable"],
     queryFn: () => operationsApi.listMyTimetable(),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && !isAdmin,
+  });
+
+  const allClasses = useQuery({
+    queryKey: ["all-classes-daily-reports"],
+    queryFn: () => academicsApi.listClassesWithDailyReports(),
+    enabled: isAdmin,
   });
 
   const classOptions = useMemo(() => {
+    if (isAdmin) {
+      return (allClasses.data ?? []).map((c) => ({ id: c.id, name: c.name }));
+    }
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
       if (slot.class_id) map.set(slot.class_id, slot.class_name ?? "—");
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [myTimetable.data]);
+  }, [isAdmin, allClasses.data, myTimetable.data]);
+
+  const adminSections = useQuery({
+    queryKey: ["class-sections", selectedClassId],
+    queryFn: () => academicsExtraApi.listSections(selectedClassId),
+    enabled: isAdmin && Boolean(selectedClassId),
+  });
 
   const sectionOptions = useMemo(() => {
     if (!selectedClassId) return [];
+    if (isAdmin) {
+      return (adminSections.data ?? []).map((s) => ({ id: s.id, name: s.name }));
+    }
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
       if (slot.class_id === selectedClassId && slot.section_id) {
@@ -88,7 +107,7 @@ function TeacherDailyReports() {
       }
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [selectedClassId, myTimetable.data]);
+  }, [isAdmin, selectedClassId, adminSections.data, myTimetable.data]);
 
   const configQuery = useQuery({
     queryKey: ["daily-report-config", selectedClassId],
@@ -101,16 +120,13 @@ function TeacherDailyReports() {
     queryFn: async () => {
       const params = { section_id: selectedSectionId, date: selectedDate };
       const [studentsRes, entriesRes] = await Promise.all([
-        api.get<{ items: { id: string; name: string; admission_number: string | null }[] }>(
-          `/api/v1/people/students`,
-          { params: { section_id: selectedSectionId, limit: 200, offset: 0 } },
-        ),
+        peopleApi.listStudentsPage({ section_id: selectedSectionId, limit: 200, offset: 0 }),
         api.get<DailyReportEntry[]>(`/api/v1/academics/classes/${selectedClassId}/daily-report-entries`, { params }),
       ]);
       const entriesByStudent = new Map<string, DailyReportEntry>();
       for (const e of entriesRes.data) entriesByStudent.set(e.student_id, e);
       return {
-        students: studentsRes.data.items ?? [],
+        students: studentsRes.items,
         entriesByStudent,
       };
     },
@@ -158,10 +174,10 @@ function TeacherDailyReports() {
     return (
       <AppShell title={t("Daily Reports")} subtitle={t("Select a class to begin")}>
         <SectionTitle icon={GraduationCap} title={t("Your classes")} />
-        {myTimetable.isLoading ? (
+        {(myTimetable.isLoading || allClasses.isLoading) ? (
           <SkeletonList count={4} />
         ) : classOptions.length === 0 ? (
-          <EmptyState title={t("No classes assigned")} />
+          <EmptyState title={t("No classes with daily reports enabled")} />
         ) : (
           <div className="space-y-2">
             {classOptions.map((cls) => (
@@ -187,6 +203,7 @@ function TeacherDailyReports() {
     return (
       <AppShell title={t("Daily Reports")} subtitle={t("Select a section")} onBack={() => setSelectedClassId("")}>
         <SectionTitle icon={Users} title={t("Sections")} />
+        {adminSections.isLoading ? <SkeletonList count={4} /> : null}
         <div className="space-y-2">
           {sectionOptions.map((sec) => (
             <Card
@@ -214,6 +231,12 @@ function TeacherDailyReports() {
     >
       <div className="space-y-3">
         <div className="flex items-center gap-2">
+          <button
+            className="rounded-xl bg-muted px-3 py-2 text-xs font-semibold"
+            onClick={() => { setSelectedClassId(""); setSelectedSectionId(""); }}
+          >
+            {t("Change class")}
+          </button>
           <button
             className="rounded-xl bg-muted px-3 py-2 text-xs font-semibold"
             onClick={() => setSelectedSectionId("")}

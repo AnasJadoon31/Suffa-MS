@@ -79,7 +79,7 @@ export const academicNav: NavItem[] = [
     label: "Daily Reports",
     icon: ListChecks,
     description: "Daily reports for students",
-    visible: (user) => ["teacher", "parent", "student"].includes(user?.role ?? ""),
+    visible: (user) => ["teacher", "parent", "student", "principal", "super_admin"].includes(user?.role ?? ""),
   },
 ];
 

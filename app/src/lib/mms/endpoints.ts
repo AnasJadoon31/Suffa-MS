@@ -51,6 +51,7 @@ export const academicsApi = {
   listSessions: () =>
     getAllPages<AcademicSessionApi>("/api/v1/academics/sessions").then((rows) => rows.map(normalizeSession)),
   listClasses: () => getAllPages<AcademicClass>("/api/v1/academics/classes"),
+  listClassesWithDailyReports: () => api.get<AcademicClass[]>("/api/v1/academics/classes/with-daily-reports").then((r) => r.data),
 };
 
 // --------------------------------------------------------------------- People

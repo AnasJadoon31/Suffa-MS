@@ -185,6 +185,25 @@ async def create_class(
     return AcademicClassRead.model_validate(academic_class)
 
 
+@router.get("/classes/with-daily-reports", response_model=list[AcademicClassRead])
+async def list_classes_with_daily_reports(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[AcademicClassRead]:
+    result = await session.execute(
+        select(AcademicClass)
+        .join(DailyReportConfig, DailyReportConfig.class_id == AcademicClass.id)
+        .where(
+            AcademicClass.madrasa_id == madrasa.id,
+            DailyReportConfig.madrasa_id == madrasa.id,
+            DailyReportConfig.enabled.is_(True),
+        )
+        .order_by(AcademicClass.name)
+    )
+    return [AcademicClassRead.model_validate(c) for c in result.scalars().all()]
+
+
 @router.get("/classes", response_model=list[AcademicClassRead])
 async def list_classes(
     response: Response,
@@ -1072,13 +1091,27 @@ async def list_student_daily_report_entries(
     madrasa: Madrasa = Depends(get_current_madrasa),
     session: AsyncSession = Depends(get_session),
 ) -> list[DailyReportEntryRead]:
-    # Authorization: students can view their own; staff with permission can view any
+    # Authorization: students can view their own; guardians can view their children's; staff with permission can view any
     if current_user.role == UserRole.student:
         student = await session.scalar(
             select(StudentProfile).where(StudentProfile.user_id == current_user.id, StudentProfile.madrasa_id == madrasa.id)
         )
         if not student or student.id != student_id:
             raise HTTPException(status_code=403, detail="Can only view your own reports")
+    elif current_user.role == UserRole.parent:
+        guardian = await session.scalar(
+            select(Guardian).where(Guardian.user_id == current_user.id, Guardian.madrasa_id == madrasa.id)
+        )
+        if not guardian:
+            raise HTTPException(status_code=403, detail="Guardian not found")
+        link = await session.scalar(
+            select(StudentGuardian.id).where(
+                StudentGuardian.guardian_id == guardian.id,
+                StudentGuardian.student_id == student_id,
+            )
+        )
+        if not link:
+            raise HTTPException(status_code=403, detail="Can only view your children's reports")
     elif not await user_has_permission(current_user, "students.view", session):
         raise HTTPException(status_code=403, detail="Missing permission")
     stmt = select(DailyReportEntry).where(

@@ -7,8 +7,12 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn("card-surface p-4", className)}>{children}</div>;
+export function Card({ className, children, ...rest }: { className?: string; children: ReactNode; [key: string]: unknown }) {
+  return (
+    <div className={cn("card-surface p-4", className)} {...rest}>
+      {children}
+    </div>
+  );
 }
 
 export function SectionTitle({ children, action, className }: { children: ReactNode; action?: ReactNode; className?: string }) {
