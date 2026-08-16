@@ -1,7 +1,8 @@
 from datetime import date, datetime
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ProgramCreate(BaseModel):
@@ -162,3 +163,68 @@ class SessionRolloverRequest(BaseModel):
     # Shift copied holiday dates forward by the gap between the two sessions'
     # start dates (e.g. a year), keeping them roughly in place on the calendar.
     shift_holiday_dates: bool = True
+
+
+# ------------------------------------------------------------------ Daily Reports
+
+DailyReportFieldType = Literal[
+    "label", "text", "textarea", "radio", "checkbox_group",
+    "dropdown", "phone", "file", "image", "boolean",
+]
+DAILY_REPORT_OPTION_TYPES = {"radio", "checkbox_group", "dropdown"}
+
+
+class DailyReportFieldDefinition(BaseModel):
+    key: str | None = None
+    label: str
+    type: DailyReportFieldType
+    required: bool = False
+    options: list[str] = Field(default_factory=list)
+    enabled: bool = True
+
+    @model_validator(mode="after")
+    def normalize(self) -> "DailyReportFieldDefinition":
+        if not self.key:
+            self.key = self.label.lower().strip().replace(" ", "_")[:64]
+        if self.type in DAILY_REPORT_OPTION_TYPES and len(self.options) < 1:
+            raise ValueError(f"Field '{self.label}' of type '{self.type}' requires at least one option.")
+        return self
+
+
+class DailyReportConfigCreate(BaseModel):
+    class_id: UUID
+    enabled: bool = False
+    fields_definition: list[DailyReportFieldDefinition] = Field(default_factory=list)
+
+
+class DailyReportConfigUpdate(BaseModel):
+    enabled: bool | None = None
+    fields_definition: list[DailyReportFieldDefinition] | None = None
+
+
+class DailyReportConfigRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    class_id: UUID
+    enabled: bool
+    fields_definition: list[dict]
+    created_at: datetime
+    updated_at: datetime
+
+
+class DailyReportEntryValues(BaseModel):
+    values: dict[str, Any]
+
+
+class DailyReportEntryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    class_id: UUID
+    section_id: UUID
+    student_id: UUID
+    date: date
+    values: dict
+    created_by_id: UUID
+    updated_by_id: UUID | None
+    created_at: datetime
+    updated_at: datetime

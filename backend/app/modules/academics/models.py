@@ -1,12 +1,12 @@
 import secrets
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, String, UniqueConstraint, func, Integer, text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, String, UniqueConstraint, func, Integer, text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, IdMixin, SlugMixin, TenantMixin, TimestampMixin
+from app.db.base import Base, IdMixin, PortableJSONB, SlugMixin, TenantMixin, TimestampMixin
 
 
 def _new_public_key() -> str:
@@ -107,3 +107,30 @@ class TeacherAssignment(Base, IdMixin, TenantMixin, TimestampMixin):
     session_id: Mapped[UUID] = mapped_column(ForeignKey("academic_sessions.id"), index=True)
     class_id: Mapped[UUID] = mapped_column(ForeignKey("classes.id"))
     course_id: Mapped[UUID] = mapped_column(ForeignKey("courses.id"))
+
+
+class DailyReportConfig(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "daily_report_configs"
+    __table_args__ = (
+        UniqueConstraint("class_id", name="uq_daily_report_config_class"),
+    )
+
+    class_id: Mapped[UUID] = mapped_column(ForeignKey("classes.id"), index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    fields_definition: Mapped[list] = mapped_column(PortableJSONB, default=list)
+
+
+class DailyReportEntry(Base, IdMixin, TenantMixin, TimestampMixin):
+    __tablename__ = "daily_report_entries"
+    __table_args__ = (
+        UniqueConstraint("class_id", "student_id", "date", name="uq_daily_report_entry"),
+        Index("idx_daily_report_entry_date", "class_id", "date"),
+    )
+
+    class_id: Mapped[UUID] = mapped_column(ForeignKey("classes.id"), index=True)
+    section_id: Mapped[UUID] = mapped_column(ForeignKey("sections.id"), index=True)
+    student_id: Mapped[UUID] = mapped_column(ForeignKey("student_profiles.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    values: Mapped[dict] = mapped_column(PortableJSONB, default=dict)
+    created_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    updated_by_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)

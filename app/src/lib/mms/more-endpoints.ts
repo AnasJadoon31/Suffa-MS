@@ -330,6 +330,51 @@ export const academicsExtraApi = {
     getAllPages<Course>(`/api/v1/academics/classes/${classId}/courses`),
 };
 
+export interface DailyReportFieldDefinition {
+  id?: string;
+  key: string;
+  label: string;
+  type: "label" | "text" | "textarea" | "radio" | "checkbox_group" | "dropdown" | "phone" | "file" | "image" | "boolean";
+  required: boolean;
+  options: string[];
+  enabled?: boolean;
+}
+
+export interface DailyReportConfig {
+  id: string;
+  class_id: string;
+  enabled: boolean;
+  fields_definition: DailyReportFieldDefinition[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DailyReportEntry {
+  id: string;
+  class_id: string;
+  section_id: string;
+  student_id: string;
+  date: string;
+  values: Record<string, unknown>;
+  created_by_id: string;
+  updated_by_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const dailyReportApi = {
+  getConfig: (classId: string) =>
+    api.get<DailyReportConfig>(`/api/v1/academics/classes/${classId}/daily-report-config`).then((r) => r.data),
+  updateConfig: (classId: string, payload: { enabled?: boolean; fields_definition?: DailyReportFieldDefinition[] }) =>
+    api.put<DailyReportConfig>(`/api/v1/academics/classes/${classId}/daily-report-config`, payload).then((r) => r.data),
+  listEntries: (classId: string, params?: { section_id?: string; date?: string; start_date?: string; end_date?: string }) =>
+    api.get<DailyReportEntry[]>(`/api/v1/academics/classes/${classId}/daily-report-entries`, { params }).then((r) => r.data),
+  saveEntry: (classId: string, studentId: string, sectionId: string, date: string, values: Record<string, unknown>) =>
+    api.post<DailyReportEntry>(`/api/v1/academics/classes/${classId}/daily-report-entries`, { values }, { params: { student_id: studentId, section_id: sectionId, date } }).then((r) => r.data),
+  listStudentEntries: (studentId: string, params?: { start_date?: string; end_date?: string }) =>
+    api.get<DailyReportEntry[]>(`/api/v1/academics/students/${studentId}/daily-report-entries`, { params }).then((r) => r.data),
+};
+
 export interface FormFieldDefinition {
   key: string;
   label: string;

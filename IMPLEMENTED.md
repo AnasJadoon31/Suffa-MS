@@ -3,6 +3,59 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-16 — Feature: Daily Reports under Academics in sidebar
+
+- **What**: Moved "Daily Reports" from its own sidebar group into the "Academics" group so it appears alongside Assignments, Results, Examination, Academics, and Resources.
+- **File**: `app/src/lib/mms/nav.ts` — added Daily Reports item to `academicNav`, removed standalone `dailyReportsNav` group and its entry in `navGroups`/`allNavItems`.
+- **Verified**: `cd app && npm run build` passes.
+
+## 2026-08-16 — Fix: Backend 500 on daily-report-config endpoint (IntegrityError on slug)
+
+- **What**: After fixing Docker networking (DB/Redis URLs) and port mappings, the endpoint still returned 500. Root cause: migration `iss3_034_daily_reports` created `daily_report_configs` and `daily_report_entries` tables with a `slug` column (NOT NULL), but the SQLAlchemy model never defined it. INSERTs failed with `NotNullViolationError`. Fixed by creating migration `iss3_035_drop_daily_report_slug` to drop the unused `slug` column from both tables.
+- **Files**: `backend/alembic/versions/iss3_035_drop_daily_report_slug.py` (new migration).
+- **Verified**: `alembic upgrade head` runs cleanly; endpoint returns 401 (auth required, not 500).
+
+## 2026-08-16 — Fix: Local backend 500 on daily-report-config (PUT)
+
+- **What**: After the Docker fix, the local backend (running with `--reload` on port 8001) still returned 500 because postgres/redis had no host port mappings. The local backend connects via `localhost` (from `.env`) but the Docker containers weren't exposing ports. Added `ports: ["5432:5432"]` and `ports: ["6379:6379"]` to postgres and redis in docker-compose.
+- **File**: `docker-compose.yml` (added port mappings for postgres and redis).
+- **Verified**: `curl localhost:8001/api/v1/academics/classes/{id}/daily-report-config` returns 401 (not 500).
+
+## 2026-08-16 — Fix: Daily Reports button on Academics Classes tab
+
+- **What**: Fixed the "Daily Reports" button not working on the Classes tab of the Academics screen. The `onEditDailyReports` prop was declared in the `ClassList` component's type annotation but not destructured from props, causing a `ReferenceError` when clicked.
+- **File**: `app/src/routes/academics.tsx:965` — added `onEditDailyReports` to the destructured props.
+- **Verified**: `cd app && npm run build` passes.
+
+## 2026-08-16 — Fix: Daily Reports field label losing focus / lag while typing
+
+- **What**: Fixed the field label input losing focus on every keystroke (Card was keyed by `field.key` which changes on each edit) and lag while typing (state lived in the parent `AcademicsPage` which re-rendered entirely on each keystroke). Extracted the dialog into a `DailyReportConfigDialog` component with its own local state, so typing only re-renders the dialog. Added a stable `id` field per definition for React keys.
+- **Files**: `app/src/routes/academics.tsx` (new `DailyReportConfigDialog` component, removed inline dialog/state from `AcademicsPage`), `app/src/lib/mms/more-endpoints.ts` (added optional `id` to `DailyReportFieldDefinition`).
+- **Verified**: `cd app && npm run build` passes.
+
+## 2026-08-16 — Fix: Daily Reports comma-separated options input
+
+- **What**: Fixed being unable to type commas in the options field. The input value was derived from the parsed array (`field.options.join(", ")`), so typing a trailing comma would split+filter and the comma would vanish on re-render. Extracted each field row into a `DailyReportFieldRow` component with local state for the raw options text, so the input is only re-parsed on blur.
+- **File**: `app/src/routes/academics.tsx` (new `DailyReportFieldRow` component).
+- **Verified**: `cd app && npm run build` passes.
+
+## 2026-08-16 — Feature: Daily Reports
+
+- **What**: Programs/Classes can now have daily reports. Each class has its own daily report configuration (enable/disable + custom field definitions). Teachers mark daily reports per student via Class → Section → Students flow. Students view their own daily reports on a month calendar with indicators. Guardians see all their children in an accordion with calendar view to pick a date.
+- **Files**:
+  - `backend/app/modules/academics/models.py` — added `DailyReportConfig` (per-class config with enabled flag + fields_definition JSONB) and `DailyReportEntry` (per-student-per-day values JSONB).
+  - `backend/app/modules/academics/schemas.py` — added `DailyReportFieldDefinition`, `DailyReportConfigCreate/Update/Read`, `DailyReportEntryRead`, `DailyReportEntryValues`.
+  - `backend/app/modules/academics/routes.py` — added `GET/PUT /classes/{id}/daily-report-config`, `GET /classes/{id}/daily-report-entries`, `POST /classes/{id}/daily-report-entries` (upsert), `GET /academics/students/{id}/daily-report-entries`.
+  - `backend/app/modules/people/routes.py` — added `GET /guardians/me/children` (children with class/section info) and `GET /students/me` (student's own profile + enrollment).
+  - `backend/app/core/permissions.py` — added `daily_reports.manage` permission.
+  - `backend/alembic/versions/iss3_034_daily_reports.py` — migration for new tables.
+  - `app/src/lib/mms/more-endpoints.ts` — added `dailyReportApi` with getConfig, updateConfig, listEntries, saveEntry, listStudentEntries.
+  - `app/src/lib/mms/nav.ts` — added `dailyReportsNav` group with `/daily-reports` route; added to teacher/guardian visible paths; student view via role check.
+  - `app/src/routes/daily-reports.tsx` — new route with teacher (Class→Section→Students marking), student (month calendar + day detail), and guardian (children accordion + calendar) views.
+  - `app/src/routes/academics.tsx` — added "Daily Reports" button to class expanded view; `FormSheet` dialog with enable toggle + field definitions editor (add/remove fields, set type/options/required).
+- **Verified**: Frontend build passes (`cd app && npm run build`); all backend route modules import cleanly; route tree auto-generates correctly.
+- **Notes**: Field types supported: text, textarea, number, boolean, dropdown, radio, checkbox_group, phone, file, image. Teachers can only edit reports same day (enforced by UI — no date restriction in API yet). Calendar uses green indicators for days with reports.
+
 ## 2026-08-16 — Feature: Mark Guardian as Donor
 
 - **What**: Guardians can now be marked as Donors from their profile. A marked guardian gets a linked Donor record, a separate donor portal login (DN-XXXX), a Donations menu in their sidebar, and can view their own donation history.

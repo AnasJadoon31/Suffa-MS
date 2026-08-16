@@ -16,6 +16,7 @@ import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as AssignmentsRouteImport } from './routes/assignments'
 import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as BlogRouteImport } from './routes/blog'
+import { Route as DailyReportsRouteImport } from './routes/daily-reports'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DonationsRouteImport } from './routes/donations'
 import { Route as ExaminationRouteImport } from './routes/examination'
@@ -77,6 +78,11 @@ const AttendanceRoute = AttendanceRouteImport.update({
 const BlogRoute = BlogRouteImport.update({
   id: '/blog',
   path: '/blog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DailyReportsRoute = DailyReportsRouteImport.update({
+  id: '/daily-reports',
+  path: '/daily-reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -223,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/assignments': typeof AssignmentsRoute
   '/attendance': typeof AttendanceRoute
   '/blog': typeof BlogRoute
+  '/daily-reports': typeof DailyReportsRoute
   '/dashboard': typeof DashboardRoute
   '/donations': typeof DonationsRoute
   '/examination': typeof ExaminationRoute
@@ -259,6 +266,7 @@ export interface FileRoutesByTo {
   '/assignments': typeof AssignmentsRoute
   '/attendance': typeof AttendanceRoute
   '/blog': typeof BlogRoute
+  '/daily-reports': typeof DailyReportsRoute
   '/dashboard': typeof DashboardRoute
   '/donations': typeof DonationsRoute
   '/examination': typeof ExaminationRoute
@@ -296,6 +304,7 @@ export interface FileRoutesById {
   '/assignments': typeof AssignmentsRoute
   '/attendance': typeof AttendanceRoute
   '/blog': typeof BlogRoute
+  '/daily-reports': typeof DailyReportsRoute
   '/dashboard': typeof DashboardRoute
   '/donations': typeof DonationsRoute
   '/examination': typeof ExaminationRoute
@@ -334,6 +343,7 @@ export interface FileRouteTypes {
     | '/assignments'
     | '/attendance'
     | '/blog'
+    | '/daily-reports'
     | '/dashboard'
     | '/donations'
     | '/examination'
@@ -370,6 +380,7 @@ export interface FileRouteTypes {
     | '/assignments'
     | '/attendance'
     | '/blog'
+    | '/daily-reports'
     | '/dashboard'
     | '/donations'
     | '/examination'
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/assignments'
     | '/attendance'
     | '/blog'
+    | '/daily-reports'
     | '/dashboard'
     | '/donations'
     | '/examination'
@@ -443,6 +455,7 @@ export interface RootRouteChildren {
   AssignmentsRoute: typeof AssignmentsRoute
   AttendanceRoute: typeof AttendanceRoute
   BlogRoute: typeof BlogRoute
+  DailyReportsRoute: typeof DailyReportsRoute
   DashboardRoute: typeof DashboardRoute
   DonationsRoute: typeof DonationsRoute
   ExaminationRoute: typeof ExaminationRoute
@@ -519,6 +532,13 @@ declare module '@tanstack/react-router' {
       path: '/blog'
       fullPath: '/blog'
       preLoaderRoute: typeof BlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/daily-reports': {
+      id: '/daily-reports'
+      path: '/daily-reports'
+      fullPath: '/daily-reports'
+      preLoaderRoute: typeof DailyReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -744,6 +764,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssignmentsRoute: AssignmentsRoute,
   AttendanceRoute: AttendanceRoute,
   BlogRoute: BlogRoute,
+  DailyReportsRoute: DailyReportsRoute,
   DashboardRoute: DashboardRoute,
   DonationsRoute: DonationsRoute,
   ExaminationRoute: ExaminationRoute,

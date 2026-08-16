@@ -11,6 +11,7 @@ import {
   Home,
   Layers,
   Library,
+  ListChecks,
   Megaphone,
   Monitor,
   Newspaper,
@@ -73,6 +74,13 @@ export const academicNav: NavItem[] = [
     description: "Classes, courses and sessions",
   },
   { to: "/resources", label: "Resources", icon: Library, description: "Shared study material", feature: "resources" },
+  {
+    to: "/daily-reports",
+    label: "Daily Reports",
+    icon: ListChecks,
+    description: "Daily reports for students",
+    visible: (user) => ["teacher", "parent", "student"].includes(user?.role ?? ""),
+  },
 ];
 
 export const operationsNav: NavItem[] = [
@@ -145,6 +153,7 @@ export const allNavItems: NavItem[] = [
 
 const teacherVisiblePaths = new Set([
   "/dashboard",
+  "/daily-reports",
   "/my-attendance",
   "/my-assessments",
   "/my-timetable",
@@ -161,6 +170,7 @@ const donorVisiblePaths = new Set([
 
 const guardianVisiblePaths = new Set([
   "/dashboard",
+  "/daily-reports",
   "/timetable",
   "/resources",
   "/assignments",

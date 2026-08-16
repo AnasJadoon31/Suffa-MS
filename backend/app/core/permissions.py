@@ -43,6 +43,7 @@ registry.register(
     Permission("students.send_credentials", "Send credentials", "auth", scoped=False),
     Permission("students.attendance.manage", "Mark/correct student attendance", "attendance", scoped=True),
     Permission("academics.manage", "Manage programs, classes, sections, courses, sessions", "academics", scoped=False),
+    Permission("daily_reports.manage", "Mark/edit daily reports for assigned classes", "academics", scoped=False),
     Permission("assignments.assign_teacher", "Assign teachers to class+course", "academics", scoped=False),
     Permission("attendance.take", "Take attendance", "attendance", scoped=True),
     Permission("attendance.edit_locked", "Override a locked attendance day", "attendance", scoped=False),

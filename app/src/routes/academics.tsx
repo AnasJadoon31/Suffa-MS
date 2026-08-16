@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { BookOpen, CalendarRange, ChevronDown, ChevronUp, GraduationCap, Layers, Plus, Trash2, Users } from "lucide-react";
+import { BookOpen, CalendarRange, ChevronDown, ChevronUp, GraduationCap, Layers, ListChecks, Plus, Trash2, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi, type AcademicClass, type AcademicSession } from "@/lib/mms/endpoints";
-import { academicsExtraApi, academicsMutations, type Section } from "@/lib/mms/more-endpoints";
+import { academicsExtraApi, academicsMutations, dailyReportApi, type Section } from "@/lib/mms/more-endpoints";
 import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
@@ -45,6 +45,168 @@ export const Route = createFileRoute("/academics")({
 });
 
 type Tab = "sessions" | "programs" | "classes" | "courses";
+
+function DailyReportFieldRow({
+  field,
+  onChange,
+  onRemove,
+}: {
+  field: { id: string; key: string; label: string; type: string; required: boolean; options: string[]; enabled: boolean };
+  onChange: (field: { id: string; key: string; label: string; type: string; required: boolean; options: string[]; enabled: boolean }) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
+  const [optionsText, setOptionsText] = useState(field.options.join(", "));
+
+  return (
+    <Card className="space-y-2 p-3">
+      <div className="grid grid-cols-[1fr_auto] gap-2">
+        <TextInput
+          value={field.label}
+          onChange={(e) => onChange({ ...field, label: e.target.value, key: e.target.value.toLowerCase().replace(/\s+/g, "_").slice(0, 64) })}
+          placeholder={t("Field label")}
+        />
+        <select
+          className="rounded-xl border border-border bg-background px-2 py-1 text-xs"
+          value={field.type}
+          onChange={(e) => {
+            const type = e.target.value;
+            onChange({ ...field, type, options: ["radio", "checkbox_group", "dropdown"].includes(type) ? (field.options.length ? field.options : [""]) : [] });
+            if (["radio", "checkbox_group", "dropdown"].includes(type) && field.options.length <= 1) {
+              setOptionsText(field.options.join(", "));
+            }
+          }}
+        >
+          {["text", "textarea", "number", "boolean", "dropdown", "radio", "checkbox_group", "phone", "file", "image"].map((tp) => (
+            <option key={tp} value={tp}>{tp}</option>
+          ))}
+        </select>
+      </div>
+      {["radio", "checkbox_group", "dropdown"].includes(field.type) ? (
+        <Field label={t("Options (comma-separated)")}>
+          <TextInput
+            value={optionsText}
+            onChange={(e) => {
+              setOptionsText(e.target.value);
+              onChange({ ...field, options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) });
+            }}
+            onBlur={() => setOptionsText(field.options.join(", "))}
+            placeholder={t("Option 1, Option 2, ...")}
+          />
+        </Field>
+      ) : null}
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-1.5 text-xs">
+          <input type="checkbox" checked={field.required} onChange={(e) => onChange({ ...field, required: e.target.checked })} className="h-3.5 w-3.5 rounded" />
+          {t("Required")}
+        </label>
+        <button className="text-xs text-destructive" onClick={onRemove}>
+          {t("Remove")}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function DailyReportConfigDialog({
+  classId,
+  className,
+  open,
+  onOpenChange,
+  onSave,
+}: {
+  classId: string;
+  className: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (config: { enabled: boolean; fields_definition: { key: string; label: string; type: string; required: boolean; options: string[]; enabled: boolean }[] }) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [enabled, setEnabled] = useState(false);
+  const [fields, setFields] = useState<{ id: string; key: string; label: string; type: string; required: boolean; options: string[]; enabled: boolean }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!open || !classId) return;
+    void (async () => {
+      try {
+        const config = await dailyReportApi.getConfig(classId);
+        setEnabled(config.enabled);
+        setFields(config.fields_definition.map((f) => ({ ...f, id: f.id ?? crypto.randomUUID(), options: f.options ?? [], enabled: f.enabled ?? true })));
+      } catch {
+        setEnabled(false);
+        setFields([]);
+      }
+      setLoaded(true);
+    })();
+  }, [open, classId]);
+
+  const handleSave = async () => {
+    await onSave({
+      enabled,
+      fields_definition: fields.map((f) => ({ key: f.key, label: f.label, type: f.type, required: f.required, options: f.options, enabled: f.enabled })),
+    });
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={(o) => !o && onOpenChange(false)}>
+      <AlertDialogContent className="max-h-[85vh] overflow-y-auto">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("Daily Reports")} — {className}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("Configure daily report fields for this class.")}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {!loaded ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">{t("Loading…")}</div>
+        ) : (
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(event) => setEnabled(event.target.checked)}
+                className="h-4 w-4 shrink-0"
+              />
+              <span className="min-w-0">
+                <span className="block font-semibold">{t("Enable daily reports")}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {t("When enabled, teachers can mark daily reports for students in this class.")}
+                </span>
+              </span>
+            </label>
+            {enabled ? (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground">{t("Report fields")}</p>
+                {fields.map((field) => (
+                  <DailyReportFieldRow
+                    key={field.id}
+                    field={field}
+                    onChange={(updated) => setFields(fields.map((f) => (f.id === updated.id ? updated : f)))}
+                    onRemove={() => setFields(fields.filter((f) => f.id !== field.id))}
+                  />
+                ))}
+                <button
+                  className="flex items-center gap-1.5 self-start rounded-xl border border-dashed border-border px-3 py-2 text-xs font-semibold text-muted-foreground"
+                  onClick={() => setFields([...fields, { id: crypto.randomUUID(), key: "", label: "", type: "text", required: false, options: [], enabled: true }])}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("Add field")}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+          <AlertDialogAction onClick={() => handleSave()}>
+            {t("Save changes")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 function AcademicsPage() {
     const { t } = useTranslation();
@@ -97,6 +259,7 @@ function AcademicsPage() {
   const [editProgramName, setEditProgramName] = useState("");
   const [editProgramPortal, setEditProgramPortal] = useState(true);
   const [deleteProgramId, setDeleteProgramId] = useState<string | null>(null);
+  const [editingClassDr, setEditingClassDr] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!editingSession) return;
@@ -361,6 +524,17 @@ function AcademicsPage() {
       await client.invalidateQueries({ queryKey: ["class-courses"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not delete course"),
+  });
+
+  const saveDailyReportConfig = useMutation({
+    mutationFn: ({ classId, config }: { classId: string; config: { enabled: boolean; fields_definition: { key: string; label: string; type: string; required: boolean; options: string[]; enabled: boolean }[] } }) =>
+      dailyReportApi.updateConfig(classId, config),
+    onSuccess: async () => {
+      toast.success("Daily report config saved");
+      setEditingClassDr(null);
+      await client.invalidateQueries({ queryKey: ["daily-report-config"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not save config"),
   });
 
   return (
@@ -674,6 +848,16 @@ function AcademicsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {editingClassDr ? (
+        <DailyReportConfigDialog
+          classId={editingClassDr.id}
+          className={editingClassDr.name}
+          open={Boolean(editingClassDr)}
+          onOpenChange={(open) => !open && setEditingClassDr(null)}
+          onSave={(config) => saveDailyReportConfig.mutateAsync({ classId: editingClassDr.id, config })}
+        />
+      ) : null}
+
       {!loading && tab === "programs" ? (
         <div className="space-y-2">
           <TextInput
@@ -728,6 +912,7 @@ function AcademicsPage() {
             assignCoursePending={assignClassCourse.isPending}
             unassignCourse={(classId: string, courseId: string) => unassignClassCourse.mutate({ classId, courseId })}
             unassignCoursePending={unassignClassCourse.isPending}
+            onEditDailyReports={(id, name) => setEditingClassDr({ id, name })}
           />
         </div>
       ) : null}
@@ -845,6 +1030,7 @@ function ClassList({
   assignCoursePending,
   unassignCourse,
   unassignCoursePending,
+  onEditDailyReports,
 }: {
   classes: AcademicClass[];
   programs: { id: string; name: string }[];
@@ -865,6 +1051,7 @@ function ClassList({
   assignCoursePending: boolean;
   unassignCourse: (classId: string, courseId: string) => void;
   unassignCoursePending: boolean;
+  onEditDailyReports: (classId: string, name: string) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -940,6 +1127,17 @@ function ClassList({
                     />
                   ) : null}
                 </div>
+                {canManage ? (
+                  <div className="px-3 py-1.5">
+                    <button
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary-soft px-2.5 py-1.5 text-xs font-bold text-primary"
+                      onClick={() => onEditDailyReports(cls.id, cls.name)}
+                    >
+                      <ListChecks className="h-3.5 w-3.5" />
+                      {t("Daily Reports")}
+                    </button>
+                  </div>
+                ) : null}
                 {classSections.map((sec) => (
                   <div
                     key={sec.id}

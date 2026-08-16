@@ -599,6 +599,38 @@ async def list_students(
     return [await _student_read(session, row) for row in rows]
 
 
+@router.get("/students/me")
+async def get_my_student_profile(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if current_user.role != UserRole.student:
+        raise HTTPException(status_code=403, detail="Only students can access this endpoint")
+    student = await session.scalar(
+        select(StudentProfile).where(
+            StudentProfile.user_id == current_user.id,
+            StudentProfile.madrasa_id == madrasa.id,
+        )
+    )
+    if not student:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+    enrollment = await session.scalar(
+        select(Enrollment).where(
+            Enrollment.student_id == student.id,
+            Enrollment.madrasa_id == madrasa.id,
+            Enrollment.ended_on.is_(None),
+        )
+    )
+    return {
+        "id": str(student.id),
+        "name": student.name,
+        "admission_number": student.admission_number,
+        "class_id": str(enrollment.class_id) if enrollment else None,
+        "section_id": str(enrollment.section_id) if enrollment else None,
+    }
+
+
 @router.get("/students/{student_id}", response_model=StudentRead)
 async def get_student(
     student_id: UUID,
@@ -1141,6 +1173,61 @@ async def list_guardian_students(
         response=response,
     )
     return [StudentRead.model_validate(row) for row in rows]
+
+
+# ----------------------------------------------------------- Guardian Children
+
+
+@router.get("/guardians/me/children")
+async def list_guardian_children(
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    if current_user.role != UserRole.parent:
+        raise HTTPException(status_code=403, detail="Only guardians can access this endpoint")
+
+    guardian = await session.scalar(
+        select(Guardian).where(Guardian.user_id == current_user.id, Guardian.madrasa_id == madrasa.id)
+    )
+    if not guardian:
+        raise HTTPException(status_code=404, detail="Guardian not found")
+
+    students = (
+        await session.execute(
+            select(StudentProfile)
+            .join(StudentGuardian, StudentGuardian.student_id == StudentProfile.id)
+            .where(StudentGuardian.guardian_id == guardian.id, StudentProfile.madrasa_id == madrasa.id)
+            .order_by(StudentProfile.name)
+        )
+    ).scalars().all()
+
+    result = []
+    for student in students:
+        enrollment = await session.scalar(
+            select(Enrollment).where(
+                Enrollment.student_id == student.id,
+                Enrollment.madrasa_id == madrasa.id,
+                Enrollment.ended_on.is_(None),
+            )
+        )
+        class_info = None
+        if enrollment:
+            academic_class = await session.get(AcademicClass, enrollment.class_id) if enrollment.class_id else None
+            section = await session.get(Section, enrollment.section_id) if enrollment.section_id else None
+            class_info = {
+                "id": str(enrollment.class_id),
+                "name": academic_class.name if academic_class else None,
+                "section_id": str(enrollment.section_id) if enrollment.section_id else None,
+                "section_name": section.name if section else None,
+            }
+        result.append({
+            "id": str(student.id),
+            "name": student.name,
+            "admission_number": student.admission_number,
+            "current_class": class_info,
+        })
+    return result
 
 
 # ---------------------------------------------------------------- Guardian Portal

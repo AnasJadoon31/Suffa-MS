@@ -12,6 +12,7 @@ from app.core.dependencies import (
     get_current_madrasa,
     require_permission,
 )
+from app.core.dependencies import user_has_permission
 from app.core.hijri import to_hijri_string
 from app.core.error_codes import ErrorCode
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars
@@ -23,6 +24,8 @@ from app.modules.academics.models import (
     AcademicSession,
     Course,
     ClassCourse,
+    DailyReportConfig,
+    DailyReportEntry,
     Enrollment,
     Madrasa,
     Program,
@@ -43,6 +46,11 @@ from app.modules.academics.schemas import (
     CourseCreate,
     CourseRead,
     CourseUpdate,
+    DailyReportConfigCreate,
+    DailyReportConfigRead,
+    DailyReportConfigUpdate,
+    DailyReportEntryRead,
+    DailyReportEntryValues,
     ProgramCreate,
     ProgramRead,
     ProgramUpdate,
@@ -870,3 +878,217 @@ async def unassign_student(
     enrollment.ended_on = end_date
     await session.commit()
     return {"status": "success", "ended_on": end_date.isoformat()}
+
+
+# ----------------------------------------------------------- Daily Report Config
+
+
+def _validate_fields_definition(fields: list[dict]) -> list[dict]:
+    """Ensure field definitions are well-formed and keys are unique."""
+    keys: set[str] = set()
+    for f in fields:
+        key = f.get("key") or f.get("label", "").lower().strip().replace(" ", "_")[:64]
+        if not key:
+            raise HTTPException(status_code=400, detail="Each field must have a non-empty key or label.")
+        if key in keys:
+            raise HTTPException(status_code=409, detail=f"Duplicate field key: {key}")
+        keys.add(key)
+        f["key"] = key
+        ftype = f.get("type", "text")
+        if ftype in {"radio", "checkbox_group", "dropdown"} and not f.get("options"):
+            raise HTTPException(status_code=400, detail=f"Field '{f.get('label')}' of type '{ftype}' requires options.")
+    return fields
+
+
+@router.get("/classes/{class_id}/daily-report-config", response_model=DailyReportConfigRead)
+async def get_daily_report_config(
+    class_id: UUID,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> DailyReportConfigRead:
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    config = (
+        await session.execute(
+            select(DailyReportConfig).where(
+                DailyReportConfig.class_id == class_id,
+                DailyReportConfig.madrasa_id == madrasa.id,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if config is None:
+        config = DailyReportConfig(madrasa_id=madrasa.id, class_id=class_id, enabled=False, fields_definition=[])
+        session.add(config)
+        await session.commit()
+        await session.refresh(config)
+
+    return DailyReportConfigRead.model_validate(config)
+
+
+@router.put("/classes/{class_id}/daily-report-config", response_model=DailyReportConfigRead)
+async def update_daily_report_config(
+    class_id: UUID,
+    payload: DailyReportConfigUpdate,
+    current_user: User = Depends(require_permission("academics.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> DailyReportConfigRead:
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    config = (
+        await session.execute(
+            select(DailyReportConfig).where(
+                DailyReportConfig.class_id == class_id,
+                DailyReportConfig.madrasa_id == madrasa.id,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if config is None:
+        config = DailyReportConfig(madrasa_id=madrasa.id, class_id=class_id, enabled=False, fields_definition=[])
+        session.add(config)
+
+    if payload.enabled is not None:
+        config.enabled = payload.enabled
+    if payload.fields_definition is not None:
+        raw = [f.model_dump() if hasattr(f, "model_dump") else f for f in payload.fields_definition]
+        config.fields_definition = _validate_fields_definition(raw)
+
+    await session.commit()
+    await session.refresh(config)
+    return DailyReportConfigRead.model_validate(config)
+
+
+# ----------------------------------------------------------- Daily Report Entries
+
+
+@router.get("/classes/{class_id}/daily-report-entries", response_model=list[DailyReportEntryRead])
+async def list_daily_report_entries(
+    class_id: UUID,
+    section_id: UUID | None = None,
+    date: DateType | None = None,
+    start_date: DateType | None = None,
+    end_date: DateType | None = None,
+    response: Response = None,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[DailyReportEntryRead]:
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    stmt = select(DailyReportEntry).where(
+        DailyReportEntry.class_id == class_id,
+        DailyReportEntry.madrasa_id == madrasa.id,
+    )
+    if section_id is not None:
+        stmt = stmt.where(DailyReportEntry.section_id == section_id)
+    if date is not None:
+        stmt = stmt.where(DailyReportEntry.date == date)
+    elif start_date is not None or end_date is not None:
+        if start_date:
+            stmt = stmt.where(DailyReportEntry.date >= start_date)
+        if end_date:
+            stmt = stmt.where(DailyReportEntry.date <= end_date)
+
+    result = await session.execute(stmt.order_by(DailyReportEntry.date.desc()))
+    return [DailyReportEntryRead.model_validate(e) for e in result.scalars().all()]
+
+
+@router.post("/classes/{class_id}/daily-report-entries", response_model=DailyReportEntryRead)
+async def upsert_daily_report_entry(
+    class_id: UUID,
+    payload: DailyReportEntryValues,
+    section_id: UUID = Query(...),
+    student_id: UUID = Query(...),
+    entry_date: DateType = Query(alias="date"),
+    current_user: User = Depends(require_permission("daily_reports.manage")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> DailyReportEntryRead:
+    academic_class = await session.get(AcademicClass, class_id)
+    if not academic_class or academic_class.madrasa_id != madrasa.id:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Verify the student is enrolled in this class/section
+    enrollment = (
+        await session.execute(
+            select(Enrollment).where(
+                Enrollment.student_id == student_id,
+                Enrollment.class_id == class_id,
+                Enrollment.section_id == section_id,
+                Enrollment.ended_on.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Student not enrolled in this class/section")
+
+    # Only one entry per student per day — update if exists
+    entry = (
+        await session.execute(
+            select(DailyReportEntry).where(
+                DailyReportEntry.class_id == class_id,
+                DailyReportEntry.student_id == student_id,
+                DailyReportEntry.date == entry_date,
+                DailyReportEntry.madrasa_id == madrasa.id,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if entry is None:
+        entry = DailyReportEntry(
+            madrasa_id=madrasa.id,
+            class_id=class_id,
+            section_id=section_id,
+            student_id=student_id,
+            date=entry_date,
+            values=payload.values,
+            created_by_id=current_user.id,
+        )
+        session.add(entry)
+    else:
+        entry.values = payload.values
+        entry.updated_by_id = current_user.id
+
+    await session.commit()
+    await session.refresh(entry)
+    return DailyReportEntryRead.model_validate(entry)
+
+
+@router.get("/students/{student_id}/daily-report-entries", response_model=list[DailyReportEntryRead])
+async def list_student_daily_report_entries(
+    student_id: UUID,
+    start_date: DateType | None = None,
+    end_date: DateType | None = None,
+    current_user: User = Depends(get_current_user),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> list[DailyReportEntryRead]:
+    # Authorization: students can view their own; staff with permission can view any
+    if current_user.role == UserRole.student:
+        student = await session.scalar(
+            select(StudentProfile).where(StudentProfile.user_id == current_user.id, StudentProfile.madrasa_id == madrasa.id)
+        )
+        if not student or student.id != student_id:
+            raise HTTPException(status_code=403, detail="Can only view your own reports")
+    elif not await user_has_permission(current_user, "students.view", session):
+        raise HTTPException(status_code=403, detail="Missing permission")
+    stmt = select(DailyReportEntry).where(
+        DailyReportEntry.student_id == student_id,
+        DailyReportEntry.madrasa_id == madrasa.id,
+    )
+    if start_date:
+        stmt = stmt.where(DailyReportEntry.date >= start_date)
+    if end_date:
+        stmt = stmt.where(DailyReportEntry.date <= end_date)
+
+    result = await session.execute(stmt.order_by(DailyReportEntry.date.desc()))
+    return [DailyReportEntryRead.model_validate(e) for e in result.scalars().all()]

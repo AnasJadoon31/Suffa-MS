@@ -5,6 +5,13 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-16 — Daily Reports (Follow-up)
+
+- Add server-side enforcement of "editable same day only" (check date on entry update, reject if not today).
+- Add a bulk-save / "save all" button for teachers to submit all student reports at once.
+- Add daily reports export (PDF/CSV) for principals.
+- Consider making the calendar view show partial vs complete report status (e.g., some students done but not all).
+
 ## 2026-08-15 — Guardian wards' data views
 
 - Build a guardian-specific assignments/grades view (read-only, scoped to their wards) so guardians can see ward progress after being blocked from the management view.
