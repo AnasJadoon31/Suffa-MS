@@ -339,12 +339,12 @@ function AnnouncementCard({
           <Megaphone className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-display text-base font-extrabold leading-snug">{item.title}</p>
+          <p className="truncate font-display text-base font-extrabold leading-snug">{item.title}</p>
           <p className="text-xs text-muted-foreground">
             {new Date(item.publish_at ?? item.created_at).toLocaleString()}
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+        <div className="flex shrink-0 flex-wrap justify-end gap-1.5 max-w-[40%]">
           {item.category ? <Pill tone="gold">{item.category}</Pill> : null}
           <Pill>{audienceLabel(item.audience_scope)}</Pill>
         </div>

@@ -421,7 +421,7 @@ function StudentView({ data }: { data: StudentDashboard }) {
           {t("My attendance")}</p>
         <p className="mt-1 font-display text-4xl font-extrabold">{rate}%</p>
         <p className="mt-1 text-xs text-primary-foreground/70">
-          {present} {t("present of")}{values.length} {t("recorded days")}</p>
+          {present} {t("present of")} {values.length} {t("recorded days")}</p>
       </Card>
 
       <SectionTitle>{t("Today's periods")}</SectionTitle>
