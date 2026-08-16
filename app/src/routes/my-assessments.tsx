@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, ChevronRight, Download, GraduationCap, Users } from "lucide-react";
+import { BookOpen, ChevronRight, Download, GraduationCap, Upload, Users } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
 import { FormSheet } from "@/components/app/FormSheet";
@@ -18,7 +19,7 @@ import { DrillHeader, DrillSearchInput, MarkingView, ResultsView } from "./exami
 export const Route = createFileRoute("/my-assessments")({
   head: () => ({
     meta: [
-      { title: "My Assessments — Suffa MS" },
+      { title: "My Assignments — Suffa MS" },
       { name: "description", content: "My assignments and submission status" },
     ],
   }),
@@ -26,6 +27,229 @@ export const Route = createFileRoute("/my-assessments")({
 });
 
 function MyAssessmentsPage() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  if (user?.role === "student") return <StudentAssessments />;
+  return <TeacherAssessments />;
+}
+
+function StudentAssessments() {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "submitted" | "graded" | "overdue">("all");
+  const [courseFilter, setCourseFilter] = useState("");
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+
+  const assignments = useQuery({
+    queryKey: ["my-assignments", "student"],
+    queryFn: () => assessmentsApi.listAssignments({ mine_only: true, sort: "created_at" }),
+  });
+
+  const courseOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of assignments.data ?? []) {
+      if (a.course_id && a.course_name) map.set(a.course_id, a.course_name);
+    }
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [assignments.data]);
+
+  const filtered = useMemo(() => {
+    let list = assignments.data ?? [];
+    const term = search.trim().toLowerCase();
+    if (term) {
+      list = list.filter((a) =>
+        `${a.title} ${a.description ?? ""} ${a.course_name ?? ""} ${a.class_name ?? ""}`.toLowerCase().includes(term),
+      );
+    }
+    if (courseFilter) {
+      list = list.filter((a) => a.course_id === courseFilter);
+    }
+    if (statusFilter === "pending") list = list.filter((a) => !a.submitted_at && new Date(a.due_date) >= new Date());
+    else if (statusFilter === "overdue") list = list.filter((a) => !a.submitted_at && new Date(a.due_date) < new Date());
+    else if (statusFilter === "submitted") list = list.filter((a) => a.submitted_at && a.submission_mark == null);
+    else if (statusFilter === "graded") list = list.filter((a) => a.submission_mark != null);
+    return list;
+  }, [assignments.data, search, statusFilter, courseFilter]);
+
+  const pending = filtered.filter((a) => !a.submitted_at);
+  const submitted = filtered.filter((a) => a.submitted_at);
+
+  const openAttachment = async (fileKey: string) => {
+    const url = await filesApi.presignDownload(fileKey);
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleSubmit = async (assignmentId: string) => {
+    if (!submissionFile) {
+      toast.error(t("Choose a file first"));
+      return;
+    }
+    setSubmittingId(assignmentId);
+    try {
+      const fileKey = await uploadFile(submissionFile, "submissions");
+      await assessmentsMutations.submitAssignment(assignmentId, fileKey);
+      toast.success(t("Assignment submitted"));
+      setSubmissionFile(null);
+      await client.invalidateQueries({ queryKey: ["my-assignments"] });
+    } catch (err) {
+      toast.error(apiErrorMessage(err, t("Could not submit")));
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const handleWithdraw = async (assignmentId: string) => {
+    try {
+      await assessmentsMutations.removeOwnSubmission(assignmentId);
+      toast.success(t("Submission withdrawn"));
+      await client.invalidateQueries({ queryKey: ["my-assignments"] });
+    } catch (err) {
+      toast.error(apiErrorMessage(err, t("Could not withdraw")));
+    }
+  };
+
+  const renderAssignmentCard = (assignment: Assignment) => {
+    const overdue = new Date(assignment.due_date) < new Date() && !assignment.submitted_at;
+    return (
+      <Card key={assignment.id} className="space-y-2.5 p-3.5">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
+            <p className="truncate font-display text-base font-extrabold">{assignment.title}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {[assignment.course_name, assignment.class_name, assignment.section_name].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          {assignment.submitted_at ? (
+            assignment.submission_mark != null ? (
+              <Pill tone="success">{t("Graded")}</Pill>
+            ) : (
+              <Pill tone="muted">{t("Submitted")}</Pill>
+            )
+          ) : (
+            <Pill tone={overdue ? "destructive" : "warning"}>
+              {overdue ? t("Overdue") : t("Open")}
+            </Pill>
+          )}
+        </div>
+
+        {assignment.description ? (
+          <p className="line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{assignment.description}</p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span>{t("Due")}: {new Date(assignment.due_date).toLocaleDateString()}</span>
+          {assignment.max_marks != null ? <span>{t("Max")}: {assignment.max_marks}</span> : null}
+        </div>
+
+        {assignment.attachment_key ? (
+          <button onClick={() => void openAttachment(assignment.attachment_key!)} className="flex items-center gap-1 text-xs font-bold text-primary">
+            <Download className="h-3.5 w-3.5" />
+            {t("Attachment")}
+          </button>
+        ) : null}
+
+        {assignment.submission_mark != null ? (
+          <div className="rounded-xl bg-success/10 px-3 py-2 text-xs font-semibold text-success">
+            {t("Mark")}: {assignment.submission_mark}
+            {assignment.submission_feedback ? ` — ${assignment.submission_feedback}` : ""}
+          </div>
+        ) : null}
+
+        {!assignment.submitted_at ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-muted px-3 py-2 text-xs font-bold">
+              <Upload className="h-3.5 w-3.5" />
+              {submissionFile?.name && submittingId === assignment.id ? submissionFile.name : t("Choose file")}
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  setSubmissionFile(e.target.files?.[0] ?? null);
+                  setSubmittingId(assignment.id);
+                }}
+              />
+            </label>
+            <button
+              onClick={() => void handleSubmit(assignment.id)}
+              disabled={!submissionFile || submittingId !== assignment.id}
+              className="gradient-emerald flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+            >
+              {submittingId === assignment.id && submissionFile ? <GraduationCap className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              {t("Submit")}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => void handleWithdraw(assignment.id)}
+            className="text-xs font-bold text-destructive"
+          >
+            {t("Withdraw submission")}
+          </button>
+        )}
+      </Card>
+    );
+  };
+
+  return (
+    <AppShell title={t("My assignments")} subtitle={t("Your assignments and submission status")}>
+      {assignments.isLoading ? <SkeletonList rows={4} /> : null}
+      {assignments.isError ? (
+        <EmptyState title={apiErrorMessage(assignments.error, t("Could not load assignments"))} />
+      ) : null}
+
+      {assignments.data ? (
+        <>
+          <div className="mb-3 space-y-2">
+            <Field label={t("Search assignments")}>
+              <TextInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Type a title, course or class...")} />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <div className="min-w-[7rem] flex-1">
+                <CustomDropdown value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
+                  <option value="all">{t("All status")}</option>
+                  <option value="pending">{t("Pending")}</option>
+                  <option value="overdue">{t("Overdue")}</option>
+                  <option value="submitted">{t("Submitted")}</option>
+                  <option value="graded">{t("Graded")}</option>
+                </CustomDropdown>
+              </div>
+              {courseOptions.length > 1 ? (
+                <div className="min-w-[7rem] flex-1">
+                  <CustomDropdown value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
+                    <option value="">{t("All courses")}</option>
+                    {courseOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </CustomDropdown>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {pending.length > 0 ? (
+            <>
+              <SectionTitle>{t("Pending")}</SectionTitle>
+              <div className="space-y-2.5">{pending.map(renderAssignmentCard)}</div>
+            </>
+          ) : null}
+
+          {submitted.length > 0 ? (
+            <>
+              <SectionTitle>{t("Submitted")}</SectionTitle>
+              <div className="space-y-2.5">{submitted.map(renderAssignmentCard)}</div>
+            </>
+          ) : null}
+
+          {pending.length === 0 && submitted.length === 0 ? (
+            <EmptyState title={t("No assignments yet")} hint={t("New tasks will show up here.")} />
+          ) : null}
+        </>
+      ) : null}
+    </AppShell>
+  );
+}
+
+function TeacherAssessments() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
@@ -167,7 +391,7 @@ function MyAssessmentsPage() {
 
   return (
     <AppShell
-      title={t("My assessments")}
+      title={t("My assignments")}
       subtitle={t("Your classes, marking and results")}
       right={
         tab === "assignments" ? (

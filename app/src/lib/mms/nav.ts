@@ -107,7 +107,7 @@ export const myNav: NavItem[] = [
   },
   {
     to: "/my-assessments",
-    label: "My Assessments",
+    label: "My Assignments",
     icon: ClipboardList,
     description: "Your assignments and results",
   },
