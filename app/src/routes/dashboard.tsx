@@ -85,7 +85,7 @@ function DashboardPage() {
 
   return (
     <AppShell
-      title={`${t("Assalamu alaikum")}, ${data?.role === "donor" && donorProfile.data ? donorProfile.data.name : (user?.username ?? "")}`}
+      title={`${t("Assalamu alaikum")}, ${data?.role === "donor" && donorProfile.data ? donorProfile.data.name : (user?.name ?? user?.username ?? "")}`}
       subtitle={
         today.data ? `${today.data.hijri} · ${today.data.gregorian}` : (madrasa?.name ?? "Suffa MS")
       }
