@@ -258,11 +258,11 @@ export const attendanceApi = {
         params: range,
       })
       .then((r) => r.data),
-  studentHistory: (classId: string, studentId: string, range?: AttendanceDateRange) =>
+  studentHistory: (classId: string, studentId: string, range?: AttendanceDateRange, courseId?: string) =>
     api
       .get<StudentAttendanceHistory>(
         `/api/v1/attendance/classes/${classId}/students/${studentId}/history`,
-        { params: range },
+        { params: { ...range, ...(courseId ? { course_id: courseId } : {}) } },
       )
       .then((r) => r.data),
   sync: (entries: AttendanceSyncEntry[]) =>

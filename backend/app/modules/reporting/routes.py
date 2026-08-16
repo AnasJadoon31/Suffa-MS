@@ -687,9 +687,24 @@ async def _student_dashboard_for_profile(
         and (form.open_until is None or form.open_until >= now)
     ]
 
+    class_courses: list[dict[str, str]] = []
+    if viewer_class_id is not None:
+        course_rows = (
+            await session.execute(
+                select(Course.id, Course.name)
+                .join(ClassCourse, ClassCourse.course_id == Course.id)
+                .where(ClassCourse.class_id == viewer_class_id)
+                .order_by(Course.name)
+            )
+        ).all()
+        class_courses = [{"id": str(cid), "name": cname} for cid, cname in course_rows]
+
     return {
         "role": "student",
         "class_id": str(viewer_class_id) if viewer_class_id else None,
+        "section_id": str(enrollment.section_id) if enrollment and enrollment.section_id else None,
+        "program_id": str(enrollment.program_id) if enrollment and enrollment.program_id else None,
+        "courses": class_courses,
         "my_attendance": my_attendance,
         "my_attendance_periods": my_attendance_periods,
         "today_timetable": today_timetable,

@@ -107,20 +107,46 @@ function ParentAttendance() {
     queryFn: () => reportingApi.dashboard(),
   });
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedCourses, setSelectedCourses] = useState<Record<string, string>>({});
+
+  const selfContainedSetting = useQuery({
+    queryKey: ["setting-self-contained-enabled"],
+    queryFn: async () => {
+      const catalog = await opsApi.listSettingsCatalog();
+      const enabled = catalog.find((s) => s.key === "academics.self_contained_enabled");
+      const programs = catalog.find((s) => s.key === "academics.self_contained_programs");
+      const programIds = new Set<string>();
+      if (programs?.value) {
+        try {
+          const parsed = JSON.parse(programs.value);
+          if (Array.isArray(parsed)) parsed.forEach((id: string) => programIds.add(id));
+        } catch { /* ignore */ }
+      }
+      return { enabled: enabled?.value === "true", programIds };
+    },
+    staleTime: 60_000,
+  });
+
   const data = dashboard.data;
 
-  if (dashboard.isLoading) return <AppShell title={t("Attendance")}><SkeletonList rows={4} /></AppShell>;
+  if (dashboard.isLoading || selfContainedSetting.isLoading)
+    return <AppShell title={t("Attendance")}><SkeletonList rows={4} /></AppShell>;
   if (dashboard.isError) return <AppShell title={t("Attendance")}><EmptyState title={t("Attendance unavailable")} /></AppShell>;
 
   const children = Array.isArray((data as any)?.children) ? (data as any).children : [];
   if (children.length === 0) return <AppShell title={t("Attendance")}><EmptyState title={t("No children found")} /></AppShell>;
+
+  function isSelfContained(child: any): boolean {
+    if (!selfContainedSetting.data?.enabled || !child.program_id) return false;
+    return selfContainedSetting.data.programIds.has(child.program_id);
+  }
 
   return (
     <AppShell title={t("Attendance")}>
       <div className="space-y-2.5">
         {children.map((child: any) => {
           const isOpen = expanded === child.id;
-          const classId = child.current_class?.id ?? child.class_id;
+          const classId = child.class_id;
           if (!classId) {
             return (
               <Card key={child.id} className="p-3.5">
@@ -129,6 +155,11 @@ function ParentAttendance() {
               </Card>
             );
           }
+          const selfContained = isSelfContained(child);
+          const courses: { id: string; name: string }[] = child.courses || [];
+          const needsCourseSelection = !selfContained && courses.length > 0;
+          const selectedCourseId = selectedCourses[child.id] || "";
+
           return (
             <Card key={child.id} className="overflow-hidden p-0">
               <button
@@ -150,13 +181,32 @@ function ParentAttendance() {
               </button>
               <div className={cn("border-t border-border", !isOpen && "hidden")}>
                 <div className="px-3.5 pb-3.5 pt-2">
-                  <MyStudentAttendance
-                    child={{
-                      id: child.id,
-                      name: child.name,
-                      classId,
-                    }}
-                  />
+                  {needsCourseSelection && !selectedCourseId ? (
+                    <div className="space-y-3">
+                      <p className="text-xs text-muted-foreground">{t("Select a course to view attendance")}</p>
+                      <Select
+                        label={t("Course")}
+                        value=""
+                        onChange={(val) => setSelectedCourses((prev) => ({ ...prev, [child.id]: val }))}
+                        options={[
+                          { value: "", label: t("Select") },
+                          ...courses.map((c) => ({ value: c.id, label: c.name })),
+                        ]}
+                      />
+                    </div>
+                  ) : (
+                    <ChildAttendance
+                      child={{
+                        id: child.id,
+                        name: child.name,
+                        classId,
+                      }}
+                      courseId={selectedCourseId || undefined}
+                      courseName={courses.find((c) => c.id === selectedCourseId)?.name}
+                      showCourseLabel={needsCourseSelection}
+                      onChangeCourse={() => setSelectedCourses((prev) => ({ ...prev, [child.id]: "" }))}
+                    />
+                  )}
                 </div>
               </div>
             </Card>
@@ -164,6 +214,41 @@ function ParentAttendance() {
         })}
       </div>
     </AppShell>
+  );
+}
+
+function ChildAttendance({
+  child,
+  courseId,
+  courseName,
+  showCourseLabel,
+  onChangeCourse,
+}: {
+  child: { id: string; name: string; classId: string };
+  courseId?: string;
+  courseName?: string;
+  showCourseLabel: boolean;
+  onChangeCourse: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div>
+      {showCourseLabel ? (
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <Pill tone="default">
+            <BookOpen className="h-3 w-3" />
+            {courseName}
+          </Pill>
+          <button
+            onClick={onChangeCourse}
+            className="text-xs font-semibold text-primary hover:underline"
+          >
+            {t("Change course")}
+          </button>
+        </div>
+      ) : null}
+      <MyStudentAttendance child={child} courseId={courseId} />
+    </div>
   );
 }
 
@@ -1398,16 +1483,16 @@ function TeacherAttendancePanel({ canEdit }: { canEdit: boolean }) {
 
 /* -------------------------------------------------------- Student's own */
 
-function MyStudentAttendance({ child }: { child?: { id: string; name: string; classId: string } }) {
+function MyStudentAttendance({ child, courseId }: { child?: { id: string; name: string; classId: string }; courseId?: string }) {
     const { t } = useTranslation();
   const [month, setMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const isGuardianView = Boolean(child);
 
   const history = useQuery({
-    queryKey: ["my-attendance", child?.id, month.getFullYear(), month.getMonth()],
+    queryKey: ["my-attendance", child?.id, month.getFullYear(), month.getMonth(), courseId],
     queryFn: () => child
-      ? attendanceApi.studentHistory(child.classId, child.id, monthRange(month))
+      ? attendanceApi.studentHistory(child.classId, child.id, monthRange(month), courseId)
       : attendanceApi.myStudentHistory(monthRange(month)),
     retry: false,
   });

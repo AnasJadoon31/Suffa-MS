@@ -3,6 +3,13 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-15 — Feature: Guardian attendance course selection for non-self-contained programs
+
+- **What**: When a guardian's child is enrolled in a program that is NOT self-contained, the attendance view now requires selecting a course before showing the attendance calendar. After selection, a course label with "Change course" button is shown above the attendance so it's always clear which course the attendance is for. Self-contained programs skip course selection and show attendance directly.
+- **Files**: `app/src/routes/attendance.tsx` (ParentAttendance + ChildAttendance components), `app/src/lib/mms/endpoints.ts` (studentHistory API now passes courseId), `backend/app/modules/reporting/routes.py` (dashboard now returns class_id, section_id, program_id, courses per child), `app/src/i18n/locales/en.json`, `app/src/i18n/locales/ur.json`
+- **Verified**: `npm run build` succeeds. Backend imports OK.
+- **Logic**: Dashboard response now includes `program_id` and `courses` for each child. ParentAttendance checks `academics.self_contained_enabled` / `academics.self_contained_programs` settings against the child's `program_id`. If not self-contained and the class has courses, shows a course dropdown first. Once selected, `ChildAttendance` renders a course label + "Change course" link above `MyStudentAttendance` (which filters by courseId).
+
 ## 2026-08-15 — Fix: Guardian portal leaking all assignments + admin sidebar
 
 - **Sidebar leak**: `isNavItemVisible` in `nav.ts` had no guardian branch, so guardians fell through to the default return and saw every non-feature-gated nav item (same as admin). Added `guardianVisiblePaths` allowlist: `/dashboard`, `/timetable`, `/resources`, `/announcements`, `/me`.
