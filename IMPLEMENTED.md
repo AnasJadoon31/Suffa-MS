@@ -3,6 +3,17 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-16 — Feature: Guardian Results under Academics
+
+- **What**: Added a "Results" entry under Academics in the guardian sidebar. Lists all guardian's children in an accordion (same pattern as Assignments). Expanding a child shows session selector + course breakdown with expandable exam marks.
+- **Files**:
+  - `backend/app/modules/assessments/routes.py` — added `/results/parent-view` endpoint that returns all children with their session results (accepts optional `session_id` query param for session switching).
+  - `app/src/lib/mms/more-endpoints.ts` — added `ParentResultView` type and `parentResults()` API function.
+  - `app/src/routes/results.tsx` — added `GuardianResultsView` and `ChildResultView` components; updated `ResultsPage` to render guardian view for parent role.
+  - `app/src/lib/mms/nav.ts` — added `/results` to `guardianVisiblePaths`.
+- **Verified**: Frontend build passes (`cd app && npm run build`); backend route registered and Python syntax valid.
+- **Notes**: Reuses the same accordion pattern and course breakdown UI from assignments/student results. Results visibility respects the `published` flag from the backend.
+
 ## 2026-08-16 — Fix: Non-admission form submission 500 error
 
 - **What**: Non-admission forms (created via the Forms tab) returned "Internal server error" on submission because `normalize_admission_fields` always injected built-in admission fields (student_name, guardian_name, etc.) into any form's validation, even when the form had nothing to do with admissions. Required built-in fields missing from the response triggered 422; malformed field definitions in the DB triggered `pydantic.ValidationError` which propagated as a 500.
