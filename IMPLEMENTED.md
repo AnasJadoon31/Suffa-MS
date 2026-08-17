@@ -3,6 +3,13 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-17 — Fix: Deployment failure (stale pgdata volume + DNS conflict on Coolify network)
+
+- **What**: Deployment failed with `InvalidPasswordError: password authentication failed for user "mms"`. Two root causes: (1) the `pgdata` volume had stale credentials from a previous deployment — PostgreSQL ignores `POSTGRES_PASSWORD` when the data directory already exists; (2) the backend resolved `postgres` and `redis` hostnames to Coolify's shared `coolify-db` and Coolify Redis containers on the shared `coolify` network instead of the project's own containers.
+- **Fix (server)**: Removed the stale `pgdata` volume and recreated the postgres container. Updated backend and worker to use full container names (`postgres-mehk45n5h18uso5e94d7tpzu-024157606306`, `redis-mehk45n5h18uso5e94d7tpzu-024157612635`) in `DATABASE_URL` and `REDIS_URL` to avoid DNS ambiguity.
+- **Fix (repo)**: Updated `docker-compose.yml` to add explicit `networks.default.alias` entries for `postgres` and `redis` so service names resolve correctly even when the backend is also attached to the `coolify` network.
+- **Verified**: All containers healthy; `/healthz` returns `{"status":"ok"}`; worker started and processed cron job.
+
 ## 2026-08-17 — Feature: My Assignments parity with Assignments page
 
 - **What**: My Assignments (`/my-assessments`) now mirrors the Assignments (`/my-assignments`) page card-for-card. Teachers see their own uploads + other teachers' uploads for their timetable classes/courses. Clicking a card opens the shared `AssignmentDetailSheet` with file download, submissions list, and grading UI — same as the Assignments page. Own assignments show Edit/Delete actions on the card and in the detail sheet. Teachers can view submissions and grade any assignment on a class/course they teach (not just their own).
