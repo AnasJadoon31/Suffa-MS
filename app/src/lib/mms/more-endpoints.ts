@@ -100,6 +100,7 @@ export interface Assignment {
   submission_mark?: number | null;
   submission_feedback?: string | null;
   submitted_at?: string | null;
+  is_mine: boolean;
 }
 
 export interface ParentAssignmentView {

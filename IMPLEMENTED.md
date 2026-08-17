@@ -3,6 +3,12 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-17 — Feature: My Assignments parity with Assignments page
+
+- **What**: My Assignments (`/my-assessments`) now mirrors the Assignments (`/my-assignments`) page card-for-card. Teachers see their own uploads + other teachers' uploads for their timetable classes/courses. Clicking a card opens the shared `AssignmentDetailSheet` with file download, submissions list, and grading UI — same as the Assignments page. Own assignments show Edit/Delete actions on the card and in the detail sheet. Teachers can view submissions and grade any assignment on a class/course they teach (not just their own).
+- **Files**: `app/src/routes/my-assessments.tsx` (filter bar layout, `canManage` based on role, Edit/Delete gated by `is_mine`), `app/src/routes/assignments.tsx` (exported `AssignmentDetailSheet` and `EditAssignmentSheet`, added `onMutated` callback), `backend/app/modules/assessments/routes.py` (teachers without `view_all` see all assignments for their timetable classes when `mine_only` is not set; `_require_assignment_owner_or_manager` now allows teachers to manage assignments on their timetable classes/courses), `backend/app/modules/assessments/schemas.py` (added `is_mine: bool` to `AssignmentRead`), `app/src/lib/mms/more-endpoints.ts` (added `is_mine` to `Assignment` type), `app/src/i18n/locales/en.json` and `ur.json` (added "By" key).
+- **Verified**: `cd app && npm run build` passes; assignment tests pass (11/11).
+
 ## 2026-08-16 — Fix: Duplicate exam columns in Results tab
 
 - **What**: Results tab showed Mid Term/Final Term/Assignments repeated 3× because `_exam_types_for_result_scope` returned duplicate `ExamType` rows from the DB.

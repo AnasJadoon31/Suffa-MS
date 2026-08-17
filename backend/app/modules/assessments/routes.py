@@ -254,14 +254,28 @@ async def _require_assignment_owner_or_manager(
     current_user: User,
     assignment: Assignment,
 ) -> None:
-    """Teachers may manage only assignments they created themselves."""
+    """Teachers may manage their own assignments or any assignment on a class/course they teach."""
     if current_user.role != UserRole.teacher:
         return
     if await user_has_permission(current_user, "assignments.manage_all", session):
         return
     teacher = await _teacher_profile(session, current_user)
-    if teacher is None or assignment.created_by_id != teacher.id:
+    if teacher is None:
         raise HTTPException(status_code=403, detail="You can only manage your own assignments")
+    if assignment.created_by_id == teacher.id:
+        return
+    active_session_id = await _active_session_id(session, assignment.madrasa_id)
+    if await teacher_teaches(
+        session,
+        madrasa_id=assignment.madrasa_id,
+        teacher_id=teacher.id,
+        session_id=active_session_id,
+        class_id=assignment.class_id,
+        course_id=assignment.course_id,
+        section_id=assignment.section_id,
+    ):
+        return
+    raise HTTPException(status_code=403, detail="You can only manage your own assignments")
 
 
 # ------------------------------------------------------------------- Assignments
@@ -457,6 +471,7 @@ async def _assignment_reads(
     rows: list[Assignment],
     student_id: UUID | None = None,
     section_name_overrides: dict[UUID, str] | None = None,
+    owner_id: UUID | None = None,
 ) -> list[AssignmentRead]:
     """Attach display names (class/section/course/teacher) to assignment rows."""
     class_names = dict((await session.execute(select(AcademicClass.id, AcademicClass.name).where(AcademicClass.madrasa_id == madrasa_id))).all())
@@ -488,6 +503,7 @@ async def _assignment_reads(
             submission_mark=submission.mark if submission else None,
             submission_feedback=submission.feedback if submission else None,
             submitted_at=submission.submitted_at if submission else None,
+            is_mine=owner_id is not None and row.created_by_id == owner_id,
         )
         reads.append(AssignmentRead(**data))
     return reads
@@ -583,8 +599,12 @@ async def list_assignments(
     if current_user.role == UserRole.teacher and not await user_has_permission(
         current_user, "assignments.view_all", session
     ):
+        # Teachers without view_all: always scope to their timetable
+        # classes/courses. mine_only further restricts to only their
+        # own assignments; without it they see every assignment for
+        # the classes/courses they teach.
         should_scope_to_teacher = True
-        if teacher is not None:
+        if teacher is not None and mine_only:
             stmt = stmt.where(Assignment.created_by_id == teacher.id)
     if mine_only and teacher is None and current_user.role != UserRole.student:
         response.headers["X-Total-Count"] = "0"
@@ -664,6 +684,7 @@ async def list_assignments(
         collapsed_rows,
         student_id=student.id if student is not None else None,
         section_name_overrides=section_name_overrides,
+        owner_id=teacher.id if teacher is not None else None,
     )
 
 

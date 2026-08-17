@@ -76,6 +76,7 @@ function AssignmentsPage() {
   const client = useQueryClient();
   const isStudent = user?.role === "student";
   const isGuardian = user?.role === "parent";
+  const isTeacher = user?.role === "teacher";
   const canManage =
     user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate || user?.role === "teacher";
   const [tab, setTab] = useState<"assignments" | "marking" | "results">("assignments");
@@ -301,8 +302,8 @@ function AssignmentsPage() {
         </div>
       ) : null}
 
-      {tab === "marking" ? <MarkingView canManage={canManage} /> : null}
-      {tab === "results" ? <ResultsView canManage={canManage} /> : null}
+      {tab === "marking" ? <MarkingView canManage={canManage} teacherScoped={isTeacher} /> : null}
+      {tab === "results" ? <ResultsView canManage={canManage} teacherScoped={isTeacher} /> : null}
       {tab === "assignments" && isGuardian ? (
         <GuardianAssignmentsView
           data={parentView.data ?? []}
@@ -419,6 +420,11 @@ function AssignmentsPage() {
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
+                  {item.teacher_name ? (
+                    <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                      {t("By")} {item.teacher_name}
+                    </p>
+                  ) : null}
                 </button>
                 {item.submitted_at ? (
                   <Pill tone="success">{t("Submitted")}</Pill>
@@ -663,16 +669,18 @@ function GuardianAssignmentsView({
   );
 }
 
-function AssignmentDetailSheet({
+export function AssignmentDetailSheet({
   assignment,
   open,
   onOpenChange,
   canManage,
+  onMutated,
 }: {
   assignment: Assignment;
   open: boolean;
   onOpenChange: (next: boolean) => void;
   canManage: boolean;
+  onMutated?: () => void;
 }) {
     const { t } = useTranslation();
   const client = useQueryClient();
@@ -694,6 +702,7 @@ function AssignmentDetailSheet({
       toast.success("Submission graded");
       void client.invalidateQueries({ queryKey: ["assignment-submissions", assignment.id] });
       void client.invalidateQueries({ queryKey: ["assignments"] });
+      onMutated?.();
     },
   });
 
@@ -803,7 +812,7 @@ function AssignmentDetailSheet({
   );
 }
 
-function EditAssignmentSheet({
+export function EditAssignmentSheet({
   assignment,
   open,
   onOpenChange,

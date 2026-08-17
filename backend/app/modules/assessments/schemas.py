@@ -74,6 +74,7 @@ class AssignmentRead(BaseModel):
     submission_mark: float | None = None
     submission_feedback: str | None = None
     submitted_at: datetime | None = None
+    is_mine: bool = False
 
 
 class SubmissionCreate(BaseModel):

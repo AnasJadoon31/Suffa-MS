@@ -1,20 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, ChevronRight, Download, GraduationCap, Upload, Users } from "lucide-react";
-import type { KeyboardEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CalendarDays, CheckCircle2, Download, Edit2, Eye, GraduationCap, Trash2, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
-import { Card, CustomDropdown, EmptyState, Field, Pill, SectionTitle, SkeletonList, TextArea, TextInput } from "@/components/app/Primitives";
+import { ActionButton, Card, CustomDropdown, EmptyState, Field, Pill, SectionTitle, SkeletonList, TextArea, TextInput } from "@/components/app/Primitives";
 import { useAuth } from "@/lib/mms/auth";
 import { operationsApi } from "@/lib/mms/endpoints";
 import { assessmentsApi, assessmentsMutations, filesApi, type Assignment, uploadFile } from "@/lib/mms/more-endpoints";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { cn } from "@/lib/utils";
-import { DrillHeader, DrillSearchInput, MarkingView, ResultsView } from "./examination";
+import { AssignmentDetailSheet, EditAssignmentSheet } from "./assignments";
+import { MarkingView, ResultsView } from "./examination";
 
 export const Route = createFileRoute("/my-assessments")({
   head: () => ({
@@ -253,10 +254,14 @@ function TeacherAssessments() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const client = useQueryClient();
+  const canManage =
+    user?.role === "principal" || user?.role === "super_admin" || user?.is_principal_delegate || user?.role === "teacher";
   const [tab, setTab] = useState<"assignments" | "marking" | "results">("assignments");
 
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [filters, setFilters] = useState({ classId: "", sectionId: "", courseId: "" });
+  const [search, setSearch] = useState("");
   const [newClassId, setNewClassId] = useState("");
   const [newSectionId, setNewSectionId] = useState("");
   const [newCourseId, setNewCourseId] = useState("");
@@ -265,9 +270,6 @@ function TeacherAssessments() {
   const [newAttachmentFile, setNewAttachmentFile] = useState<File | null>(null);
   const [newDueDate, setNewDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [newMaxMarks, setNewMaxMarks] = useState("");
-  const [classSearch, setClassSearch] = useState("");
-  const [courseSearch, setCourseSearch] = useState("");
-  const [assignmentSearch, setAssignmentSearch] = useState("");
 
   const myTimetable = useQuery({
     queryKey: ["my-timetable"],
@@ -282,31 +284,23 @@ function TeacherAssessments() {
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [myTimetable.data]);
-  const searchedClassOptions = useMemo(() => {
-    const term = classSearch.trim().toLowerCase();
-    if (!term) return classOptions;
-    return classOptions.filter((item) => item.name.toLowerCase().includes(term));
-  }, [classOptions, classSearch]);
   const sectionOptions = useMemo(() => {
     if (!filters.classId) return [];
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
-      if (
-        slot.class_id === filters.classId &&
-        slot.section_id
-      ) {
+      if (slot.class_id === filters.classId && slot.section_id) {
         map.set(slot.section_id, slot.section_name ?? "—");
       }
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [filters.classId, myTimetable.data]);
   const courseOptions = useMemo(() => {
-    if (!filters.classId || !filters.sectionId) return [];
+    if (!filters.classId) return [];
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
       if (
         slot.class_id === filters.classId &&
-        slot.section_id === filters.sectionId &&
+        (!filters.sectionId || slot.section_id === filters.sectionId) &&
         slot.course_id
       ) {
         map.set(slot.course_id, slot.course_name ?? "—");
@@ -314,11 +308,6 @@ function TeacherAssessments() {
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
   }, [filters.classId, filters.sectionId, myTimetable.data]);
-  const searchedCourseOptions = useMemo(() => {
-    const term = courseSearch.trim().toLowerCase();
-    if (!term) return courseOptions;
-    return courseOptions.filter((item) => item.name.toLowerCase().includes(term));
-  }, [courseOptions, courseSearch]);
   const newSectionOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const slot of myTimetable.data ?? []) {
@@ -341,27 +330,26 @@ function TeacherAssessments() {
   }, [myTimetable.data, newClassId, newSectionId]);
 
   const assignments = useQuery({
-    queryKey: ["my-assignments", filters],
+    queryKey: ["my-assignments", "teacher", filters],
     queryFn: () => assessmentsApi.listAssignments({
-      mine_only: true,
       class_id: filters.classId || undefined,
       section_id: filters.sectionId || undefined,
       course_id: filters.courseId || undefined,
       sort: "created_at",
     }),
-    enabled: Boolean(user && filters.classId && filters.sectionId && filters.courseId),
+    enabled: Boolean(user),
   });
-  const selectedClassName = classOptions.find((item) => item.id === filters.classId)?.name;
-  const selectedSectionName = sectionOptions.find((item) => item.id === filters.sectionId)?.name;
-  const selectedCourseName = courseOptions.find((item) => item.id === filters.courseId)?.name;
-  const visibleAssignments = useMemo(() => {
+
+  const filteredAssignments = useMemo(() => {
     const list = assignments.data ?? [];
-    const term = assignmentSearch.trim().toLowerCase();
+    const term = search.trim().toLowerCase();
     if (!term) return list;
-    return list.filter((assignment) =>
-      `${assignment.title} ${assignment.description ?? ""} ${assignment.due_date ?? ""}`.toLowerCase().includes(term),
+    return list.filter((a) =>
+      `${a.title} ${a.description ?? ""} ${a.teacher_name ?? ""} ${a.course_name ?? ""} ${a.class_name ?? ""}`.toLowerCase().includes(term),
     );
-  }, [assignmentSearch, assignments.data]);
+  }, [assignments.data, search]);
+
+  const activeCount = [filters.classId, filters.sectionId, filters.courseId].filter(Boolean).length;
 
   const handleCreateAssignment = async () => {
     const attachmentKey = newAttachmentFile ? await uploadFile(newAttachmentFile, "assignments") : undefined;
@@ -383,6 +371,16 @@ function TeacherAssessments() {
     await client.invalidateQueries({ queryKey: ["my-assignments"] });
     await client.invalidateQueries({ queryKey: ["assignments"] });
   };
+
+  const remove = useMutation({
+    mutationFn: (id: string) => assessmentsMutations.deleteAssignment(id),
+    onSuccess: () => {
+      toast.success("Deleted");
+      setSelectedAssignment(null);
+      void client.invalidateQueries({ queryKey: ["my-assignments"] });
+      void client.invalidateQueries({ queryKey: ["assignments"] });
+    },
+  });
 
   const openAssignmentAttachment = async (fileKey: string) => {
     const url = await filesApi.presignDownload(fileKey);
@@ -467,241 +465,161 @@ function TeacherAssessments() {
       {tab === "results" ? <ResultsView canManage={false} teacherScoped /> : null}
       {tab !== "assignments" ? null : (
         <>
-          {!filters.sectionId ? (
-            <>
-              <SectionTitle>{t("Classes")}</SectionTitle>
-              {classOptions.length > 4 ? (
-                <DrillSearchInput value={classSearch} onChange={setClassSearch} placeholder={t("Search classes...")} />
-              ) : null}
-              <div className="space-y-2">
-                {searchedClassOptions.map((item) => (
-                  <Card key={item.id} className="space-y-2 p-3.5">
-                    <button
-                      onClick={() => setFilters((current) => ({
-                        classId: current.classId === item.id ? "" : item.id,
-                        sectionId: "",
-                        courseId: "",
-                      }))}
-                      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"
-                    >
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-                        <GraduationCap className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 text-left">
-                        <p className="truncate font-semibold">{item.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{t("View sections")}</p>
-                      </div>
-                      <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", filters.classId === item.id ? "rotate-90" : "")} />
-                    </button>
-                    {filters.classId === item.id ? (
-                      <div className="space-y-2 border-t border-border pt-2">
-                        {sectionOptions.map((section) => (
-                          <button
-                            key={section.id}
-                            onClick={() => setFilters((current) => ({ ...current, sectionId: section.id, courseId: "" }))}
-                            className="w-full"
-                          >
-                            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl bg-muted px-3 py-2.5">
-                              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
-                                <Users className="h-4 w-4" />
-                              </span>
-                              <div className="min-w-0 text-left">
-                                <p className="truncate text-sm font-semibold">{section.name}</p>
-                                <p className="truncate text-xs text-muted-foreground">{t("View courses")}</p>
-                              </div>
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          </button>
-                        ))}
-                        {sectionOptions.length === 0 ? <EmptyState title={t("No sections found")} /> : null}
-                      </div>
-                    ) : null}
-                  </Card>
+          <FilterBar activeCount={activeCount} onClear={() => setFilters({ classId: "", sectionId: "", courseId: "" })}>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t("Class")}>
+                <CustomDropdown
+                  value={filters.classId}
+                  onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value, sectionId: "", courseId: "" }))}
+                >
+                  <option value="">{t("All classes")}</option>
+                  {classOptions.map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </CustomDropdown>
+              </Field>
+              <Field label={t("Section")}>
+                <CustomDropdown
+                  value={filters.sectionId}
+                  disabled={!filters.classId}
+                  onChange={(e) => setFilters((f) => ({ ...f, sectionId: e.target.value, courseId: "" }))}
+                >
+                  <option value="">{t("All sections")}</option>
+                  {sectionOptions.map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </CustomDropdown>
+              </Field>
+            </div>
+            <Field label={t("Course")}>
+              <CustomDropdown
+                value={filters.courseId}
+                disabled={!filters.classId}
+                onChange={(e) => setFilters((f) => ({ ...f, courseId: e.target.value }))}
+              >
+                <option value="">{t("All courses")}</option>
+                {courseOptions.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
-                {myTimetable.isLoading ? <SkeletonList rows={3} /> : null}
-                {!myTimetable.isLoading && searchedClassOptions.length === 0 ? <EmptyState title={t("No classes found")} /> : null}
-              </div>
-            </>
-          ) : (
-            <DrillHeader onBack={() => setFilters({ classId: "", sectionId: "", courseId: "" })}>
-              <span className="text-xs font-bold uppercase text-muted-foreground">{t("Class")}</span>
-              <Pill tone="gold">{selectedClassName ?? t("Selected")}</Pill>
-              {selectedSectionName ? <Pill tone="muted">{selectedSectionName}</Pill> : null}
-              {selectedCourseName ? <Pill tone="muted">{selectedCourseName}</Pill> : null}
-            </DrillHeader>
-          )}
+              </CustomDropdown>
+            </Field>
+          </FilterBar>
 
-          {filters.classId && filters.sectionId && !filters.courseId ? (
-            <>
-              <SectionTitle>{t("Courses")}</SectionTitle>
-              {courseOptions.length > 4 ? (
-                <DrillSearchInput value={courseSearch} onChange={setCourseSearch} placeholder={t("Search courses...")} />
-              ) : null}
-              <div className="space-y-2">
-                {searchedCourseOptions.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setFilters((current) => ({ ...current, courseId: item.id }))}
-                    className="w-full"
-                  >
-                    <Card className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3.5">
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-                        <BookOpen className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 text-left">
-                        <p className="truncate font-semibold">{item.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{t("View assignments")}</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </Card>
-                  </button>
-                ))}
-                {searchedCourseOptions.length === 0 ? <EmptyState title={t("No courses assigned")} /> : null}
-              </div>
-            </>
+          <div className="mb-3">
+            <Field label={t("Search assignments")}>
+              <TextInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Type a title, teacher, course or class...")} />
+            </Field>
+          </div>
+
+          {assignments.isLoading ? <SkeletonList rows={4} /> : null}
+          {assignments.isError ? (
+            <EmptyState title={apiErrorMessage(assignments.error, t("Could not load assignments"))} />
           ) : null}
 
-          {filters.classId && filters.sectionId && filters.courseId ? (
-            <>
-              {assignments.isLoading ? <SkeletonList rows={4} /> : null}
-              {assignments.isError ? (
-                <EmptyState title={apiErrorMessage(assignments.error, t("Could not load assignments"))} />
-              ) : null}
-              <SectionTitle>{t("Assignments")}</SectionTitle>
-              {(assignments.data?.length ?? 0) > 6 ? (
-                <DrillSearchInput value={assignmentSearch} onChange={setAssignmentSearch} placeholder={t("Search assignments...")} />
-              ) : null}
-              {visibleAssignments.length === 0 ? (
-                <EmptyState title={t("No assignments yet")} />
-              ) : (
-                <div className="space-y-2.5">
-                  {visibleAssignments.map((assignment) => {
-                    return (
-                      <div
-                        key={assignment.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedAssignment(assignment)}
-                        onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
-                          if (event.key === "Enter" || event.key === " ") setSelectedAssignment(assignment);
-                        }}
-                        className="cursor-pointer"
-                      >
-                        <Card className="space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="font-semibold">{assignment.title}</p>
-                              {assignment.description ? (
-                                <p className="mt-0.5 text-xs text-muted-foreground">{assignment.description}</p>
-                              ) : null}
-                              {assignment.due_date ? (
-                                <p className="mt-1 text-xs">
-                                  <Pill tone="warning">{t("Due")} {assignment.due_date.slice(0, 10)}</Pill>
-                                </p>
-                              ) : null}
-                            </div>
-                            <Pill tone="muted">{t("Review")}</Pill>
-                          </div>
-                          {assignment.attachment_key ? (
-                            <button
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void openAssignmentAttachment(assignment.attachment_key!);
-                              }}
-                              className="flex items-center gap-1 text-xs font-bold text-primary"
-                            >
-                              <Download className="h-3 w-3" />
-                              {t("Attachment")}
-                            </button>
-                          ) : null}
-                          {assignment.submission_mark != null ? (
-                            <p className="text-xs">
-                              {t("Mark")}: {assignment.submission_mark}{" "}
-                              {assignment.submission_feedback ? `— ${assignment.submission_feedback}` : ""}
-                            </p>
-                          ) : null}
-                        </Card>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {selectedAssignment ? (
-                <TeacherAssignmentReviewSheet
-                  assignment={selectedAssignment}
-                  onClose={() => setSelectedAssignment(null)}
-                />
-              ) : null}
-            </>
+          {!assignments.isLoading && !assignments.isError && filteredAssignments.length === 0 ? (
+            <EmptyState title={t("No assignments")} hint={t("New tasks will show up here.")} />
+          ) : null}
+
+          <div className="space-y-2.5">
+            {filteredAssignments.map((item) => {
+              const overdue = new Date(item.due_date) < new Date() && !item.submitted_at;
+              return (
+                <Card key={item.id} className="space-y-2 p-3.5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                    <button
+                      type="button"
+                      className="min-w-0 text-left"
+                      onClick={() => setSelectedAssignment(item)}
+                    >
+                      <p className="truncate font-display text-base font-extrabold">{item.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[item.course_name, item.class_name, item.section_name]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                      {item.teacher_name ? (
+                        <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                          {t("By")} {item.teacher_name}
+                        </p>
+                      ) : null}
+                    </button>
+                    {item.submitted_at ? (
+                      <Pill tone="success">{t("Submitted")}</Pill>
+                    ) : (
+                      <Pill tone={overdue ? "destructive" : "muted"}>
+                        {overdue ? "Overdue" : "Open"}
+                      </Pill>
+                    )}
+                  </div>
+
+                  <p className="line-clamp-3 whitespace-pre-line text-sm text-muted-foreground">
+                    {item.instructions}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      {new Date(item.due_date).toLocaleDateString()}
+                    </span>
+                    {item.max_marks != null ? <span>{t("Max")}{item.max_marks}</span> : null}
+                    {item.submission_mark != null ? (
+                      <span className="inline-flex items-center gap-1.5 font-bold text-success">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {item.submission_mark}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {item.submission_feedback ? (
+                    <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+                      {item.submission_feedback}
+                    </p>
+                  ) : null}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ActionButton variant="soft" onClick={() => setSelectedAssignment(item)}>
+                      <Eye className="h-4 w-4" />
+                      {t("Open")}</ActionButton>
+                    {item.attachment_key ? (
+                      <ActionButton variant="soft" onClick={() => void openAssignmentAttachment(item.attachment_key!)}>
+                        <Download className="h-4 w-4" />
+                        {t("Attachment")}</ActionButton>
+                    ) : null}
+                    {item.is_mine ? (
+                      <>
+                        <ActionButton variant="soft" onClick={() => setEditingAssignment(item)}>
+                          <Edit2 className="h-4 w-4" />
+                          {t("Edit")}</ActionButton>
+                        <ActionButton variant="danger" onClick={() => remove.mutate(item.id)}>
+                          <Trash2 className="h-4 w-4" />
+                          {t("Delete")}</ActionButton>
+                      </>
+                    ) : null}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {selectedAssignment ? (
+            <AssignmentDetailSheet
+              assignment={selectedAssignment}
+              open={Boolean(selectedAssignment)}
+              onOpenChange={(next) => !next && setSelectedAssignment(null)}
+              canManage={canManage}
+              onMutated={() => void client.invalidateQueries({ queryKey: ["my-assignments"] })}
+            />
+          ) : null}
+
+          {editingAssignment ? (
+            <EditAssignmentSheet
+              assignment={editingAssignment}
+              open={Boolean(editingAssignment)}
+              onOpenChange={(next) => !next && setEditingAssignment(null)}
+            />
           ) : null}
         </>
       )}
     </AppShell>
-  );
-}
-
-function TeacherAssignmentReviewSheet({
-  assignment,
-  onClose,
-}: {
-  assignment: Assignment;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const status = useQuery({
-    queryKey: ["assignment-submission-status", assignment.id],
-    queryFn: () => assessmentsMutations.listSubmissionStatus(assignment.id),
-  });
-
-  const openFile = async (fileKey: string) => {
-    const url = await filesApi.presignDownload(fileKey);
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-      <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-card p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate font-display text-lg font-extrabold">{assignment.title}</p>
-            <p className="text-sm text-muted-foreground">
-              {[assignment.course_name, assignment.class_name, assignment.section_name].filter(Boolean).join(" · ")}
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-xl px-3 py-2 text-xs font-bold text-primary">{t("Close")}</button>
-        </div>
-
-        <p className="mt-4 whitespace-pre-line text-sm text-muted-foreground">{assignment.instructions}</p>
-        {assignment.attachment_key ? (
-          <button onClick={() => void openFile(assignment.attachment_key!)} className="mt-3 flex items-center gap-1 rounded-xl bg-primary-soft px-3 py-2 text-xs font-bold text-primary">
-            <Download className="h-4 w-4" />
-            {t("Download attachment")}
-          </button>
-        ) : null}
-
-        <SectionTitle>{t("Students")}</SectionTitle>
-        {status.isLoading ? <SkeletonList rows={4} /> : null}
-        {status.isError ? <EmptyState title={apiErrorMessage(status.error, t("Could not load submissions"))} /> : null}
-        <div className="space-y-2">
-          {(status.data ?? []).map((student) => (
-            <Card key={student.student_id} className="flex items-center gap-3 p-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{student.student_name}</p>
-                <p className="text-xs text-muted-foreground">{student.admission_number}</p>
-              </div>
-              {student.file_key ? (
-                <button onClick={() => void openFile(student.file_key!)} className="flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">
-                  <Download className="h-4 w-4" />
-                  {t("Download")}
-                </button>
-              ) : (
-                <Pill tone="warning">{t("Not submitted")}</Pill>
-              )}
-            </Card>
-          ))}
-        </div>
-        {!status.isLoading && !status.isError && (status.data ?? []).length === 0 ? <EmptyState title={t("No students found")} /> : null}
-      </div>
-    </div>
   );
 }
