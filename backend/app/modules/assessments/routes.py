@@ -578,6 +578,7 @@ async def list_assignments(
     category: str | None = None,
     created_by_id: UUID | None = None,
     mine_only: bool = False,
+    scope_to_timetable: bool = False,
     sort: str = "created_at",  # due_date | created_at | title | teacher
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
@@ -596,13 +597,15 @@ async def list_assignments(
 
     teacher = await _teacher_profile(session, current_user)
     should_scope_to_teacher = mine_only and teacher is not None
-    if current_user.role == UserRole.teacher and not await user_has_permission(
-        current_user, "assignments.view_all", session
+    if current_user.role == UserRole.teacher and (
+        scope_to_timetable or not await user_has_permission(current_user, "assignments.view_all", session)
     ):
         # Teachers without view_all: always scope to their timetable
         # classes/courses. mine_only further restricts to only their
         # own assignments; without it they see every assignment for
-        # the classes/courses they teach.
+        # the classes/courses they teach. scope_to_timetable forces
+        # scoping regardless of view_all (used by the personal
+        # "My assignments" view).
         should_scope_to_teacher = True
         if teacher is not None and mine_only:
             stmt = stmt.where(Assignment.created_by_id == teacher.id)

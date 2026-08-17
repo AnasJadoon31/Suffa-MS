@@ -260,7 +260,7 @@ function TeacherAssessments() {
 
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
-  const [filters, setFilters] = useState({ classId: "", sectionId: "", courseId: "" });
+  const [filters, setFilters] = useState({ classId: "", sectionId: "", courseId: "", mineOnly: false });
   const [search, setSearch] = useState("");
   const [newClassId, setNewClassId] = useState("");
   const [newSectionId, setNewSectionId] = useState("");
@@ -335,6 +335,8 @@ function TeacherAssessments() {
       class_id: filters.classId || undefined,
       section_id: filters.sectionId || undefined,
       course_id: filters.courseId || undefined,
+      mine_only: filters.mineOnly || undefined,
+      scope_to_timetable: true,
       sort: "created_at",
     }),
     enabled: Boolean(user),
@@ -349,7 +351,7 @@ function TeacherAssessments() {
     );
   }, [assignments.data, search]);
 
-  const activeCount = [filters.classId, filters.sectionId, filters.courseId].filter(Boolean).length;
+  const activeCount = [filters.classId, filters.sectionId, filters.courseId, filters.mineOnly].filter(Boolean).length;
 
   const handleCreateAssignment = async () => {
     const attachmentKey = newAttachmentFile ? await uploadFile(newAttachmentFile, "assignments") : undefined;
@@ -465,50 +467,65 @@ function TeacherAssessments() {
       {tab === "results" ? <ResultsView canManage={false} teacherScoped /> : null}
       {tab !== "assignments" ? null : (
         <>
-          <FilterBar activeCount={activeCount} onClear={() => setFilters({ classId: "", sectionId: "", courseId: "" })}>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label={t("Class")}>
-                <CustomDropdown
-                  value={filters.classId}
-                  onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value, sectionId: "", courseId: "" }))}
-                >
-                  <option value="">{t("All classes")}</option>
-                  {classOptions.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name}</option>
-                  ))}
-                </CustomDropdown>
-              </Field>
-              <Field label={t("Section")}>
-                <CustomDropdown
-                  value={filters.sectionId}
-                  disabled={!filters.classId}
-                  onChange={(e) => setFilters((f) => ({ ...f, sectionId: e.target.value, courseId: "" }))}
-                >
-                  <option value="">{t("All sections")}</option>
-                  {sectionOptions.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name}</option>
-                  ))}
-                </CustomDropdown>
-              </Field>
+          <div className="mb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <label className="flex shrink-0 items-center gap-2 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  checked={filters.mineOnly}
+                  onChange={(e) => setFilters((f) => ({ ...f, mineOnly: e.target.checked }))}
+                  className="h-4 w-4 rounded border-border"
+                />
+                {t("Mine only")}
+              </label>
+              <div className="min-w-0 flex-1">
+                <FilterBar activeCount={activeCount} onClear={() => setFilters({ classId: "", sectionId: "", courseId: "", mineOnly: false })}>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label={t("Class")}>
+                      <CustomDropdown
+                        value={filters.classId}
+                        onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value, sectionId: "", courseId: "" }))}
+                      >
+                        <option value="">{t("All classes")}</option>
+                        {classOptions.map((item) => (
+                          <option key={item.id} value={item.id}>{item.name}</option>
+                        ))}
+                      </CustomDropdown>
+                    </Field>
+                    <Field label={t("Section")}>
+                      <CustomDropdown
+                        value={filters.sectionId}
+                        disabled={!filters.classId}
+                        onChange={(e) => setFilters((f) => ({ ...f, sectionId: e.target.value, courseId: "" }))}
+                      >
+                        <option value="">{t("All sections")}</option>
+                        {sectionOptions.map((item) => (
+                          <option key={item.id} value={item.id}>{item.name}</option>
+                        ))}
+                      </CustomDropdown>
+                    </Field>
+                  </div>
+                  <Field label={t("Course")}>
+                    <CustomDropdown
+                      value={filters.courseId}
+                      disabled={!filters.classId}
+                      onChange={(e) => setFilters((f) => ({ ...f, courseId: e.target.value }))}
+                    >
+                      <option value="">{t("All courses")}</option>
+                      {courseOptions.map((item) => (
+                        <option key={item.id} value={item.id}>{item.name}</option>
+                      ))}
+                    </CustomDropdown>
+                  </Field>
+                </FilterBar>
+              </div>
             </div>
-            <Field label={t("Course")}>
-              <CustomDropdown
-                value={filters.courseId}
-                disabled={!filters.classId}
-                onChange={(e) => setFilters((f) => ({ ...f, courseId: e.target.value }))}
-              >
-                <option value="">{t("All courses")}</option>
-                {courseOptions.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name}</option>
-                ))}
-              </CustomDropdown>
-            </Field>
-          </FilterBar>
-
-          <div className="mb-3">
-            <Field label={t("Search assignments")}>
-              <TextInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Type a title, teacher, course or class...")} />
-            </Field>
+            <TextInput
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("Search assignments...")}
+              className="mb-2"
+            />
           </div>
 
           {assignments.isLoading ? <SkeletonList rows={4} /> : null}

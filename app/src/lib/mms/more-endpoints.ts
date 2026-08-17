@@ -595,6 +595,7 @@ export const assessmentsApi = {
     course_id?: string;
     category?: string;
     mine_only?: boolean;
+    scope_to_timetable?: boolean;
     date_from?: string;
     date_to?: string;
     sort?: "due_date" | "created_at" | "title" | "teacher";
