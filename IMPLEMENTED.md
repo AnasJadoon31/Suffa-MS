@@ -2714,3 +2714,9 @@ and authorization tests, the backend suite is now 120 tests.
 
 - Implemented: Copied `favicon.png` to `favicon.ico` in `app/public` to prevent 404 errors when browsers request the default favicon file.
 - Files: `app/public/favicon.ico`
+
+## 2026-08-23 - App SSR & PWA Client Hydration Crash Fix
+- Implemented: Fixed the `Invariant failed` crash on offline/PWA refresh by separating client bootstrap into SSR and SPA logic paths. Bootstrapped SPA using `router.load()` before render.
+- Implemented: Fixed Vite 8 / Rolldown SSR circular chunking bug where `__exportAll` failed to evaluate due to ESM TDZ, causing Nitro SSR 500 crashes and throwing the client into the static fallback route.
+- Files: `app/src/client.tsx`, `app/scripts/fix-sw.sh`, `app/vite.config.ts`
+- Verified: `npm run build` succeeds; Local Nitro SSR server tested with `curl -sI` returns HTTP 200 and renders `$_TSR` correctly.

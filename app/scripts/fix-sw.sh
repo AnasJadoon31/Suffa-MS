@@ -112,4 +112,68 @@ JSEOF
 node /tmp/patch-static.js "$(pwd)/$MANIFEST_PATH"
 rm -f /tmp/patch-static.js
 
+# Step 5: Fix Rolldown SSR circular chunk bug.
+# Vite 8 / Rolldown sometimes splits the SSR server entry into two chunks
+# with a circular import:  A imports __exportAll from B, B imports server_exports from A.
+# ESM live bindings resolve this in theory, but Node evaluates A first (because
+# it's the entry), and when A runs `import { server_exports } from B`, Node loads
+# B which tries to read __exportAll from A — but A hasn't defined it yet (TDZ).
+# Fix: inline the __exportAll helper directly in any SSR file that imports it.
+echo "Fixing Rolldown SSR circular chunk (__exportAll)..."
+cat > /tmp/patch-ssr-circular.js << 'JSEOF'
+const fs = require('fs');
+const path = require('path');
+
+const ssrDir = path.join(process.argv[2], '.output/server/_ssr');
+if (!fs.existsSync(ssrDir)) { console.log('No _ssr dir, skipping'); process.exit(0); }
+
+const helperCode = `
+var __defProp = Object.defineProperty;
+var __exportAll = (all, no_symbols) => {
+  let target = {};
+  for (var name in all) __defProp(target, name, { get: all[name], enumerable: true });
+  if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
+  return target;
+};
+`;
+
+const files = fs.readdirSync(ssrDir).filter(f => f.endsWith('.mjs'));
+let patched = 0;
+for (const file of files) {
+  const filePath = path.join(ssrDir, file);
+  let code = fs.readFileSync(filePath, 'utf8');
+
+  // Check if this file imports __exportAll from a sibling chunk
+  const importRe = /import\s*\{\s*[^}]*\b(\w+)\s+as\s+__exportAll\b[^}]*\}\s*from\s*"\.\/([^"]+)"/;
+  const match = code.match(importRe);
+  if (!match) continue;
+
+  // Remove the __exportAll binding from the import (keep other bindings if any)
+  const fullImport = match[0];
+  const aliasName = match[1];  // e.g. "n"
+  const fromFile = match[2];
+
+  // Try to remove just the __exportAll binding from the import
+  // Pattern: "n as __exportAll" possibly with leading/trailing comma
+  let newImport = fullImport.replace(new RegExp(',?\\s*' + aliasName + '\\s+as\\s+__exportAll'), '');
+  newImport = newImport.replace(new RegExp(aliasName + '\\s+as\\s+__exportAll\\s*,?'), '');
+
+  // If the import is now empty (only had __exportAll), remove the whole import
+  if (/import\s*\{\s*\}\s*from/.test(newImport)) {
+    code = code.replace(fullImport, '');
+  } else {
+    code = code.replace(fullImport, newImport);
+  }
+
+  // Prepend the inlined helper
+  code = helperCode + code;
+  fs.writeFileSync(filePath, code);
+  patched++;
+  console.log('Inlined __exportAll in ' + file);
+}
+if (!patched) console.log('No __exportAll circular imports found');
+JSEOF
+node /tmp/patch-ssr-circular.js "$(pwd)"
+rm -f /tmp/patch-ssr-circular.js
+
 echo "=== Post-build fix complete ==="

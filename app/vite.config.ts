@@ -31,7 +31,7 @@ function generateAppShell(): Plugin {
           cssFiles.push(fileName);
         }
       }
-      const jsTags = mainJs ? `<script type="module" src="/${mainJs}?v=2" crossorigin></script>` : "";
+      const jsTags = mainJs ? `<script type="module" src="/${mainJs}" crossorigin></script>` : "";
       const cssTags = cssFiles.map((f) => `<link rel="stylesheet" href="/${f}" />`).join("\n    ");
       const html = `<!DOCTYPE html>
 <html lang="en">
@@ -83,16 +83,10 @@ export default defineConfig({
   },
   vite: {
     build: {
-      rollupOptions: {
-        output: {
-          // Force new filenames (rc1) so Cloudflare treats them as new
-          // resources — the CDN cached the old build's assets truncated to
-          // 6024 bytes (stale Nitro manifest) with immutable 1-year TTL.
-          entryFileNames: `assets/[name]-[hash]-rc1.js`,
-          chunkFileNames: `assets/[name]-[hash]-rc1.js`,
-          assetFileNames: `assets/[name]-[hash]-rc1.[ext]`,
-        },
-      },
+      // No custom rollupOptions.output naming — let Vite/rolldown use defaults.
+      // A previous `-rc1` suffix caused the SSR build to emit chunk pairs like
+      // server-HASH-rc1.mjs / server-HASH-rc12.mjs with a circular import that
+      // crashes at runtime (`__exportAll is not a function`).
     },
     plugins: [
       generateAppShell(),

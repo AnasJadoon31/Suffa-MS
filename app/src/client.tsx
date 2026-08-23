@@ -1,23 +1,48 @@
+import { StrictMode, startTransition } from "react";
 import { hydrateRoot, createRoot } from "react-dom/client";
-import { RouterProvider } from "@tanstack/react-router";
 import { StartClient } from "@tanstack/react-start/client";
+import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
 
-const router = getRouter();
+declare global {
+  interface Window {
+    __TSR__?: { matches?: Array<unknown>; streamedValues?: Record<string, unknown> };
+    $_TSR?: unknown;
+  }
+}
 
 const isSpaShell =
-  !window.__TSR__ || !window.__TSR__.matches || window.__TSR__.matches.length === 0;
+  !window.$_TSR &&
+  (!window.__TSR__ || !window.__TSR__.matches || window.__TSR__.matches.length === 0);
 
 if (isSpaShell) {
-  // If no SSR state was injected (or if we intentionally injected matches: []),
-  // it means we are booting from the static PWA index.html shell.
-  // Instead of hydrating (which will throw Invariant failed due to DOM mismatch
-  // and missing matches), we do a full client-side render over the document.
+  // ── PWA offline shell / service-worker fallback ──────────────────
+  // The static index.html has no SSR state (`$_TSR` is missing and
+  // `__TSR__.matches` is empty).  TanStack Start's default client
+  // entry calls `hydrateRoot` + `StartClient` which internally runs
+  // `hydrateStart()` → reads `window.$_TSR` → throws "Invariant
+  // failed" because there is nothing to hydrate against.
   //
-  // NOTE: StartClient expects a valid hydration promise. For a pure SPA fallback,
-  // we bypass StartClient completely and just boot the RouterProvider directly.
-  createRoot(document).render(<RouterProvider router={router} />);
+  // Instead we boot the router as a pure client-side SPA: load the
+  // routes first, then mount with `createRoot`.
+  const router = getRouter();
+  router.load().then(() => {
+    startTransition(() => {
+      createRoot(document).render(
+        <StrictMode>
+          <RouterProvider router={router} />
+        </StrictMode>,
+      );
+    });
+  });
 } else {
-  // Standard SSR hydration
-  hydrateRoot(document, <StartClient router={router} />);
+  // ── Standard SSR hydration (Nitro served the page) ───────────────
+  startTransition(() => {
+    hydrateRoot(
+      document,
+      <StrictMode>
+        <StartClient />
+      </StrictMode>,
+    );
+  });
 }
