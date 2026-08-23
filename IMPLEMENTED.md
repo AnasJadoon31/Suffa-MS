@@ -3,6 +3,13 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-23 — Fix: TanStack Router Build Failure
+
+- **What**: The production build failed during SSR generation with missing exports from `@tanstack/router-core` (e.g. `getScriptPreloadAttrs`). This was caused by conflicting versions: `package.json` had locked `@tanstack/react-router`, `@tanstack/react-start`, and `@tanstack/router-plugin` to `1.168.18` via overrides, but npm still resolved core dependencies like `@tanstack/router-core` to the newer `1.171.x` release which had breaking structural changes.
+- **Files**: `app/package.json`
+- **Fix**: Removed the strict overrides and updated the three `@tanstack` dependencies to `^1.170.32` so they resolve in sync with their core packages.
+- **Verified**: `npm run build` in `app` completes successfully and generates the correct SSR manifest and SW.
+
 ## 2026-08-23 — Fix: Result Publishing UI & Timetable Weekday Mapping
 
 - **What**: The results publishing badge was showing unpublished results to students, and the timetable in `my-timetable.tsx` was misaligning teachers/classes because the day-of-week mapping incorrectly assumed Sunday=0, whereas the backend provided Monday=0.
