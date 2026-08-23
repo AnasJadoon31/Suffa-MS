@@ -2692,3 +2692,12 @@ and authorization tests, the backend suite is now 120 tests.
 - Files: `app/package.json`, `app/pnpm-lock.yaml`
 - Verified: `pnpm run build` completes successfully. PWA and SW generated without `ENOENT` errors.
 - Notes: The `1.170.x` updates introduced breaking changes in `router-core/ssr/server.js` exports that `react-start` `1.168.x` still relied on.
+
+## 2026-08-23 - White Screen Invariant failed on Reload & Backend Container Crash
+
+- Implemented: Removed duplicate index.html generation from scripts/fix-sw.sh to prevent overwriting vite.config.ts's __TSR__-injected app shell, fixing the TanStack Router hydration crash (Invariant failed) on PWA offline reload.
+- Implemented: Fixed backend DB connection string parsing for Coolify postgres URLs by adding a global validator in backend/app/core/config.py.
+- Implemented: Refactored backend/bootstrap.py to gracefully handle madrasas with multiple principals.
+- Files: `app/scripts/fix-sw.sh`, `backend/app/core/config.py`, `backend/bootstrap.py`
+- Verified: Browser build successful, checked static index.html output has correct __TSR__ dehydration payload.
+- Notes: The PWA offline shell now correctly hydrates without throwing useMatch Invariant errors.
