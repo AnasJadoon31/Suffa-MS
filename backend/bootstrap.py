@@ -104,12 +104,13 @@ async def bootstrap() -> None:
             await session.flush()
             print(f"[bootstrap] created madrasa '{tenant_slug}'")
 
-        existing_admin = (
+        existing_admins = (
             await session.execute(
                 select(User).where(User.madrasa_id == madrasa.id, User.role == UserRole.principal)
             )
-        ).scalar_one_or_none()
-        if existing_admin is None:
+        ).scalars().all()
+        
+        if not existing_admins:
             if not admin_password:
                 raise RuntimeError(
                     "No Principal exists yet and BOOTSTRAP_ADMIN_PASSWORD is not set — "
@@ -137,31 +138,31 @@ async def bootstrap() -> None:
             )
             print(f"[bootstrap] created Principal login '{admin_username}' for tenant '{tenant_slug}'")
         else:
-            print(f"[bootstrap] tenant '{tenant_slug}' already has a Principal login, skipping")
-            # Backfill: ensure existing principals have a TeacherProfile.
-            admin_user = existing_admin
-            existing_profile = (
-                await session.execute(
-                    select(TeacherProfile).where(
-                        TeacherProfile.user_id == admin_user.id,
-                        TeacherProfile.madrasa_id == madrasa.id,
+            print(f"[bootstrap] tenant '{tenant_slug}' already has Principal login(s), skipping creation")
+            # Backfill: ensure all existing principals have a TeacherProfile.
+            for admin_user in existing_admins:
+                existing_profile = (
+                    await session.execute(
+                        select(TeacherProfile).where(
+                            TeacherProfile.user_id == admin_user.id,
+                            TeacherProfile.madrasa_id == madrasa.id,
+                        )
                     )
-                )
-            ).scalar_one_or_none()
-            if existing_profile is None:
-                session.add(
-                    TeacherProfile(
-                        madrasa_id=madrasa.id,
-                        user_id=admin_user.id,
-                    employee_code=admin_employee_code,
-                        name="Admin",
-                        whatsapp_number="+920000000000",
-                        is_principal_delegate=True,
-                        status="active",
+                ).scalars().first()
+                if existing_profile is None:
+                    session.add(
+                        TeacherProfile(
+                            madrasa_id=madrasa.id,
+                            user_id=admin_user.id,
+                            employee_code=admin_employee_code,
+                            name=admin_user.username.title(),
+                            whatsapp_number="+920000000000",
+                            is_principal_delegate=True,
+                            status="active",
+                        )
                     )
-                )
-                await session.flush()
-                print(f"[bootstrap] created TeacherProfile for existing Principal '{admin_user.username}'")
+                    await session.flush()
+                    print(f"[bootstrap] created TeacherProfile for existing Principal '{admin_user.username}'")
 
         existing_super_admin = (
             await session.execute(
@@ -171,7 +172,7 @@ async def bootstrap() -> None:
                     User.role == UserRole.super_admin,
                 )
             )
-        ).scalar_one_or_none()
+        ).scalars().first()
         if existing_super_admin is None and super_admin_password:
             session.add(
                 User(
