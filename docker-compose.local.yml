@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mms
+      POSTGRES_USER: mms
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mms_password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    networks:
+      default:
+        aliases:
+          - postgres
+          - db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mms -d mms"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      default:
+        aliases:
+          - redis
+          - cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD:-mms_password}@postgres:5432/mms
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD:-mms_password}@postgres:5432/mms
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:

@@ -1,42 +1,4 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: mms
-      POSTGRES_USER: mms
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-mms_password}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_HOST_PORT:-5433}:5432"
-    networks:
-      default:
-        aliases:
-          - postgres
-          - db
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mms -d mms"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    networks:
-      default:
-        aliases:
-          - redis
-          - cache
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: ./backend
@@ -44,8 +6,8 @@ services:
     image: suffa-ms-backend
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-production}
-      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD:-mms_password}@postgres:5432/mms
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
       S3_ENDPOINT: ${MINIO_ENDPOINT}
       S3_PUBLIC_URL: ${MINIO_PUBLIC_URL}
       S3_BUCKET: ${MINIO_BUCKET:-suffa-ms}
@@ -75,11 +37,6 @@ services:
     labels:
       - "traefik.docker.network=coolify"
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     healthcheck:
       # Container health should prove the API process is serving HTTP.
       # /readyz still checks the database and remains useful for diagnostics,
@@ -96,8 +53,8 @@ services:
     command: arq app.worker.WorkerSettings
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-production}
-      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD:-mms_password}@postgres:5432/mms
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
       SECRET_KEY: ${SECRET_KEY}
       DEFAULT_TENANT: ${DEFAULT_TENANT:-suffa}
     depends_on:
@@ -128,6 +85,3 @@ services:
 networks:
   coolify:
     external: true
-
-volumes:
-  pgdata:

@@ -3,6 +3,12 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-23 — Fix: Result Publishing UI & Timetable Weekday Mapping
+
+- **What**: The results publishing badge was showing unpublished results to students, and the timetable in `my-timetable.tsx` was misaligning teachers/classes because the day-of-week mapping incorrectly assumed Sunday=0, whereas the backend provided Monday=0.
+- **Files**: `app/src/routes/my-timetable.tsx` (fixed `DAY_KEYS`), `app/src/routes/examination.tsx` (added `published` check to result rows), `backend/app/modules/assessments/schemas.py` and `routes.py` (exposed `published` boolean).
+- **Verified**: Fixed UI rendering for student and admin views.
+
 ## 2026-08-17 — Fix: Deployment failure (stale pgdata volume + DNS conflict on Coolify network)
 
 - **What**: Deployment failed with `InvalidPasswordError: password authentication failed for user "mms"`. Two root causes: (1) the `pgdata` volume had stale credentials from a previous deployment — PostgreSQL ignores `POSTGRES_PASSWORD` when the data directory already exists; (2) the backend resolved `postgres` and `redis` hostnames to Coolify's shared `coolify-db` and Coolify Redis containers on the shared `coolify` network instead of the project's own containers.
