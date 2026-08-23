@@ -2701,3 +2701,16 @@ and authorization tests, the backend suite is now 120 tests.
 - Files: `app/scripts/fix-sw.sh`, `backend/app/core/config.py`, `backend/bootstrap.py`
 - Verified: Browser build successful, checked static index.html output has correct __TSR__ dehydration payload.
 - Notes: The PWA offline shell now correctly hydrates without throwing useMatch Invariant errors.
+
+## 2026-08-23 - Custom Client Entry for PWA SPA Fallback
+
+- Implemented: Added a custom `app/src/client.tsx` entry point to override TanStack Start's default client behavior.
+- Context: TanStack Start's `StartClient` crashes with an `Invariant failed` if it boots from a static PWA shell with missing or empty `__TSR__` dehydrated matches.
+- Fix: The custom entry detects if the shell has empty `matches` (injected by `generateAppShell`) and falls back to a full client-side `createRoot(document)` using just `RouterProvider`, bypassing the fragile `hydrateStart()` logic.
+- Files: `app/src/client.tsx`
+- Verified: `npm run build` successfully compiles the custom client entry.
+
+## 2026-08-23 - Fix favicon 404
+
+- Implemented: Copied `favicon.png` to `favicon.ico` in `app/public` to prevent 404 errors when browsers request the default favicon file.
+- Files: `app/public/favicon.ico`
