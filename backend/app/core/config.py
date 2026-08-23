@@ -52,6 +52,16 @@ class Settings(BaseSettings):
     evolution_webhook_base64: bool = True
     evolution_webhook_events: str = ""
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _force_asyncpg(cls, value: str) -> str:
+        if isinstance(value, str):
+            if value.startswith("postgres://"):
+                return value.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif value.startswith("postgresql://") and not value.startswith("postgresql+asyncpg://"):
+                return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return value
+
     @field_validator("upload_allowed_content_types", mode="before")
     @classmethod
     def _split_content_types(cls, value: str | list[str]) -> list[str]:
