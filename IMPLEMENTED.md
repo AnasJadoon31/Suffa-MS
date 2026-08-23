@@ -2686,3 +2686,9 @@ and authorization tests, the backend suite is now 120 tests.
 - Files: `backend/app/modules/assessments/schemas.py`, `backend/app/modules/assessments/routes.py`, `app/src/lib/mms/endpoints.ts`, `app/src/routes/examination.tsx`
 - Notes: The seed script inserted `ResultPublication` records without ensuring all marks were complete. This caused the student to see their published results, while the Admin UI simultaneously showed a disabled "Publish class results" button with missing marks warnings, falsely suggesting the results were still in draft.
 
+## 2026-08-23 - Fix TanStack Router Dependency Mismatch
+
+- Implemented: Pinned `@tanstack/react-router`, `@tanstack/react-start`, and `@tanstack/router-plugin` to version `1.168.18` to resolve severe missing export build errors and runtime routing crashes caused by version mismatch.
+- Files: `app/package.json`, `app/pnpm-lock.yaml`
+- Verified: `pnpm run build` completes successfully. PWA and SW generated without `ENOENT` errors.
+- Notes: The `1.170.x` updates introduced breaking changes in `router-core/ssr/server.js` exports that `react-start` `1.168.x` still relied on.
