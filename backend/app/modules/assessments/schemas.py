@@ -285,6 +285,7 @@ class MatrixStudentRow(BaseModel):
     admission_number: str
     courses: list[MatrixCourseCell] = []
     overall_score: float | None = None
+    published: bool = False
 
 
 class SectionResultMatrix(BaseModel):

@@ -943,14 +943,22 @@ export function ResultsView({
                   <div className="space-y-2 border-t border-border pt-2">
                     {!teacherScoped && canManage ? (
                       <div className="space-y-1">
-                        <button disabled={publish.isPending || classMatrix.isLoading || !canPublishClassResults} onClick={() => publish.mutate()} className="gradient-emerald w-full rounded-xl py-2 text-xs font-bold text-primary-foreground disabled:opacity-60">
-                          {t("Publish class results")}
-                        </button>
-                        {!classMatrix.isLoading && classMissingMarkCount > 0 ? (
-                          <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
-                            {t("Complete all course marks before publishing")} ({classMissingMarkCount})
+                        {publishedCount === totalStudentCount && totalStudentCount > 0 ? (
+                          <p className="rounded-xl bg-success-soft px-3 py-2 text-xs font-semibold text-success text-center">
+                            {t("Results published")}
                           </p>
-                        ) : null}
+                        ) : (
+                          <>
+                            <button disabled={publish.isPending || classMatrix.isLoading || !canPublishClassResults} onClick={() => publish.mutate()} className="gradient-emerald w-full rounded-xl py-2 text-xs font-bold text-primary-foreground disabled:opacity-60">
+                              {publishedCount > 0 ? t("Publish remaining results") : t("Publish class results")}
+                            </button>
+                            {!classMatrix.isLoading && classMissingMarkCount > 0 ? (
+                              <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+                                {t("Complete all course marks before publishing")} ({classMissingMarkCount})
+                              </p>
+                            ) : null}
+                          </>
+                        )}
                       </div>
                     ) : null}
                     {sectionCards.map((section) => (

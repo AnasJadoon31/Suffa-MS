@@ -2433,6 +2433,7 @@ async def _section_matrix(
                 admission_number=student.admission_number,
                 courses=cells,
                 overall_score=round(sum(scored) / len(scored), 2) if scored else None,
+                published=student.id in published_student_ids,
             )
         )
 

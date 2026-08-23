@@ -2666,3 +2666,17 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: Super-admin authentication now routes to the Platform console. Platform users see platform branding, platform scope in My Profile, and a platform-only navigation menu instead of a madrasa dashboard or tenant navigation.
 - Files: `app/src/components/app/Navigation.tsx`, `app/src/routes/{dashboard.tsx,index.tsx,me.tsx}`.
 - Verified: source review and `git diff --check`; no full build run for this role-presentation change per request.
+## 2026-08-23 - Fix my-timetable Day of Week Mapping
+
+- Implemented: Fixed the day index mapping in `my-timetable.tsx` so that `day_of_week=0` maps to Monday instead of Sunday.
+- Files: `app/src/routes/my-timetable.tsx`
+- Verified: Traced backend slot `day_of_week` integer representation against the frontend mapping in the view.
+- Notes: The student view incorrectly displayed Monday's schedule under the 'SUN' header.
+
+## 2026-08-23 - Fix Admin Results Publishing UI Discrepancy
+
+- Implemented: Added a `published` boolean to the `MatrixStudentRow` API endpoint to inform the frontend whether a student's results have already been published.
+- Implemented: Updated the Admin Examination Classes view to explicitly show a "Results published" badge (and hide the publish button) if all students' results in a class have already been published.
+- Files: `backend/app/modules/assessments/schemas.py`, `backend/app/modules/assessments/routes.py`, `app/src/lib/mms/endpoints.ts`, `app/src/routes/examination.tsx`
+- Notes: The seed script inserted `ResultPublication` records without ensuring all marks were complete. This caused the student to see their published results, while the Admin UI simultaneously showed a disabled "Publish class results" button with missing marks warnings, falsely suggesting the results were still in draft.
+

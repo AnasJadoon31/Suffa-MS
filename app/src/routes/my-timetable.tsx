@@ -9,7 +9,7 @@ import { Card, EmptyState, SectionTitle, SkeletonList } from "@/components/app/P
 import { operationsApi, type TimetableSlot } from "@/lib/mms/endpoints";
 import { apiErrorMessage } from "@/lib/mms/api";
 
-const DAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 export const Route = createFileRoute("/my-timetable")({
   head: () => ({
