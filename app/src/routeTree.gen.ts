@@ -9,190 +9,45 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TimetableRouteImport } from './routes/timetable'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as SetPasswordRouteImport } from './routes/set-password'
-import { Route as RolesRouteImport } from './routes/roles'
-import { Route as ResultsRouteImport } from './routes/results'
-import { Route as ResourcesRouteImport } from './routes/resources'
-import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as PlatformRouteImport } from './routes/platform'
-import { Route as PeopleRouteImport } from './routes/people'
-import { Route as MyTimetableRouteImport } from './routes/my-timetable'
-import { Route as MyProfileRouteImport } from './routes/my-profile'
-import { Route as MyAttendanceRouteImport } from './routes/my-attendance'
-import { Route as MyAssessmentsRouteImport } from './routes/my-assessments'
-import { Route as MoreRouteImport } from './routes/more'
-import { Route as MeRouteImport } from './routes/me'
-import { Route as LeaveRouteImport } from './routes/leave'
-import { Route as IncompleteProfilesRouteImport } from './routes/incomplete-profiles'
-import { Route as HolidaysRouteImport } from './routes/holidays'
-import { Route as FormsRouteImport } from './routes/forms'
-import { Route as FinanceRouteImport } from './routes/finance'
-import { Route as ExaminationRouteImport } from './routes/examination'
-import { Route as DonationsRouteImport } from './routes/donations'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as DailyReportsRouteImport } from './routes/daily-reports'
-import { Route as BlogRouteImport } from './routes/blog'
-import { Route as AttendanceRouteImport } from './routes/attendance'
-import { Route as AssignmentsRouteImport } from './routes/assignments'
-import { Route as AnnouncementsRouteImport } from './routes/announcements'
-import { Route as AdmissionsRouteImport } from './routes/admissions'
-import { Route as AcademicsRouteImport } from './routes/academics'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as PeopleStudentIdRouteImport } from './routes/people.$studentId'
-import { Route as AdmissionsApplicationIdRouteImport } from './routes/admissions.$applicationId'
+import { Route as AcademicsRouteImport } from './routes/academics'
+import { Route as AdmissionsRouteImport } from './routes/admissions'
+import { Route as AnnouncementsRouteImport } from './routes/announcements'
+import { Route as AssignmentsRouteImport } from './routes/assignments'
+import { Route as AttendanceRouteImport } from './routes/attendance'
+import { Route as BlogRouteImport } from './routes/blog'
+import { Route as DailyReportsRouteImport } from './routes/daily-reports'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DonationsRouteImport } from './routes/donations'
+import { Route as ExaminationRouteImport } from './routes/examination'
+import { Route as FinanceRouteImport } from './routes/finance'
+import { Route as FormsRouteImport } from './routes/forms'
+import { Route as HolidaysRouteImport } from './routes/holidays'
+import { Route as IncompleteProfilesRouteImport } from './routes/incomplete-profiles'
+import { Route as LeaveRouteImport } from './routes/leave'
+import { Route as MeRouteImport } from './routes/me'
+import { Route as MoreRouteImport } from './routes/more'
+import { Route as MyAssessmentsRouteImport } from './routes/my-assessments'
+import { Route as MyAttendanceRouteImport } from './routes/my-attendance'
+import { Route as MyProfileRouteImport } from './routes/my-profile'
+import { Route as MyTimetableRouteImport } from './routes/my-timetable'
+import { Route as PeopleRouteImport } from './routes/people'
+import { Route as PlatformRouteImport } from './routes/platform'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as ResultsRouteImport } from './routes/results'
+import { Route as RolesRouteImport } from './routes/roles'
+import { Route as SetPasswordRouteImport } from './routes/set-password'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TimetableRouteImport } from './routes/timetable'
 import { Route as AdmissionTokenRouteImport } from './routes/admission.$token'
+import { Route as AdmissionsApplicationIdRouteImport } from './routes/admissions.$applicationId'
+import { Route as PeopleStudentIdRouteImport } from './routes/people.$studentId'
 
-const TimetableRoute = TimetableRouteImport.update({
-  id: '/timetable',
-  path: '/timetable',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SetPasswordRoute = SetPasswordRouteImport.update({
-  id: '/set-password',
-  path: '/set-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RolesRoute = RolesRouteImport.update({
-  id: '/roles',
-  path: '/roles',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResultsRoute = ResultsRouteImport.update({
-  id: '/results',
-  path: '/results',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResourcesRoute = ResourcesRouteImport.update({
-  id: '/resources',
-  path: '/resources',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReportsRoute = ReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlatformRoute = PlatformRouteImport.update({
-  id: '/platform',
-  path: '/platform',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PeopleRoute = PeopleRouteImport.update({
-  id: '/people',
-  path: '/people',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MyTimetableRoute = MyTimetableRouteImport.update({
-  id: '/my-timetable',
-  path: '/my-timetable',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MyProfileRoute = MyProfileRouteImport.update({
-  id: '/my-profile',
-  path: '/my-profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MyAttendanceRoute = MyAttendanceRouteImport.update({
-  id: '/my-attendance',
-  path: '/my-attendance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MyAssessmentsRoute = MyAssessmentsRouteImport.update({
-  id: '/my-assessments',
-  path: '/my-assessments',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MoreRoute = MoreRouteImport.update({
-  id: '/more',
-  path: '/more',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MeRoute = MeRouteImport.update({
-  id: '/me',
-  path: '/me',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LeaveRoute = LeaveRouteImport.update({
-  id: '/leave',
-  path: '/leave',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IncompleteProfilesRoute = IncompleteProfilesRouteImport.update({
-  id: '/incomplete-profiles',
-  path: '/incomplete-profiles',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HolidaysRoute = HolidaysRouteImport.update({
-  id: '/holidays',
-  path: '/holidays',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FormsRoute = FormsRouteImport.update({
-  id: '/forms',
-  path: '/forms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FinanceRoute = FinanceRouteImport.update({
-  id: '/finance',
-  path: '/finance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ExaminationRoute = ExaminationRouteImport.update({
-  id: '/examination',
-  path: '/examination',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DonationsRoute = DonationsRouteImport.update({
-  id: '/donations',
-  path: '/donations',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DailyReportsRoute = DailyReportsRouteImport.update({
-  id: '/daily-reports',
-  path: '/daily-reports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BlogRoute = BlogRouteImport.update({
-  id: '/blog',
-  path: '/blog',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AttendanceRoute = AttendanceRouteImport.update({
-  id: '/attendance',
-  path: '/attendance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AssignmentsRoute = AssignmentsRouteImport.update({
-  id: '/assignments',
-  path: '/assignments',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AnnouncementsRoute = AnnouncementsRouteImport.update({
-  id: '/announcements',
-  path: '/announcements',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdmissionsRoute = AdmissionsRouteImport.update({
-  id: '/admissions',
-  path: '/admissions',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AcademicsRoute = AcademicsRouteImport.update({
@@ -200,25 +55,170 @@ const AcademicsRoute = AcademicsRouteImport.update({
   path: '/academics',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AdmissionsRoute = AdmissionsRouteImport.update({
+  id: '/admissions',
+  path: '/admissions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PeopleStudentIdRoute = PeopleStudentIdRouteImport.update({
-  id: '/$studentId',
-  path: '/$studentId',
-  getParentRoute: () => PeopleRoute,
+const AnnouncementsRoute = AnnouncementsRouteImport.update({
+  id: '/announcements',
+  path: '/announcements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssignmentsRoute = AssignmentsRouteImport.update({
+  id: '/assignments',
+  path: '/assignments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AttendanceRoute = AttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogRoute = BlogRouteImport.update({
+  id: '/blog',
+  path: '/blog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DailyReportsRoute = DailyReportsRouteImport.update({
+  id: '/daily-reports',
+  path: '/daily-reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DonationsRoute = DonationsRouteImport.update({
+  id: '/donations',
+  path: '/donations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExaminationRoute = ExaminationRouteImport.update({
+  id: '/examination',
+  path: '/examination',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceRoute = FinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FormsRoute = FormsRouteImport.update({
+  id: '/forms',
+  path: '/forms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HolidaysRoute = HolidaysRouteImport.update({
+  id: '/holidays',
+  path: '/holidays',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IncompleteProfilesRoute = IncompleteProfilesRouteImport.update({
+  id: '/incomplete-profiles',
+  path: '/incomplete-profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaveRoute = LeaveRouteImport.update({
+  id: '/leave',
+  path: '/leave',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeRoute = MeRouteImport.update({
+  id: '/me',
+  path: '/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MoreRoute = MoreRouteImport.update({
+  id: '/more',
+  path: '/more',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyAssessmentsRoute = MyAssessmentsRouteImport.update({
+  id: '/my-assessments',
+  path: '/my-assessments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyAttendanceRoute = MyAttendanceRouteImport.update({
+  id: '/my-attendance',
+  path: '/my-attendance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyProfileRoute = MyProfileRouteImport.update({
+  id: '/my-profile',
+  path: '/my-profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyTimetableRoute = MyTimetableRouteImport.update({
+  id: '/my-timetable',
+  path: '/my-timetable',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PeopleRoute = PeopleRouteImport.update({
+  id: '/people',
+  path: '/people',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlatformRoute = PlatformRouteImport.update({
+  id: '/platform',
+  path: '/platform',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResultsRoute = ResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RolesRoute = RolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetPasswordRoute = SetPasswordRouteImport.update({
+  id: '/set-password',
+  path: '/set-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TimetableRoute = TimetableRouteImport.update({
+  id: '/timetable',
+  path: '/timetable',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdmissionTokenRoute = AdmissionTokenRouteImport.update({
+  id: '/admission/$token',
+  path: '/admission/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdmissionsApplicationIdRoute = AdmissionsApplicationIdRouteImport.update({
   id: '/$applicationId',
   path: '/$applicationId',
   getParentRoute: () => AdmissionsRoute,
 } as any)
-const AdmissionTokenRoute = AdmissionTokenRouteImport.update({
-  id: '/admission/$token',
-  path: '/admission/$token',
-  getParentRoute: () => rootRouteImport,
+const PeopleStudentIdRoute = PeopleStudentIdRouteImport.update({
+  id: '/$studentId',
+  path: '/$studentId',
+  getParentRoute: () => PeopleRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -485,214 +485,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/timetable': {
-      id: '/timetable'
-      path: '/timetable'
-      fullPath: '/timetable'
-      preLoaderRoute: typeof TimetableRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/set-password': {
-      id: '/set-password'
-      path: '/set-password'
-      fullPath: '/set-password'
-      preLoaderRoute: typeof SetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/roles': {
-      id: '/roles'
-      path: '/roles'
-      fullPath: '/roles'
-      preLoaderRoute: typeof RolesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/results': {
-      id: '/results'
-      path: '/results'
-      fullPath: '/results'
-      preLoaderRoute: typeof ResultsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/resources': {
-      id: '/resources'
-      path: '/resources'
-      fullPath: '/resources'
-      preLoaderRoute: typeof ResourcesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reports': {
-      id: '/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof ReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/platform': {
-      id: '/platform'
-      path: '/platform'
-      fullPath: '/platform'
-      preLoaderRoute: typeof PlatformRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/people': {
-      id: '/people'
-      path: '/people'
-      fullPath: '/people'
-      preLoaderRoute: typeof PeopleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/my-timetable': {
-      id: '/my-timetable'
-      path: '/my-timetable'
-      fullPath: '/my-timetable'
-      preLoaderRoute: typeof MyTimetableRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/my-profile': {
-      id: '/my-profile'
-      path: '/my-profile'
-      fullPath: '/my-profile'
-      preLoaderRoute: typeof MyProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/my-attendance': {
-      id: '/my-attendance'
-      path: '/my-attendance'
-      fullPath: '/my-attendance'
-      preLoaderRoute: typeof MyAttendanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/my-assessments': {
-      id: '/my-assessments'
-      path: '/my-assessments'
-      fullPath: '/my-assessments'
-      preLoaderRoute: typeof MyAssessmentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/more': {
-      id: '/more'
-      path: '/more'
-      fullPath: '/more'
-      preLoaderRoute: typeof MoreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/me': {
-      id: '/me'
-      path: '/me'
-      fullPath: '/me'
-      preLoaderRoute: typeof MeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/leave': {
-      id: '/leave'
-      path: '/leave'
-      fullPath: '/leave'
-      preLoaderRoute: typeof LeaveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/incomplete-profiles': {
-      id: '/incomplete-profiles'
-      path: '/incomplete-profiles'
-      fullPath: '/incomplete-profiles'
-      preLoaderRoute: typeof IncompleteProfilesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/holidays': {
-      id: '/holidays'
-      path: '/holidays'
-      fullPath: '/holidays'
-      preLoaderRoute: typeof HolidaysRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forms': {
-      id: '/forms'
-      path: '/forms'
-      fullPath: '/forms'
-      preLoaderRoute: typeof FormsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/finance': {
-      id: '/finance'
-      path: '/finance'
-      fullPath: '/finance'
-      preLoaderRoute: typeof FinanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/examination': {
-      id: '/examination'
-      path: '/examination'
-      fullPath: '/examination'
-      preLoaderRoute: typeof ExaminationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/donations': {
-      id: '/donations'
-      path: '/donations'
-      fullPath: '/donations'
-      preLoaderRoute: typeof DonationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/daily-reports': {
-      id: '/daily-reports'
-      path: '/daily-reports'
-      fullPath: '/daily-reports'
-      preLoaderRoute: typeof DailyReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/blog': {
-      id: '/blog'
-      path: '/blog'
-      fullPath: '/blog'
-      preLoaderRoute: typeof BlogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/attendance': {
-      id: '/attendance'
-      path: '/attendance'
-      fullPath: '/attendance'
-      preLoaderRoute: typeof AttendanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/assignments': {
-      id: '/assignments'
-      path: '/assignments'
-      fullPath: '/assignments'
-      preLoaderRoute: typeof AssignmentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/announcements': {
-      id: '/announcements'
-      path: '/announcements'
-      fullPath: '/announcements'
-      preLoaderRoute: typeof AnnouncementsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admissions': {
-      id: '/admissions'
-      path: '/admissions'
-      fullPath: '/admissions'
-      preLoaderRoute: typeof AdmissionsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/academics': {
@@ -702,19 +499,222 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AcademicsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/admissions': {
+      id: '/admissions'
+      path: '/admissions'
+      fullPath: '/admissions'
+      preLoaderRoute: typeof AdmissionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/people/$studentId': {
-      id: '/people/$studentId'
-      path: '/$studentId'
-      fullPath: '/people/$studentId'
-      preLoaderRoute: typeof PeopleStudentIdRouteImport
-      parentRoute: typeof PeopleRoute
+    '/announcements': {
+      id: '/announcements'
+      path: '/announcements'
+      fullPath: '/announcements'
+      preLoaderRoute: typeof AnnouncementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assignments': {
+      id: '/assignments'
+      path: '/assignments'
+      fullPath: '/assignments'
+      preLoaderRoute: typeof AssignmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/attendance': {
+      id: '/attendance'
+      path: '/attendance'
+      fullPath: '/attendance'
+      preLoaderRoute: typeof AttendanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog': {
+      id: '/blog'
+      path: '/blog'
+      fullPath: '/blog'
+      preLoaderRoute: typeof BlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/daily-reports': {
+      id: '/daily-reports'
+      path: '/daily-reports'
+      fullPath: '/daily-reports'
+      preLoaderRoute: typeof DailyReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/donations': {
+      id: '/donations'
+      path: '/donations'
+      fullPath: '/donations'
+      preLoaderRoute: typeof DonationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/examination': {
+      id: '/examination'
+      path: '/examination'
+      fullPath: '/examination'
+      preLoaderRoute: typeof ExaminationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance': {
+      id: '/finance'
+      path: '/finance'
+      fullPath: '/finance'
+      preLoaderRoute: typeof FinanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forms': {
+      id: '/forms'
+      path: '/forms'
+      fullPath: '/forms'
+      preLoaderRoute: typeof FormsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/holidays': {
+      id: '/holidays'
+      path: '/holidays'
+      fullPath: '/holidays'
+      preLoaderRoute: typeof HolidaysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/incomplete-profiles': {
+      id: '/incomplete-profiles'
+      path: '/incomplete-profiles'
+      fullPath: '/incomplete-profiles'
+      preLoaderRoute: typeof IncompleteProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leave': {
+      id: '/leave'
+      path: '/leave'
+      fullPath: '/leave'
+      preLoaderRoute: typeof LeaveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/me': {
+      id: '/me'
+      path: '/me'
+      fullPath: '/me'
+      preLoaderRoute: typeof MeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/more': {
+      id: '/more'
+      path: '/more'
+      fullPath: '/more'
+      preLoaderRoute: typeof MoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-assessments': {
+      id: '/my-assessments'
+      path: '/my-assessments'
+      fullPath: '/my-assessments'
+      preLoaderRoute: typeof MyAssessmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-attendance': {
+      id: '/my-attendance'
+      path: '/my-attendance'
+      fullPath: '/my-attendance'
+      preLoaderRoute: typeof MyAttendanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-profile': {
+      id: '/my-profile'
+      path: '/my-profile'
+      fullPath: '/my-profile'
+      preLoaderRoute: typeof MyProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-timetable': {
+      id: '/my-timetable'
+      path: '/my-timetable'
+      fullPath: '/my-timetable'
+      preLoaderRoute: typeof MyTimetableRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/people': {
+      id: '/people'
+      path: '/people'
+      fullPath: '/people'
+      preLoaderRoute: typeof PeopleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/platform': {
+      id: '/platform'
+      path: '/platform'
+      fullPath: '/platform'
+      preLoaderRoute: typeof PlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/results': {
+      id: '/results'
+      path: '/results'
+      fullPath: '/results'
+      preLoaderRoute: typeof ResultsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/roles': {
+      id: '/roles'
+      path: '/roles'
+      fullPath: '/roles'
+      preLoaderRoute: typeof RolesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/set-password': {
+      id: '/set-password'
+      path: '/set-password'
+      fullPath: '/set-password'
+      preLoaderRoute: typeof SetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/timetable': {
+      id: '/timetable'
+      path: '/timetable'
+      fullPath: '/timetable'
+      preLoaderRoute: typeof TimetableRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admission/$token': {
+      id: '/admission/$token'
+      path: '/admission/$token'
+      fullPath: '/admission/$token'
+      preLoaderRoute: typeof AdmissionTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admissions/$applicationId': {
       id: '/admissions/$applicationId'
@@ -723,12 +723,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdmissionsApplicationIdRouteImport
       parentRoute: typeof AdmissionsRoute
     }
-    '/admission/$token': {
-      id: '/admission/$token'
-      path: '/admission/$token'
-      fullPath: '/admission/$token'
-      preLoaderRoute: typeof AdmissionTokenRouteImport
-      parentRoute: typeof rootRouteImport
+    '/people/$studentId': {
+      id: '/people/$studentId'
+      path: '/$studentId'
+      fullPath: '/people/$studentId'
+      preLoaderRoute: typeof PeopleStudentIdRouteImport
+      parentRoute: typeof PeopleRoute
     }
   }
 }

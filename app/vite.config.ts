@@ -48,8 +48,8 @@ function generateAppShell(): Plugin {
   ${jsTags}
 </body>
 </html>`;
-      this.emitFile({ type: "asset", fileName: "index.html", source: html });
-      console.log("Generated app shell index.html");
+      this.emitFile({ type: "asset", fileName: "offline.html", source: html });
+      console.log("Generated app shell offline.html");
     },
   };
 }
@@ -101,7 +101,7 @@ export default defineConfig({
         workbox: {
           globDirectory: ".output/public",
           globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico,webmanifest}"],
-          navigateFallback: "/index.html",
+          navigateFallback: "/offline.html",
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
           runtimeCaching: [
             {
