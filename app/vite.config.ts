@@ -13,7 +13,7 @@ import { resolve } from "node:path";
 function generateAppShell(): Plugin {
   return {
     name: "generate-app-shell",
-    apply: "build",
+    apply: (_config: unknown, env: { isSsrBuild?: boolean }) => !env.isSsrBuild,
     enforce: "pre",
     generateBundle(_options, bundle) {
       // Find the main entry chunk and CSS from the client bundle
@@ -21,8 +21,11 @@ function generateAppShell(): Plugin {
       const cssFiles: string[] = [];
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type === "chunk") {
-          if (chunk.isEntry && fileName.startsWith("index-")) {
-            mainJs = fileName;
+          if (chunk.isEntry) {
+            const basename = fileName.split('/').pop() || "";
+            if (basename.startsWith("client-") || basename.startsWith("index-") || basename.startsWith("_client-")) {
+              mainJs = fileName;
+            }
           }
         } else if (chunk.type === "asset" && fileName.endsWith(".css")) {
           cssFiles.push(fileName);
@@ -33,14 +36,15 @@ function generateAppShell(): Plugin {
       const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#064e3b" />
   <title>Suffa MS</title>
   ${cssTags}
 </head>
 <body>
-  <div id="app"></div>
+  <!-- Inject empty __TSR__ state to prevent TanStack Start client from throwing Invariant failed on offline boot -->
+  <script>window.__TSR__ = { matches: [], streamedValues: {} };</script>
   ${jsTags}
 </body>
 </html>`;
@@ -91,7 +95,8 @@ export default defineConfig({
       },
     },
     plugins: [
-        clientOnlyPWA({
+      generateAppShell(),
+      clientOnlyPWA({
         strategies: "generateSW",
         registerType: "autoUpdate",
         injectRegister: null,
