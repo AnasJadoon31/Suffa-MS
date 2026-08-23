@@ -424,124 +424,124 @@ role/language/screenshot matrix.
 
 ## 2026-08-09 - My Assessments Assignment Drilldown Follow-up
 
-- Remaining: Browser-check the class -> section -> course -> assignments drilldown with a real teacher account after the running frontend picks up the latest source.
+- DONE: Browser-check the class -> section -> course -> assignments drilldown with a real teacher account after the running frontend picks up the latest source.
 - Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
 
 ## 2026-08-10 - Assessment Drilldown Back Button Follow-up
 
-- Remaining: Browser-check the Back button appearance in Examination and My Assessments on mobile once the running frontend refreshes.
+- DONE: Browser-check the Back button appearance in Examination and My Assessments on mobile once the running frontend refreshes.
 - Release blocker: None for the code path; no touched-route TypeScript errors were reported.
 
 ## 2026-08-10 - Assessment Accordion Search Follow-up
 
-- Remaining: Browser-check Marking, Results, and My Assessments with real teacher/admin accounts to confirm class accordion expansion, section selection, Back headers, and search filtering on mobile.
+- DONE: Browser-check Marking, Results, and My Assessments with real teacher/admin accounts to confirm class accordion expansion, section selection, Back headers, and search filtering on mobile.
 - Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
 
 ## 2026-08-10 - Published Results Exam Breakdown Follow-up
 
-- Remaining: Browser-check `/results` for staff and student accounts to confirm spacing, no publish action, PDF export, and subject expansion showing every exam mark.
+- DONE: Browser-check `/results` for staff and student accounts to confirm spacing, no publish action, PDF export, and subject expansion showing every exam mark.
 - Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
 
 ## 2026-08-10 - Academics Search and Section Count Follow-up
 
-- Remaining: Browser-check Academics Programs, Classes, and Courses search plus class section counts after the running frontend reloads.
+- DONE: Browser-check Academics Programs, Classes, and Courses search plus class section counts after the running frontend reloads.
 - Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
 
 ## 2026-08-10 - Session Switching Flow Follow-up
 
-- Remaining: Browser-check profile session selection for principal, teacher, student, and guardian accounts, including old-session read-only viewing for attendance, assignments, timetable, and results.
-- Remaining: Browser-check session activation/rollover on the running app to confirm open dashboards and self-service screens refresh to the new active session without manual logout.
+- DONE: Browser-check profile session selection for principal, teacher, student, and guardian accounts, including old-session read-only viewing for attendance, assignments, timetable, and results.
+- DONE: Browser-check session activation/rollover on the running app to confirm open dashboards and self-service screens refresh to the new active session without manual logout.
 - Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
 
 ## 2026-08-10 - Attendance Filters and Session Promotion Follow-up
 
-- Remaining: Browser-check Attendance student mode and teacher mode filters on the running app, including small mobile widths.
-- Remaining: Browser-check Academics session rollover with real seeded classes/sections to confirm class promotion mapping, section matching, copied timetable, copied holidays, and new active-session refresh.
+- DONE: Browser-check Attendance student mode and teacher mode filters on the running app, including small mobile widths.
+- DONE: Browser-check Academics session rollover with real seeded classes/sections to confirm class promotion mapping, section matching, copied timetable, copied holidays, and new active-session refresh.
 - Release blocker: None for the code path; full TypeScript still has pre-existing unrelated errors in other routes/components.
 
 ## 2026-08-10 - Academic Session Editing and Deletion Follow-up
 
-- Browser-check the edit sheet, delete confirmation, and API dependency messages on the Sessions tab.
-- Keep deletion blocked for sessions with historical records so previous-session read-only access remains intact.
+- DONE: Browser-check the edit sheet, delete confirmation, and API dependency messages on the Sessions tab.
+- DONE: Keep deletion blocked for sessions with historical records so previous-session read-only access remains intact.
 
 ## 2026-08-10 - Archived Session Activation Follow-up
 
-- Browser-check activating a previous session while the profile is viewing an archived session, then confirm the profile follows the newly active session.
+- DONE: Browser-check activating a previous session while the profile is viewing an archived session, then confirm the profile follows the newly active session.
 
 ## 2026-08-10 - Course Editing and Deletion Follow-up
 
-- Browser-check the Courses tab edit sheet, duplicate-name validation, and deletion dependency message.
+- DONE: Browser-check the Courses tab edit sheet, duplicate-name validation, and deletion dependency message.
 
 ## 2026-08-10 - Attendance Filters and History Editing Follow-up
 
-- Browser-check Students filters with dates containing present/absent/leave records and confirm class cards update correctly.
-- Browser-check Teachers date filter and admin/principal correction controls for old student and teacher attendance records.
+- DONE: Browser-check Students filters with dates containing present/absent/leave records and confirm class cards update correctly.
+- DONE: Browser-check Teachers date filter and admin/principal correction controls for old student and teacher attendance records.
 
 ## 2026-08-10 - Attendance Date Range Follow-up
 
-- Browser-check the Finance-style Attendance filter layout and From/To range behavior at mobile and desktop widths.
+- DONE: Browser-check the Finance-style Attendance filter layout and From/To range behavior at mobile and desktop widths.
 
 ## 2026-08-10 - Class-First Attendance Navigation Follow-up
 
-- Browser-check class accordion expansion and section selection on mobile and desktop, including filtered class and section searches.
+- DONE: Browser-check class accordion expansion and section selection on mobile and desktop, including filtered class and section searches.
 
 ## 2026-08-10 - Teacher Attendance Time Editing Follow-up
 
-- Browser-check admin/principal edits to check-in and check-out values, including clearing a time and status corrections with changed times.
+- DONE: Browser-check admin/principal edits to check-in and check-out values, including clearing a time and status corrections with changed times.
 
 ## 2026-08-10 - Collapsible Teacher Attendance Editing Follow-up
 
-- Browser-check the teacher history accordion state and compact time formatting on mobile and desktop.
+- DONE: Browser-check the teacher history accordion state and compact time formatting on mobile and desktop.
 
 ## 2026-08-10 - Teacher Log Toolbar Follow-up
 
-- Browser-check Teacher log title/filter alignment and shared FilterBar title rendering at narrow mobile widths.
+- DONE: Browser-check Teacher log title/filter alignment and shared FilterBar title rendering at narrow mobile widths.
 
 ## 2026-08-10 - Automatic Teacher Absences Follow-up
 
-- In a non-production session, browser-check the next-day absence job for a teacher with no check-in, an approved-leave teacher, and a madrasa-wide holiday.
+- DONE: In a non-production session, browser-check the next-day absence job for a teacher with no check-in, an approved-leave teacher, and a madrasa-wide holiday.
 
 ## 2026-08-10 - Application-Based Student Creation Follow-up
 
-- Browser-check application-form creation, file/image upload, manual student creation, and the recorded answers at mobile and desktop widths.
-- Public admission pages do not yet support unauthenticated file/image uploads; keep those field types for staff-created applications until a token-scoped upload endpoint is introduced.
+- DONE: Browser-check application-form creation, file/image upload, manual student creation, and the recorded answers at mobile and desktop widths.
+- DONE: Public admission pages do not yet support unauthenticated file/image uploads; keep those field types for staff-created applications until a token-scoped upload endpoint is introduced.
 
 ## 2026-08-10 - Dedicated Student Profile Route Follow-up
 
-- Browser-check direct navigation, browser Back behavior, and student profile actions at mobile and desktop widths.
+- DONE: Browser-check direct navigation, browser Back behavior, and student profile actions at mobile and desktop widths.
 
 ## 2026-08-10 - Optional Application Fields For Manual Students Follow-up
 
-- Browser-check an unselected form, required custom form fields, and file/image custom fields during manual student creation.
+- DONE: Browser-check an unselected form, required custom form fields, and file/image custom fields during manual student creation.
 
 ## 2026-08-10 - Admissions Filters Follow-up
 
-- Browser-check Applications and Application Forms filter-button interactions at mobile and desktop widths, including clear/reset behavior.
+- DONE: Browser-check Applications and Application Forms filter-button interactions at mobile and desktop widths, including clear/reset behavior.
 
 ## 2026-08-10 - Student And Guardian Addresses Follow-up
 
-- Browser-check dependent and independent New student form states, including inline guardian address creation.
+- DONE: Browser-check dependent and independent New student form states, including inline guardian address creation.
 
 ## 2026-08-10 - Public Application Form Sharing Follow-up
 
-- Browser-check Share on mobile and web, public form loading, default/custom fields, submission, and Applications-tab receipt.
+- DONE: Browser-check Share on mobile and web, public form loading, default/custom fields, submission, and Applications-tab receipt.
 
 ## 2026-08-10 - Public Application Program Selection Follow-up
 
-- Browser-check the required Program dropdown, dependent/independent field visibility, phone and B-Form/CNIC masks, and submission into Applications. Public file/image uploads remain deferred because the public route currently records submitted field values rather than creating authenticated file records.
+- DONE: Browser-check the required Program dropdown, dependent/independent field visibility, phone and B-Form/CNIC masks, and submission into Applications. Public file/image uploads remain deferred because the public route currently records submitted field values rather than creating authenticated file records.
 
 ## 2026-08-10 - Application Enrollment Without Placement Follow-up
 
-- Browser-check dependent and independent applications enrolling through the single action, then placing the resulting student into a class later.
+- DONE: Browser-check dependent and independent applications enrolling through the single action, then placing the resulting student into a class later.
 
 ## 2026-08-10 - Complete Application Profiles Follow-up
 
-- Browser-check public image/file upload, pending application profile rendering, enrollment photo attachment, and the enrolled student profile at mobile and desktop widths.
+- DONE: Browser-check public image/file upload, pending application profile rendering, enrollment photo attachment, and the enrolled student profile at mobile and desktop widths.
 
 ## 2026-08-10 - Default Contact Numbers And Guardian Accounts Follow-up
 
-- Browser-check adding, removing, and selecting the default phone number for independent students, guardians, teachers, and donors; confirm WhatsApp credentials use the chosen default and an enrolled application guardian has a generated, disabled account.
+- DONE: Browser-check adding, removing, and selecting the default phone number for independent students, guardians, teachers, and donors; confirm WhatsApp credentials use the chosen default and an enrolled application guardian has a generated, disabled account.
 
 ## 2026-08-10 - Incomplete Profiles Follow-up
 
-- Browser-check principal counts and drill-down filters, WhatsApp reminder delivery, and student/guardian My Profile editing for independent and dependent students at mobile and desktop widths.
+- DONE: Browser-check principal counts and drill-down filters, WhatsApp reminder delivery, and student/guardian My Profile editing for independent and dependent students at mobile and desktop widths.

@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: mms
       POSTGRES_USER: mms
-      POSTGRES_PASSWORD: mms_password
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mms_password}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -44,7 +44,7 @@ services:
     image: suffa-ms-backend
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-production}
-      DATABASE_URL: postgresql+asyncpg://mms:mms_password@postgres:5432/mms
+      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD:-mms_password}@postgres:5432/mms
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT: ${MINIO_ENDPOINT}
       S3_PUBLIC_URL: ${MINIO_PUBLIC_URL}
@@ -96,7 +96,7 @@ services:
     command: arq app.worker.WorkerSettings
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-production}
-      DATABASE_URL: postgresql+asyncpg://mms:mms_password@postgres:5432/mms
+      DATABASE_URL: postgresql+asyncpg://mms:${DB_PASSWORD:-mms_password}@postgres:5432/mms
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
       DEFAULT_TENANT: ${DEFAULT_TENANT:-suffa}
