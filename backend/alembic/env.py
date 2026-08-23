@@ -11,12 +11,13 @@ from app.db.migration_lock import run_migrations_with_lock
 from app.db.models import Base
 
 import os
+from app.db.session import _async_database_url
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 if os.getenv("DATABASE_URL"):
-    config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
+    config.set_main_option("sqlalchemy.url", _async_database_url(os.getenv("DATABASE_URL")))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

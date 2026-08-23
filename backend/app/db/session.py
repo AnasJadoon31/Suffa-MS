@@ -7,7 +7,9 @@ from app.core.config import settings
 
 def _async_database_url(url: str) -> str:
     """Use SQLAlchemy's asyncpg dialect when Coolify injects a plain Postgres URL."""
-    if url.startswith("postgresql://"):
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://"):
         return url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return url
 
