@@ -1186,6 +1186,8 @@ export const peopleMutations = {
   reactivateTeacher: (id: string) =>
     api.post(`/api/v1/people/teachers/${id}/reactivate`).then((r) => r.data),
 
+  guardianDetail: (id: string) =>
+    api.get<GuardianDetail>(`/api/v1/people/guardians/${id}`).then((r) => r.data),
   createGuardian: (payload: {
     name: string;
     relationship: string;

@@ -621,10 +621,12 @@ export function GuardianDetailSheet({
   guardian,
   open,
   onOpenChange,
+  page = false,
 }: {
   guardian: GuardianDetail | null;
   open: boolean;
   onOpenChange: (next: boolean) => void;
+  page?: boolean;
 }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -632,6 +634,13 @@ export function GuardianDetailSheet({
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [confirmReactivate, setConfirmReactivate] = useState(false);
   const [credentialPhone, setCredentialPhone] = useState("");
+
+  const incompleteQuery = useQuery({
+    queryKey: ["incomplete-profiles", "guardian"],
+    queryFn: () => reportingApi.incompleteProfiles("guardian"),
+    enabled: Boolean(guardian && open),
+  });
+  const missingFields = incompleteQuery.data?.find((p) => p.id === guardian?.id)?.missing_fields;
 
   const studentsQuery = useQuery({
     queryKey: ["guardian-students", guardian?.id],
@@ -643,123 +652,158 @@ export function GuardianDetailSheet({
 
   const credentialPhoneOptions = phoneOptions(guardian.phone_numbers, t("Guardian"));
 
-  return (
-    <ManagedSheet
-      open={open}
-      onOpenChange={onOpenChange}
-      title={guardian.name}
-      subtitle={
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill tone="muted">{guardian.relationship}</Pill>
-          {guardian.username ? (
-            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent-foreground">
-              {guardian.username}
-            </span>
-          ) : null}
-          {guardian.is_donor ? <Pill tone="success">{t("Donor")}</Pill> : null}
-        </div>
-      }
-    >
-      <div className="mb-4">
-          <Row label={t("Phone(s)")} value={guardian.phone_list?.join(" · ") || guardian.phone_numbers} />
-          <Row label={t("CNIC")} value={guardian.cnic} />
-          <Row label={t("Address")} value={guardian.address} />
-        </div>
-
-        <div className="mb-4">
-          <p className="mb-1 text-xs font-semibold text-muted-foreground">{t("Students")}</p>
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {(studentsQuery.data ?? []).map((s) => (
-              <button key={s.id} type="button" onClick={() => { peopleMutations.unlinkStudentFromGuardian(guardian.id, s.id).then(() => { void client.invalidateQueries({ queryKey: ["guardian-students", guardian.id] }); }); }} className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary">{s.name} ×</button>
-            ))}
-          </div>
-          <StudentSearchSelect
-            excludeIds={(studentsQuery.data ?? []).map((s) => s.id)}
-            onSelect={(studentId) => {
-              peopleMutations.linkStudentToGuardian(guardian.id, studentId).then(() => {
-                void client.invalidateQueries({ queryKey: ["guardian-students", guardian.id] });
-              });
-            }}
-          />
-        </div>
-
-         <ActionBar>
-          <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
-            {t("Edit")}</ActionButton>
-          <ActionButton
-            className="flex-1"
-            variant="soft"
-            onClick={() =>
-              copyCredentialsLink(() => peopleMutations.guardianCredentialsLink(guardian.id), t)
-            }
-          >
-            <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
-        </ActionBar>
-        {credentialPhoneOptions.length > 1 ? (
-          <div className="mt-2">
-            <Field label={t("Credential recipient")}>
-              <CustomDropdown value={credentialPhone} onChange={(event) => setCredentialPhone(event.target.value)}>
-                <option value="">{t("Default recipient")}</option>
-                {credentialPhoneOptions.map((option) => (
-                  <option key={`${option.label}-${option.value}`} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </CustomDropdown>
-            </Field>
-          </div>
+  const subtitle = (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Pill tone="muted">{guardian.relationship}</Pill>
+        {guardian.username ? (
+          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent-foreground">
+            {guardian.username}
+          </span>
         ) : null}
-        <ActionBar className="mt-2">
-          <WhatsAppSendAction
-            onSend={() =>
-              sendCredentialsToWhatsApp({
-                subjectType: "guardian",
-                subjectId: guardian.id,
-                phoneNumber: credentialPhone || credentialPhoneOptions[0]?.value,
-                fetcher: () => peopleMutations.guardianCredentialsLink(guardian.id),
-                t,
-              })
-            }
-          >
-            {t("Send via WhatsApp")}
-          </WhatsAppSendAction>
-        </ActionBar>
-        {guardian.status === "active" ? (
-          confirmDeactivate ? (
-            <ActionBar className="mt-2">
-              <ActionButton variant="danger" className="flex-1" onClick={async () => { await peopleMutations.deactivateGuardian(guardian.id); toast.success("Guardian deactivated"); void client.invalidateQueries({ queryKey: ["people"] }); onOpenChange(false); }}>
-                <ShieldOff className="h-4 w-4" /> {t("Confirm deactivate")}</ActionButton>
-              <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmDeactivate(false)}>
-                {t("Cancel")}</ActionButton>
-            </ActionBar>
-          ) : (
-            <ActionBar className="mt-2">
-              <ActionButton
-                variant="danger"
-                className="w-full"
-                onClick={() => setConfirmDeactivate(true)}
-              >
-                <ShieldOff className="h-4 w-4" /> {t("Deactivate")}</ActionButton>
-            </ActionBar>
-          )
-        ) : confirmReactivate ? (
+        {guardian.is_donor ? <Pill tone="success">{t("Donor")}</Pill> : null}
+        <Pill tone={guardian.status === "active" ? "success" : "muted"}>
+          {t(guardian.status)}
+        </Pill>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 empty:hidden">
+        {missingFields?.map((field) => (
+          <Pill key={field} tone="warning">
+            Missing: {field}
+          </Pill>
+        ))}
+      </div>
+    </div>
+  );
+
+  const containerContent = (
+    <>
+      <div className="mb-4">
+        <Row label={t("Phone(s)")} value={guardian.phone_list?.join(" · ") || guardian.phone_numbers} />
+        <Row label={t("CNIC")} value={guardian.cnic} />
+        <Row label={t("Address")} value={guardian.address} />
+      </div>
+
+      <div className="mb-4">
+        <p className="mb-1 text-xs font-semibold text-muted-foreground">{t("Students")}</p>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {(studentsQuery.data ?? []).map((s) => (
+            <button key={s.id} type="button" onClick={() => { peopleMutations.unlinkStudentFromGuardian(guardian.id, s.id).then(() => { void client.invalidateQueries({ queryKey: ["guardian-students", guardian.id] }); }); }} className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary">{s.name} ×</button>
+          ))}
+        </div>
+        <StudentSearchSelect
+          excludeIds={(studentsQuery.data ?? []).map((s) => s.id)}
+          onSelect={(studentId) => {
+            peopleMutations.linkStudentToGuardian(guardian.id, studentId).then(() => {
+              void client.invalidateQueries({ queryKey: ["guardian-students", guardian.id] });
+            });
+          }}
+        />
+      </div>
+
+      <ActionBar>
+        <ActionButton className="flex-1" variant="soft" onClick={() => setEditOpen(true)}>
+          {t("Edit")}</ActionButton>
+        <ActionButton
+          className="flex-1"
+          variant="soft"
+          onClick={() =>
+            copyCredentialsLink(() => peopleMutations.guardianCredentialsLink(guardian.id), t)
+          }
+        >
+          <Copy className="h-4 w-4" /> {t("Credentials link")}</ActionButton>
+      </ActionBar>
+      {credentialPhoneOptions.length > 1 ? (
+        <div className="mt-2">
+          <Field label={t("Credential recipient")}>
+            <CustomDropdown value={credentialPhone} onChange={(event) => setCredentialPhone(event.target.value)}>
+              <option value="">{t("Default recipient")}</option>
+              {credentialPhoneOptions.map((option) => (
+                <option key={`${option.label}-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </CustomDropdown>
+          </Field>
+        </div>
+      ) : null}
+      <ActionBar className="mt-2">
+        <WhatsAppSendAction
+          onSend={() =>
+            sendCredentialsToWhatsApp({
+              subjectType: "guardian",
+              subjectId: guardian.id,
+              phoneNumber: credentialPhone || credentialPhoneOptions[0]?.value,
+              fetcher: () => peopleMutations.guardianCredentialsLink(guardian.id),
+              t,
+            })
+          }
+        >
+          {t("Send via WhatsApp")}
+        </WhatsAppSendAction>
+      </ActionBar>
+      {guardian.status === "active" ? (
+        confirmDeactivate ? (
           <ActionBar className="mt-2">
-            <ActionButton variant="success" className="flex-1" onClick={async () => { await peopleMutations.reactivateGuardian(guardian.id); toast.success("Guardian reactivated"); void client.invalidateQueries({ queryKey: ["people"] }); onOpenChange(false); }}>
-              <ShieldCheck className="h-4 w-4" /> {t("Confirm reactivate")}</ActionButton>
-            <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmReactivate(false)}>
+            <ActionButton variant="danger" className="flex-1" onClick={async () => { await peopleMutations.deactivateGuardian(guardian.id); toast.success("Guardian deactivated"); void client.invalidateQueries({ queryKey: ["people"] }); onOpenChange(false); }}>
+              <ShieldOff className="h-4 w-4" /> {t("Confirm deactivate")}</ActionButton>
+            <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmDeactivate(false)}>
               {t("Cancel")}</ActionButton>
           </ActionBar>
         ) : (
           <ActionBar className="mt-2">
             <ActionButton
-              variant="success"
+              variant="danger"
               className="w-full"
-              onClick={() => setConfirmReactivate(true)}
+              onClick={() => setConfirmDeactivate(true)}
             >
-              <ShieldCheck className="h-4 w-4" /> {t("Reactivate")}</ActionButton>
+              <ShieldOff className="h-4 w-4" /> {t("Deactivate")}</ActionButton>
           </ActionBar>
-        )}
-        <GuardianForm guardian={guardian} open={editOpen} onOpenChange={setEditOpen} />
+        )
+      ) : confirmReactivate ? (
+        <ActionBar className="mt-2">
+          <ActionButton variant="success" className="flex-1" onClick={async () => { await peopleMutations.reactivateGuardian(guardian.id); toast.success("Guardian reactivated"); void client.invalidateQueries({ queryKey: ["people"] }); onOpenChange(false); }}>
+            <ShieldCheck className="h-4 w-4" /> {t("Confirm reactivate")}</ActionButton>
+          <ActionButton className="flex-1" variant="ghost" onClick={() => setConfirmReactivate(false)}>
+            {t("Cancel")}</ActionButton>
+        </ActionBar>
+      ) : (
+        <ActionBar className="mt-2">
+          <ActionButton
+            variant="success"
+            className="w-full"
+            onClick={() => setConfirmReactivate(true)}
+          >
+            <ShieldCheck className="h-4 w-4" /> {t("Reactivate")}</ActionButton>
+        </ActionBar>
+      )}
+      <GuardianForm guardian={guardian} open={editOpen} onOpenChange={setEditOpen} />
+    </>
+  );
+
+  if (page) {
+    return (
+      <StudentDetailContainer
+        page={page}
+        open={open}
+        onBack={() => onOpenChange(false)}
+        title={guardian.name}
+        onPhotoClick={() => {}}
+        subtitle={subtitle}
+      >
+        {containerContent}
+      </StudentDetailContainer>
+    );
+  }
+
+  return (
+    <ManagedSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={guardian.name}
+      subtitle={subtitle}
+    >
+      {containerContent}
     </ManagedSheet>
   );
 }

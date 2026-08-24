@@ -1000,6 +1000,17 @@ async def unmark_guardian_as_donor(
     return GuardianRead.model_validate(guardian)
 
 
+@router.get("/guardians/{guardian_id}", response_model=GuardianRead)
+async def get_guardian(
+    guardian_id: UUID,
+    current_user: User = Depends(require_permission("students.view")),
+    madrasa: Madrasa = Depends(get_current_madrasa),
+    session: AsyncSession = Depends(get_session),
+) -> GuardianRead:
+    guardian = await _get_or_404(session, Guardian, guardian_id, madrasa.id)
+    return GuardianRead.model_validate(guardian)
+
+
 @router.get("/guardians", response_model=list[GuardianRead])
 async def list_guardians(
     response: Response,

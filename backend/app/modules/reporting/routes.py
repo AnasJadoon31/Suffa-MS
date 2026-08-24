@@ -95,19 +95,32 @@ async def _incomplete_profiles(session: AsyncSession, madrasa_id: UUID) -> list[
         missing = _missing_required_answers(records.get(student.id))
         if not student.b_form_number:
             missing.append("B-Form / CNIC")
+        phone = student.default_phone_number
+        if not phone and student.phone_list:
+            phone = student.phone_list[0]
+        if not phone and student.phone:
+            phone = student.phone
         if student.is_independent:
-            if not student.default_phone_number:
+            if not phone:
                 missing.append("Phone")
             if not student.address:
                 missing.append("Address")
         elif not guardian_links.get(student.id):
             missing.append("Guardian")
         if missing:
-            rows.append({"id": str(student.id), "profile_type": "student", "name": student.name, "missing_fields": missing, "phone": student.default_phone_number})
+            rows.append({"id": str(student.id), "profile_type": "student", "name": student.name, "missing_fields": missing, "phone": phone})
     for guardian in (await session.execute(select(Guardian).where(Guardian.madrasa_id == madrasa_id))).scalars().all():
-        missing = [label for label, value in (("CNIC", guardian.cnic), ("Address", guardian.address), ("Phone", guardian.default_phone_number)) if not value]
+        phone = guardian.default_phone_number
+        if not phone and guardian.phone_list:
+            phone = guardian.phone_list[0]
+        if not phone and guardian.phone_numbers:
+            phone = guardian.phone_numbers.split(",")[0].strip()
+        missing = []
+        if not guardian.cnic: missing.append("CNIC")
+        if not guardian.address: missing.append("Address")
+        if not phone: missing.append("Phone")
         if missing:
-            rows.append({"id": str(guardian.id), "profile_type": "guardian", "name": guardian.name, "missing_fields": missing, "phone": guardian.default_phone_number})
+            rows.append({"id": str(guardian.id), "profile_type": "guardian", "name": guardian.name, "missing_fields": missing, "phone": phone})
     return rows
 
 
