@@ -2,7 +2,7 @@ name: Build and Push to GHCR
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-push:
@@ -15,6 +15,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Add this step to enable caching
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -25,15 +29,21 @@ jobs:
       - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
-          context: ./backend           # Changed from . to ./backend
+          context: ./backend
           file: ./backend/Dockerfile
           push: true
           tags: ghcr.io/anasjadoon31/suffa-ms-backend:latest
+          # Add these two lines for backend cache
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
-          context: ./app               # Changed from . to ./app
+          context: ./app
           file: ./app/Dockerfile
           push: true
           tags: ghcr.io/anasjadoon31/suffa-ms-app:latest
+          # Add these two lines for frontend cache
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
