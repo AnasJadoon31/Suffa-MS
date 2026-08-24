@@ -37,11 +37,9 @@ export function registerServiceWorker(): void {
   if (typeof window === "undefined" || !("serviceWorker" in window.navigator)) return;
 
   const refuse =
-    !import.meta.env.PROD ||
     window.self !== window.top ||
     isBlockedHost(window.location.hostname) ||
-    new URLSearchParams(window.location.search).get("sw") === "off" ||
-    import.meta.env.VITE_ENABLE_OFFLINE !== "true";
+    new URLSearchParams(window.location.search).get("sw") === "off";
 
   if (refuse) {
     void unregisterOldWorkers(true).catch(() => undefined);
@@ -53,7 +51,10 @@ export function registerServiceWorker(): void {
     .catch(() => undefined)
     .finally(() => {
       void window.navigator.serviceWorker
-        .register(SW_URL, { scope: "/" })
+        .register(SW_URL, { 
+          scope: "/",
+          type: import.meta.env.PROD ? "classic" : "module" 
+        })
         .then((registration) => {
           console.log("SW registered:", registration.scope);
         })

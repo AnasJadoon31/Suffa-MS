@@ -11,6 +11,12 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+declare global {
+  interface Window {
+    deferredPrompt: InstallPromptEvent | null;
+  }
+}
+
 export function PwaLayer() {
     const { t } = useTranslation();
   const [offline, setOffline] = useState(false);
@@ -33,6 +39,10 @@ export function PwaLayer() {
       setInstallEvent(event as InstallPromptEvent);
     };
     window.addEventListener("beforeinstallprompt", onInstallPrompt);
+
+    if (window.deferredPrompt) {
+      setInstallEvent(window.deferredPrompt);
+    }
 
     registerServiceWorker();
 
@@ -72,6 +82,7 @@ export function PwaLayer() {
               await installEvent.prompt();
               await installEvent.userChoice;
               setInstallEvent(null);
+              window.deferredPrompt = null;
             }}
             className="gradient-emerald inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground"
           >

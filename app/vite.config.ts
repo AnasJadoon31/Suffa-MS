@@ -98,11 +98,11 @@ export default defineConfig({
         registerType: "autoUpdate",
         injectRegister: null,
         filename: "sw-v4.js",
-        selfDestroying: process.env.VITE_ENABLE_OFFLINE !== "true",
-        devOptions: { enabled: false },
+        selfDestroying: false,
+        devOptions: { enabled: true, type: "module" },
         manifest: false,
         outDir: ".output/public",
-        workbox: {
+        workbox: process.env.VITE_ENABLE_OFFLINE === "true" ? {
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,
@@ -130,6 +130,12 @@ export default defineConfig({
               },
             },
           ],
+        } : {
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+          globPatterns: [],
+          runtimeCaching: [],
         },
       }),
     ],
