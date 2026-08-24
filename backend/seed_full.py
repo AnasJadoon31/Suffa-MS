@@ -319,7 +319,14 @@ async def seed():
                 id=uid(f"drc-{class_name}"), madrasa_id=MID,
                 class_id=cl.id, enabled=True,
                 fields_definition=[
-                    {"id": fid, "label": label, "required": req}
+                    {
+                        "key": fid,
+                        "label": label,
+                        "type": "text",
+                        "required": req,
+                        "options": [],
+                        "enabled": True,
+                    }
                     for fid, label, req in DR_FIELDS
                 ],
                 created_at=NOW, updated_at=NOW,
