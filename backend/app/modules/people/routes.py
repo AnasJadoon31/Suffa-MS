@@ -74,6 +74,11 @@ async def get_my_profile(
         if guardian is None:
             raise HTTPException(status_code=404, detail="Guardian profile not found")
         return {"profile_type": "guardian", "profile": GuardianRead.model_validate(guardian).model_dump(mode="json")}
+    if current_user.role in (UserRole.teacher, UserRole.principal):
+        teacher = await session.scalar(select(TeacherProfile).where(TeacherProfile.user_id == current_user.id, TeacherProfile.madrasa_id == madrasa.id))
+        if teacher is None:
+            raise HTTPException(status_code=404, detail="Teacher profile not found")
+        return {"profile_type": "teacher", "profile": TeacherRead.model_validate(teacher).model_dump(mode="json")}
     raise HTTPException(status_code=404, detail="This account has no editable person profile")
 
 
@@ -115,6 +120,18 @@ async def update_my_profile(
             guardian.phone_list, guardian.default_phone_number, guardian.phone_numbers = numbers, default, default or guardian.phone_numbers
         await session.commit()
         return {"profile_type": "guardian", "profile": GuardianRead.model_validate(guardian).model_dump(mode="json")}
+    if current_user.role in (UserRole.teacher, UserRole.principal):
+        teacher = await session.scalar(select(TeacherProfile).where(TeacherProfile.user_id == current_user.id, TeacherProfile.madrasa_id == madrasa.id))
+        if teacher is None:
+            raise HTTPException(status_code=404, detail="Teacher profile not found")
+        for key in ("name", "cnic", "address"):
+            if getattr(payload, key) is not None:
+                setattr(teacher, key, getattr(payload, key))
+        if payload.phone_list is not None or payload.default_phone_number is not None:
+            numbers, default = _contacts(payload.phone_list if payload.phone_list is not None else teacher.phone_list, teacher.whatsapp_number, payload.default_phone_number or teacher.default_phone_number)
+            teacher.phone_list, teacher.default_phone_number, teacher.whatsapp_number = numbers, default, default or teacher.whatsapp_number
+        await session.commit()
+        return {"profile_type": "teacher", "profile": TeacherRead.model_validate(teacher).model_dump(mode="json")}
     raise HTTPException(status_code=404, detail="This account has no editable person profile")
 
 

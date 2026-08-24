@@ -65,7 +65,7 @@ function MePage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const personProfile = useQuery({ queryKey: ["my-person-profile"], queryFn: peopleApi.myProfile, enabled: user?.role === "student" || user?.role === "parent", retry: false });
+  const personProfile = useQuery({ queryKey: ["my-person-profile"], queryFn: peopleApi.myProfile, enabled: user?.role === "student" || user?.role === "parent" || user?.role === "teacher" || user?.role === "principal", retry: false });
   const [personName, setPersonName] = useState("");
   const [personAddress, setPersonAddress] = useState("");
   const [personCnic, setPersonCnic] = useState("");
@@ -85,12 +85,22 @@ function MePage() {
     if (!profile) return;
     setPersonName(String(profile["name"] ?? "")); setPersonAddress(String(profile["address"] ?? ""));
     setPersonCnic(String(profile["cnic"] ?? profile["b_form_number"] ?? "")); setPersonDob(String(profile["date_of_birth"] ?? ""));
-    const phones = Array.isArray(profile["phone_list"]) && (profile["phone_list"] as unknown[]).length ? (profile["phone_list"] as string[]).map(String) : [String(profile["default_phone_number"] ?? profile["phone"] ?? profile["phone_numbers"] ?? "+92")];
+    const phones = Array.isArray(profile["phone_list"]) && (profile["phone_list"] as unknown[]).length ? (profile["phone_list"] as string[]).map(String) : [String(profile["default_phone_number"] ?? profile["phone"] ?? profile["phone_numbers"] ?? profile["whatsapp_number"] ?? "+92")];
     setPersonPhones(phones); setPersonDefaultPhone(String(profile["default_phone_number"] ?? phones[0]));
     setAdmissionAnswers((profile["admission_record"] as { answers?: Record<string, unknown> } | undefined)?.answers ?? {});
   }, [personProfile.data]);
 
-  const savePersonProfile = useMutation({ mutationFn: () => peopleApi.updateMyProfile(personProfile.data?.profile_type === "guardian" ? { name: personName, address: personAddress, cnic: personCnic, phone_list: personPhones.filter((phone) => phone.length > 3), default_phone_number: personDefaultPhone } : { name: personName, date_of_birth: personDob || undefined, b_form_number: personCnic, address: personAddress, phone_list: personPhones.filter((phone) => phone.length > 3), default_phone_number: personDefaultPhone, admission_answers: admissionAnswers }), onSuccess: () => { toast.success("Profile updated"); void client.invalidateQueries({ queryKey: ["my-person-profile"] }); } });
+  const savePersonProfile = useMutation({ mutationFn: () => {
+    const validPhones = personPhones.filter((phone) => phone.length > 3);
+    const validDefault = personDefaultPhone.length > 3 ? personDefaultPhone : undefined;
+    const payload: Record<string, unknown> = { name: personName, address: personAddress, cnic: personCnic, phone_list: validPhones, default_phone_number: validDefault };
+    if (personProfile.data?.profile_type === "student") {
+        payload.date_of_birth = personDob || undefined;
+        payload.b_form_number = personCnic;
+        payload.admission_answers = admissionAnswers;
+    }
+    return peopleApi.updateMyProfile(payload);
+  }, onSuccess: () => { toast.success("Profile updated"); void client.invalidateQueries({ queryKey: ["my-person-profile"] }); } });
 
   const canChooseSession = (sessions.data ?? []).length > 0;
   const activeSession = useMemo(
@@ -177,7 +187,7 @@ function MePage() {
         {!isDonor ? <Row icon={<Globe className="h-4 w-4" />} label={t("Session")} value={activeSessionLabel} /> : null}
       </div>
 
-      {personProfile.data ? <><SectionTitle>{t("Personal profile")}</SectionTitle><Card className="space-y-3 p-3.5"><Field label={t("Full name")}><TextInput value={personName} onChange={(event) => setPersonName(event.target.value)} /></Field>{personProfile.data.profile_type === "student" ? <><Field label={t("Date of birth")}><TextInput type="date" value={personDob} onChange={(event) => setPersonDob(event.target.value)} /></Field><Field label={t("B-Form number")}><TextInput value={personCnic} onChange={(event) => setPersonCnic(event.target.value)} /></Field></> : <Field label={t("CNIC")}><TextInput value={personCnic} onChange={(event) => setPersonCnic(event.target.value)} /></Field>}{(personProfile.data.profile_type === "guardian" || Boolean((personProfile.data.profile as any).is_independent)) ? <><Field label={t("Address")}><TextInput value={personAddress} onChange={(event) => setPersonAddress(event.target.value)} /></Field><Field label={t("Phone number(s)")}><PhoneNumbersField numbers={personPhones} defaultNumber={personDefaultPhone} onChange={(numbers, defaultNumber) => { setPersonPhones(numbers); setPersonDefaultPhone(defaultNumber); }} /></Field></> : <p className="text-sm text-muted-foreground">Contact details are managed by your guardian.</p>}{personProfile.data.profile_type === "student" && (personProfile.data.profile as any).admission_record ? <AdmissionAnswerFields fields={((personProfile.data.profile as any).admission_record.fields_definition ?? []).filter((field: any) => !field.built_in && !field.key.startsWith("guardian_"))} answers={admissionAnswers} onChange={setAdmissionAnswers} /> : null}<ActionButton onClick={() => savePersonProfile.mutate()} disabled={savePersonProfile.isPending} className="w-full">{t("Save profile")}</ActionButton></Card></> : null}
+      {personProfile.data ? <><SectionTitle>{t("Personal profile")}</SectionTitle><Card className="space-y-3 p-3.5"><Field label={t("Full name")}><TextInput value={personName} onChange={(event) => setPersonName(event.target.value)} /></Field>{personProfile.data.profile_type === "student" ? <><Field label={t("Date of birth")}><TextInput type="date" value={personDob} onChange={(event) => setPersonDob(event.target.value)} /></Field><Field label={t("B-Form number")}><TextInput value={personCnic} onChange={(event) => setPersonCnic(event.target.value)} /></Field></> : <Field label={t("CNIC")}><TextInput value={personCnic} onChange={(event) => setPersonCnic(event.target.value)} /></Field>}{(personProfile.data.profile_type !== "student" || Boolean((personProfile.data.profile as any).is_independent)) ? <><Field label={t("Address")}><TextInput value={personAddress} onChange={(event) => setPersonAddress(event.target.value)} /></Field><Field label={t("Phone number(s)")}><PhoneNumbersField numbers={personPhones} defaultNumber={personDefaultPhone} onChange={(numbers, defaultNumber) => { setPersonPhones(numbers); setPersonDefaultPhone(defaultNumber); }} /></Field></> : <p className="text-sm text-muted-foreground">Contact details are managed by your guardian.</p>}{personProfile.data.profile_type === "student" && (personProfile.data.profile as any).admission_record ? <AdmissionAnswerFields fields={((personProfile.data.profile as any).admission_record.fields_definition ?? []).filter((field: any) => !field.built_in && !field.key.startsWith("guardian_"))} answers={admissionAnswers} onChange={setAdmissionAnswers} /> : null}<ActionButton onClick={() => savePersonProfile.mutate()} disabled={savePersonProfile.isPending} className="w-full">{t("Save profile")}</ActionButton></Card></> : null}
 
       <SectionTitle>{t("Preferences")}</SectionTitle>
       <Card className="space-y-3 p-3.5">
