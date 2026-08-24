@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "dev:host": "vite dev --host 0.0.0.0",
-    "build": "vite build; sh ./scripts/fix-sw.sh",
+    "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview --host 0.0.0.0",
     "lint": "eslint .",
