@@ -99,6 +99,9 @@ export default defineConfig({
         manifest: false,
         outDir: ".output/public",
         workbox: {
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
           globDirectory: ".output/public",
           globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico,webmanifest}"],
           navigateFallback: "/offline.html",
