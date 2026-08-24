@@ -211,13 +211,11 @@ export function StudentDetailSheet({
             <Pill tone={student.status === "active" ? "success" : "muted"}>{student.status}</Pill>
             <span className="text-xs text-muted-foreground">{student.admission_number}</span>
           </div>
-          {missingFields && missingFields.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {missingFields.map((field) => (
-                <Pill key={field} tone="warning">Missing: {field}</Pill>
-              ))}
-            </div>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2 empty:hidden">
+            {missingFields?.map((field) => (
+              <Pill key={field} tone="warning">Missing: {field}</Pill>
+            ))}
+          </div>
         </div>
       }
     >

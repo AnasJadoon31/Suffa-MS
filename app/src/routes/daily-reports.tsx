@@ -153,9 +153,10 @@ function TeacherDailyReports() {
   };
 
   const getFieldValue = (studentId: string, field: DailyReportFieldDefinition): unknown => {
+    const key = field.key || field.id || "";
     const saved = entriesByStudent.get(studentId);
-    if (saved && saved.values[field.key] !== undefined) return saved.values[field.key];
-    return studentValues[studentId]?.[field.key] ?? defaultValueForField(field);
+    if (saved && saved.values[key] !== undefined) return saved.values[key];
+    return studentValues[studentId]?.[key] ?? defaultValueForField(field);
   };
 
   const saveMutation = useMutation({
@@ -289,15 +290,18 @@ function TeacherDailyReports() {
                       <div className="grid gap-3 sm:grid-cols-2">
                         {fields
                           .filter((f) => f.type !== "label" && f.enabled !== false)
-                          .map((field) => (
-                            <Field key={field.key} label={field.label}>
-                              <ReportFieldInput
-                                field={field}
-                                value={getFieldValue(student.id, field)}
-                                onChange={(v) => handleFieldChange(student.id, field.key, v)}
-                              />
-                            </Field>
-                          ))}
+                          .map((field) => {
+                            const fieldKey = field.key || field.id || "";
+                            return (
+                              <Field key={fieldKey} label={field.label}>
+                                <ReportFieldInput
+                                  field={field}
+                                  value={getFieldValue(student.id, field)}
+                                  onChange={(v) => handleFieldChange(student.id, fieldKey, v)}
+                                />
+                              </Field>
+                            );
+                          })}
                       </div>
                       <button
                         className="flex items-center gap-1.5 self-end rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
@@ -486,9 +490,10 @@ function StudentDailyReports() {
                 {(selectedConfigQuery.data?.fields_definition ?? [])
                   .filter((f) => f.type !== "label" && f.enabled !== false)
                   .map((field) => {
-                    const val = selectedEntry.values[field.key];
+                    const fieldKey = field.key || field.id || "";
+                    const val = selectedEntry.values[fieldKey];
                     return (
-                      <div key={field.key} className="flex flex-col gap-0.5">
+                      <div key={fieldKey} className="flex flex-col gap-0.5">
                         <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
                         <span className="text-sm">
                           {field.type === "boolean" ? (val ? t("Yes") : t("No")) :
@@ -645,9 +650,10 @@ function GuardianChildReports({
               {(configQuery.data?.fields_definition ?? [])
                 .filter((f) => f.type !== "label" && f.enabled !== false)
                 .map((field) => {
-                  const val = selectedEntry.values[field.key];
+                  const fieldKey = field.key || field.id || "";
+                  const val = selectedEntry.values[fieldKey];
                   return (
-                    <div key={field.key} className="flex flex-col gap-0.5">
+                    <div key={fieldKey} className="flex flex-col gap-0.5">
                       <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
                       <span className="text-sm">
                         {field.type === "boolean" ? (val ? t("Yes") : t("No")) :

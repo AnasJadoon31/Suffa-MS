@@ -1,5 +1,5 @@
 import React, { type ReactNode, useState } from "react";
-import { Check, ChevronDown, ChevronsUpDown, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronsUpDown, Eye, EyeOff, type LucideIcon } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -160,6 +160,30 @@ const controlClass =
   "w-full rounded-2xl border border-border bg-card px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-primary";
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = props.type === "password";
+
+  if (isPassword) {
+    return (
+      <div className="relative">
+        <input
+          {...props}
+          type={showPassword ? "text" : "password"}
+          className={cn(controlClass, props.className, "ltr:pr-10 rtl:pl-10")}
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground rtl:right-auto rtl:left-0"
+          onClick={() => setShowPassword((s) => !s)}
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    );
+  }
+
   return <input {...props} className={cn(controlClass, props.className)} />;
 }
 

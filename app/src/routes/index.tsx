@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Building2, Globe, KeyRound, Loader2, LogIn, UserRound } from "lucide-react";
+import { Building2, Eye, EyeOff, Globe, KeyRound, Loader2, LogIn, UserRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { apiErrorMessage, DEFAULT_TENANT } from "@/lib/mms/api";
@@ -31,6 +31,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [tenant, setTenant] = useState(DEFAULT_TENANT);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -110,9 +111,25 @@ function LoginPage() {
             />
           </Field>
 
-          <Field icon={<KeyRound className="h-4 w-4" />} label={t("Password")}>
+          <Field 
+            icon={<KeyRound className="h-4 w-4" />} 
+            label={t("Password")}
+            action={
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowPassword(!showPassword);
+                }}
+                className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                aria-label={showPassword ? t("Hide password") : t("Show password")}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            }
+          >
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               className="w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -148,10 +165,12 @@ function Field({
   icon,
   label,
   children,
+  action,
 }: {
   icon: React.ReactNode;
   label: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }) {
     const { t } = useTranslation();
   return (
@@ -165,6 +184,7 @@ function Field({
         </span>
         {children}
       </span>
+      {action && <div className="shrink-0">{action}</div>}
     </label>
   );
 }
