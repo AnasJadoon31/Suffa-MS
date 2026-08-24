@@ -16,6 +16,9 @@ import {
   SkeletonList,
   TextInput,
 } from "@/components/app/Primitives";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
@@ -174,7 +177,7 @@ function HolidaysPage() {
       {query.isLoading ? <SkeletonList rows={4} /> : null}
       {!query.isLoading && items.length === 0 ? <EmptyState title={t("No holidays scheduled")} /> : null}
 
-      <div className="space-y-2.5">
+      <div className="space-y-2.5 md:hidden">
         {items.map((item) => {
           const upcoming = item.end_date >= today;
           return (
@@ -216,6 +219,67 @@ function HolidaysPage() {
             </Card>
           );
         })}
+      </div>
+
+      <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/30">
+            <TableRow>
+              <TableHead className="w-[60px] text-center"></TableHead>
+              <TableHead>{t("Holiday Name")}</TableHead>
+              <TableHead>{t("Date")}</TableHead>
+              {canManage ? (
+                <TableHead className="text-right">{t("Actions")}</TableHead>
+              ) : (
+                <TableHead className="text-right">{t("Status")}</TableHead>
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => {
+              const upcoming = item.end_date >= today;
+              return (
+                <TableRow key={item.id} className="transition-colors hover:bg-muted/50">
+                  <TableCell className="w-[60px]">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent-foreground mx-auto">
+                      <Palmtree className="h-5 w-5" />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-semibold">{item.name}</p>
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(item.start_date).toLocaleDateString()} —{" "}
+                      {new Date(item.end_date).toLocaleDateString()}
+                      {item.category ? ` · ${item.category}` : ""}
+                    </p>
+                  </TableCell>
+                  {canManage ? (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end mt-1">
+                        <ActionMenu>
+                          <DropdownMenuItem onClick={() => setEditing(item)}>
+                            <Edit2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                            {t("Edit")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => remove.mutate(item.id)} className="text-destructive focus:text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {t("Delete")}
+                          </DropdownMenuItem>
+                        </ActionMenu>
+                      </div>
+                    </TableCell>
+                  ) : (
+                    <TableCell className="text-right">
+                      <Pill tone={upcoming ? "success" : "muted"}>{upcoming ? "Upcoming" : "Past"}</Pill>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
 
       {editing ? (

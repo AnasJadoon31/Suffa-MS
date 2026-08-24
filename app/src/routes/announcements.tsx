@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ChevronDown, Edit2, Megaphone, Trash2 } from "lucide-react";
+import { ChevronDown, Edit2, Megaphone, Trash2, MoreVertical, Eye } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app/AppShell";
@@ -11,6 +11,9 @@ import {
 } from "@/components/app/content/AnnouncementFormFields";
 import { FormSheet } from "@/components/app/FormSheet";
 import { Card, EmptyState, Field, Pill, CustomDropdown, SkeletonList, TextInput } from "@/components/app/Primitives";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RichText } from "@/components/app/RichText";
 import { useAuth } from "@/lib/mms/auth";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
@@ -202,10 +205,28 @@ function AnnouncementsPage() {
             <EmptyState title={t("Nothing announced yet")} hint="New notices will appear here." />
           ) : null}
 
-          <div className="space-y-2.5">
+          <div className="space-y-2.5 md:hidden">
             {items.map((item) => (
               <AnnouncementCard key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
             ))}
+          </div>
+
+          <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="w-[60px] text-center"></TableHead>
+                  <TableHead>{t("Announcement")}</TableHead>
+                  <TableHead>{t("Audience")}</TableHead>
+                  <TableHead className="text-right">{t("Actions")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => (
+                  <AnnouncementTableRow key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </>
       )}
@@ -300,15 +321,30 @@ function GuardianAnnouncementsView({
                 />
               </div>
             </button>
-            {isOpen ? (
-              <div className="border-t border-border px-3.5 pb-3.5 pt-2">
-                <div className="space-y-2.5">
-                  {group.items.map((item) => (
-                    <AnnouncementCard key={item.id} item={item} canManage={canManage} onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} />
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            {isOpen ? <div className="overflow-hidden border-t border-border">
+                  <div className="space-y-2.5 md:hidden p-3.5 bg-muted/10">
+                    {group.items.map((item) => (
+                      <AnnouncementCard key={item.id} item={item} canManage={canManage} onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} />
+                    ))}
+                  </div>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="w-[60px] text-center"></TableHead>
+                          <TableHead>{t("Announcement")}</TableHead>
+                          <TableHead>{t("Audience")}</TableHead>
+                          <TableHead className="text-right">{t("Actions")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {group.items.map((item) => (
+                          <AnnouncementTableRow key={item.id} item={item} canManage={canManage} onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} />
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div> : null}
           </Card>
         );
       })}
@@ -349,7 +385,9 @@ function AnnouncementCard({
           <Pill>{audienceLabel(item.audience_scope)}</Pill>
         </div>
       </div>
-      <RichText html={item.body} />
+      <div className="prose prose-sm dark:prose-invert">
+        <RichText html={item.body} />
+      </div>
       <div className="flex items-center gap-3">
         {item.attachment_link ? (
           <a
@@ -378,6 +416,79 @@ function AnnouncementCard({
         ) : null}
       </div>
     </Card>
+  );
+}
+
+function AnnouncementTableRow({
+  item,
+  canManage,
+  onEdit,
+  onDelete,
+}: {
+  item: Announcement;
+  canManage: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  const audienceLabel = (scope: { all?: boolean; roles?: string[] }) => {
+    if (scope?.all || !scope?.roles?.length) return t("All");
+    return scope.roles.map((role) => t(role === "teachers" || role === "teacher" ? "Teachers" : role === "students" || role === "student" ? "Students" : "Guardians")).join(", ");
+  };
+  return (
+    <TableRow className="transition-colors hover:bg-muted/50">
+      <TableCell className="w-[60px] align-top">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent-foreground mx-auto">
+          <Megaphone className="h-5 w-5" />
+        </div>
+      </TableCell>
+      <TableCell className="align-top">
+        <p className="font-display text-base font-extrabold leading-snug">{item.title}</p>
+        <p className="text-xs text-muted-foreground mb-2">
+          {new Date(item.publish_at ?? item.created_at).toLocaleString()}
+        </p>
+        <div className="prose prose-sm dark:prose-invert line-clamp-3">
+          <RichText html={item.body} />
+        </div>
+      </TableCell>
+      <TableCell className="align-top">
+        <div className="flex flex-col gap-1.5">
+          {item.category ? <Pill tone="gold">{item.category}</Pill> : null}
+          <Pill>{audienceLabel(item.audience_scope)}</Pill>
+        </div>
+      </TableCell>
+      <TableCell className="align-top text-right">
+        <div className="flex justify-end mt-1">
+          <ActionMenu>
+            {item.attachment_link ? (
+              <DropdownMenuItem asChild>
+                <a
+                  href={item.attachment_link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center w-full cursor-pointer"
+                >
+                  <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                  {t("Open attachment")}
+                </a>
+              </DropdownMenuItem>
+            ) : null}
+            {canManage ? (
+              <>
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                  {t("Edit")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t("Delete")}
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </ActionMenu>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }
 

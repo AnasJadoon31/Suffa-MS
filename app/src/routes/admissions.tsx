@@ -19,6 +19,7 @@ import {
   TextInput,
   Segmented,
 } from "@/components/app/Primitives";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AdmissionFormEditorSheet } from "@/components/app/admissions/AdmissionFormEditorSheet";
 import { useAuth } from "@/lib/mms/auth";
 import {
@@ -221,7 +222,7 @@ function AdmissionsPage() {
             </Field>
           </div>
         </FilterBar>
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 md:hidden">
           {filteredForms.map((form) => (
             <Card key={form.id} className="space-y-2 p-3.5">
               <div className="flex items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary-soft text-primary"><FileText className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="font-semibold">{form.title}</p><p className="text-xs text-muted-foreground">{form.program_name ?? form.category} · {form.is_open ? "Open" : "Closed"}</p></div></div>
@@ -231,6 +232,73 @@ function AdmissionsPage() {
             </Card>
           ))}
           {!forms.isLoading && filteredForms.length === 0 ? <EmptyState title="No application forms" /> : null}
+        </div>
+        <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader className="bg-muted/30">
+              <TableRow>
+                <TableHead className="w-[60px] text-center"></TableHead>
+                <TableHead>{t("Form Name")}</TableHead>
+                <TableHead>{t("Details")}</TableHead>
+                {canManage ? <TableHead className="text-right">{t("Actions")}</TableHead> : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredForms.map((form) => (
+                <TableRow key={form.id} className="transition-colors hover:bg-muted/50">
+                  <TableCell className="w-[60px]">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary-soft text-primary mx-auto">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-semibold">{form.title}</p>
+                    <p className="text-xs text-muted-foreground">{form.program_name ?? form.category} · {form.is_open ? t("Open") : t("Closed")}</p>
+                  </TableCell>
+                  <TableCell>
+                    {form.description ? <p className="text-sm text-muted-foreground line-clamp-1">{form.description}</p> : null}
+                    <p className="text-xs text-muted-foreground">
+                      {form.fields_definition.filter((field) => field.enabled !== false && field.type !== "label" && !field.built_in).length} {t("fields")}
+                    </p>
+                  </TableCell>
+                  {canManage ? (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-xl bg-primary-soft px-3 py-2 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
+                          onClick={() => void shareApplicationForm(form)}
+                        >
+                          <Share2 className="h-3.5 w-3.5" />
+                          {t("Share")}
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-xl bg-muted px-3 py-2 text-xs font-bold hover:bg-muted/80 transition-colors"
+                          onClick={() => {
+                            setEditingForm(form);
+                            setFormEditorOpen(true);
+                          }}
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                          {t("Edit")}
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-xl bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive hover:bg-destructive/20 transition-colors"
+                          onClick={() => setDeleteForm(form)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {t("Delete")}
+                        </button>
+                      </div>
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {!forms.isLoading && filteredForms.length === 0 ? <div className="p-6"><EmptyState title="No application forms" /></div> : null}
         </div>
         </>
       ) : <>
@@ -290,7 +358,7 @@ function AdmissionsPage() {
         <EmptyState title={t("No applications")} />
       ) : null}
 
-      <div className="space-y-2.5">
+      <div className="space-y-2.5 md:hidden">
         {items.map((item) => (
           <Card key={item.id} className="space-y-2 p-3.5">
             <button type="button" className="block w-full text-left" onClick={() => navigate({ to: "/admissions/$applicationId", params: { applicationId: item.id } })}>
@@ -319,6 +387,59 @@ function AdmissionsPage() {
             </button>
           </Card>
         ))}
+      </div>
+
+      <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/30">
+            <TableRow>
+              <TableHead className="w-[80px] text-center">{t("Avatar")}</TableHead>
+              <TableHead>{t("Applicant")}</TableHead>
+              <TableHead>{t("Notes")}</TableHead>
+              <TableHead className="text-right">{t("Status")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => (
+              <TableRow
+                key={item.id}
+                className="cursor-pointer transition-colors hover:bg-muted/50"
+                onClick={() => navigate({ to: "/admissions/$applicationId", params: { applicationId: item.id } })}
+              >
+                <TableCell className="w-[80px]">
+                  <div className="flex justify-center">
+                    <ApplicationAvatar application={item} />
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <p className="truncate font-semibold">{item.applicant_name}</p>
+                  <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                    <Phone className="h-3.5 w-3.5" />
+                    {item.guardian_contact}
+                  </p>
+                </TableCell>
+                <TableCell>
+                  {item.notes ? <p className="text-sm text-muted-foreground line-clamp-1">{item.notes}</p> : <span className="text-muted-foreground">-</span>}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end">
+                    <Pill
+                      tone={
+                        item.status === "accepted"
+                          ? "success"
+                          : item.status === "rejected"
+                            ? "destructive"
+                            : "warning"
+                      }
+                    >
+                      {item.status}
+                    </Pill>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
       </>}

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ChevronDown, Download, Edit2, FileText, Trash2, Upload, Video } from "lucide-react";
+import { ChevronDown, Download, Edit2, FileText, Trash2, Upload, Video, MoreVertical } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -16,6 +16,9 @@ import {
   SkeletonList,
   TextInput,
 } from "@/components/app/Primitives";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi, reportingApi, type ParentDashboard } from "@/lib/mms/endpoints";
@@ -276,12 +279,22 @@ function ResourcesPage() {
                       />
                     </button>
                     {isOpen ? (
-                      <div className="border-t border-border px-3.5 pb-3.5 pt-2">
-                        <div className="space-y-2.5">
-                          {group.items.map((item) => (
-                            <ResourceCard key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
-                          ))}
-                        </div>
+                      <div className="overflow-hidden border-t border-border">
+                        <Table>
+                          <TableHeader className="bg-muted/30">
+                            <TableRow>
+                              <TableHead className="w-[60px] text-center"></TableHead>
+                              <TableHead>{t("Resource")}</TableHead>
+                              <TableHead>{t("Description")}</TableHead>
+                              <TableHead className="text-right">{t("Actions")}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.items.map((item) => (
+                              <ResourceCard key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
+                            ))}
+                          </TableBody>
+                        </Table>
                       </div>
                     ) : null}
                   </Card>
@@ -306,11 +319,28 @@ function ResourcesPage() {
                         />
                       </button>
                       {isOpen ? (
-                        <div className="border-t border-border px-3.5 pb-3.5 pt-2">
-                          <div className="space-y-2.5">
+                        <div className="border-t border-border">
+                          <div className="space-y-2.5 md:hidden p-3.5">
                             {grouped.globalItems.map((item) => (
                               <ResourceCard key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
                             ))}
+                          </div>
+                          <div className="hidden md:block">
+                            <Table>
+                              <TableHeader className="bg-muted/30">
+                                <TableRow>
+                                  <TableHead className="w-[60px] text-center"></TableHead>
+                                  <TableHead>{t("Resource")}</TableHead>
+                                  <TableHead>{t("Description")}</TableHead>
+                                  <TableHead className="text-right">{t("Actions")}</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {grouped.globalItems.map((item) => (
+                                  <ResourceTableRow key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
+                                ))}
+                              </TableBody>
+                            </Table>
                           </div>
                         </div>
                       ) : null}
@@ -385,10 +415,28 @@ function ResourcesPage() {
             <EmptyState title={t("No resources yet")} hint="Teachers can share notes and videos here." />
           ) : null}
 
-          <div className="space-y-2.5">
+          <div className="space-y-2.5 md:hidden">
             {items.map((item) => (
               <ResourceCard key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
             ))}
+          </div>
+
+          <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="w-[60px] text-center"></TableHead>
+                  <TableHead>{t("Resource")}</TableHead>
+                  <TableHead>{t("Description")}</TableHead>
+                  <TableHead className="text-right">{t("Actions")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => (
+                  <ResourceTableRow key={item.id} item={item} canManage={canManage} onEdit={() => setEditing(item)} onDelete={() => remove.mutate(item.id)} />
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </>
       )}
@@ -405,7 +453,7 @@ function ResourcesPage() {
 }
 
 function ResourceCard({ item, canManage, onEdit, onDelete }: { item: ResourceItem; canManage: boolean; onEdit: () => void; onDelete: () => void }) {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
   return (
     <Card
       className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 p-3.5"
@@ -426,44 +474,108 @@ function ResourceCard({ item, canManage, onEdit, onDelete }: { item: ResourceIte
             href={item.video_url}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 inline-block text-sm font-bold text-primary underline underline-offset-4"
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
           >
-            {t("Watch")}</a>
+            <Video className="h-3.5 w-3.5" />
+            {t("Watch video")}
+          </a>
         ) : null}
         {item.file_key ? (
           <button
-            type="button"
             onClick={async () => {
               const url = await filesApi.presignDownload(item.file_key!);
               window.open(url, "_blank", "noopener,noreferrer");
             }}
-            className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-primary underline underline-offset-4"
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
           >
             <Download className="h-3.5 w-3.5" />
-            {t("Open file")}</button>
+            {t("Download attachment")}
+          </button>
         ) : null}
       </div>
       {canManage ? (
         <div className="flex gap-2">
           <button
-            aria-label="Edit resource"
             onClick={onEdit}
             className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary"
           >
             <Edit2 className="h-4 w-4" />
           </button>
           <button
-            aria-label="Delete resource"
             onClick={onDelete}
             className="grid h-9 w-9 place-items-center rounded-xl bg-destructive/10 text-destructive"
           >
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
-      ) : (
-        <span />
-      )}
+      ) : null}
     </Card>
+  );
+}
+
+function ResourceTableRow({ item, canManage, onEdit, onDelete }: { item: ResourceItem; canManage: boolean; onEdit: () => void; onDelete: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <TableRow className="transition-colors hover:bg-muted/50">
+      <TableCell className="w-[60px] align-top">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary-soft text-primary mx-auto">
+          {item.video_url ? <Video className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+        </div>
+      </TableCell>
+      <TableCell className="align-top">
+        <p className="font-semibold">{item.title}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {item.owner_name ?? t("Shared")} · {new Date(item.created_at).toLocaleDateString()}
+        </p>
+      </TableCell>
+      <TableCell className="align-top">
+        {item.description ? (
+          <p className="line-clamp-2 text-sm text-muted-foreground">{item.description}</p>
+        ) : <span className="text-muted-foreground">-</span>}
+      </TableCell>
+      <TableCell className="align-top text-right">
+        <div className="flex justify-end mt-1">
+          <ActionMenu>
+            {item.video_url ? (
+              <DropdownMenuItem asChild>
+                <a
+                  href={item.video_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center w-full cursor-pointer"
+                >
+                  <Video className="mr-2 h-4 w-4 text-muted-foreground" />
+                  {t("Watch video")}
+                </a>
+              </DropdownMenuItem>
+            ) : null}
+            {item.file_key ? (
+              <DropdownMenuItem
+                onClick={async () => {
+                  const url = await filesApi.presignDownload(item.file_key!);
+                  window.open(url, "_blank", "noopener,noreferrer");
+                }}
+              >
+                <Download className="mr-2 h-4 w-4 text-muted-foreground" />
+                {t("Download attachment")}
+              </DropdownMenuItem>
+            ) : null}
+            {canManage ? (
+              <>
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                  {t("Edit")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t("Delete")}
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </ActionMenu>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }
 

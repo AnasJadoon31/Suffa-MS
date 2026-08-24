@@ -25,6 +25,7 @@ import { StudentForm } from "@/components/app/people/StudentForm";
 import { TeacherForm } from "@/components/app/people/TeacherForm";
 import { GuardianForm } from "@/components/app/people/GuardianForm";
 import { DonorForm } from "@/components/app/people/DonorForm";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/mms/auth";
 import { academicsApi, peopleApi, type Guardian, type Student, type Teacher } from "@/lib/mms/endpoints";
 import { filesApi, financeMutations, peopleMutations, type Donor } from "@/lib/mms/more-endpoints";
@@ -281,8 +282,8 @@ function PeoplePage() {
         </div>
       ) : null}
 
-      {/* Responsive Grid for Cards on Mobile & Desktop */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+      {/* Responsive Grid for Cards on Mobile */}
+      <div className="grid grid-cols-1 gap-3 md:hidden">
         {items.map((person) => {
           const record = person as unknown as Record<string, unknown>;
           const id = String(record["id"]);
@@ -366,6 +367,117 @@ function PeoplePage() {
             </Card>
           );
         })}
+      </div>
+
+      <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/30">
+            <TableRow>
+              <TableHead className="w-[80px] text-center">{t("Avatar")}</TableHead>
+              <TableHead>{t("Name")}</TableHead>
+              <TableHead>{t("Details")}</TableHead>
+              <TableHead className="text-right">{t("Status")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((person) => {
+              const record = person as unknown as Record<string, unknown>;
+              const id = String(record["id"]);
+              const name = String(record["name"] ?? "");
+              const subtitle =
+                (record["admission_number"] as string) ??
+                (record["employee_code"] as string) ??
+                (record["phone_numbers"] as string) ??
+                (record["contact"] as string) ??
+                "";
+
+              const handleRowClick = () => {
+                if (tab === "students")
+                  navigate({
+                    to: "/people/$studentId",
+                    params: { studentId: id },
+                    search: { tab: undefined as string | undefined, section_id: undefined as string | undefined },
+                  });
+                else if (tab === "teachers") setDetailTeacherId(id);
+                else if (tab === "guardians") setDetailGuardianId(id);
+                else if (tab === "donors") setDetailDonorId(id);
+              };
+
+              return (
+                <TableRow
+                  key={id}
+                  className="cursor-pointer transition-colors hover:bg-muted/50"
+                  onClick={handleRowClick}
+                >
+                  <TableCell className="w-[80px]">
+                    <div className="flex justify-center">
+                      {tab === "students" ? (
+                        <StudentAvatar
+                          student={person as Student}
+                          onOpen={(e) => {
+                            e.stopPropagation();
+                            handleRowClick();
+                          }}
+                        />
+                      ) : (
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft font-display text-sm font-extrabold text-primary">
+                          {name.slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <p className="truncate font-semibold">{name}</p>
+                  </TableCell>
+                  <TableCell>
+                    <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                      {subtitle}
+                      {record["relationship"] ? (
+                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[0.65rem] font-medium">
+                          {String(record["relationship"])}
+                        </span>
+                      ) : null}
+                      {tab === "guardians" && record["username"] ? (
+                        <span className="rounded-full bg-primary-soft px-1.5 py-0.5 text-[0.65rem] font-medium text-primary">
+                          {String(record["username"])}
+                        </span>
+                      ) : null}
+                      {tab === "donors" && record["username"] ? (
+                        <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.65rem] font-medium text-accent-foreground">
+                          {String(record["username"])}
+                        </span>
+                      ) : null}
+                      {record["current_class"] ? ` · ${String(record["current_class"])}` : ""}
+                    </p>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      {canManage ? (
+                        <button
+                          type="button"
+                          aria-label="Copy credentials link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            credentials(id);
+                          }}
+                          title={t("Copy credentials link")}
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary transition-colors hover:bg-primary/20"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                      <div className="shrink-0">
+                        <Pill tone={(record["status"] ?? "active") === "active" ? "success" : "muted"}>
+                          {t(String(record["status"] ?? "active"))}
+                        </Pill>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
 
       {query.hasNextPage ? (

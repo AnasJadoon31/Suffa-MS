@@ -15,6 +15,9 @@ import {
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { ActionMenu } from "@/components/ui/action-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+
 import { AppShell } from "@/components/app/AppShell";
 import { FilterBar } from "@/components/app/FilterBar";
 import { FormSheet } from "@/components/app/FormSheet";
@@ -29,6 +32,7 @@ import {
   TextArea,
   TextInput,
 } from "@/components/app/Primitives";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { academicsApi } from "@/lib/mms/endpoints";
 import { useAuth } from "@/lib/mms/auth";
 import {
@@ -403,7 +407,7 @@ function AssignmentsPage() {
         <EmptyState title={t("No assignments")} hint="New tasks will show up here." />
       ) : null}
 
-      <div className="space-y-2.5">
+      <div className="space-y-2.5 md:hidden">
         {items.map((item: Assignment) => {
           const overdue = new Date(item.due_date) < new Date() && !item.submitted_at;
           return (
@@ -462,16 +466,19 @@ function AssignmentsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <ActionButton variant="soft" onClick={() => setSelectedAssignment(item)}>
                   <Eye className="h-4 w-4" />
-                  {t("Open")}</ActionButton>
+                  {t("Open")}
+                </ActionButton>
                 {item.attachment_key ? (
                   <ActionButton variant="soft" onClick={() => void openAssignmentAttachment(item.attachment_key!)}>
                     <Download className="h-4 w-4" />
-                    {t("Attachment")}</ActionButton>
+                    {t("Attachment")}
+                </ActionButton>
                 ) : null}
                 {isStudent ? (
                   item.submitted_at ? (
                     <ActionButton variant="soft" onClick={() => unsubmit.mutate(item.id)}>
-                      {t("Withdraw")}</ActionButton>
+                      {t("Withdraw")}
+                    </ActionButton>
                   ) : (
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-muted px-4 py-2.5 font-display text-sm font-extrabold">
                       <Upload className="h-4 w-4" />
@@ -498,22 +505,166 @@ function AssignmentsPage() {
                     disabled={submit.isPending}
                   >
                     {submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    {t("Submit")}</ActionButton>
+                    {t("Submit")}
+                </ActionButton>
                 ) : null}
                 {canManage ? (
                   <>
                     <ActionButton variant="soft" onClick={() => setEditingAssignment(item)}>
                       <Edit2 className="h-4 w-4" />
-                      {t("Edit")}</ActionButton>
+                      {t("Edit")}
+                    </ActionButton>
                     <ActionButton variant="danger" onClick={() => remove.mutate(item.id)}>
                       <Trash2 className="h-4 w-4" />
-                      {t("Delete")}</ActionButton>
+                      {t("Delete")}
+                    </ActionButton>
                   </>
                 ) : null}
               </div>
             </Card>
           );
         })}
+      </div>
+
+      <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/30">
+            <TableRow>
+              <TableHead>{t("Assignment")}</TableHead>
+              <TableHead>{t("Instructions")}</TableHead>
+              <TableHead>{t("Details")}</TableHead>
+              <TableHead className="text-right">{t("Status & Actions")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item: Assignment) => {
+              const overdue = new Date(item.due_date) < new Date() && !item.submitted_at;
+              return (
+                <TableRow key={item.id} className="transition-colors hover:bg-muted/50">
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="min-w-0 text-left"
+                      onClick={() => setSelectedAssignment(item)}
+                    >
+                      <p className="truncate font-display text-base font-extrabold">{item.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[item.course_name, item.class_name, item.section_name]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                      {item.teacher_name ? (
+                        <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                          {t("By")} {item.teacher_name}
+                        </p>
+                      ) : null}
+                    </button>
+                  </TableCell>
+                  <TableCell>
+                    <p className="line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">
+                      {item.instructions}
+                    </p>
+                    {item.submission_feedback ? (
+                      <p className="mt-2 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+                        {item.submission_feedback}
+                      </p>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        {new Date(item.due_date).toLocaleDateString()}
+                      </span>
+                      {item.max_marks != null ? <span>{t("Max")} {item.max_marks}</span> : null}
+                      {item.submission_mark != null ? (
+                        <span className="inline-flex items-center gap-1.5 font-bold text-success">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {item.submission_mark}
+                        </span>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex flex-col items-end gap-2">
+                      {item.submitted_at ? (
+                        <Pill tone="success">{t("Submitted")}</Pill>
+                      ) : (
+                        <Pill tone={overdue ? "destructive" : "muted"}>
+                          {overdue ? "Overdue" : "Open"}
+                        </Pill>
+                      )}
+                      <div className="flex justify-end mt-1">
+                        <ActionMenu>
+                          <DropdownMenuItem onClick={() => setSelectedAssignment(item)}>
+                            <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                            {t("Open")}
+                          </DropdownMenuItem>
+                          {item.attachment_key ? (
+                            <DropdownMenuItem onClick={() => void openAssignmentAttachment(item.attachment_key!)}>
+                              <Download className="mr-2 h-4 w-4 text-muted-foreground" />
+                              {t("Attachment")}
+                            </DropdownMenuItem>
+                          ) : null}
+                          {isStudent ? (
+                            item.submitted_at ? (
+                              <DropdownMenuItem onClick={() => unsubmit.mutate(item.id)}>
+                                <Trash2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                                {t("Withdraw")}
+                              </DropdownMenuItem>
+                            ) : (
+                              <>
+                                <DropdownMenuItem asChild>
+                                  <label className="flex w-full cursor-pointer items-center">
+                                    <Upload className="mr-2 h-4 w-4 text-muted-foreground" />
+                                    {submissionFile?.name && selectedAssignment?.id === item.id
+                                      ? "Replace file"
+                                      : "Choose file"}
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      onChange={(event) => setSubmissionFile(event.target.files?.[0] ?? null)}
+                                    />
+                                  </label>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    if (!submissionFile) {
+                                      e.preventDefault();
+                                      toast.error("Choose a file first");
+                                      return;
+                                    }
+                                    submit.mutate({ id: item.id, file: submissionFile });
+                                  }}
+                                  disabled={submit.isPending}
+                                >
+                                  {submit.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin text-muted-foreground" /> : <Save className="mr-2 h-4 w-4 text-muted-foreground" />}
+                                  {t("Submit")}
+                                </DropdownMenuItem>
+                              </>
+                            )
+                          ) : null}
+                          {canManage ? (
+                            <>
+                              <DropdownMenuItem onClick={() => setEditingAssignment(item)}>
+                                <Edit2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                                {t("Edit")}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => remove.mutate(item.id)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                {t("Delete")}
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
+                        </ActionMenu>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
 
       {selectedAssignment ? (

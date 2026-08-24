@@ -15,6 +15,7 @@ import {
   CustomDropdown,
   SkeletonList,
 } from "@/components/app/Primitives";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/mms/auth";
 import { apiErrorMessage } from "@/lib/mms/api";
 import { academicsApi } from "@/lib/mms/endpoints";
@@ -250,7 +251,7 @@ function LeavePage() {
       {query.isLoading ? <SkeletonList rows={4} /> : null}
       {!query.isLoading && items.length === 0 ? <EmptyState title={t("No leave requests")} /> : null}
 
-      <div className="space-y-2.5">
+      <div className="space-y-2.5 md:hidden">
         {items.map((item: Leave) => (
           <Card key={item.id} className="space-y-2 p-3.5">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
@@ -271,16 +272,73 @@ function LeavePage() {
                   onClick={() => review.mutate({ id: item.id, status: "approved" })}
                   className="rounded-xl bg-primary-soft py-2 text-xs font-bold uppercase tracking-wide text-success"
                 >
-                  {t("Approve")}</button>
+                  {t("Approve")}
+                </button>
                 <button
                   onClick={() => review.mutate({ id: item.id, status: "rejected" })}
                   className="rounded-xl bg-destructive/10 py-2 text-xs font-bold uppercase tracking-wide text-destructive"
                 >
-                  {t("Reject")}</button>
+                  {t("Reject")}
+                </button>
               </div>
             ) : null}
           </Card>
         ))}
+      </div>
+
+      <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/30">
+            <TableRow>
+              <TableHead>{t("Employee")}</TableHead>
+              <TableHead>{t("Leave Dates")}</TableHead>
+              <TableHead>{t("Reason")}</TableHead>
+              <TableHead className="text-right">{t("Status & Actions")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item: Leave) => (
+              <TableRow key={item.id} className="transition-colors hover:bg-muted/50">
+                <TableCell>
+                  <p className="truncate font-semibold">{item.person_name ?? t("Leave request")}</p>
+                </TableCell>
+                <TableCell>
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {new Date(item.start_date).toLocaleDateString()} —{" "}
+                    {new Date(item.end_date).toLocaleDateString()}
+                  </p>
+                </TableCell>
+                <TableCell>
+                  {item.reason ? <p className="text-sm text-muted-foreground line-clamp-2">{item.reason}</p> : <span className="text-muted-foreground">-</span>}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-col items-end gap-2">
+                    {!(item.status === "pending" && canReview) && (
+                      <Pill tone={tone(item.status)}>{t(item.status)}</Pill>
+                    )}
+                    {canReview && item.status === "pending" ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => review.mutate({ id: item.id, status: "approved" })}
+                          className="rounded-xl bg-primary-soft px-3 py-1 text-xs font-bold uppercase tracking-wide text-success"
+                        >
+                          {t("Approve")}
+                        </button>
+                        <button
+                          onClick={() => review.mutate({ id: item.id, status: "rejected" })}
+                          className="rounded-xl bg-destructive/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-destructive"
+                        >
+                          {t("Reject")}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </AppShell>
   );
