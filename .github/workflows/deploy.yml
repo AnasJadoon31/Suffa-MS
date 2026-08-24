@@ -53,12 +53,12 @@ jobs:
       - name: Trigger Production Deployment
         if: github.ref_name == 'main'
         run: |
-          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_BACKEND_MAIN }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
-          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_FRONTEND_MAIN }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
+          curl -X POST "${{ secrets.COOLIFY_WEBHOOK_BACKEND_MAIN }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
+          curl -X POST "${{ secrets.COOLIFY_WEBHOOK_FRONTEND_MAIN }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
 
       # Only trigger the Staging Coolify webhooks if the branch is 'staging'
       - name: Trigger Staging Deployment
         if: github.ref_name == 'staging'
         run: |
-          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_BACKEND_STAGING }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
-          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_FRONTEND_STAGING }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
+          curl -X POST "${{ secrets.COOLIFY_WEBHOOK_BACKEND_STAGING }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
+          curl -X POST "${{ secrets.COOLIFY_WEBHOOK_FRONTEND_STAGING }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
