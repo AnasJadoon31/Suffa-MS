@@ -10,8 +10,8 @@ import { StudentForm } from "./StudentForm";
 import { TeacherForm } from "./TeacherForm";
 import { GuardianForm } from "./GuardianForm";
 import { DonorForm } from "./DonorForm";
-import { academicsApi, peopleApi } from "@/lib/mms/endpoints";
-import { academicsExtraApi, filesApi, financeApi } from "@/lib/mms/more-endpoints";
+import { academicsApi, peopleApi, reportingApi } from "@/lib/mms/endpoints";
+import { filesApi, financeApi, academicsExtraApi } from "@/lib/mms/more-endpoints";
 import { api, apiErrorMessage } from "@/lib/mms/api";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -120,6 +120,13 @@ export function StudentDetailSheet({
     enabled: Boolean(student && open),
   });
 
+  const incompleteQuery = useQuery({
+    queryKey: ["incomplete-profiles", "student"],
+    queryFn: () => reportingApi.incompleteProfiles("student"),
+    enabled: Boolean(student && open && student.status === "active"),
+  });
+  const missingFields = incompleteQuery.data?.find((p) => p.id === student?.id)?.missing_fields;
+
   const [editEnrollment, setEditEnrollment] = useState(false);
   const [enrollClassId, setEnrollClassId] = useState(student?.active_enrollment?.class_id ?? "");
   const [enrollSectionId, setEnrollSectionId] = useState(student?.active_enrollment?.section_id ?? "");
@@ -199,9 +206,18 @@ export function StudentDetailSheet({
       photoUrl={photoQuery.data}
       onPhotoClick={() => setPhotoOpen(true)}
       subtitle={
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill tone={student.status === "active" ? "success" : "muted"}>{student.status}</Pill>
-          <span className="text-xs text-muted-foreground">{student.admission_number}</span>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill tone={student.status === "active" ? "success" : "muted"}>{student.status}</Pill>
+            <span className="text-xs text-muted-foreground">{student.admission_number}</span>
+          </div>
+          {missingFields && missingFields.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {missingFields.map((field) => (
+                <Pill key={field} tone="warning">Missing: {field}</Pill>
+              ))}
+            </div>
+          ) : null}
         </div>
       }
     >
