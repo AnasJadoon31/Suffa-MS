@@ -134,8 +134,7 @@ export default defineConfig({
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,
-          globDirectory: ".output/public",
-          globPatterns: ["manifest.webmanifest"],
+          globPatterns: [],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
