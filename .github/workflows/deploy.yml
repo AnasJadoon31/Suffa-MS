@@ -60,5 +60,5 @@ jobs:
       - name: Trigger Staging Deployment
         if: github.ref_name == 'staging'
         run: |
-          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_BACKEND_STAGING }}"
-          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_FRONTEND_STAGING }}"
+          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_BACKEND_STAGING }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}
+          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_FRONTEND_STAGING }}" -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}
