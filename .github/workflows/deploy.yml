@@ -42,10 +42,12 @@ jobs:
           context: ./app
           file: ./app/Dockerfile
           push: true
-          # Dynamically tags with the branch name
           tags: ghcr.io/anasjadoon31/suffa-ms-app:${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Dynamically set the API URL based on the branch name
+          build-args: |
+            VITE_API_BASE=${{ github.ref_name == 'main' && 'https://api-suffa.anas31.qzz.io' || 'https://api-suffa-staging.anas31.qzz.io' }}
 
       # Only trigger the Production Coolify webhooks if the branch is 'main'
       - name: Trigger Production Deployment
