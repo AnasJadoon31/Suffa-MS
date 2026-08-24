@@ -2,7 +2,7 @@ name: Build and Push to GHCR
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging] # Add any branches you want to build here
 
 jobs:
   build-and-push:
@@ -15,7 +15,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Add this step to enable caching
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -32,8 +31,8 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: ghcr.io/anasjadoon31/suffa-ms-backend:latest
-          # Add these two lines for backend cache
+          # Dynamically tags with the branch name (e.g., :main or :staging)
+          tags: ghcr.io/anasjadoon31/suffa-ms-backend:${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -43,7 +42,21 @@ jobs:
           context: ./app
           file: ./app/Dockerfile
           push: true
-          tags: ghcr.io/anasjadoon31/suffa-ms-app:latest
-          # Add these two lines for frontend cache
+          # Dynamically tags with the branch name
+          tags: ghcr.io/anasjadoon31/suffa-ms-app:${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Only trigger the Production Coolify webhooks if the branch is 'main'
+      - name: Trigger Production Deployment
+        if: github.ref_name == 'main'
+        run: |
+          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_BACKEND_MAIN }}"
+          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_FRONTEND_MAIN }}"
+
+      # Only trigger the Staging Coolify webhooks if the branch is 'staging'
+      - name: Trigger Staging Deployment
+        if: github.ref_name == 'staging'
+        run: |
+          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_BACKEND_STAGING }}"
+          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_FRONTEND_STAGING }}"
