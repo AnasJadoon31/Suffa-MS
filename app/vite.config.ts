@@ -43,8 +43,11 @@ function generateAppShell(): Plugin {
   ${cssTags}
 </head>
 <body>
-  <!-- Inject empty __TSR__ state to prevent TanStack Start client from throwing Invariant failed on offline boot -->
-  <script>window.__TSR__ = { matches: [], streamedValues: {} };</script>
+  <!-- Inject empty state to prevent TanStack Start client from throwing on offline boot -->
+  <script>
+    window.__TSR__ = { matches: [], streamedValues: {} };
+    window.$_TSR = { t: {}, p: function() {}, buffer: [] };
+  </script>
   ${jsTags}
 </body>
 </html>`;
@@ -95,6 +98,7 @@ export default defineConfig({
         registerType: "autoUpdate",
         injectRegister: null,
         filename: "sw-v4.js",
+        selfDestroying: process.env.VITE_ENABLE_OFFLINE !== "true",
         devOptions: { enabled: false },
         manifest: false,
         outDir: ".output/public",

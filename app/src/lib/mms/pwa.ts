@@ -14,13 +14,14 @@ function isBlockedHost(hostname: string): boolean {
   );
 }
 
-async function unregisterOldWorkers(): Promise<void> {
+async function unregisterOldWorkers(all = false): Promise<void> {
   // Remove any previous SW (legacy pass-through /sw.js or older sw-v*.js)
   // so the current one fully controls fetches.
   const registrations = await window.navigator.serviceWorker.getRegistrations();
   await Promise.allSettled(
     registrations
       .filter((registration) => {
+        if (all) return true;
         const url =
           registration.active?.scriptURL ??
           registration.waiting?.scriptURL ??
@@ -39,10 +40,11 @@ export function registerServiceWorker(): void {
     !import.meta.env.PROD ||
     window.self !== window.top ||
     isBlockedHost(window.location.hostname) ||
-    new URLSearchParams(window.location.search).get("sw") === "off";
+    new URLSearchParams(window.location.search).get("sw") === "off" ||
+    import.meta.env.VITE_ENABLE_OFFLINE !== "true";
 
   if (refuse) {
-    void unregisterOldWorkers().catch(() => undefined);
+    void unregisterOldWorkers(true).catch(() => undefined);
     return;
   }
 
