@@ -2,7 +2,7 @@ name: Build and Push to GHCR
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
   build-and-push:
@@ -25,7 +25,7 @@ jobs:
       - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./backend           # Changed from . to ./backend
           file: ./backend/Dockerfile
           push: true
           tags: ghcr.io/anasjadoon31/suffa-ms-backend:latest
@@ -33,7 +33,7 @@ jobs:
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./app               # Changed from . to ./app
           file: ./app/Dockerfile
           push: true
           tags: ghcr.io/anasjadoon31/suffa-ms-app:latest
