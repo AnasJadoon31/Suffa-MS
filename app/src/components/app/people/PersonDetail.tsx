@@ -82,7 +82,7 @@ async function sendCredentialsToWhatsApp({
     });
     toast.success(`${t("Credentials sent on WhatsApp")} +${result.normalised_number}`);
   } catch (error) {
-    toast.error(apiErrorMessage(error, t("Failed to send credentials on WhatsApp")));
+    toast.error(t(apiErrorMessage(error, "Failed to send credentials on WhatsApp")));
   }
 }
 
@@ -850,7 +850,7 @@ export function DonorDetailSheet({
       });
       toast.success(`${t("Credentials sent on WhatsApp")} +${result.normalised_number}`);
     } catch (error) {
-      toast.error(apiErrorMessage(error, t("Failed to send credentials on WhatsApp")));
+      toast.error(t(apiErrorMessage(error, "Failed to send credentials on WhatsApp")));
     }
   }
 

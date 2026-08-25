@@ -27,7 +27,7 @@ export function DonorProfileSheet({ donorId, onClose }: { donorId: string; onClo
       const result = await financeMutations.sendDonationReceipt(donationId);
       toast.success(`${t("Receipt sent on WhatsApp")} +${result.normalised_number}`);
     } catch (error) {
-      toast.error(apiErrorMessage(error, t("Failed to send receipt on WhatsApp")));
+      toast.error(t(apiErrorMessage(error, "Failed to send receipt on WhatsApp")));
     }
   }
 

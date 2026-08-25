@@ -2733,3 +2733,9 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: Refactored `FilterBar` so the Filter button is uniformly placed on the left, and the New/Action button is uniformly placed on the right. Migrated all action buttons in main routes (`academics.tsx`, `roles.tsx`, `donations.tsx`, `admissions.tsx`, `resources.tsx`, `blog.tsx`, etc.) from `AppShell`'s `right` prop to the new `FilterBar` `action` prop, ensuring a consistent layout pattern across all screens.
 - Files: `app/src/components/app/FilterBar.tsx`, `app/src/routes/academics.tsx`, `app/src/routes/roles.tsx`, and all other route files containing action buttons.
 - Verified: `cd app && npm run build` completes successfully without type errors. Verified that academics screen correctly implements the new pattern instead of its previous custom search fields.
+
+## 2026-08-25 - WhatsApp Validation & Notification Fix
+
+- Implemented: Added `_require_whatsapp_number` in `backend/app/modules/messaging/routes.py` to check if a phone number exists on WhatsApp before sending text or media via Evolution API. The frontend now correctly translates the `whatsapp_phone_invalid` error and displays a proper warning notification instead of a false success message.
+- Files: `backend/app/modules/messaging/routes.py`, `app/src/components/app/people/PersonDetail.tsx`, `app/src/components/app/finance/DonorProfileSheet.tsx`, `app/src/routes/finance.tsx`, `app/src/i18n/locales/en.json`, `app/src/i18n/locales/ur.json`
+- Verified: Backend successfully compiled. Frontend build passes.

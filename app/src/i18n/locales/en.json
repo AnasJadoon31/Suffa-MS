@@ -598,6 +598,7 @@
   "Credential recipient": "Credential recipient",
   "Default recipient": "Default recipient",
   "A dependent student requires at least one guardian": "A dependent student requires at least one guardian",
+  "whatsapp_phone_invalid": "The phone number is not registered on WhatsApp.",
   "Link a guardian with a WhatsApp number before sending credentials.": "Link a guardian with a WhatsApp number before sending credentials.",
   "Mark/correct student attendance": "Mark/correct student attendance",
   "Manage programs, classes, sections, courses, sessions": "Manage programs, classes, sections, courses, sessions",

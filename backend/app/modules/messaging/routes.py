@@ -548,6 +548,34 @@ def render_variables(template_text: str, variables: dict[str, str]) -> str:
     return message
 
 
+async def _require_whatsapp_number(
+    client: httpx.AsyncClient, headers: dict[str, str], config: EvolutionConfig, number: str
+) -> None:
+    endpoint = f"{config.base_url}/chat/whatsappNumbers/{config.instance_path}"
+    try:
+        response = await client.post(endpoint, headers=headers, json={"numbers": [number]})
+    except httpx.RequestError as exc:
+        logger.warning("Evolution check-number request failed: %s", type(exc).__name__)
+        return
+
+    if response.is_error:
+        logger.warning("Evolution check-number returned status=%s", response.status_code)
+        return
+
+    try:
+        data = response.json()
+        if isinstance(data, list) and len(data) > 0:
+            item = data[0]
+            if isinstance(item, dict) and "exists" in item:
+                if not item["exists"]:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=ErrorCode.WHATSAPP_PHONE_INVALID
+                    )
+    except (ValueError, TypeError):
+        pass
+
+
 async def render_and_dispatch(
     session: AsyncSession,
     *,
@@ -586,6 +614,7 @@ async def render_and_dispatch(
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 await _require_open_evolution_instance(client, headers, config)
+                await _require_whatsapp_number(client, headers, config, number)
                 response = await client.post(endpoint, headers=headers, json=payload)
         except httpx.RequestError as exc:
             logger.warning("Evolution text delivery request failed: %s", type(exc).__name__)
@@ -614,6 +643,7 @@ async def render_and_dispatch(
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 await _require_open_evolution_instance(client, headers, config)
+                await _require_whatsapp_number(client, headers, config, number)
                 response = await client.post(endpoint, headers=headers, json=payload)
         except httpx.RequestError as exc:
             logger.warning("Evolution media delivery request failed: %s", type(exc).__name__)

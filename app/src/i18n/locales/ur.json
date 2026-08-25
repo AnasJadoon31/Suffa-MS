@@ -626,6 +626,7 @@
   "Credential recipient": "کریڈنشل وصول کنندہ",
   "Default recipient": "ڈیفالٹ وصول کنندہ",
   "A dependent student requires at least one guardian": "Dependent طالب علم کے لیے کم از کم ایک سرپرست ضروری ہے",
+  "whatsapp_phone_invalid": "یہ فون نمبر واٹس ایپ پر رجسٹرڈ نہیں ہے۔",
   "Link a guardian with a WhatsApp number before sending credentials.": "کریڈنشلز بھیجنے سے پہلے واٹس ایپ نمبر والے سرپرست کو لنک کریں۔",
   "Mark/correct student attendance": "طلباء کی حاضری درج/درست کریں",
   "Manage programs, classes, sections, courses, sessions": "پروگرام، کلاسز، سیکشنز، کورسز، سیشنز کا انتظام",
