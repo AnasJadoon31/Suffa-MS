@@ -8,6 +8,7 @@ export const API_BASE =
   (import.meta.env["VITE_API_BASE"] as string | undefined) ?? "http://localhost:8001";
 
 export const TOKEN_KEY = "mms_token";
+export const REFRESH_TOKEN_KEY = "mms_refresh_token";
 export const TENANT_KEY = "mms_tenant";
 export const DEFAULT_TENANT = (import.meta.env["VITE_DEFAULT_TENANT"] as string | undefined) ?? "default";
 
@@ -127,7 +128,7 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError & { __OFFLINE_QUEUED__?: boolean }) => {
+  async (error: AxiosError & { __OFFLINE_QUEUED__?: boolean }) => {
     if (error.__OFFLINE_QUEUED__) {
       // Mutation was queued offline — not a real error
       return Promise.resolve({ data: { queued: true } }) as unknown;
@@ -138,7 +139,35 @@ api.interceptors.response.use(
     const isQuiet = QUIET_PATHS.some((path) => url.includes(path));
 
     if (error.response?.status === 401 && typeof window !== "undefined") {
+      const originalRequest = error.config as any;
+      if (originalRequest && !originalRequest._retry && !url.includes("/api/v1/auth/refresh")) {
+        const refreshToken = window.localStorage.getItem(REFRESH_TOKEN_KEY);
+        if (refreshToken) {
+          originalRequest._retry = true;
+          try {
+            const refreshResponse = await axios.post(
+              `${API_BASE}/api/v1/auth/refresh`,
+              { refresh_token: refreshToken },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            const { access_token, refresh_token: new_refresh_token } = refreshResponse.data;
+            window.localStorage.setItem(TOKEN_KEY, access_token);
+            if (new_refresh_token) {
+              window.localStorage.setItem(REFRESH_TOKEN_KEY, new_refresh_token);
+            }
+            originalRequest.headers["Authorization"] = `Bearer ${access_token}`;
+            return await api(originalRequest);
+          } catch (refreshError) {
+            window.localStorage.removeItem(TOKEN_KEY);
+            window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+            window.dispatchEvent(new Event("mms:unauthorized"));
+            return Promise.reject(refreshError);
+          }
+        }
+      }
+
       window.localStorage.removeItem(TOKEN_KEY);
+      window.localStorage.removeItem(REFRESH_TOKEN_KEY);
       window.dispatchEvent(new Event("mms:unauthorized"));
     }
 

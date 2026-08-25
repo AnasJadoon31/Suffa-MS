@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, setAcademicSessionId, DEFAULT_TENANT, TENANT_KEY, TOKEN_KEY, readToken } from "./api";
+import { api, setAcademicSessionId, DEFAULT_TENANT, TENANT_KEY, TOKEN_KEY, REFRESH_TOKEN_KEY, readToken } from "./api";
 import { setSuperAdminWorkspace } from "./workspace";
 import i18n from "@/i18n";
 
@@ -50,7 +50,7 @@ interface AuthState {
   isLoading: boolean;
   hasPermission: (code: string) => boolean;
   hasFeature: (key: string) => boolean;
-  login: (username: string, password: string, tenant: string) => Promise<void>;
+  login: (username: string, password: string, tenant: string, remember_me: boolean) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -104,24 +104,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     window.localStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(REFRESH_TOKEN_KEY);
     queryClient.clear();
     applyProfile({});
     setIsLoading(false);
   }, [applyProfile, queryClient]);
 
   const login = useCallback(
-    async (username: string, password: string, tenant: string) => {
+    async (username: string, password: string, tenant: string, remember_me: boolean) => {
       queryClient.clear();
       // A new sign-in always starts from the platform boundary. This flag only
       // affects super-admin accounts; tenant workspaces are entered explicitly
       // from the Platform screen after authentication.
       setSuperAdminWorkspace("platform");
-      const response = await api.post<{ access_token: string }>(
+      const response = await api.post<{ access_token: string, refresh_token?: string }>(
         "/api/v1/auth/token",
-        { username, password },
+        { username, password, remember_me },
         { headers: { "X-Madrasa": tenant } },
       );
       window.localStorage.setItem(TOKEN_KEY, response.data.access_token);
+      if (response.data.refresh_token) {
+        window.localStorage.setItem(REFRESH_TOKEN_KEY, response.data.refresh_token);
+      }
       window.localStorage.setItem(TENANT_KEY, tenant || DEFAULT_TENANT);
       setIsLoading(true);
       await refresh();

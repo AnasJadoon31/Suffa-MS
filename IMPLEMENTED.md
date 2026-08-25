@@ -2739,3 +2739,9 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: Added `_require_whatsapp_number` in `backend/app/modules/messaging/routes.py` to check if a phone number exists on WhatsApp before sending text or media via Evolution API. The frontend now correctly translates the `whatsapp_phone_invalid` error and displays a proper warning notification instead of a false success message.
 - Files: `backend/app/modules/messaging/routes.py`, `app/src/components/app/people/PersonDetail.tsx`, `app/src/components/app/finance/DonorProfileSheet.tsx`, `app/src/routes/finance.tsx`, `app/src/i18n/locales/en.json`, `app/src/i18n/locales/ur.json`
 - Verified: Backend successfully compiled. Frontend build passes.
+
+## 2026-08-25 - Implement Remember Me Functionality with Refresh Tokens
+
+- Implemented: Added "Remember Me" checkbox on the login page. When checked, the backend issues a long-lived refresh token stored in the browser's local storage. A new `/refresh` endpoint securely exchanges this token for a new access token when the session expires, keeping the user logged in silently (essential for PWAs).
+- Files: `backend/app/modules/auth/schemas.py`, `backend/app/modules/auth/routes.py`, `app/src/lib/mms/api.ts`, `app/src/lib/mms/auth.tsx`, `app/src/routes/index.tsx`
+- Verified: Frontend build completes successfully. 

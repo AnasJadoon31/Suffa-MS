@@ -35,6 +35,7 @@ function LoginPage() {
   const [tenant, setTenant] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) void navigate({ to: user?.role === "super_admin" ? "/platform" : "/dashboard" });
@@ -56,7 +57,7 @@ function LoginPage() {
     setError("");
     try {
       const loginTenant = tenant.trim() || DEFAULT_TENANT;
-      await login(username.trim(), password, loginTenant);
+      await login(username.trim(), password, loginTenant, rememberMe);
     } catch (err) {
       setError(apiErrorMessage(err, "Invalid username or password"));
     } finally {
@@ -138,6 +139,16 @@ function LoginPage() {
               required
             />
           </Field>
+
+          <label className="flex items-center gap-2 px-1 text-sm font-medium text-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded-md border-muted-foreground/30 text-emerald-600 focus:ring-emerald-500"
+            />
+            {t("Remember me")}
+          </label>
 
           {error ? (
             <p className="rounded-xl bg-destructive/10 px-3 py-2.5 text-sm font-medium text-destructive">

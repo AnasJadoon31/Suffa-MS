@@ -41,6 +41,7 @@ from app.modules.auth.schemas import (
     PermissionRoleUpdate,
     ProvisionUserRequest,
     ProvisionUserResponse,
+    RefreshRequest,
     Role,
     RoleAssignRequest,
     SetPasswordRequest,
@@ -180,7 +181,78 @@ async def login(
     await clear_failures(lockout_key)
     minutes = await _session_lifetime_minutes(session, user)
     token = issue_token(str(user.id), minutes=minutes, extra={"tenant": tenant.slug, "role": str(user.role)})
-    return TokenResponse(access_token=token)
+    
+    refresh_token = None
+    if payload.remember_me:
+        # Issue a refresh token valid for 30 days
+        refresh_token = issue_token(
+            str(user.id), 
+            minutes=30 * 24 * 60, 
+            extra={"tenant": tenant.slug, "role": str(user.role), "type": "refresh"}
+        )
+        
+    return TokenResponse(access_token=token, refresh_token=refresh_token)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(
+    payload: RefreshRequest,
+    session: AsyncSession = Depends(get_session)
+) -> TokenResponse:
+    try:
+        token_payload = jwt.decode(payload.refresh_token, settings.secret_key, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        
+    if token_payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+        
+    try:
+        user_id = UUID(token_payload["sub"])
+    except (KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid refresh token format")
+        
+    tenant_slug = token_payload.get("tenant")
+    if not tenant_slug:
+        raise HTTPException(status_code=401, detail="Invalid refresh token format")
+
+    user = await session.scalar(select(User).where(User.id == user_id))
+    if user is None or user.status != UserStatus.active:
+        raise HTTPException(status_code=401, detail="User is no longer active")
+        
+    tenant = await session.scalar(select(Madrasa).where(Madrasa.slug == tenant_slug))
+    if tenant is None:
+        raise HTTPException(status_code=401, detail="Tenant no longer exists")
+        
+    if user.role != UserRole.super_admin and user.madrasa_id != tenant.id:
+        raise HTTPException(status_code=401, detail="Invalid tenant for user")
+        
+    # Check portal access flags again
+    try:
+        if user.role == UserRole.donor and user.madrasa_id is not None and not await _donor_portal_enabled(session, user.madrasa_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Donor portal access is disabled by this madrasa")
+        if user.role == UserRole.student and user.madrasa_id is not None and not await _student_portal_enabled(session, user.madrasa_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student portal access is disabled by this madrasa")
+        if user.role == UserRole.guardian and user.madrasa_id is not None and not await _guardian_portal_enabled(session, user.madrasa_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Guardian portal access is disabled by this madrasa")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    await check_profile_active(session, user)
+    
+    minutes = await _session_lifetime_minutes(session, user)
+    new_access_token = issue_token(str(user.id), minutes=minutes, extra={"tenant": tenant_slug, "role": str(user.role)})
+    
+    # Issue a new refresh token to implement rolling refresh
+    new_refresh_token = issue_token(
+        str(user.id), 
+        minutes=30 * 24 * 60, 
+        extra={"tenant": tenant_slug, "role": str(user.role), "type": "refresh"}
+    )
+    
+    return TokenResponse(access_token=new_access_token, refresh_token=new_refresh_token)
 
 
 @router.get("/me", response_model=CurrentUserResponse)
