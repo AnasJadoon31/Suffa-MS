@@ -27,14 +27,20 @@ export function BottomNav() {
     const { t } = useTranslation();
   const isActive = useActive();
   const { user, hasFeature } = useAuth();
-  const visibleTabs = tabs
-    .map((tab) => (user?.role === "teacher" || user?.role === "student") && tab.to === "/attendance" ? { ...tab, to: "/my-attendance" } : tab)
-    .filter((tab) => {
-      if ("roles" in tab && tab.roles) {
-        return user?.role !== undefined && (tab.roles as readonly string[]).includes(user.role);
-      }
-      return isNavItemVisible(tab, user?.role, hasFeature);
-    });
+  const isPlatform = user?.role === "super_admin" && !isTenantWorkspace(user.role);
+  const visibleTabs = isPlatform 
+    ? [
+        { to: "/platform", label: "Home", icon: Home },
+        { to: "/me", label: "Profile", icon: User },
+      ]
+    : tabs
+      .map((tab) => (user?.role === "teacher" || user?.role === "student") && tab.to === "/attendance" ? { ...tab, to: "/my-attendance" } : tab)
+      .filter((tab) => {
+        if ("roles" in tab && tab.roles) {
+          return user?.role !== undefined && (tab.roles as readonly string[]).includes(user.role);
+        }
+        return isNavItemVisible(tab, user?.role, hasFeature);
+      });
 
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur-md lg:hidden">
@@ -98,19 +104,22 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const { user, hasFeature } = useAuth();
   const isActive = useActive();
-  const groups = user?.role === "super_admin" && !isTenantWorkspace(user.role)
-    ? navGroups.map((group) => ({ ...group, items: group.items.filter((item) => item.to === "/platform" || item.to === "/me") })).filter((group) => group.items.length)
+  const isPlatform = user?.role === "super_admin" && !isTenantWorkspace(user.role);
+  const groups = isPlatform
+    ? [{ title: "", items: navGroups.flatMap(g => g.items).filter((item) => item.to === "/platform" || item.to === "/me") }]
     : navGroups.map((group) => ({
         ...group,
         items: group.items.filter((item) => (item.visible?.(user) ?? true) && isNavItemVisible(item, user?.role, hasFeature)),
       })).filter((group) => group.items.length);
   return (
     <div className="space-y-5">
-      {groups.map((group) => (
-        <div key={group.title}>
-          <p className="px-3.5 pb-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.16em] text-muted-foreground/70">
-            {t(group.title)}
-          </p>
+      {groups.map((group, i) => (
+        <div key={group.title || i}>
+          {group.title ? (
+            <p className="px-3.5 pb-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.16em] text-muted-foreground/70">
+              {t(group.title)}
+            </p>
+          ) : null}
           <ul className="space-y-1">
             {group.items.map(({ to, label, icon: Icon }) => {
               const active = isActive(to);

@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
+from app.core.config import settings
 from app.core.dependencies import get_enabled_features, require_super_admin
 from app.core.features import FEATURES, FEATURE_KEYS
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, paginate_scalars, paginate_sequence
@@ -46,7 +47,7 @@ async def list_madaris(
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> list[PlatformMadrasaRead]:
-    stmt = select(Madrasa)
+    stmt = select(Madrasa).where(Madrasa.slug != settings.default_tenant)
     rows = await paginate_scalars(
         session, stmt.order_by(Madrasa.created_at), limit=limit, offset=offset, response=response
     )

@@ -131,7 +131,7 @@ export const adminNav: NavItem[] = [
   { to: "/reports", label: "Reports", icon: FileBarChart2, description: "Export CSV and PDF", feature: "reports" },
   { to: "/settings", label: "Settings", icon: Settings, description: "Madrasa configuration" },
   { to: "/roles", label: "Roles", icon: ShieldCheck, description: "Permission roles" },
-  { to: "/platform", label: "Platform", icon: Monitor, description: "Super admin console" },
+  { to: "/platform", label: "Home", icon: Home, description: "Super admin console" },
   { to: "/me", label: "My Profile", icon: UserRound, description: "Account and session" },
 ];
 

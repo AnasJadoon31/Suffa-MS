@@ -32,7 +32,7 @@ function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [tenant, setTenant] = useState(DEFAULT_TENANT);
+  const [tenant, setTenant] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -94,7 +94,7 @@ function LoginPage() {
               className="w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
               value={tenant}
               onChange={(e) => setTenant(e.target.value)}
-              placeholder={t("suffa")}
+              placeholder={t("Enter your tenant id")}
               autoCapitalize="none"
             />
           </Field>
@@ -104,7 +104,7 @@ function LoginPage() {
               className="w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder={t("your.username")}
+              placeholder={t("Enter your username")}
               autoCapitalize="none"
               autoComplete="username"
               required
@@ -133,7 +133,7 @@ function LoginPage() {
               className="w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={t("Enter your password")}
               autoComplete="current-password"
               required
             />
