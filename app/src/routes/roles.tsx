@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Shield, Trash2, Users } from "lucide-react";
-import { useState } from "react";
+import { Plus, Shield, Trash2, Users, Search } from "lucide-react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
@@ -184,6 +184,7 @@ function PermissionPicker({
   onChange: (next: string[]) => void;
 }) {
   const { t } = useTranslation();
+  const [search, setSearch] = useState("");
   const perms = useQuery({
     queryKey: ["permissions-registry"],
     queryFn: () => permissionsApi.list(),
@@ -197,24 +198,66 @@ function PermissionPicker({
     );
   };
 
+  const filteredPerms = useMemo(() => {
+    const query = search.toLowerCase();
+    return (perms.data || []).filter(
+      (p) =>
+        p.label.toLowerCase().includes(query) ||
+        p.code.toLowerCase().includes(query) ||
+        p.module.toLowerCase().includes(query)
+    );
+  }, [perms.data, search]);
+
+  const grouped = useMemo(() => {
+    return filteredPerms.reduce((acc, perm) => {
+      const mod = perm.module || "other";
+      if (!acc[mod]) acc[mod] = [];
+      acc[mod].push(perm);
+      return acc;
+    }, {} as Record<string, typeof filteredPerms>);
+  }, [filteredPerms]);
+
   return (
-    <div className="max-h-60 space-y-1 overflow-y-auto">
-      {perms.data?.map((perm) => (
-        <button
-          key={perm.code}
-          type="button"
-          onClick={() => toggle(perm.code)}
-          className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${
-            selected.includes(perm.code)
-              ? "bg-primary-soft text-primary font-semibold"
-              : "hover:bg-muted"
-          }`}
-        >
-          <Shield className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">{t(perm.label)}</span>
-          {selected.includes(perm.code) ? "✓" : ""}
-        </button>
-      ))}
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <TextInput
+          placeholder={t("Search permissions...")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+      <div className="space-y-4">
+        {Object.entries(grouped).map(([module, modulePerms]) => (
+          <div key={module} className="space-y-1">
+            <h4 className="px-1 text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">
+              {t(module)}
+            </h4>
+            {modulePerms.map((perm) => (
+              <button
+                key={perm.code}
+                type="button"
+                onClick={() => toggle(perm.code)}
+                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
+                  selected.includes(perm.code)
+                    ? "bg-primary-soft text-primary font-semibold"
+                    : "hover:bg-muted"
+                }`}
+              >
+                <Shield className="h-3.5 w-3.5 shrink-0" />
+                <span className="flex-1">{t(perm.label)}</span>
+                {selected.includes(perm.code) ? "✓" : ""}
+              </button>
+            ))}
+          </div>
+        ))}
+        {filteredPerms.length === 0 && (
+          <p className="px-1 py-4 text-center text-sm text-muted-foreground">
+            {t("No permissions found.")}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

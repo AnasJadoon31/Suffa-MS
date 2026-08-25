@@ -1449,5 +1449,5 @@ export const rolesApi = {
 
 export const permissionsApi = {
   list: () =>
-    api.get<{ code: string; label: string; module: string; scoped: boolean }[]>("/api/v1/auth/permissions").then((r) => r.data),
+    getAllPages<{ code: string; label: string; module: string; scoped: boolean }>("/api/v1/auth/permissions"),
 };

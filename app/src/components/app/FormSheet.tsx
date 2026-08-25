@@ -52,12 +52,14 @@ export function FormSheet({
         ) : undefined
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-3.5">
-        {children}
-        <ActionButton type="submit" disabled={busy} className="w-full">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {submitLabel}
-        </ActionButton>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+        <div className="space-y-3.5">{children}</div>
+        <div className="sticky bottom-[-2rem] z-10 -mx-4 mt-2 bg-card px-4 pb-8 pt-2">
+          <ActionButton type="submit" disabled={busy} className="w-full">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {submitLabel}
+          </ActionButton>
+        </div>
       </form>
     </ManagedSheet>
   );

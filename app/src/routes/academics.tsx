@@ -51,12 +51,10 @@ function DailyReportFieldRow({
   field,
   onChange,
   onRemove,
-  hasDuplicateKey,
 }: {
   field: { id: string; key: string; label: string; type: string; required: boolean; options: string[]; enabled: boolean };
   onChange: (field: { id: string; key: string; label: string; type: string; required: boolean; options: string[]; enabled: boolean }) => void;
   onRemove: () => void;
-  hasDuplicateKey: boolean;
 }) {
   const { t } = useTranslation();
   const [optionsText, setOptionsText] = useState(field.options.join(", "));
@@ -66,7 +64,14 @@ function DailyReportFieldRow({
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <TextInput
           value={field.label}
-          onChange={(e) => onChange({ ...field, label: e.target.value })}
+          onChange={(e) => {
+            const label = e.target.value;
+            let newKey = field.key;
+            if ((field as any).isNew) {
+               newKey = label.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_") || field.key;
+            }
+            onChange({ ...field, label, key: newKey });
+          }}
           placeholder={t("Field label")}
         />
         <select
@@ -85,17 +90,7 @@ function DailyReportFieldRow({
           ))}
         </select>
       </div>
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-muted-foreground">{t("Field key")}</label>
-        <TextInput
-          value={field.key}
-          onChange={(e) => onChange({ ...field, key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })}
-          placeholder={t("unique_field_key")}
-        />
-        {hasDuplicateKey ? (
-          <p className="mt-1 text-xs text-destructive">{t("This key is duplicated. Each field must have a unique key.")}</p>
-        ) : null}
-      </div>
+
       {["radio", "checkbox_group", "dropdown"].includes(field.type) ? (
         <Field label={t("Options (comma-separated)")}>
           <TextInput
@@ -196,9 +191,16 @@ function DailyReportConfigDialog({
                   <DailyReportFieldRow
                     key={field.id}
                     field={field}
-                    onChange={(updated) => setFields(fields.map((f) => (f.id === updated.id ? updated : f)))}
+                    onChange={(updated) => {
+                      let key = updated.key;
+                      let n = 1;
+                      const baseKey = key || "field";
+                      while (fields.some((f) => f.id !== updated.id && f.key === key)) {
+                        key = `${baseKey}_${n++}`;
+                      }
+                      setFields(fields.map((f) => (f.id === updated.id ? { ...updated, key } : f)));
+                    }}
                     onRemove={() => setFields(fields.filter((f) => f.id !== field.id))}
-                    hasDuplicateKey={fields.some((f) => f.id !== field.id && f.key === field.key)}
                   />
                 ))}
                 <button
@@ -209,7 +211,7 @@ function DailyReportConfigDialog({
                     let n = 1;
                     const existing = new Set(fields.map((f) => f.key));
                     while (existing.has(key)) { key = `${baseKey}_${++n}`; }
-                    setFields([...fields, { id: crypto.randomUUID(), key, label: "", type: "text", required: false, options: [], enabled: true }]);
+                    setFields([...fields, { id: crypto.randomUUID(), key, label: "", type: "text", required: false, options: [], enabled: true, isNew: true } as any]);
                   }}
                 >
                   <Plus className="h-3.5 w-3.5" />
