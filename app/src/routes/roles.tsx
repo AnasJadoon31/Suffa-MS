@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
 import { FormSheet } from "@/components/app/FormSheet";
+import { FilterBar } from "@/components/app/FilterBar";
 import {
   Card,
   EmptyState,
@@ -90,39 +91,43 @@ function RolesPage() {
     <AppShell
       title={t("Roles")}
       subtitle={t("Permission roles for teachers")}
-      right={
-        canManage ? (
-          <FormSheet
-            title={editingRole ? "Edit role" : "New role"}
-            triggerLabel="Add"
-            submitLabel={editingRole ? "Save" : "Create"}
-            open={sheetOpen}
-            onOpenChange={(next) => {
-              setSheetOpen(next);
-              if (!next) resetForm();
-            }}
-            onSubmit={async () => {
-              if (editingRole) await update.mutateAsync();
-              else await create.mutateAsync();
-            }}
-          >
-            <Field label={t("Role name *")}>
-              <TextInput
-                required
-                maxLength={120}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </Field>
-            <SectionTitle>{t("Permissions")}</SectionTitle>
-            <PermissionPicker
-              selected={selectedCodes}
-              onChange={setSelectedCodes}
-            />
-          </FormSheet>
-        ) : undefined
-      }
     >
+      <FilterBar
+        activeCount={0}
+        onClear={() => {}}
+        action={
+          canManage ? (
+            <FormSheet
+              title={editingRole ? "Edit role" : "New role"}
+              triggerLabel="Add"
+              submitLabel={editingRole ? "Save" : "Create"}
+              open={sheetOpen}
+              onOpenChange={(next) => {
+                setSheetOpen(next);
+                if (!next) resetForm();
+              }}
+              onSubmit={async () => {
+                if (editingRole) await update.mutateAsync();
+                else await create.mutateAsync();
+              }}
+            >
+              <Field label={t("Role name *")}>
+                <TextInput
+                  required
+                  maxLength={120}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </Field>
+              <SectionTitle>{t("Permissions")}</SectionTitle>
+              <PermissionPicker
+                selected={selectedCodes}
+                onChange={setSelectedCodes}
+              />
+            </FormSheet>
+          ) : undefined
+        }
+      />
       {roles.isLoading ? <SkeletonList rows={4} /> : null}
       {roles.data?.length === 0 ? (
         <EmptyState title={t("No roles yet")} hint={t("Create roles to assign permission sets to teachers")} />

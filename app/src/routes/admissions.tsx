@@ -178,11 +178,6 @@ function AdmissionsPage() {
     <AppShell
       title={t("Admissions")}
       subtitle={tab === "forms" ? `${filteredForms.length} application forms` : `${items.length} applications`}
-      right={canManage && tab === "forms" ? (
-        <button type="button" onClick={() => { setEditingForm(null); setFormEditorOpen(true); }} className="gradient-emerald inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground">
-          {t("New")}
-        </button>
-      ) : undefined}
     >
       <Segmented value={tab} onChange={(value) => setTab(value as "applications" | "forms")} options={[{ key: "applications", label: "Applications" }, { key: "forms", label: "Application forms" }]} />
 
@@ -197,6 +192,11 @@ function AdmissionsPage() {
             setFormCategoryFilter("");
             setFormProgramFilter("");
           }}
+          action={canManage && tab === "forms" ? (
+            <button type="button" onClick={() => { setEditingForm(null); setFormEditorOpen(true); }} className="gradient-emerald inline-flex h-9 items-center gap-1.5 rounded-xl px-3 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground">
+              {t("New")}
+            </button>
+          ) : undefined}
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Field label={t("Status")}>

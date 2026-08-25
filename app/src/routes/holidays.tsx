@@ -117,19 +117,20 @@ function HolidaysPage() {
     <AppShell
       title={t("Holidays")}
       subtitle={`${items.length} in the calendar`}
-      right={
-        canManage ? (
-          <FormSheet title={t("New holiday")} triggerLabel="Add" onSubmit={() => create.mutateAsync()}>
-            <HolidayFormFields
-              values={form}
-              classOptions={classes.data ?? []}
-              onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
-            />
-          </FormSheet>
-        ) : undefined
-      }
     >
-      <FilterBar activeCount={activeCount} onClear={() => setFilters(emptyFilters)}>
+      <FilterBar activeCount={activeCount} onClear={() => setFilters(emptyFilters)}
+        action={
+          canManage ? (
+            <FormSheet title={t("New holiday")} triggerLabel="Add" onSubmit={() => create.mutateAsync()}>
+              <HolidayFormFields
+                values={form}
+                classOptions={classes.data ?? []}
+                onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+              />
+            </FormSheet>
+          ) : undefined
+        }
+      >
         <Field label={t("Category")}>
           <CustomDropdown
             value={filters.category}

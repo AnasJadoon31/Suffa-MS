@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
 import { FormSheet } from "@/components/app/FormSheet";
+import { FilterBar } from "@/components/app/FilterBar";
 import {
   Card,
   EmptyState,
@@ -562,142 +563,6 @@ function AcademicsPage() {
     <AppShell
       title={t("Academics")}
       subtitle={t("Structure of your madrasa")}
-      right={
-        canManage ? (
-          <FormSheet
-            title={`New ${tab.slice(0, -1)}`}
-            triggerLabel="Add"
-            submitLabel="Create"
-            onSubmit={() => create.mutateAsync()}
-          >
-            <Field label={t("Name")}>
-              <TextInput required value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            {tab === "classes" ? (
-              <Field label={t("Program")}>
-                <CustomDropdown
-                  required
-                  value={programId}
-                  onChange={(e) => setProgramId(e.target.value)}
-                >
-                  <option value="">{t("Select program")}</option>
-                  {(programs.data ?? []).map((program) => (
-                    <option key={program.id} value={program.id}>
-                      {program.name}
-                    </option>
-                  ))}
-                </CustomDropdown>
-              </Field>
-            ) : null}
-            {tab === "sessions" ? (
-              <>
-                <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1">
-                  {(["rollover", "blank"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setSessionCreateMode(mode)}
-                      className={cn(
-                        "rounded-xl py-2 text-xs font-bold uppercase tracking-wide",
-                        sessionCreateMode === mode
-                          ? "bg-card text-primary shadow-[var(--shadow-soft)]"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      {mode === "rollover" ? t("Promote students") : t("Empty session")}
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label={t("Start")}>
-                    <TextInput
-                      type="date"
-                      required
-                      value={start}
-                      onChange={(e) => setStart(e.target.value)}
-                    />
-                  </Field>
-                  <Field label={t("End")}>
-                    <TextInput
-                      type="date"
-                      required
-                      value={end}
-                      onChange={(e) => setEnd(e.target.value)}
-                    />
-                  </Field>
-                </div>
-                {sessionCreateMode === "rollover" ? (
-                  <div className="space-y-3 rounded-2xl border border-border bg-muted/35 p-3">
-                    <Field label={t("Promote from")}>
-                      <CustomDropdown
-                        required
-                        value={rolloverSourceId}
-                        onChange={(event) => setRolloverSourceSessionId(event.target.value)}
-                      >
-                        <option value="">{t("Select session")}</option>
-                        {(sessions.data ?? []).map((session) => (
-                          <option key={session.id} value={session.id}>
-                            {session.name}
-                            {session.is_active ? " (Active)" : ""}
-                          </option>
-                        ))}
-                      </CustomDropdown>
-                    </Field>
-                    <div className="space-y-2">
-                      <p className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">
-                        {t("Promotion map")}
-                      </p>
-                      {promotionClasses.map((academicClass, index) => (
-                        <label
-                          key={academicClass.id}
-                          className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 rounded-xl bg-card p-2.5"
-                        >
-                          <span className="truncate text-sm font-bold">{academicClass.name}</span>
-                          <CustomDropdown
-                            value={promotionValue(academicClass.id, index)}
-                            onChange={(event) =>
-                              setPromotionTargets((current) => ({
-                                ...current,
-                                [academicClass.id]: event.target.value,
-                              }))
-                            }
-                          >
-                            <option value="__graduate__">{t("Graduate / leave unenrolled")}</option>
-                            {promotionClasses.map((targetClass) => (
-                              <option key={targetClass.id} value={targetClass.id}>
-                                {targetClass.name}
-                              </option>
-                            ))}
-                          </CustomDropdown>
-                        </label>
-                      ))}
-                    </div>
-                    <label className="flex items-center gap-2 text-sm font-semibold">
-                      <input
-                        type="checkbox"
-                        checked={copyTimetable}
-                        onChange={(event) => setCopyTimetable(event.target.checked)}
-                      />
-                      {t("Copy timetable to new session")}
-                    </label>
-                    <label className="flex items-center gap-2 text-sm font-semibold">
-                      <input
-                        type="checkbox"
-                        checked={copyHolidays}
-                        onChange={(event) => setCopyHolidays(event.target.checked)}
-                      />
-                      {t("Copy holidays to new session")}
-                    </label>
-                    <p className="text-xs font-semibold text-muted-foreground">
-                      {t("Sections are matched by name in the target class. If no matching section exists, the first section in that class is used.")}
-                    </p>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-          </FormSheet>
-        ) : undefined
-      }
     >
       <div className="mb-3 grid grid-cols-4 gap-1.5 rounded-2xl bg-muted p-1">
         {(["sessions", "programs", "classes", "courses"] as Tab[]).map((key) => (
@@ -715,6 +580,156 @@ function AcademicsPage() {
           </button>
         ))}
       </div>
+
+      <FilterBar
+        activeCount={0}
+        onClear={() => {}}
+        search={
+          tab === "programs"
+            ? { value: programSearch, onChange: setProgramSearch, placeholder: t("Search programs...") }
+            : tab === "classes"
+            ? { value: classSearch, onChange: setClassSearch, placeholder: t("Search classes...") }
+            : tab === "courses"
+            ? { value: courseSearch, onChange: setCourseSearch, placeholder: t("Search courses...") }
+            : undefined
+        }
+        action={
+          canManage ? (
+            <FormSheet
+              title={`New ${tab.slice(0, -1)}`}
+              triggerLabel="Add"
+              submitLabel="Create"
+              onSubmit={() => create.mutateAsync()}
+            >
+              <Field label={t("Name")}>
+                <TextInput required value={name} onChange={(e) => setName(e.target.value)} />
+              </Field>
+              {tab === "classes" ? (
+                <Field label={t("Program")}>
+                  <CustomDropdown
+                    required
+                    value={programId}
+                    onChange={(e) => setProgramId(e.target.value)}
+                  >
+                    <option value="">{t("Select program")}</option>
+                    {(programs.data ?? []).map((program) => (
+                      <option key={program.id} value={program.id}>
+                        {program.name}
+                      </option>
+                    ))}
+                  </CustomDropdown>
+                </Field>
+              ) : null}
+              {tab === "sessions" ? (
+                <>
+                  <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1">
+                    {(["rollover", "blank"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setSessionCreateMode(mode)}
+                        className={cn(
+                          "rounded-xl py-2 text-xs font-bold uppercase tracking-wide",
+                          sessionCreateMode === mode
+                            ? "bg-card text-primary shadow-[var(--shadow-soft)]"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {mode === "rollover" ? t("Promote students") : t("Empty session")}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label={t("Start")}>
+                      <TextInput
+                        type="date"
+                        required
+                        value={start}
+                        onChange={(e) => setStart(e.target.value)}
+                      />
+                    </Field>
+                    <Field label={t("End")}>
+                      <TextInput
+                        type="date"
+                        required
+                        value={end}
+                        onChange={(e) => setEnd(e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                  {sessionCreateMode === "rollover" ? (
+                    <div className="space-y-3 rounded-2xl border border-border bg-muted/35 p-3">
+                      <Field label={t("Promote from")}>
+                        <CustomDropdown
+                          required
+                          value={rolloverSourceId}
+                          onChange={(event) => setRolloverSourceSessionId(event.target.value)}
+                        >
+                          <option value="">{t("Select session")}</option>
+                          {(sessions.data ?? []).map((session) => (
+                            <option key={session.id} value={session.id}>
+                              {session.name}
+                              {session.is_active ? " (Active)" : ""}
+                            </option>
+                          ))}
+                        </CustomDropdown>
+                      </Field>
+                      <div className="space-y-2">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">
+                          {t("Promotion map")}
+                        </p>
+                        {promotionClasses.map((academicClass, index) => (
+                          <label
+                            key={academicClass.id}
+                            className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 rounded-xl bg-card p-2.5"
+                          >
+                            <span className="truncate text-sm font-bold">{academicClass.name}</span>
+                            <CustomDropdown
+                              value={promotionValue(academicClass.id, index)}
+                              onChange={(event) =>
+                                setPromotionTargets((current) => ({
+                                  ...current,
+                                  [academicClass.id]: event.target.value,
+                                }))
+                              }
+                            >
+                              <option value="__graduate__">{t("Graduate / leave unenrolled")}</option>
+                              {promotionClasses.map((targetClass) => (
+                                <option key={targetClass.id} value={targetClass.id}>
+                                  {targetClass.name}
+                                </option>
+                              ))}
+                            </CustomDropdown>
+                          </label>
+                        ))}
+                      </div>
+                      <label className="flex items-center gap-2 text-sm font-semibold">
+                        <input
+                          type="checkbox"
+                          checked={copyTimetable}
+                          onChange={(event) => setCopyTimetable(event.target.checked)}
+                        />
+                        {t("Copy timetable to new session")}
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-semibold">
+                        <input
+                          type="checkbox"
+                          checked={copyHolidays}
+                          onChange={(event) => setCopyHolidays(event.target.checked)}
+                        />
+                        {t("Copy holidays to new session")}
+                      </label>
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        {t("Sections are matched by name in the target class. If no matching section exists, the first section in that class is used.")}
+                      </p>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </FormSheet>
+          ) : undefined
+        }
+      />
 
       {loading ? <SkeletonList rows={5} /> : null}
 
@@ -881,11 +896,6 @@ function AcademicsPage() {
 
       {!loading && tab === "programs" ? (
         <div className="space-y-2">
-          <TextInput
-            value={programSearch}
-            onChange={(event) => setProgramSearch(event.target.value)}
-            placeholder={t("Search programs...")}
-          />
           <Items
             empty={filteredPrograms.length === 0}
             rows={filteredPrograms.map((program) => ({
@@ -902,17 +912,11 @@ function AcademicsPage() {
                 : undefined,
             }))}
           />
-          {filteredPrograms.length === 0 ? <EmptyState title={t("Nothing here yet")} /> : null}
         </div>
       ) : null}
 
       {!loading && tab === "classes" ? (
         <div className="space-y-2">
-          <TextInput
-            value={classSearch}
-            onChange={(event) => setClassSearch(event.target.value)}
-            placeholder={t("Search classes...")}
-          />
           <ClassList
             classes={filteredClasses}
             programs={programs.data ?? []}
@@ -940,11 +944,6 @@ function AcademicsPage() {
 
       {!loading && tab === "courses" ? (
         <div className="space-y-2">
-          <TextInput
-            value={courseSearch}
-            onChange={(event) => setCourseSearch(event.target.value)}
-            placeholder={t("Search courses...")}
-          />
           <Items
             empty={filteredCourses.length === 0}
             rows={filteredCourses.map((item) => ({

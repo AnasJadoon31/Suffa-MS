@@ -393,60 +393,6 @@ function TeacherAssessments() {
     <AppShell
       title={t("My assignments")}
       subtitle={t("Your classes, marking and results")}
-      right={
-        tab === "assignments" ? (
-          <FormSheet
-            title={t("New assignment")}
-            triggerLabel={t("New")}
-            submitLabel={t("Create")}
-            onSubmit={handleCreateAssignment}
-          >
-            <Field label={t("Class")}>
-              <CustomDropdown required value={newClassId} onChange={(event) => { setNewClassId(event.target.value); setNewSectionId(""); setNewCourseId(""); }}>
-                <option value="">{t("Select class")}</option>
-                {classOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </CustomDropdown>
-            </Field>
-            <Field label={t("Section")}>
-              <CustomDropdown value={newSectionId} disabled={!newClassId} onChange={(event) => { setNewSectionId(event.target.value); setNewCourseId(""); }}>
-                <option value="">{t("Whole class")}</option>
-                {newSectionOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </CustomDropdown>
-            </Field>
-            <Field label={t("Course")}>
-              <CustomDropdown required value={newCourseId} disabled={!newClassId} onChange={(event) => setNewCourseId(event.target.value)}>
-                <option value="">{t("Select course")}</option>
-                {newCourseOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </CustomDropdown>
-            </Field>
-            <Field label={t("Title")}>
-              <TextInput required value={newTitle} onChange={(event) => setNewTitle(event.target.value)} />
-            </Field>
-            <Field label={t("Instructions")}>
-              <TextArea required value={newInstructions} onChange={(event) => setNewInstructions(event.target.value)} />
-            </Field>
-            <Field label={t("Attachment")}>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.webp"
-                onChange={(event) => setNewAttachmentFile(event.target.files?.[0] ?? null)}
-                className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-xl file:border file:border-border file:bg-card file:px-3 file:py-2 file:text-xs file:font-bold file:text-foreground"
-              />
-              {newAttachmentFile ? (
-                <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{newAttachmentFile.name}</p>
-              ) : null}
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label={t("Due date")}>
-                <TextInput type="date" required value={newDueDate} onChange={(event) => setNewDueDate(event.target.value)} />
-              </Field>
-              <Field label={t("Max marks")}>
-                <TextInput type="number" min={0} value={newMaxMarks} onChange={(event) => setNewMaxMarks(event.target.value)} />
-              </Field>
-            </div>
-          </FormSheet>
-        ) : undefined
-      }
     >
       <div className="mb-3 grid grid-cols-3 gap-1.5 rounded-2xl bg-muted p-1">
         {(["assignments", "marking", "results"] as const).map((key) => (
@@ -479,7 +425,62 @@ function TeacherAssessments() {
                 {t("Mine only")}
               </label>
               <div className="min-w-0 flex-1">
-                <FilterBar activeCount={activeCount} onClear={() => setFilters({ classId: "", sectionId: "", courseId: "", mineOnly: false })}>
+                <FilterBar activeCount={activeCount} onClear={() => setFilters({ classId: "", sectionId: "", courseId: "", mineOnly: false })}
+                  action={
+                    tab === "assignments" ? (
+                      <FormSheet
+                        title={t("New assignment")}
+                        triggerLabel={t("New")}
+                        submitLabel={t("Create")}
+                        onSubmit={handleCreateAssignment}
+                      >
+                        <Field label={t("Class")}>
+                          <CustomDropdown required value={newClassId} onChange={(event) => { setNewClassId(event.target.value); setNewSectionId(""); setNewCourseId(""); }}>
+                            <option value="">{t("Select class")}</option>
+                            {classOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                          </CustomDropdown>
+                        </Field>
+                        <Field label={t("Section")}>
+                          <CustomDropdown value={newSectionId} disabled={!newClassId} onChange={(event) => { setNewSectionId(event.target.value); setNewCourseId(""); }}>
+                            <option value="">{t("Whole class")}</option>
+                            {newSectionOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                          </CustomDropdown>
+                        </Field>
+                        <Field label={t("Course")}>
+                          <CustomDropdown required value={newCourseId} disabled={!newClassId} onChange={(event) => setNewCourseId(event.target.value)}>
+                            <option value="">{t("Select course")}</option>
+                            {newCourseOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                          </CustomDropdown>
+                        </Field>
+                        <Field label={t("Title")}>
+                          <TextInput required value={newTitle} onChange={(event) => setNewTitle(event.target.value)} />
+                        </Field>
+                        <Field label={t("Instructions")}>
+                          <TextArea required value={newInstructions} onChange={(event) => setNewInstructions(event.target.value)} />
+                        </Field>
+                        <Field label={t("Attachment")}>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.webp"
+                            onChange={(event) => setNewAttachmentFile(event.target.files?.[0] ?? null)}
+                            className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-xl file:border file:border-border file:bg-card file:px-3 file:py-2 file:text-xs file:font-bold file:text-foreground"
+                          />
+                          {newAttachmentFile ? (
+                            <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{newAttachmentFile.name}</p>
+                          ) : null}
+                        </Field>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Field label={t("Due date")}>
+                            <TextInput type="date" required value={newDueDate} onChange={(event) => setNewDueDate(event.target.value)} />
+                          </Field>
+                          <Field label={t("Max marks")}>
+                            <TextInput type="number" min={0} value={newMaxMarks} onChange={(event) => setNewMaxMarks(event.target.value)} />
+                          </Field>
+                        </div>
+                      </FormSheet>
+                    ) : undefined
+                  }
+                >
                   <div className="grid grid-cols-2 gap-3">
                     <Field label={t("Class")}>
                       <CustomDropdown

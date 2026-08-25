@@ -210,40 +210,6 @@ function ResourcesPage() {
     <AppShell
       title={t("Resources")}
       subtitle={`${items.length} items`}
-      right={
-        canManage ? (
-          <FormSheet
-            title={t("Share a resource")}
-            triggerLabel="Share"
-            submitLabel="Share"
-            onSubmit={() => createResource.mutateAsync()}
-          >
-            <ResourceFormFields
-              values={form}
-              categories={categories.data ?? []}
-              onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
-              categoryComposer={
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
-                  <Field label={t("New category")}>
-                    <TextInput
-                      value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value)}
-                      placeholder={t("e.g. Tajweed notes")}
-                    />
-                  </Field>
-                  <button
-                    type="button"
-                    disabled={!newCategory.trim()}
-                    onClick={() => createCategory.mutate()}
-                    className="rounded-2xl bg-muted px-3.5 py-2.5 text-sm font-bold disabled:opacity-50"
-                  >
-                    {t("Add")}</button>
-                </div>
-              }
-            />
-          </FormSheet>
-        ) : undefined
-      }
     >
       {isGuardian ? (
         <>
@@ -370,6 +336,40 @@ function ResourcesPage() {
             onClear={() => {
               setExtra(emptyExtra);
             }}
+            action={
+              canManage ? (
+                <FormSheet
+                  title={t("Share a resource")}
+                  triggerLabel="Share"
+                  submitLabel="Share"
+                  onSubmit={() => createResource.mutateAsync()}
+                >
+                  <ResourceFormFields
+                    values={form}
+                    categories={categories.data ?? []}
+                    onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+                    categoryComposer={
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                        <Field label={t("New category")}>
+                          <TextInput
+                            value={newCategory}
+                            onChange={(e) => setNewCategory(e.target.value)}
+                            placeholder={t("e.g. Tajweed notes")}
+                          />
+                        </Field>
+                        <button
+                          type="button"
+                          disabled={!newCategory.trim()}
+                          onClick={() => createCategory.mutate()}
+                          className="rounded-2xl bg-muted px-3.5 py-2.5 text-sm font-bold disabled:opacity-50"
+                        >
+                          {t("Add")}</button>
+                      </div>
+                    }
+                  />
+                </FormSheet>
+              ) : undefined
+            }
           >
             <div className="grid grid-cols-2 gap-3">
               <Field label={t("Class")}>

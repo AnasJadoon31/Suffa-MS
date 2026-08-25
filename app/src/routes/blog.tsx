@@ -152,26 +152,26 @@ function BlogPage() {
     <AppShell
       title={t("Blog")}
       subtitle={`${filtered.length} posts`}
-      right={
-        canManage ? (
-          <FormSheet
-            title={t("New post")}
-            triggerLabel="Write"
-            submitLabel="Save draft"
-            onSubmit={() => create.mutateAsync(false)}
-          >
-            <BlogPostFormFields
-              values={form}
-              onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
-            />
-          </FormSheet>
-        ) : undefined
-      }
     >
       <FilterBar
         search={{ value: search, onChange: setSearch, placeholder: t("Search posts…") }}
         activeCount={activeCount}
         onClear={clearFilters}
+        action={
+          canManage ? (
+            <FormSheet
+              title={t("New post")}
+              triggerLabel="Write"
+              submitLabel="Save draft"
+              onSubmit={() => create.mutateAsync(false)}
+            >
+              <BlogPostFormFields
+                values={form}
+                onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+              />
+            </FormSheet>
+          ) : undefined
+        }
       >
         {canManage ? (
           <Field label={t("Status")}>

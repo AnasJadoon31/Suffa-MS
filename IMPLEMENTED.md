@@ -2727,3 +2727,9 @@ and authorization tests, the backend suite is now 120 tests.
 - Implemented: Fixed Vite 8 / Rolldown SSR circular chunking bug where `__exportAll` failed to evaluate due to ESM TDZ, causing Nitro SSR 500 crashes and throwing the client into the static fallback route.
 - Files: `app/src/client.tsx`, `app/scripts/fix-sw.sh`, `app/vite.config.ts`
 - Verified: `npm run build` succeeds; Local Nitro SSR server tested with `curl -sI` returns HTTP 200 and renders `$_TSR` correctly.
+
+## 2026-08-25 - Standardize Action and Filter Button Placement Project-Wide
+
+- Implemented: Refactored `FilterBar` so the Filter button is uniformly placed on the left, and the New/Action button is uniformly placed on the right. Migrated all action buttons in main routes (`academics.tsx`, `roles.tsx`, `donations.tsx`, `admissions.tsx`, `resources.tsx`, `blog.tsx`, etc.) from `AppShell`'s `right` prop to the new `FilterBar` `action` prop, ensuring a consistent layout pattern across all screens.
+- Files: `app/src/components/app/FilterBar.tsx`, `app/src/routes/academics.tsx`, `app/src/routes/roles.tsx`, and all other route files containing action buttons.
+- Verified: `cd app && npm run build` completes successfully without type errors. Verified that academics screen correctly implements the new pattern instead of its previous custom search fields.

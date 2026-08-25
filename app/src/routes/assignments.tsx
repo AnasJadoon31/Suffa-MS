@@ -218,76 +218,6 @@ function AssignmentsPage() {
     <AppShell
       title={isGuardian ? t("Assignments") : t("Assessments")}
       subtitle={`${items.length} total`}
-      right={
-        canManage && tab === "assignments" ? (
-          <FormSheet
-            title={t("New assignment")}
-            triggerLabel="New"
-            submitLabel="Create"
-            onSubmit={() => create.mutateAsync()}
-          >
-            <Field label={t("Class")}>
-              <CustomDropdown required value={classId} onChange={(e) => setClassId(e.target.value)}>
-                <option value="">{t("Select class")}</option>
-                {(classes.data ?? []).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </CustomDropdown>
-            </Field>
-            <Field label={t("Course")}>
-              <CustomDropdown required value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-                <option value="">{t("Select course")}</option>
-                {(courses.data ?? []).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </CustomDropdown>
-            </Field>
-            <Field label={t("Title")}>
-              <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} />
-            </Field>
-            <Field label={t("Instructions")}>
-              <TextArea
-                required
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-              />
-            </Field>
-            <Field label={t("Attachment")}>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.webp"
-                onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
-                className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-xl file:border file:border-border file:bg-card file:px-3 file:py-2 file:text-xs file:font-bold file:text-foreground"
-              />
-              {attachmentFile ? (
-                <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{attachmentFile.name}</p>
-              ) : null}
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label={t("Due date")}>
-                <TextInput
-                  type="date"
-                  required
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                />
-              </Field>
-              <Field label={t("Max marks")}>
-                <TextInput
-                  type="number"
-                  min={0}
-                  value={maxMarks}
-                  onChange={(e) => setMaxMarks(e.target.value)}
-                />
-              </Field>
-            </div>
-          </FormSheet>
-        ) : undefined
-      }
     >
       {!isGuardian ? (
         <div className="mb-3 grid grid-cols-3 gap-1.5 rounded-2xl bg-muted p-1">
@@ -320,7 +250,74 @@ function AssignmentsPage() {
       ) : null}
       {tab === "assignments" && !isGuardian ? (
         <>
-      <FilterBar activeCount={activeCount} onClear={() => setFilters(emptyFilters)}>
+      <FilterBar activeCount={activeCount} onClear={() => setFilters(emptyFilters)}
+        action={
+          canManage && tab === "assignments" ? (
+            <FormSheet
+              title={t("New assignment")}
+              triggerLabel="New"
+              submitLabel="Create"
+              onSubmit={() => create.mutateAsync()}
+            >
+              <Field label={t("Class")}>
+                <CustomDropdown required value={classId} onChange={(e) => setClassId(e.target.value)}>
+                  <option value="">{t("Select class")}</option>
+                  {(classes.data ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </CustomDropdown>
+              </Field>
+              <Field label={t("Course")}>
+                <CustomDropdown required value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+                  <option value="">{t("Select course")}</option>
+                  {(courses.data ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </CustomDropdown>
+              </Field>
+              <Field label={t("Title")}>
+                <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} />
+              </Field>
+              <Field label={t("Instructions")}>
+                <TextArea required value={instructions} onChange={(e) => setInstructions(e.target.value)} />
+              </Field>
+              <Field label={t("Attachment")}>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.webp"
+                  onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-xl file:border file:border-border file:bg-card file:px-3 file:py-2 file:text-xs file:font-bold file:text-foreground"
+                />
+                {attachmentFile ? (
+                  <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{attachmentFile.name}</p>
+                ) : null}
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label={t("Due date")}>
+                  <TextInput
+                    type="date"
+                    required
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                </Field>
+                <Field label={t("Max marks")}>
+                  <TextInput
+                    type="number"
+                    min={0}
+                    value={maxMarks}
+                    onChange={(e) => setMaxMarks(e.target.value)}
+                  />
+                </Field>
+              </div>
+            </FormSheet>
+          ) : undefined
+        }
+      >
         {canManage ? (
           <>
             <div className="grid grid-cols-2 gap-3">

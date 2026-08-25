@@ -46,7 +46,7 @@ export function FormSheet({
       title={title}
       trigger={
         triggerLabel ? (
-          <SheetTrigger className="gradient-emerald inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground shadow-[var(--shadow-raised)]">
+          <SheetTrigger className="gradient-emerald inline-flex h-9 items-center gap-1.5 rounded-xl px-3 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground shadow-[var(--shadow-raised)]">
             {triggerLabel}
           </SheetTrigger>
         ) : undefined

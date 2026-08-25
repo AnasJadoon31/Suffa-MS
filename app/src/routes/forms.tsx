@@ -103,19 +103,6 @@ function FormsPage() {
     <AppShell
       title={t("Forms")}
       subtitle={`${forms.length} forms`}
-      right={
-        canCreate && tab === "forms" ? (
-          <button
-            type="button"
-            onClick={() => {
-              setEditingForm(null);
-              setEditorOpen(true);
-            }}
-            className="gradient-emerald inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground shadow-[var(--shadow-raised)]"
-          >
-            {t("New")}</button>
-        ) : undefined
-      }
     >
       {canViewResponses ? (
         <Segmented
@@ -134,6 +121,19 @@ function FormsPage() {
             search={{ value: search, onChange: setSearch, placeholder: t("Search forms…") }}
             activeCount={activeCount}
             onClear={clearFilters}
+            action={
+              canCreate && tab === "forms" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingForm(null);
+                    setEditorOpen(true);
+                  }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-sm"
+                >
+                  {t("New")}</button>
+              ) : undefined
+            }
           >
             <Field label={t("Category")}>
               <CustomDropdown value={category} onChange={(e) => setCategory(e.target.value)}>

@@ -133,15 +133,6 @@ function LeavePage() {
     <AppShell
       title={t("Leave")}
       subtitle={canReview ? "All requests" : "My requests"}
-      right={
-        <button
-          onClick={() => setOpen((value) => !value)}
-          className="grid h-10 w-10 place-items-center rounded-2xl bg-primary-foreground/15 text-primary-foreground"
-          aria-label="New leave request"
-        >
-          <Plus className="h-5 w-5" />
-        </button>
-      }
     >
       {open ? (
         <form onSubmit={submit} className="card-surface mb-3 space-y-3 p-4">
@@ -194,6 +185,15 @@ function LeavePage() {
         }}
         activeCount={activeCount}
         onClear={() => setFilters(emptyFilters)}
+        action={
+          <button
+            onClick={() => setOpen((value) => !value)}
+            className="grid h-9 w-9 place-items-center rounded-xl bg-primary-soft text-primary"
+            aria-label="New leave request"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        }
       >
         {canReview ? (
           <>

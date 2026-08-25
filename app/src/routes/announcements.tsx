@@ -130,21 +130,6 @@ function AnnouncementsPage() {
     <AppShell
       title={t("Announcements")}
       subtitle={`${items.length} notices`}
-      right={
-        canManage ? (
-          <FormSheet
-            title={t("New announcement")}
-            triggerLabel="New"
-            submitLabel="Publish"
-            onSubmit={() => create.mutateAsync()}
-          >
-            <AnnouncementFormFields
-              values={form}
-              onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
-            />
-          </FormSheet>
-        ) : undefined
-      }
     >
       {isGuardian ? (
         <>
@@ -172,6 +157,21 @@ function AnnouncementsPage() {
             search={{ value: search, onChange: setSearch, placeholder: t("Search announcements…") }}
             activeCount={activeCount}
             onClear={clearFilters}
+            action={
+              canManage ? (
+                <FormSheet
+                  title={t("New announcement")}
+                  triggerLabel="New"
+                  submitLabel="Publish"
+                  onSubmit={() => create.mutateAsync()}
+                >
+                  <AnnouncementFormFields
+                    values={form}
+                    onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+                  />
+                </FormSheet>
+              ) : undefined
+            }
           >
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <Field label={t("Audience")}>
