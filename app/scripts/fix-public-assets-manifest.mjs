@@ -26,7 +26,12 @@ let manifest = readFileSync(manifestPath, "utf-8");
 let fixed = 0;
 
 for (const filePath of listFiles(publicDir)) {
-  const urlPath = "/" + filePath.slice(publicDir.length + 1).split("\\").join("/");
+  const urlPath =
+    "/" +
+    filePath
+      .slice(publicDir.length + 1)
+      .split("\\")
+      .join("/");
   const entryRe = new RegExp(
     `("${urlPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}":\\s*\\{[^{}]*"size":\\s*)(\\d+)([^{}]*\\})`,
   );
@@ -44,7 +49,10 @@ for (const filePath of listFiles(publicDir)) {
   // e.g. "\"387-abc\""), so `[^"]*` alone would stop at the first inner `\"`.
   const patchedEntry = entryText
     .replace(/"etag":\s*"(?:[^"\\]|\\.)*"/, `"etag": ${JSON.stringify(etag)}`)
-    .replace(/"mtime":\s*"(?:[^"\\]|\\.)*"/, `"mtime": ${JSON.stringify(actualStat.mtime.toJSON())}`)
+    .replace(
+      /"mtime":\s*"(?:[^"\\]|\\.)*"/,
+      `"mtime": ${JSON.stringify(actualStat.mtime.toJSON())}`,
+    )
     .replace(/"size":\s*\d+/, `"size": ${actualStat.size}`);
   manifest = manifest.replace(entryText, patchedEntry);
   fixed++;
@@ -53,7 +61,9 @@ for (const filePath of listFiles(publicDir)) {
 
 if (fixed > 0) {
   writeFileSync(manifestPath, manifest);
-  console.log(`fix-public-assets-manifest: corrected ${fixed} stale manifest entr${fixed === 1 ? "y" : "ies"}`);
+  console.log(
+    `fix-public-assets-manifest: corrected ${fixed} stale manifest entr${fixed === 1 ? "y" : "ies"}`,
+  );
 } else {
   console.log("fix-public-assets-manifest: no stale manifest entries found");
 }

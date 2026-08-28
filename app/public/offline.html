@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#064e3b" />
+<title>Suffa MS — Offline</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #f6f5f0;
+    color: #1c1c1a;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .card {
+    max-width: 360px;
+    text-align: center;
+  }
+  h1 {
+    font-size: 1.25rem;
+    margin: 0 0 8px;
+    color: #064e3b;
+  }
+  p {
+    margin: 0 0 20px;
+    color: #55534c;
+    line-height: 1.5;
+  }
+  button {
+    font: inherit;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    background: #064e3b;
+    color: #f6f5f0;
+    cursor: pointer;
+  }
+  button:active { opacity: 0.85; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>You're offline</h1>
+    <p>This page hasn't been saved for offline use yet. Reconnect and try again, or go back to a page you've already visited.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+  <script>
+    window.addEventListener("online", () => location.reload());
+  </script>
+</body>
+</html>

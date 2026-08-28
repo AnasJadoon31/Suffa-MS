@@ -5,6 +5,13 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-29 — PWA Offline Fix Follow-Up
+
+- Deploy and verify against the live Coolify/Cloudflare stack: confirm the CDN doesn't serve a cached copy of the old `sw-v4.js` (browsers auto-detect the new `sw-v5.js` URL and update since it's a different file, but check Cloudflare edge cache behavior on first real deploy per the 2026-08-14 CDN-cache incidents in `IMPLEMENTED.md`).
+- Run a real-device offline smoke test (not just Playwright's `context.setOffline`) covering: airplane mode mid-session, force-quitting and reopening the installed PWA while offline, and the outbox/mutation-sync banner still working now that navigation caching behaves correctly.
+- The `suffa-pages` NetworkFirst cache currently has no relationship to the offline mutation outbox (`mutationQueue.ts`) — confirm a page reload after a queued offline mutation shows the queued state consistently rather than a stale pre-mutation cached page.
+- Unrelated deprecation warnings surfaced while touching `package.json` for this fix: `recharts@2.15.4` (EOL, needs v3 migration) and `@types/dompurify@3.2.0` (stub package, dompurify ships its own types now — safe to remove `@types/dompurify` and its import once confirmed unused). Both pre-date this fix and are out of scope here, but the project's package-error policy calls for addressing them separately.
+
 ## 2026-08-16 — Daily Reports (Follow-up)
 
 - Add server-side enforcement of "editable same day only" (check date on entry update, reject if not today).

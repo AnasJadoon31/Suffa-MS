@@ -8,60 +8,11 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { loadEnv } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import type { Plugin } from "vite";
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
 
 // Vite only merges .env values into process.env for client code (import.meta.env);
 // this file runs as plain Node before that happens, so process.env.VITE_ENABLE_OFFLINE
 // would silently stay undefined unless we load .env ourselves.
-Object.assign(process.env, loadEnv(process.env.NODE_ENV ?? "production", process.cwd(), ""));
-
-function generateAppShell(): Plugin {
-  return {
-    name: "generate-app-shell",
-    apply: (_config: unknown, env: { isSsrBuild?: boolean }) => !env.isSsrBuild,
-    enforce: "pre",
-    generateBundle(_options, bundle) {
-      // Find the main entry chunk and CSS from the client bundle
-      let mainJs = "";
-      const cssFiles: string[] = [];
-      for (const [fileName, chunk] of Object.entries(bundle)) {
-        if (chunk.type === "chunk") {
-          if (chunk.isEntry) {
-            const basename = fileName.split('/').pop() || "";
-            if (basename.startsWith("client-") || basename.startsWith("index-") || basename.startsWith("_client-")) {
-              mainJs = fileName;
-            }
-          }
-        } else if (chunk.type === "asset" && fileName.endsWith(".css")) {
-          cssFiles.push(fileName);
-        }
-      }
-      const jsTags = mainJs ? `<script type="module" src="/${mainJs}" crossorigin></script>` : "";
-      const cssTags = cssFiles.map((f) => `<link rel="stylesheet" href="/${f}" />`).join("\n    ");
-      const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <meta name="theme-color" content="#064e3b" />
-  <title>Suffa MS</title>
-  ${cssTags}
-</head>
-<body>
-  <!-- Inject empty state to prevent TanStack Start client from throwing on offline boot -->
-  <script>
-    window.__TSR__ = { matches: [], streamedValues: {} };
-    window.$_TSR = { t: {}, p: function() {}, buffer: [] };
-  </script>
-  ${jsTags}
-</body>
-</html>`;
-      this.emitFile({ type: "asset", fileName: "offline.html", source: html });
-      console.log("Generated app shell offline.html");
-    },
-  };
-}
+Object.assign(process.env, loadEnv(process.env["NODE_ENV"] ?? "production", process.cwd(), ""));
 
 // vite-plugin-pwa generates the service worker on every build pass. TanStack
 // Start runs both a client build and an SSR build, so the SW is written twice
@@ -98,60 +49,19 @@ export default defineConfig({
       // crashes at runtime (`__exportAll is not a function`).
     },
     plugins: [
-      generateAppShell(),
       clientOnlyPWA({
-        strategies: "generateSW",
+        strategies: "injectManifest",
+        srcDir: "src",
+        filename: "sw-v5.ts",
         registerType: "autoUpdate",
         injectRegister: null,
-        filename: "sw-v4.js",
         selfDestroying: false,
         devOptions: { enabled: true, type: "module" },
         manifest: false,
         outDir: ".output/public",
-        workbox: process.env.VITE_ENABLE_OFFLINE === "true" ? {
-          cleanupOutdatedCaches: true,
-          clientsClaim: true,
-          skipWaiting: true,
+        injectManifest: {
           globDirectory: ".output/public",
           globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico,webmanifest}"],
-          navigateFallback: "/offline.html",
-          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
-          runtimeCaching: [
-            {
-              urlPattern: ({ request }) =>
-                ["style", "script", "worker", "font", "image"].includes(request.destination),
-              handler: "CacheFirst",
-              options: {
-                cacheName: "suffa-assets",
-                expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              },
-            },
-            {
-              urlPattern: /\/api\/v1\//,
-              handler: "StaleWhileRevalidate",
-              options: {
-                cacheName: "suffa-api-cache",
-                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
-                cacheableResponse: { statuses: [0, 200] },
-              },
-            },
-          ],
-        } : {
-          cleanupOutdatedCaches: true,
-          clientsClaim: true,
-          skipWaiting: true,
-          globPatterns: [],
-          runtimeCaching: [
-            {
-              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-              handler: "CacheFirst",
-              options: {
-                cacheName: "google-fonts-cache",
-                expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-                cacheableResponse: { statuses: [0, 200] },
-              },
-            }
-          ],
         },
       }),
     ],

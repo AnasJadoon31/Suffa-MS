@@ -1,5 +1,5 @@
 /** Guarded service-worker registration. Offline support only runs on the published site. */
-const SW_URL = "/sw-v4.js";
+const SW_URL = "/sw-v5.js";
 
 function isBlockedHost(hostname: string): boolean {
   return (
@@ -27,7 +27,7 @@ async function unregisterOldWorkers(all = false): Promise<void> {
           registration.waiting?.scriptURL ??
           registration.installing?.scriptURL ??
           "";
-        return url.includes("/sw") && !url.includes("/sw-v4.js");
+        return url.includes("/sw") && !url.includes("/sw-v5.js");
       })
       .map((registration) => registration.unregister()),
   );
@@ -40,7 +40,7 @@ export function registerServiceWorker(): void {
     window.self !== window.top ||
     isBlockedHost(window.location.hostname) ||
     new URLSearchParams(window.location.search).get("sw") === "off" ||
-    import.meta.env.VITE_ENABLE_OFFLINE !== "true";
+    import.meta.env["VITE_ENABLE_OFFLINE"] !== "true";
 
   if (refuse) {
     void unregisterOldWorkers(true).catch(() => undefined);
@@ -52,9 +52,9 @@ export function registerServiceWorker(): void {
     .catch(() => undefined)
     .finally(() => {
       void window.navigator.serviceWorker
-        .register(SW_URL, { 
+        .register(SW_URL, {
           scope: "/",
-          type: import.meta.env.PROD ? "classic" : "module" 
+          type: import.meta.env.PROD ? "classic" : "module",
         })
         .then((registration) => {
           console.log("SW registered:", registration.scope);
