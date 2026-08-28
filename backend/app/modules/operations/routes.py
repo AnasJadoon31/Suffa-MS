@@ -730,9 +730,7 @@ async def my_timetable(
             ))
         ).scalar_one_or_none()
         if profile is None:
-            if current_user.role == UserRole.teacher:
-                return []
-            raise HTTPException(status_code=403, detail=ErrorCode.TIMETABLE_SELF_SERVICE_ONLY)
+            return []
         stmt = select(TimetableSlot).where(
             TimetableSlot.madrasa_id == madrasa.id,
             (TimetableSlot.session_id == context_session.id) | (TimetableSlot.session_id.is_(None)),
