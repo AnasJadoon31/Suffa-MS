@@ -5,10 +5,16 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { loadEnv } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import type { Plugin } from "vite";
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+
+// Vite only merges .env values into process.env for client code (import.meta.env);
+// this file runs as plain Node before that happens, so process.env.VITE_ENABLE_OFFLINE
+// would silently stay undefined unless we load .env ourselves.
+Object.assign(process.env, loadEnv(process.env.NODE_ENV ?? "production", process.cwd(), ""));
 
 function generateAppShell(): Plugin {
   return {

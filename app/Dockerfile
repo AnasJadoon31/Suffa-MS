@@ -2,6 +2,8 @@ FROM node:24-alpine AS build
 WORKDIR /app
 ARG VITE_API_BASE
 ENV VITE_API_BASE=$VITE_API_BASE
+ARG VITE_ENABLE_OFFLINE=true
+ENV VITE_ENABLE_OFFLINE=$VITE_ENABLE_OFFLINE
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
