@@ -12,9 +12,12 @@ from app.modules.academics.models import Enrollment, AcademicClass
 
 class TeacherProfile(Base, IdMixin, TenantMixin, TimestampMixin):
     __tablename__ = "teacher_profiles"
+    __table_args__ = (
+        UniqueConstraint("madrasa_id", "employee_code", name="uq_teacher_employee_code_tenant"),
+    )
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
-    employee_code: Mapped[str] = mapped_column(String(40), unique=True)
+    employee_code: Mapped[str] = mapped_column(String(40))
     name: Mapped[str] = mapped_column(String(160))
     whatsapp_number: Mapped[str] = mapped_column(String(32))
     phone_list: Mapped[list] = mapped_column(PortableJSONB, default=list)

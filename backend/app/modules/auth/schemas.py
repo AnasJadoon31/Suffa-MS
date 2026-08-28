@@ -145,3 +145,19 @@ class PermissionRoleRead(BaseModel):
 class RoleAssignRequest(BaseModel):
     user_id: UUID
     role_id: UUID
+
+
+class SignupInitiateRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=150)
+    phone: str = Field(min_length=7, max_length=20)
+    school_name: str = Field(min_length=2, max_length=120)
+    with_demo_data: bool = False
+
+
+class SignupVerifyRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=150)
+    otp: str = Field(min_length=6, max_length=6)
+
+class SignupVerifyResponse(BaseModel):
+    madrasa_id: UUID
+    set_password_url: str

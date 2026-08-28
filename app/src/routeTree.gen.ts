@@ -40,6 +40,7 @@ import { Route as ResultsRouteImport } from './routes/results'
 import { Route as RolesRouteImport } from './routes/roles'
 import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TimetableRouteImport } from './routes/timetable'
 import { Route as AdmissionTokenRouteImport } from './routes/admission.$token'
 import { Route as AdmissionsApplicationIdRouteImport } from './routes/admissions.$applicationId'
@@ -201,6 +202,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TimetableRoute = TimetableRouteImport.update({
   id: '/timetable',
   path: '/timetable',
@@ -259,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/roles': typeof RolesRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/signup': typeof SignupRoute
   '/timetable': typeof TimetableRoute
   '/admission/$token': typeof AdmissionTokenRoute
   '/admissions/$applicationId': typeof AdmissionsApplicationIdRoute
@@ -297,6 +304,7 @@ export interface FileRoutesByTo {
   '/roles': typeof RolesRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/signup': typeof SignupRoute
   '/timetable': typeof TimetableRoute
   '/admission/$token': typeof AdmissionTokenRoute
   '/admissions/$applicationId': typeof AdmissionsApplicationIdRoute
@@ -336,6 +344,7 @@ export interface FileRoutesById {
   '/roles': typeof RolesRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/signup': typeof SignupRoute
   '/timetable': typeof TimetableRoute
   '/admission/$token': typeof AdmissionTokenRoute
   '/admissions/$applicationId': typeof AdmissionsApplicationIdRoute
@@ -376,6 +385,7 @@ export interface FileRouteTypes {
     | '/roles'
     | '/set-password'
     | '/settings'
+    | '/signup'
     | '/timetable'
     | '/admission/$token'
     | '/admissions/$applicationId'
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
     | '/roles'
     | '/set-password'
     | '/settings'
+    | '/signup'
     | '/timetable'
     | '/admission/$token'
     | '/admissions/$applicationId'
@@ -452,6 +463,7 @@ export interface FileRouteTypes {
     | '/roles'
     | '/set-password'
     | '/settings'
+    | '/signup'
     | '/timetable'
     | '/admission/$token'
     | '/admissions/$applicationId'
@@ -491,6 +503,7 @@ export interface RootRouteChildren {
   RolesRoute: typeof RolesRoute
   SetPasswordRoute: typeof SetPasswordRoute
   SettingsRoute: typeof SettingsRoute
+  SignupRoute: typeof SignupRoute
   TimetableRoute: typeof TimetableRoute
   AdmissionTokenRoute: typeof AdmissionTokenRoute
   GuardiansGuardianIdRoute: typeof GuardiansGuardianIdRoute
@@ -715,6 +728,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/timetable': {
       id: '/timetable'
       path: '/timetable'
@@ -808,6 +828,7 @@ const rootRouteChildren: RootRouteChildren = {
   RolesRoute: RolesRoute,
   SetPasswordRoute: SetPasswordRoute,
   SettingsRoute: SettingsRoute,
+  SignupRoute: SignupRoute,
   TimetableRoute: TimetableRoute,
   AdmissionTokenRoute: AdmissionTokenRoute,
   GuardiansGuardianIdRoute: GuardiansGuardianIdRoute,

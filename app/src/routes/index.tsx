@@ -166,6 +166,10 @@ function LoginPage() {
 
           <p className="pt-2 text-center text-xs text-muted-foreground">
             {t("Trouble signing in? Contact your madrasa administrator.")}</p>
+
+          <p className="pt-4 text-center text-sm font-medium">
+            {t("Don't have an account?")} <a href="/signup" className="text-emerald-600 hover:underline">{t("Create one")}</a>
+          </p>
         </form>
       </div>
     </div>

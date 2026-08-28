@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173", "http://localhost:3000"]
     set_password_token_hours: int = 24
 
+    # SMTP configuration for sending emails (e.g., OTP)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+
     # Object storage (S3-compatible / MinIO). Empty by default — file
     # upload endpoints stay disabled until these are configured.
     s3_endpoint: str = ""

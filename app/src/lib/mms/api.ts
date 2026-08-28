@@ -41,6 +41,15 @@ export async function getAllPages<T>(url: string, params?: object): Promise<T[]>
   }
 }
 
+export async function signupInitiate(payload: { email: string; phone: string; school_name: string; with_demo_data: boolean }): Promise<void> {
+  await api.post("/api/v1/auth/signup/initiate", payload);
+}
+
+export async function signupVerify(payload: { email: string; otp: string }): Promise<{ madrasa_id: string; set_password_url: string }> {
+  const res = await api.post("/api/v1/auth/signup/verify", payload);
+  return res.data;
+}
+
 let academicSessionId: string | null = null;
 export function setAcademicSessionId(id: string | null): void {
   academicSessionId = id;

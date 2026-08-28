@@ -39,7 +39,8 @@ export function registerServiceWorker(): void {
   const refuse =
     window.self !== window.top ||
     isBlockedHost(window.location.hostname) ||
-    new URLSearchParams(window.location.search).get("sw") === "off";
+    new URLSearchParams(window.location.search).get("sw") === "off" ||
+    import.meta.env.VITE_ENABLE_OFFLINE !== "true";
 
   if (refuse) {
     void unregisterOldWorkers(true).catch(() => undefined);

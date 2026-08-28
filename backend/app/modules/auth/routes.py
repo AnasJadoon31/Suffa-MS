@@ -47,10 +47,19 @@ from app.modules.auth.schemas import (
     SetPasswordRequest,
     TokenResponse,
     CurrentUserResponse,
-    UpdateMeRequest,
     UserRead,
-    MadrasaRead
+    UpdateMeRequest,
+    MadrasaRead,
+    SignupInitiateRequest,
+    SignupVerifyRequest,
+    SignupVerifyResponse,
 )
+from app.core.email import send_email
+from app.core.rate_limit import get_redis
+from app.modules.platform.demo_seed import seed_demo_data
+import random
+import json
+import re
 
 router = APIRouter()
 
@@ -811,3 +820,119 @@ async def list_user_roles(
         d.permission_codes = list(codes)
         result.append(d)
     return result
+
+
+@router.post("/signup/initiate")
+async def signup_initiate(payload: SignupInitiateRequest) -> dict:
+    redis = get_redis()
+    # Check rate limit per IP or email could be added here
+    otp = str(random.randint(100000, 999999))
+    
+    # Store request details in redis for 10 minutes
+    key = f"signup:{payload.email.lower()}"
+    data = payload.model_dump()
+    data["otp"] = otp
+    await redis.setex(key, 600, json.dumps(data))
+    
+    # Send email
+    subject = "Verify your email for Suffa MS"
+    html_content = f"<html><body><h2>Your OTP is: {otp}</h2><p>This code will expire in 10 minutes.</p></body></html>"
+    sent = await send_email(payload.email, subject, html_content)
+    
+    if not sent:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="We are unable to send the OTP at this time. Please try again later."
+        )
+    
+    return {"message": "OTP sent successfully"}
+
+
+@router.post("/signup/verify", response_model=SignupVerifyResponse)
+async def signup_verify(
+    payload: SignupVerifyRequest,
+    session: AsyncSession = Depends(get_session)
+) -> SignupVerifyResponse:
+    redis = get_redis()
+    key = f"signup:{payload.email.lower()}"
+    raw_data = await redis.get(key)
+    
+    if not raw_data:
+        raise HTTPException(status_code=400, detail="OTP expired or invalid email")
+        
+    data = json.loads(raw_data)
+    if data["otp"] != payload.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+        
+    # Generate unique slug
+    base_slug = re.sub(r"[^a-z0-9]+", "-", data["school_name"].strip().lower()).strip("-")
+    if not base_slug:
+        base_slug = "madrasa"
+        
+    candidate = base_slug
+    suffix = 1
+    while True:
+        existing = await session.execute(select(Madrasa).where(Madrasa.slug == candidate))
+        if existing.scalar_one_or_none() is None:
+            break
+        suffix += 1
+        candidate = f"{base_slug}-{suffix}"
+        
+    # Create Madrasa
+    madrasa = Madrasa(name=data["school_name"], slug=candidate, content_language="en")
+    session.add(madrasa)
+    await session.flush()
+    # Use None for the actor since it's a self-signup. provision_login will use the provisioned user's ID.
+    actor_id = None
+    
+    try:
+        # Create Principal User
+        principal, set_password_url = await provision_login(
+            session,
+            madrasa_id=madrasa.id,
+            actor_id=actor_id,
+            username=payload.email,
+            role=UserRole.principal,
+        )
+    except UsernameTakenError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        
+    if data.get("with_demo_data"):
+        await seed_demo_data(madrasa.id, session)
+        
+    record_audit(
+        session,
+        madrasa_id=madrasa.id,
+        actor_id=principal.id,
+        action="platform.madrasa.signup",
+        entity_name="madrasa",
+        entity_id=str(madrasa.id),
+        old_values=None,
+        new_values={"slug": madrasa.slug, "email": payload.email},
+    )
+    
+    await session.commit()
+    
+    # Clear OTP
+    await redis.delete(f"signup_otp:{payload.email}")
+    
+    # Send welcome email
+    welcome_subject = "Welcome to Suffa MS!"
+    welcome_html = f"""
+    <h2>Welcome to Suffa MS, {madrasa.name}!</h2>
+    <p>Your workspace has been created successfully.</p>
+    <p><strong>Your login details:</strong></p>
+    <ul>
+        <li><strong>Madrasa (Tenant ID):</strong> {madrasa.slug}</li>
+        <li><strong>Username:</strong> {payload.email}</li>
+    </ul>
+    <p>Thank you for choosing Suffa MS!</p>
+    """
+    # Fire and forget or await. We can await it since it's already an async operation.
+    await send_email(payload.email, welcome_subject, welcome_html)
+    
+    # Append the newly created username and tenant slug so the frontend can display them to the user
+    return SignupVerifyResponse(
+        madrasa_id=madrasa.id,
+        set_password_url=f"{set_password_url}&username={payload.email}&slug={madrasa.slug}"
+    )

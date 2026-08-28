@@ -50,7 +50,7 @@ async def provision_login(
     session: AsyncSession,
     *,
     madrasa_id: UUID,
-    actor_id: UUID,
+    actor_id: UUID | None,
     username: str,
     role: UserRole,
     preferred_language: str = "en",
@@ -92,7 +92,7 @@ async def provision_login(
     record_audit(
         session,
         madrasa_id=madrasa_id,
-        actor_id=actor_id,
+        actor_id=actor_id or user.id,
         action="user.provision",
         entity_name="user",
         entity_id=str(user.id),
