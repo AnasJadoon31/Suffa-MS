@@ -16,6 +16,13 @@ export const DEFAULT_TENANT =
 export const api = axios.create({
   baseURL: API_BASE,
   headers: { "Content-Type": "application/json" },
+  // Without this, a request over a genuinely degraded connection (weak
+  // signal, a stalled tunnel/proxy, a DNS lookup that never resolves) can
+  // sit pending indefinitely instead of failing — unlike a clean
+  // disconnect, which fails fast. That leaves any await on it (a mutation's
+  // loading state, the offline-queue fallback in the response interceptor
+  // below) hung forever with no error to recover from.
+  timeout: 30_000,
 });
 
 export interface PageResult<T> {

@@ -3,6 +3,14 @@
 Running log of completed work (newest first). Design rationale lives in
 `IMPLEMENT.md`; the remaining backlog in `TO_IMPLEMENT.md`.
 
+## 2026-08-29 — Fix: attendance save spinner stuck forever after a mid-request disconnect
+
+- **What**: Reported live on staging: the "Save offline · Save30 marks" button stayed spinning (`save.isPending`) indefinitely while the app correctly showed the "OFFLINE — showing saved data" banner. Both were accurate about different moments: the save was tapped while online (taking `attendance.tsx`'s network path, `attendanceApi.sync(entries)`), the connection then genuinely dropped mid-request (the banner reacts immediately to the browser's `offline` event), but the **already in-flight** request had nothing to make it fail — `src/lib/mms/api.ts`'s shared axios instance had no `timeout` configured at all.
+- **Root cause**: A clean disconnect fails a request fast (what every earlier test in this session simulated via Playwright's `context.setOffline`), but a genuinely degraded connection — weak signal, a stalled tunnel/proxy, a DNS lookup that never resolves — can leave a request sitting pending indefinitely instead. `attendance.tsx`'s save mutation already has a `try { attendanceApi.sync(...) } catch { enqueue offline }` fallback specifically for this, but a promise that never settles never reaches that `catch` — so the mutation, and the button's `isPending`-driven spinner, waited forever.
+- **Fix**: Added `timeout: 30_000` to the shared `axios.create(...)` in `api.ts`. A timed-out request has no `error.response` (same shape as a real network failure), so it also correctly flows through the reactive offline-queueing path added earlier today for any *other* mutation caught in the same situation, not just this one hand-rolled attendance fallback.
+- **Files**: `app/src/lib/mms/api.ts`.
+- **Verified**: `tsc --noEmit`/`eslint` clean (pre-existing unrelated `any` untouched); production build unaffected. No endpoint in this codebase does large file uploads or long-running exports through this shared client (`grep` for `FormData`/`multipart`/blob-response endpoints found none), so 30s has no known legitimate-slow-request case to conflict with.
+
 ## 2026-08-29 — Fix: attendance calendar snapped back to a marked date on every click of an unmarked one
 
 - **What**: Reported live on staging as "unable to go to any date except those which are already marked" on the principal's class Attendance Calendar. Unrelated to any of the PWA/offline work in the entries below — a plain pre-existing React effect bug.
