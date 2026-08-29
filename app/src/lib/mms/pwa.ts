@@ -1,5 +1,9 @@
 /** Guarded service-worker registration. Offline support only runs on the published site. */
-const SW_URL = "/sw-v5.js";
+// vite-plugin-pwa's devOptions serves the injectManifest SW at this fixed
+// internal dev path (not the production filename) whenever it's running
+// under `vite dev` — registering "/sw-v5.js" there 404s, since that file
+// only exists in a real build's output.
+const SW_URL = import.meta.env.DEV ? "/dev-sw.js?dev-sw" : "/sw-v5.js";
 
 function isBlockedHost(hostname: string): boolean {
   return (
@@ -27,7 +31,7 @@ async function unregisterOldWorkers(all = false): Promise<void> {
           registration.waiting?.scriptURL ??
           registration.installing?.scriptURL ??
           "";
-        return url.includes("/sw") && !url.includes("/sw-v5.js");
+        return url.includes("/sw") && !url.includes(SW_URL);
       })
       .map((registration) => registration.unregister()),
   );

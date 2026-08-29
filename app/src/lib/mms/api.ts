@@ -10,7 +10,8 @@ export const API_BASE =
 export const TOKEN_KEY = "mms_token";
 export const REFRESH_TOKEN_KEY = "mms_refresh_token";
 export const TENANT_KEY = "mms_tenant";
-export const DEFAULT_TENANT = (import.meta.env["VITE_DEFAULT_TENANT"] as string | undefined) ?? "default";
+export const DEFAULT_TENANT =
+  (import.meta.env["VITE_DEFAULT_TENANT"] as string | undefined) ?? "default";
 
 export const api = axios.create({
   baseURL: API_BASE,
@@ -41,11 +42,19 @@ export async function getAllPages<T>(url: string, params?: object): Promise<T[]>
   }
 }
 
-export async function signupInitiate(payload: { email: string; phone: string; school_name: string; with_demo_data: boolean }): Promise<void> {
+export async function signupInitiate(payload: {
+  email: string;
+  phone: string;
+  school_name: string;
+  with_demo_data: boolean;
+}): Promise<void> {
   await api.post("/api/v1/auth/signup/initiate", payload);
 }
 
-export async function signupVerify(payload: { email: string; otp: string }): Promise<{ madrasa_id: string; set_password_url: string }> {
+export async function signupVerify(payload: {
+  email: string;
+  otp: string;
+}): Promise<{ madrasa_id: string; set_password_url: string }> {
   const res = await api.post("/api/v1/auth/signup/verify", payload);
   return res.data;
 }
@@ -60,7 +69,9 @@ export function readToken(): string | null {
   const token = window.localStorage.getItem(TOKEN_KEY);
   if (!token) return null;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { exp?: number };
+    const payload = JSON.parse(
+      atob(token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/")),
+    ) as { exp?: number };
     if (payload.exp && payload.exp <= Math.floor(Date.now() / 1000)) {
       window.localStorage.removeItem(TOKEN_KEY);
       return null;
@@ -120,9 +131,27 @@ export function apiErrorMessage(error: unknown, fallback = "Something went wrong
 const MUTATION_METHODS = new Set(["post", "put", "patch", "delete"]);
 const QUIET_PATHS = ["/api/v1/auth/token"];
 
+// Auth requests (login, refresh, signup) must never be queued for later —
+// they need a live round trip *now* to produce a token, not a replayed
+// `{queued: true}` stand-in. Without this, submitting the login form while
+// navigator.onLine reports false (a real drop, or just an unreliable read
+// right at page load) silently "succeeds" with no session, which reads to a
+// user as the app being stuck.
+function isQueueExempt(url: string): boolean {
+  return url.includes("/api/v1/auth/");
+}
+
 api.interceptors.request.use((config) => {
   const method = config.method?.toLowerCase();
-  if (isMutationRequest(method) && !isOnline()) {
+  if (isMutationRequest(method)) {
+    // Stash the original (pre-serialization) request body. By the time a
+    // failed request reaches the response interceptor below, axios has
+    // already turned object bodies into a JSON string on `config.data` —
+    // capturing it here keeps whatever later queues this mutation storing
+    // the same shape `flushMutations` expects to replay.
+    (config as { __offlineReplayData?: unknown }).__offlineReplayData = config.data ?? null;
+  }
+  if (isMutationRequest(method) && !isOnline() && !isQueueExempt(config.url ?? "")) {
     // Offline: queue the mutation instead of making the network request
     const url = config.url ?? "";
     const data = config.data ?? null;
@@ -147,6 +176,23 @@ api.interceptors.response.use(
     const url = error.config?.url ?? "";
     const isQuiet = QUIET_PATHS.some((path) => url.includes(path));
 
+    // navigator.onLine only reflects the network adapter, not real
+    // reachability — a weak signal, VPN hiccup, or unreachable server all
+    // leave it `true` while requests genuinely fail. error.response is only
+    // set once a server actually answered, so its absence here means the
+    // request never got a response at all: queue it the same way the
+    // request interceptor does for the "known offline" case, instead of
+    // silently dropping the change.
+    if (!error.response && isMutationRequest(method) && !isQueueExempt(url)) {
+      const data =
+        (error.config as { __offlineReplayData?: unknown } | undefined)?.__offlineReplayData ??
+        null;
+      void enqueueMutation(method!, url, data).then(() => {
+        toast.success("Saved offline — will sync when online");
+      });
+      return Promise.resolve({ data: { queued: true } }) as unknown;
+    }
+
     if (error.response?.status === 401 && typeof window !== "undefined") {
       const originalRequest = error.config as any;
       if (originalRequest && !originalRequest._retry && !url.includes("/api/v1/auth/refresh")) {
@@ -157,7 +203,7 @@ api.interceptors.response.use(
             const refreshResponse = await axios.post(
               `${API_BASE}/api/v1/auth/refresh`,
               { refresh_token: refreshToken },
-              { headers: { "Content-Type": "application/json" } }
+              { headers: { "Content-Type": "application/json" } },
             );
             const { access_token, refresh_token: new_refresh_token } = refreshResponse.data;
             window.localStorage.setItem(TOKEN_KEY, access_token);

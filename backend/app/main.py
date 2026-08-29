@@ -5,6 +5,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.dependencies import require_feature, require_operations_feature
+from app.core.idempotency import idempotency_guard
 from app.core.logging import setup_logging
 from app.db.session import get_session
 from app.modules.academics.routes import router as academics_router
@@ -82,6 +83,8 @@ def create_app() -> FastAPI:
             # ServerErrorMiddleware, whose response carries no CORS headers and
             # shows up in browsers as a bogus CORS failure.
             return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+    app.middleware("http")(idempotency_guard)
     # allow_origin_regex=".*" is intentional: madrasas front this API from
     # their own custom domains, unknown at deploy time, so a fixed allowlist
     # (`cors_origins`, still applied/kept for local dev clarity) can't cover

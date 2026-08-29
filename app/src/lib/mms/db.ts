@@ -7,6 +7,10 @@ export interface OutboxEntry {
   entry: AttendanceSyncEntry;
   created_at: string;
   attempts: number;
+  // Absent on rows written before this field existed — treated as "pending".
+  // See MutationEntry.syncing_at below for what "syncing"/syncing_at mean.
+  status?: "pending" | "syncing" | "failed";
+  syncing_at?: string;
 }
 
 export interface RosterCache {
@@ -26,6 +30,11 @@ export interface MutationEntry {
   attempts: number;
   status: "pending" | "syncing" | "failed";
   error?: string;
+  // Set when status transitions to "syncing". Lets a concurrent flush (e.g.
+  // the same PWA open in a second tab, sharing this IndexedDB) tell "another
+  // tab is actively sending this right now" apart from "a previous flush
+  // crashed mid-request" — see mutationQueue.ts's STALE_SYNC_MS.
+  syncing_at?: string;
 }
 
 export class MmsDatabase extends Dexie {
