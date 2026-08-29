@@ -5,6 +5,7 @@ import { registerServiceWorker } from "@/lib/mms/pwa";
 import { useOutboxSync } from "@/lib/mms/useOutboxSync";
 import { useMutationSync } from "@/lib/mms/useMutationSync";
 import { useTranslation } from "react-i18next";
+import { RejectedEntriesSheet } from "./RejectedEntriesSheet";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -22,14 +23,19 @@ export function PwaLayer() {
   const [offline, setOffline] = useState(false);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
   const [hidden, setHidden] = useState(false);
-  const { pending, syncing, rejected, discardRejected } = useOutboxSync();
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const { pending, syncing, rejected, refresh: refreshOutbox } = useOutboxSync();
   const {
     pending: pendingMutations,
     syncing: syncingMutations,
     rejected: rejectedMutations,
-    discardRejected: discardRejectedMutations,
+    refresh: refreshMutations,
   } = useMutationSync();
   const rejectedTotal = rejected + rejectedMutations;
+  const refreshRejected = () => {
+    void refreshOutbox();
+    void refreshMutations();
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -84,19 +90,22 @@ export function PwaLayer() {
         {rejectedTotal > 0 ? (
           <div className="flex items-center justify-center gap-2 bg-destructive px-4 py-2 text-xs font-bold uppercase tracking-wide text-destructive-foreground">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            {`${rejectedTotal} couldn't be saved — needs review`}
+            {rejectedTotal} {t("couldn't be saved — needs review")}
             <button
-              onClick={() => {
-                void discardRejected();
-                void discardRejectedMutations();
-              }}
+              onClick={() => setReviewOpen(true)}
               className="ml-1 shrink-0 rounded-full bg-destructive-foreground/15 px-2 py-0.5 normal-case tracking-normal"
             >
-              {t("Discard")}
+              {t("Review")}
             </button>
           </div>
         ) : null}
       </div>
+
+      <RejectedEntriesSheet
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        onChanged={refreshRejected}
+      />
 
       {installEvent && !hidden ? (
         <div className="mb-safe-nav fixed inset-x-3 bottom-20 z-[70] flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-raised)] lg:bottom-6 lg:left-auto lg:right-6 lg:w-80">

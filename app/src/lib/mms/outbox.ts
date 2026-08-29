@@ -62,6 +62,38 @@ export async function discardAllRejectedOutboxEntries(): Promise<void> {
   await removeFromOutbox(rejected.map((e) => e.idempotency_key));
 }
 
+// Returns a permanently-rejected attendance entry to "pending" so the next
+// flush resends it unchanged.
+export async function retryRejectedOutboxEntry(idempotencyKey: string): Promise<void> {
+  const existing = await db.outbox.where("idempotency_key").equals(idempotencyKey).first();
+  if (existing?.id != null) {
+    await db.outbox.update(existing.id, {
+      status: "pending",
+      error: undefined,
+      syncing_at: undefined,
+    });
+  }
+}
+
+// Same as retryRejectedOutboxEntry, but first applies a correction — e.g. a
+// mis-marked status the server rejected (a locked day, an invalid
+// reference) — so the resend actually stands a chance of succeeding instead
+// of failing identically again.
+export async function editAndRetryOutboxEntry(
+  idempotencyKey: string,
+  patch: Partial<AttendanceSyncEntry>,
+): Promise<void> {
+  const existing = await db.outbox.where("idempotency_key").equals(idempotencyKey).first();
+  if (existing?.id != null) {
+    await db.outbox.update(existing.id, {
+      entry: { ...existing.entry, ...patch },
+      status: "pending",
+      error: undefined,
+      syncing_at: undefined,
+    });
+  }
+}
+
 async function markOutboxFailed(
   idempotencyKeys: string[],
   status: "failed" | "rejected" = "failed",

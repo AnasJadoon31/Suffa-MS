@@ -13,6 +13,7 @@ export function useMutationSync(): {
   rejected: number;
   flush: () => Promise<void>;
   discardRejected: () => Promise<void>;
+  refresh: () => Promise<void>;
 } {
   const online = useOnlineStatus();
   const [pending, setPending] = useState(0);
@@ -61,5 +62,5 @@ export function useMutationSync(): {
     return () => window.clearInterval(interval);
   }, [refreshCount]);
 
-  return { pending, syncing, rejected, flush, discardRejected };
+  return { pending, syncing, rejected, flush, discardRejected, refresh: refreshCount };
 }

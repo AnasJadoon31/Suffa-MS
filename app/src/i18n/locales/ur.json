@@ -719,5 +719,14 @@
   "My Children": "میرے بچے",
   "Profile incomplete": "پروفائل نامکمل",
   "Incomplete": "نامکمل",
-  "By": "از"
+  "By": "از",
+  "Discard": "مسترد کریں",
+  "Review": "جائزہ لیں",
+  "Retry": "دوبارہ کوشش کریں",
+  "couldn't be saved — needs review": "محفوظ نہیں ہو سکا — جائزے کی ضرورت ہے",
+  "Couldn't be saved": "محفوظ نہیں ہو سکا",
+  "These changes were rejected by the server. Discard them, or correct and retry.": "یہ تبدیلیاں سرور نے مسترد کر دیں۔ انہیں حذف کریں، یا درست کر کے دوبارہ کوشش کریں۔",
+  "Nothing to review": "جائزے کے لیے کچھ نہیں",
+  "Save & retry": "محفوظ کریں اور دوبارہ کوشش کریں",
+  "Discard all": "سب مسترد کریں"
 }

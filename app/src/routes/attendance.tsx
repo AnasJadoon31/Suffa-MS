@@ -53,6 +53,7 @@ import {
 } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
 import { enqueueEntry } from "@/lib/mms/outbox";
+import { OUTBOX_SYNCED_EVENT } from "@/lib/mms/useOutboxSync";
 import { opsApi } from "@/lib/mms/more-endpoints";
 import { useOnlineStatus } from "@/lib/mms/useOnlineStatus";
 import { useTranslation } from "react-i18next";
@@ -562,6 +563,21 @@ function AttendanceBoard() {
   const effectiveSlotId = slotId || undefined;
 
   const online = useOnlineStatus();
+
+  // The optimistic offline-save below (see `save`'s onSuccess) writes
+  // synthetic placeholder entries straight into the history query cache.
+  // Nothing else invalidates that query once the outbox actually syncs, so
+  // without this the placeholder only gets replaced by the server's real
+  // copy on the next natural refetch (month change, remount, manual
+  // refresh) — not the moment sync completes.
+  useEffect(() => {
+    const onOutboxSynced = () => {
+      void queryClient.invalidateQueries({ queryKey: ["attendance-class-history"] });
+      void queryClient.invalidateQueries({ queryKey: ["attendance-student-history"] });
+    };
+    window.addEventListener(OUTBOX_SYNCED_EVENT, onOutboxSynced);
+    return () => window.removeEventListener(OUTBOX_SYNCED_EVENT, onOutboxSynced);
+  }, [queryClient]);
 
   const save = useMutation({
     mutationFn: async (): Promise<

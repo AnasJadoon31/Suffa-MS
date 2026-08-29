@@ -124,6 +124,21 @@ export async function discardAllRejectedMutations(): Promise<void> {
   await db.mutations.where("status").equals("rejected").delete();
 }
 
+// Returns a permanently-rejected entry to "pending" so the next flush
+// resends it as-is. Same idempotency key as the original attempt — normal
+// flush retries already reuse it across attempts, so a manual retry follows
+// the same contract.
+export async function retryRejectedMutation(key: string): Promise<void> {
+  const entry = await db.mutations.where("idempotency_key").equals(key).first();
+  if (entry?.id != null) {
+    await db.mutations.update(entry.id, {
+      status: "pending",
+      error: undefined,
+      syncing_at: undefined,
+    });
+  }
+}
+
 // Marks a claimed entry as failed (transient — will retry) or rejected
 // (permanent — won't) after a send attempt. claimMutation() already counted
 // the attempt, so this only updates status/error.
@@ -195,7 +210,10 @@ export async function flushMutations(): Promise<{
           // removeMutation() completing) instead of applying it twice.
           "Idempotency-Key": entry.idempotency_key,
         },
-      });
+        // Tells api.ts's interceptors this is a replay of an already-queued
+        // entry, not a fresh mutation — see the matching checks there.
+        __offlineReplay: true,
+      } as Parameters<typeof api.request>[0] & { __offlineReplay: boolean });
       await removeMutation(entry.idempotency_key);
       synced++;
     } catch (err: unknown) {

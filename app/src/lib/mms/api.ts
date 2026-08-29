@@ -158,7 +158,11 @@ api.interceptors.request.use((config) => {
     // the same shape `flushMutations` expects to replay.
     (config as { __offlineReplayData?: unknown }).__offlineReplayData = config.data ?? null;
   }
-  if (isMutationRequest(method) && !isOnline() && !isQueueExempt(config.url ?? "")) {
+  // flushMutations() marks its own replay requests with this so they're
+  // exempt from the reactive queueing below — see the matching check in the
+  // response interceptor for why.
+  const isReplay = (config as { __offlineReplay?: boolean }).__offlineReplay === true;
+  if (isMutationRequest(method) && !isOnline() && !isQueueExempt(config.url ?? "") && !isReplay) {
     // Offline: queue the mutation instead of making the network request
     const url = config.url ?? "";
     const data = config.data ?? null;
@@ -190,7 +194,18 @@ api.interceptors.response.use(
     // request never got a response at all: queue it the same way the
     // request interceptor does for the "known offline" case, instead of
     // silently dropping the change.
-    if (!error.response && isMutationRequest(method) && !isQueueExempt(url)) {
+    //
+    // Except when this request *is* flushMutations() replaying an already
+    // -queued entry: queueing it again here would mint a fresh idempotency
+    // key and attempt count and resolve as if it succeeded, so
+    // flushMutations sees no error, deletes the original entry, and counts
+    // a request that never reached the server as "synced" — losing the
+    // original attempt history and undercounting real failures. Let it
+    // reject normally instead so flushMutations's own catch block handles
+    // the retry bookkeeping.
+    const isReplay =
+      (error.config as { __offlineReplay?: boolean } | undefined)?.__offlineReplay === true;
+    if (!error.response && isMutationRequest(method) && !isQueueExempt(url) && !isReplay) {
       const data =
         (error.config as { __offlineReplayData?: unknown } | undefined)?.__offlineReplayData ??
         null;

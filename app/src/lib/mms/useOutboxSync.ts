@@ -7,12 +7,20 @@ import {
   outboxCount,
 } from "./outbox";
 
+// Dispatched whenever a flush actually synced at least one attendance
+// entry — lets route-level components (e.g. the calendar's optimistic
+// offline-save placeholders) invalidate their own server-backed caches the
+// moment sync completes, instead of only on their next natural refetch
+// (month change, remount, manual refresh).
+export const OUTBOX_SYNCED_EVENT = "mms:outbox-synced";
+
 export function useOutboxSync(): {
   pending: number;
   syncing: boolean;
   rejected: number;
   flush: () => Promise<void>;
   discardRejected: () => Promise<void>;
+  refresh: () => Promise<void>;
 } {
   const online = useOnlineStatus();
   const [pending, setPending] = useState(0);
@@ -31,8 +39,11 @@ export function useOutboxSync(): {
     flushingRef.current = true;
     setSyncing(true);
     try {
-      await flushOutbox();
+      const result = await flushOutbox();
       await refreshCount();
+      if (result.synced > 0 && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(OUTBOX_SYNCED_EVENT, { detail: result }));
+      }
     } finally {
       setSyncing(false);
       flushingRef.current = false;
@@ -61,5 +72,5 @@ export function useOutboxSync(): {
     return () => window.clearInterval(interval);
   }, [refreshCount]);
 
-  return { pending, syncing, rejected, flush, discardRejected };
+  return { pending, syncing, rejected, flush, discardRejected, refresh: refreshCount };
 }

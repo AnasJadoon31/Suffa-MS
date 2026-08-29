@@ -691,5 +691,14 @@
   "My Children": "My Children",
   "Profile incomplete": "Profile incomplete",
   "Incomplete": "Incomplete",
-  "By": "By"
+  "By": "By",
+  "Discard": "Discard",
+  "Review": "Review",
+  "Retry": "Retry",
+  "couldn't be saved — needs review": "couldn't be saved — needs review",
+  "Couldn't be saved": "Couldn't be saved",
+  "These changes were rejected by the server. Discard them, or correct and retry.": "These changes were rejected by the server. Discard them, or correct and retry.",
+  "Nothing to review": "Nothing to review",
+  "Save & retry": "Save & retry",
+  "Discard all": "Discard all"
 }
