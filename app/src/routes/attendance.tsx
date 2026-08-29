@@ -491,6 +491,15 @@ function AttendanceBoard() {
     });
   }, [classCourseFilter, classSearch, classes.data, studentClassFilter]);
 
+  // Falls back to a valid date only when the underlying data actually
+  // changed (a month switch, a refetch) and made the current selection
+  // stale — not on every selectedDate change, which would include this
+  // effect's own setSelectedDate calls, plus the calendar's normal click
+  // handler. `selectedDate` is intentionally excluded from the deps: with it
+  // included, clicking any date with no attendance entries yet (the
+  // expected, common case — reviewing or about to mark a day) immediately
+  // snapped the selection straight back, making every unmarked date look
+  // unreachable.
   useEffect(() => {
     if (tab !== "calendar") return;
     const entries = history.data?.entries ?? [];
@@ -498,7 +507,8 @@ function AttendanceBoard() {
     if (!entries.some((entry) => entry.attendance_date === selectedDate)) {
       setSelectedDate(entries[0]!.attendance_date);
     }
-  }, [history.data, selectedDate, tab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history.data, tab]);
 
   useEffect(() => {
     if (tab !== "history") return;
@@ -507,7 +517,8 @@ function AttendanceBoard() {
     if (!entries.some((entry) => entry.attendance_date === selectedDate)) {
       setSelectedDate(entries[0]!.attendance_date);
     }
-  }, [selectedDate, studentHistory.data, tab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentHistory.data, tab]);
   const approvedLeaveIds = useMemo(
     () =>
       new Set(

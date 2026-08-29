@@ -3,6 +3,18 @@ import { db } from "./db";
 
 const MUTATION_METHODS = new Set(["post", "put", "patch", "delete"]);
 
+// Belt-and-suspenders alongside api.ts's own queueing exemption: a browser
+// that queued a login/refresh/signup request before that exemption existed
+// (or before this build reached it) can have one sitting in IndexedDB
+// already. Discarding it here on the next flush — rather than only
+// preventing new ones from being queued — means an affected browser
+// self-heals instead of retrying a stale credentialed request forever
+// (observed in the wild hammering /api/v1/auth/token into the backend's
+// login rate limit every flush cycle).
+function isQueueExempt(url: string): boolean {
+  return url.includes("/api/v1/auth/");
+}
+
 export interface QueuedMutation {
   idempotency_key: string;
   method: string;
@@ -114,6 +126,13 @@ export async function flushMutations(): Promise<{
 
   for (const candidate of candidates) {
     if (candidate.id == null) continue;
+
+    if (isQueueExempt(candidate.url)) {
+      // Should never have been queued at all — discard rather than send.
+      await removeMutation(candidate.idempotency_key);
+      continue;
+    }
+
     const entry = await claimMutation(candidate.id);
     if (!entry) continue; // not recoverable, or another tab just claimed it
 
