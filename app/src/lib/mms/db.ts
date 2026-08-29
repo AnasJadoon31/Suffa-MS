@@ -56,6 +56,14 @@ export class MmsDatabase extends Dexie {
       rosterCache: "key, cached_at",
       mutations: "++id, idempotency_key, created_at, attempts, status",
     });
+    // If a future deploy ever needs to bump the Dexie version, an older tab
+    // left open (a backgrounded installed PWA tab is the common case) would
+    // otherwise block that upgrade from completing in the new tab —
+    // IndexedDB leaves the request pending rather than erroring, so every
+    // operation in the new tab hangs silently until the old tab closes on
+    // its own. Closing this connection as soon as a newer version wants to
+    // open lets the new tab proceed immediately instead.
+    this.on("versionchange", () => this.close());
   }
 }
 

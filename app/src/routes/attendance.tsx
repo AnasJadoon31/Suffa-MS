@@ -52,7 +52,7 @@ import {
   type TeacherAttendanceLogEntry,
 } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
-import { enqueueEntry } from "@/lib/mms/outbox";
+import { enqueueEntries } from "@/lib/mms/outbox";
 import { OUTBOX_SYNCED_EVENT } from "@/lib/mms/useOutboxSync";
 import { opsApi } from "@/lib/mms/more-endpoints";
 import { useOnlineStatus } from "@/lib/mms/useOnlineStatus";
@@ -602,18 +602,14 @@ function AttendanceBoard() {
       }));
       if (!entries.length) throw new Error("Nothing to submit");
       if (!online) {
-        for (const entry of entries) {
-          await enqueueEntry(entry);
-        }
+        await enqueueEntries(entries);
         return { offline: true, count: entries.length, entries };
       }
       try {
         const result = await attendanceApi.sync(entries);
         return { offline: false, result };
       } catch {
-        for (const entry of entries) {
-          await enqueueEntry(entry);
-        }
+        await enqueueEntries(entries);
         return { offline: true, count: entries.length, entries };
       }
     },

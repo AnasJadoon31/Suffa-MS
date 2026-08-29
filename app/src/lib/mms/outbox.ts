@@ -12,6 +12,38 @@ export async function enqueueEntry(entry: AttendanceSyncEntry): Promise<number> 
   });
 }
 
+// IndexedDB can hang indefinitely instead of erroring — most commonly
+// because this connection is blocked opening (or upgrading) while another
+// tab/window still holds an older connection to the same database open
+// (a background PWA tab left over from before a redeploy is the typical
+// case). Unlike a rejected promise, a blocked open never settles, so an
+// unguarded `await` on it hangs the caller — and whatever UI state (a save
+// button's spinner) is driven by that await — forever, with no error to
+// recover from. Same defensive pattern as api.ts's 30s axios timeout for
+// the online path; converts an indefinite hang into a clear, retryable
+// error instead.
+const ENQUEUE_TIMEOUT_MS = 10_000;
+
+export async function enqueueEntries(entries: AttendanceSyncEntry[]): Promise<void> {
+  const work = (async () => {
+    for (const entry of entries) {
+      await enqueueEntry(entry);
+    }
+  })();
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error("Saving offline is taking too long — check the app and try again")),
+      ENQUEUE_TIMEOUT_MS,
+    );
+  });
+  try {
+    await Promise.race([work, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
 // Same reasoning as mutationQueue.ts's STALE_SYNC_MS: "syncing" only counts
 // as recoverable once it's old enough that no real in-flight batch could
 // still be running — otherwise a second tab's flush would resend the same
