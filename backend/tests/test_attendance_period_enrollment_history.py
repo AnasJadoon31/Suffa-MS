@@ -114,6 +114,53 @@ async def test_sync_infers_single_period_from_course_and_attendance_date(client,
     assert str(record.timetable_slot_id) == slot["id"]
 
 
+async def test_sync_accepts_the_frontends_full_length_scoped_idempotency_key(
+    client, seed, db_sessionmaker
+):
+    """The frontend builds a student sync/override idempotency_key as
+    `{subject_id}:{session_id}:{attendance_date}:{timetable_slot_id}` — three
+    UUIDs (36 chars) + a date (10) + three colons is 121 characters whenever a
+    real period is scheduled, which silently overflowed the original 120-char
+    `student_attendance.idempotency_key` column on PostgreSQL (SQLite ignores
+    declared VARCHAR lengths, so this only ever surfaced against Postgres —
+    every scoped attendance save/correction 500'd in production). Only a
+    meaningful regression under `TEST_DATABASE_URL` (see conftest.py); still
+    valid, if non-discriminating, under the default SQLite run.
+    """
+    slot = await _seed_slot(client)
+    key = f"{seed.students[0].id}:{seed.old_session.id}:2027-01-03:{slot['id']}"
+    assert len(key) == 121
+
+    sync = await client.post(
+        "/api/v1/attendance/sync",
+        json={
+            "entries": [
+                {
+                    "subject_type": "student",
+                    "subject_id": str(seed.students[0].id),
+                    "session_id": str(seed.old_session.id),
+                    "attendance_date": "2027-01-03",
+                    "status": "present",
+                    "captured_at": datetime(2027, 1, 3, 9, 0, tzinfo=UTC).isoformat(),
+                    "idempotency_key": key,
+                    "course_id": str(seed.course.id),
+                    "timetable_slot_id": slot["id"],
+                },
+            ]
+        },
+    )
+    assert sync.status_code == 200, sync.text
+    assert sync.json()["accepted"] == 1
+
+    async with db_sessionmaker() as db:
+        record = (
+            await db.execute(
+                select(StudentAttendance).where(StudentAttendance.idempotency_key == key)
+            )
+        ).scalar_one()
+    assert record.idempotency_key == key
+
+
 async def test_sync_accepts_general_record_when_course_has_no_scheduled_period_today(
     client, seed, db_sessionmaker
 ):

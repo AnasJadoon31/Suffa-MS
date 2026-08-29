@@ -48,7 +48,13 @@ class StudentAttendance(Base, IdMixin, TenantMixin, TimestampMixin):
     status: Mapped[AttendanceStatus] = mapped_column(Enum(AttendanceStatus))
     marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     marked_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
-    idempotency_key: Mapped[str] = mapped_column(String(120), unique=True)
+    # `{student_id}:{session_id}:{attendance_date}:{timetable_slot_id}` — three
+    # UUIDs (36 chars each) + a date (10) + three colons is 121 characters
+    # when a real period is scheduled, one over a 120-char column (the
+    # general/no-period case, which suffixes "general" instead of a slot
+    # UUID, fits well within 120). 160 leaves headroom without the value
+    # ever meaningfully changing shape again.
+    idempotency_key: Mapped[str] = mapped_column(String(160), unique=True)
     synced_late: Mapped[bool] = mapped_column(Boolean, default=False)
     overridden: Mapped[bool] = mapped_column(Boolean, default=False)
 

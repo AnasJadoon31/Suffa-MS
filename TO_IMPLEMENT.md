@@ -5,6 +5,13 @@ until its automated tests pass and, for visible behaviour, a role-specific scree
 reviewed. Previously verified July 22 items are retained below as historical evidence;
 they do not close or weaken the new July 23 requirements.
 
+## 2026-08-29 — Staging attendance-sync 500 (fixed and deployed to staging DB; code not yet committed)
+
+- DONE: `student_attendance.idempotency_key` was `String(120)` but the frontend's scoped key format is 121 characters — every attendance save for a class with a real scheduled period today threw an unhandled `StringDataRightTruncationError` (500) on PostgreSQL (masked locally because the default test suite runs on SQLite, which doesn't enforce `VARCHAR(n)` lengths). Column widened to `String(160)`; migration `c10d1c28657f` written, tested up/down against a local Postgres in the same schema state as staging, and proven to fix a reproduced failure via a new regression test. Full details in `IMPLEMENTED.md`.
+- DONE (2026-08-29, via SSH to the Coolify host per user approval): the migration was applied directly to the live staging database (`suffa_ms_review`) — copied the migration file into the running staging backend container and ran `alembic upgrade head`; confirmed `alembic current` reports `c10d1c28657f (head)` and `information_schema.columns` shows `idempotency_key` at 160 chars.
+- OPEN: the code (model change, migration file, new test, and the CI lock-file fix below) is only committed locally, **not pushed**. The staging *database* is fixed, but the staging *deployed image* still doesn't contain these changes — the next staging build needs this branch merged/deployed so the image and migration history stay in sync with the live DB. Production has not been touched at all yet — the same migration needs to run there before/during its next deploy.
+- OPEN: also fixed a related CI Docker build failure (`npm ci` lock-file mismatch after the `recharts` v3 bump — `app/package-lock.json` was stale because the earlier dependency change was installed with `pnpm` only). Regenerated and verified `npm ci` succeeds standalone; not yet pushed either. See `IMPLEMENTED.md`.
+
 ## 2026-08-29 — PWA Offline Fix Follow-Up
 
 - DONE (2026-08-29): `flushMutations()` no longer miscounts a failed replay as "synced." `api.ts`'s two interceptors now skip their reactive offline-queueing when the request carries `__offlineReplay: true`, which `mutationQueue.ts`'s `flushMutations()` sets on every replay it sends — a replay that fails with no response now propagates a real error into `flushMutations()`'s own catch block (correct `failed`/`rejected` bookkeeping, original attempt history preserved) instead of being silently re-queued as a fresh, successful-looking entry. `tsc --noEmit`, `eslint`, and `vite build` pass.
