@@ -363,7 +363,16 @@ async def _resolve_entry_period_scope(
         attendance_date=entry.attendance_date,
     )
     if slot is None:
-        raise HTTPException(status_code=422, detail="No scheduled period found for this course today")
+        # No scheduled period for this course/day — e.g. a teacher assigned
+        # to the class as a fixture/backup without a timetable slot that
+        # day, or without ever teaching it directly. Record it as a general
+        # (non-period) attendance entry rather than rejecting the mark;
+        # `_resolve_unique_timetable_slot` above already raises its own 409
+        # when the ambiguity is genuine (multiple periods that day). Course
+        # and slot must agree on null-ness (DB check constraint), and
+        # without a real period there's no concrete session to attribute
+        # the course to, so both are cleared rather than just the slot.
+        return entry.model_copy(update={"course_id": None})
     return entry.model_copy(update={"timetable_slot_id": slot.id})
 
 

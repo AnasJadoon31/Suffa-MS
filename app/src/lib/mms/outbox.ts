@@ -1,5 +1,6 @@
 import { db, type OutboxEntry } from "./db";
 import { attendanceApi, type AttendanceSyncEntry } from "./endpoints";
+import { isPermanentRejection } from "./mutationQueue";
 
 export async function enqueueEntry(entry: AttendanceSyncEntry): Promise<number> {
   return db.outbox.add({
@@ -18,8 +19,11 @@ export async function enqueueEntry(entry: AttendanceSyncEntry): Promise<number> 
 // already sending.
 const STALE_SYNC_MS = 30_000;
 
+// "rejected" is deliberately excluded and stays excluded — see the matching
+// comment in mutationQueue.ts's isRecoverable.
 function isRecoverable(entry: OutboxEntry): boolean {
   if (entry.status == null || entry.status === "pending" || entry.status === "failed") return true;
+  if (entry.status === "rejected") return false;
   const syncingSince = entry.syncing_at ? Date.parse(entry.syncing_at) : 0;
   return !Number.isFinite(syncingSince) || Date.now() - syncingSince > STALE_SYNC_MS;
 }
@@ -33,17 +37,41 @@ export async function outboxCount(): Promise<number> {
   return (await getRecoverableEntries()).length;
 }
 
+// Plain scan + in-memory filter, not an indexed .where("status") query:
+// "status" isn't in the outbox store's index list (unlike mutations, which
+// has it from the start), and the outbox is small enough — a handful of
+// queued attendance batches at most — that this costs nothing measurable.
+export async function getRejectedOutboxEntries(): Promise<OutboxEntry[]> {
+  const all = await db.outbox.orderBy("created_at").toArray();
+  return all.filter((e) => e.status === "rejected");
+}
+
+export async function getRejectedOutboxCount(): Promise<number> {
+  return (await getRejectedOutboxEntries()).length;
+}
+
 export async function removeFromOutbox(idempotencyKeys: string[]): Promise<void> {
   if (!idempotencyKeys.length) return;
   await db.outbox.where("idempotency_key").anyOf(idempotencyKeys).delete();
 }
 
-async function markOutboxFailed(idempotencyKeys: string[]): Promise<void> {
+export const discardRejectedOutboxEntry = (key: string) => removeFromOutbox([key]);
+
+export async function discardAllRejectedOutboxEntries(): Promise<void> {
+  const rejected = await getRejectedOutboxEntries();
+  await removeFromOutbox(rejected.map((e) => e.idempotency_key));
+}
+
+async function markOutboxFailed(
+  idempotencyKeys: string[],
+  status: "failed" | "rejected" = "failed",
+  error?: string,
+): Promise<void> {
   if (!idempotencyKeys.length) return;
   const entries = await db.outbox.where("idempotency_key").anyOf(idempotencyKeys).toArray();
   await db.transaction("rw", db.outbox, async () => {
     for (const e of entries) {
-      if (e.id != null) await db.outbox.update(e.id, { status: "failed" });
+      if (e.id != null) await db.outbox.update(e.id, { status, error });
     }
   });
 }
@@ -84,15 +112,22 @@ export async function flushOutbox(): Promise<{
     const result = await attendanceApi.sync(syncEntries);
     const savedKeys = result.idempotency_keys ?? keys;
     await removeFromOutbox(savedKeys);
-    // Claimed but not acknowledged (e.g. locked-day rejections) — surface as
-    // failed immediately rather than leaving them on "syncing" until
-    // STALE_SYNC_MS passes.
+    // Claimed but not acknowledged — the backend's own locked_keys/permission
+    // checks, a permanent rejection (a locked day needs the explicit
+    // /override endpoint, not a retry) — surface as rejected immediately
+    // rather than leaving them on "syncing" until STALE_SYNC_MS passes, or
+    // retrying a request that will fail identically forever.
     const unsavedKeys = keys.filter((k) => !savedKeys.includes(k));
-    await markOutboxFailed(unsavedKeys);
+    await markOutboxFailed(
+      unsavedKeys,
+      "rejected",
+      "Rejected by server (e.g. a locked day) — needs manual review",
+    );
     const remaining = await outboxCount();
     return { synced: savedKeys.length, failed: unsavedKeys.length, remaining };
-  } catch {
-    await markOutboxFailed(keys);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Sync failed";
+    await markOutboxFailed(keys, isPermanentRejection(err) ? "rejected" : "failed", message);
     const remaining = await outboxCount();
     return { synced: 0, failed: keys.length, remaining };
   }

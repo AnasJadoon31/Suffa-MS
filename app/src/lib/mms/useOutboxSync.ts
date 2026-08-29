@@ -1,16 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOnlineStatus } from "./useOnlineStatus";
-import { flushOutbox, outboxCount } from "./outbox";
+import {
+  discardAllRejectedOutboxEntries,
+  flushOutbox,
+  getRejectedOutboxCount,
+  outboxCount,
+} from "./outbox";
 
-export function useOutboxSync(): { pending: number; syncing: boolean; flush: () => Promise<void> } {
+export function useOutboxSync(): {
+  pending: number;
+  syncing: boolean;
+  rejected: number;
+  flush: () => Promise<void>;
+  discardRejected: () => Promise<void>;
+} {
   const online = useOnlineStatus();
   const [pending, setPending] = useState(0);
+  const [rejected, setRejected] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const flushingRef = useRef(false);
 
   const refreshCount = useCallback(async () => {
-    const count = await outboxCount();
+    const [count, rejectedCount] = await Promise.all([outboxCount(), getRejectedOutboxCount()]);
     setPending((prev) => (prev === count ? prev : count));
+    setRejected((prev) => (prev === rejectedCount ? prev : rejectedCount));
   }, []);
 
   const flush = useCallback(async () => {
@@ -25,6 +38,11 @@ export function useOutboxSync(): { pending: number; syncing: boolean; flush: () 
       flushingRef.current = false;
     }
   }, [online, refreshCount]);
+
+  const discardRejected = useCallback(async () => {
+    await discardAllRejectedOutboxEntries();
+    await refreshCount();
+  }, [refreshCount]);
 
   useEffect(() => {
     void refreshCount();
@@ -43,5 +61,5 @@ export function useOutboxSync(): { pending: number; syncing: boolean; flush: () 
     return () => window.clearInterval(interval);
   }, [refreshCount]);
 
-  return { pending, syncing, flush };
+  return { pending, syncing, rejected, flush, discardRejected };
 }

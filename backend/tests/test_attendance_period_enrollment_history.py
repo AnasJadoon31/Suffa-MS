@@ -114,6 +114,50 @@ async def test_sync_infers_single_period_from_course_and_attendance_date(client,
     assert str(record.timetable_slot_id) == slot["id"]
 
 
+async def test_sync_accepts_general_record_when_course_has_no_scheduled_period_today(
+    client, seed, db_sessionmaker
+):
+    """A teacher assigned to a class as a fixture/backup, or a course with no
+    timetable slot on this particular day, must still be able to record
+    attendance — as a general (non-period) entry — rather than being
+    permanently rejected. 2027-01-04 is a Monday; the seed fixture's only
+    timetable slot is on day_of_week=6 (Sunday), so no slot can match.
+    course_id is expected to come back null too: the DB enforces
+    (course_id IS NULL) = (timetable_slot_id IS NULL), and without a real
+    resolved period there's no concrete session to attribute the course to."""
+    marked_at = datetime(2027, 1, 4, 9, 0, tzinfo=UTC)
+    sync = await client.post(
+        "/api/v1/attendance/sync",
+        json={
+            "entries": [
+                {
+                    "subject_type": "student",
+                    "subject_id": str(seed.students[0].id),
+                    "session_id": str(seed.old_session.id),
+                    "attendance_date": "2027-01-04",
+                    "status": "present",
+                    "captured_at": marked_at.isoformat(),
+                    "idempotency_key": "period-attendance-no-slot-general",
+                    "course_id": str(seed.course.id),
+                },
+            ]
+        },
+    )
+    assert sync.status_code == 200, sync.text
+    assert sync.json()["accepted"] == 1
+
+    async with db_sessionmaker() as db:
+        record = (
+            await db.execute(
+                select(StudentAttendance).where(
+                    StudentAttendance.idempotency_key == "period-attendance-no-slot-general"
+                )
+            )
+        ).scalar_one()
+    assert record.course_id is None
+    assert record.timetable_slot_id is None
+
+
 async def test_period_attendance_round_trips_through_roster_sync_and_history(client, seed):
     slot = await _seed_slot(client)
     second_slot_response = await client.post(

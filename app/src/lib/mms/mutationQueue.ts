@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import { api, readToken, readTenant } from "./api";
 import { db } from "./db";
 
@@ -23,9 +24,24 @@ export interface QueuedMutation {
   headers: Record<string, string>;
   created_at: string;
   attempts: number;
-  status: "pending" | "syncing" | "failed";
+  status: "pending" | "syncing" | "failed" | "rejected";
   error?: string;
   syncing_at?: string;
+}
+
+// A response the server actually sent back (as opposed to no response at
+// all — a network failure, a timeout, the request never arriving) that
+// falls in the 4xx range is the server saying "this request is invalid,"
+// not "try me again later." Retrying it verbatim will fail identically
+// forever — exactly the "6 pending sync, never clears" bug this exists to
+// prevent. 408 (timeout) and 429 (rate limited) are excluded: both are
+// explicitly "try again," not "this request is wrong."
+export function isPermanentRejection(err: unknown): boolean {
+  if (!isAxiosError(err)) return false;
+  const status = err.response?.status;
+  if (status == null) return false;
+  if (status === 408 || status === 429) return false;
+  return status >= 400 && status < 500;
 }
 
 function generateKey(): string {
@@ -61,6 +77,10 @@ export async function enqueueMutation(method: string, url: string, data: unknown
 // enough that a genuinely stuck entry doesn't sit invisible for long.
 const STALE_SYNC_MS = 30_000;
 
+// "rejected" is deliberately excluded here and stays excluded forever
+// (unless the user explicitly discards it or a future edit/retry feature
+// re-queues it) — the whole point is that retrying an entry the server
+// already told us is invalid can't ever succeed on its own.
 function isRecoverable(entry: QueuedMutation): boolean {
   if (entry.status === "pending" || entry.status === "failed") return true;
   if (entry.status !== "syncing") return false;
@@ -81,16 +101,40 @@ export async function getMutationCount(): Promise<number> {
   return (await getRecoverableMutations()).length;
 }
 
+// Entries the server has permanently rejected — will never succeed by
+// retrying, so they're surfaced separately from "pending sync" rather than
+// silently retried forever or hidden inside the same count.
+export async function getRejectedMutations(): Promise<QueuedMutation[]> {
+  return db.mutations.where("status").equals("rejected").sortBy("created_at");
+}
+
+export async function getRejectedCount(): Promise<number> {
+  return db.mutations.where("status").equals("rejected").count();
+}
+
 export async function removeMutation(key: string): Promise<void> {
   await db.mutations.where("idempotency_key").equals(key).delete();
 }
 
-// Marks a claimed entry as failed after a send attempt. claimMutation()
-// already counted the attempt, so this only updates status/error.
-export async function markMutationFailed(key: string, error: string): Promise<void> {
+// Discards a permanently-rejected entry the user has reviewed — same
+// operation as removeMutation, named for what it means at the call site.
+export const discardRejectedMutation = removeMutation;
+
+export async function discardAllRejectedMutations(): Promise<void> {
+  await db.mutations.where("status").equals("rejected").delete();
+}
+
+// Marks a claimed entry as failed (transient — will retry) or rejected
+// (permanent — won't) after a send attempt. claimMutation() already counted
+// the attempt, so this only updates status/error.
+export async function markMutationFailed(
+  key: string,
+  error: string,
+  status: "failed" | "rejected" = "failed",
+): Promise<void> {
   const entry = await db.mutations.where("idempotency_key").equals(key).first();
   if (entry?.id != null) {
-    await db.mutations.update(entry.id, { status: "failed", error });
+    await db.mutations.update(entry.id, { status, error });
   }
 }
 
@@ -156,7 +200,11 @@ export async function flushMutations(): Promise<{
       synced++;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Sync failed";
-      await markMutationFailed(entry.idempotency_key, message);
+      await markMutationFailed(
+        entry.idempotency_key,
+        message,
+        isPermanentRejection(err) ? "rejected" : "failed",
+      );
       failed++;
     }
   }

@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOnlineStatus } from "./useOnlineStatus";
-import { flushMutations, getMutationCount } from "./mutationQueue";
+import {
+  discardAllRejectedMutations,
+  flushMutations,
+  getMutationCount,
+  getRejectedCount,
+} from "./mutationQueue";
 
 export function useMutationSync(): {
   pending: number;
   syncing: boolean;
+  rejected: number;
   flush: () => Promise<void>;
+  discardRejected: () => Promise<void>;
 } {
   const online = useOnlineStatus();
   const [pending, setPending] = useState(0);
+  const [rejected, setRejected] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const flushingRef = useRef(false);
 
   const refreshCount = useCallback(async () => {
-    const count = await getMutationCount();
+    const [count, rejectedCount] = await Promise.all([getMutationCount(), getRejectedCount()]);
     setPending((prev) => (prev === count ? prev : count));
+    setRejected((prev) => (prev === rejectedCount ? prev : rejectedCount));
   }, []);
 
   const flush = useCallback(async () => {
@@ -29,6 +38,11 @@ export function useMutationSync(): {
       flushingRef.current = false;
     }
   }, [online, refreshCount]);
+
+  const discardRejected = useCallback(async () => {
+    await discardAllRejectedMutations();
+    await refreshCount();
+  }, [refreshCount]);
 
   useEffect(() => {
     void refreshCount();
@@ -47,5 +61,5 @@ export function useMutationSync(): {
     return () => window.clearInterval(interval);
   }, [refreshCount]);
 
-  return { pending, syncing, flush };
+  return { pending, syncing, rejected, flush, discardRejected };
 }

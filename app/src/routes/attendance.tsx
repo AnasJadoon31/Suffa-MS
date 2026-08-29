@@ -48,6 +48,7 @@ import {
   type AttendanceLogEntry,
   type AttendanceStatus,
   type AttendanceSyncEntry,
+  type ClassAttendanceHistory,
   type TeacherAttendanceLogEntry,
 } from "@/lib/mms/endpoints";
 import { applyMutationSuccess } from "@/lib/mms/mutation-helpers";
@@ -563,7 +564,10 @@ function AttendanceBoard() {
   const online = useOnlineStatus();
 
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<
+      | { offline: true; count: number; entries: AttendanceSyncEntry[] }
+      | { offline: false; result: Awaited<ReturnType<typeof attendanceApi.sync>> }
+    > => {
       const data = roster.data;
       if (!data) throw new Error("Roster not loaded");
       if (multiplePeriods && !slotId) throw new Error("Select a period before saving");
@@ -585,7 +589,7 @@ function AttendanceBoard() {
         for (const entry of entries) {
           await enqueueEntry(entry);
         }
-        return { offline: true, count: entries.length };
+        return { offline: true, count: entries.length, entries };
       }
       try {
         const result = await attendanceApi.sync(entries);
@@ -594,21 +598,73 @@ function AttendanceBoard() {
         for (const entry of entries) {
           await enqueueEntry(entry);
         }
-        return { offline: true, count: entries.length };
+        return { offline: true, count: entries.length, entries };
       }
     },
     onSuccess: (res) => {
       if ("offline" in res && res.offline) {
         toast.success(`Saved offline — ${res.count} mark${res.count === 1 ? "" : "s"} will sync when online`);
+        // The history query is server-backed and has no way to know about
+        // these marks until the outbox actually syncs — invalidating it
+        // here would refetch stale data with nothing recorded yet and wipe
+        // out what was just marked, undoing the save from the UI's
+        // perspective (hasRecords/canMark below reads straight from this
+        // query). Inject the marks locally instead so the calendar/day view
+        // shows them as recorded immediately; a later real fetch (sync
+        // completing, a month change, a fresh mount) naturally replaces
+        // this placeholder with the server's own copy.
+        const studentsById = new Map((roster.data?.students ?? []).map((s) => [s.id, s]));
+        const nowIso = new Date().toISOString();
+        const synthetic: AttendanceLogEntry[] = res.entries.map((entry) => {
+          const student = studentsById.get(entry.subject_id);
+          return {
+            id: entry.idempotency_key,
+            attendance_date: entry.attendance_date,
+            student_id: entry.subject_id,
+            student_name: student?.name ?? "",
+            admission_number: student?.admission_number ?? "",
+            status: entry.status,
+            marked_at: nowIso,
+            synced_at: "",
+            marked_by: { id: "", username: "", display_name: "", role: "" },
+            overridden: false,
+            source: "manual",
+            locked_reason: null,
+            leave_id: null,
+            course: roster.data?.course ?? null,
+            timetable_slot: roster.data?.timetable_slot ?? null,
+            legacy_general: false,
+          };
+        });
+        const bySubject = new Map(synthetic.map((entry) => [entry.student_id, entry]));
+        queryClient.setQueryData<ClassAttendanceHistory | undefined>(
+          [
+            "attendance-class-history",
+            classId,
+            sectionId,
+            courseId,
+            isSelfContainedClass,
+            month.getFullYear(),
+            month.getMonth(),
+          ],
+          (old) => {
+            if (!old) return old;
+            const replaced = old.entries.filter(
+              (entry) =>
+                !(entry.attendance_date === synthetic[0]?.attendance_date && bySubject.has(entry.student_id)),
+            );
+            return { ...old, entries: [...replaced, ...synthetic] };
+          },
+        );
       } else if (!res.offline && res.result) {
         const locked = res.result.locked?.length ?? 0;
         toast.success(
           locked ? `Saved — ${locked} entr${locked === 1 ? "y" : "ies"} locked` : "Attendance saved",
         );
+        void queryClient.invalidateQueries({ queryKey: ["attendance-class-history"] });
       }
       setEditing(false);
       setMarks({});
-      void queryClient.invalidateQueries({ queryKey: ["attendance-class-history"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: (error) => toast.error(apiErrorMessage(error, "Couldn't save attendance")),

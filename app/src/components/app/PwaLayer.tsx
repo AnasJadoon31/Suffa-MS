@@ -1,4 +1,4 @@
-import { Download, RefreshCw, WifiOff, X } from "lucide-react";
+import { AlertTriangle, Download, RefreshCw, WifiOff, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { registerServiceWorker } from "@/lib/mms/pwa";
@@ -18,12 +18,18 @@ declare global {
 }
 
 export function PwaLayer() {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
   const [offline, setOffline] = useState(false);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
   const [hidden, setHidden] = useState(false);
-  const { pending, syncing } = useOutboxSync();
-  const { pending: pendingMutations, syncing: syncingMutations } = useMutationSync();
+  const { pending, syncing, rejected, discardRejected } = useOutboxSync();
+  const {
+    pending: pendingMutations,
+    syncing: syncingMutations,
+    rejected: rejectedMutations,
+    discardRejected: discardRejectedMutations,
+  } = useMutationSync();
+  const rejectedTotal = rejected + rejectedMutations;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -55,27 +61,50 @@ export function PwaLayer() {
 
   return (
     <>
-      {offline ? (
-         <div className="fixed inset-x-0 top-0 z-[70] flex items-center justify-center gap-2 bg-foreground/90 px-4 py-2 text-xs font-bold uppercase tracking-wide text-background">
-           <WifiOff className="h-3.5 w-3.5" />
-           {t("Offline — showing saved data")}
-           {pendingMutations > 0 ? ` · ${pendingMutations} action${pendingMutations > 1 ? "s" : ""} queued` : ""}
-         </div>
-      ) : pending > 0 || pendingMutations > 0 ? (
-         <div className="fixed inset-x-0 top-0 z-[70] flex items-center justify-center gap-2 bg-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-accent-foreground">
-           <RefreshCw className={`h-3.5 w-3.5 ${syncing || syncingMutations ? "animate-spin" : ""}`} />
-           {syncing || syncingMutations
-             ? `Syncing ${pending + pendingMutations}...`
-             : `${pending + pendingMutations} pending sync`}
-         </div>
-      ) : null}
+      <div className="fixed inset-x-0 top-0 z-[70] flex flex-col">
+        {offline ? (
+          <div className="flex items-center justify-center gap-2 bg-foreground/90 px-4 py-2 text-xs font-bold uppercase tracking-wide text-background">
+            <WifiOff className="h-3.5 w-3.5" />
+            {t("Offline — showing saved data")}
+            {pendingMutations > 0
+              ? ` · ${pendingMutations} action${pendingMutations > 1 ? "s" : ""} queued`
+              : ""}
+          </div>
+        ) : pending > 0 || pendingMutations > 0 ? (
+          <div className="flex items-center justify-center gap-2 bg-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-accent-foreground">
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${syncing || syncingMutations ? "animate-spin" : ""}`}
+            />
+            {syncing || syncingMutations
+              ? `Syncing ${pending + pendingMutations}...`
+              : `${pending + pendingMutations} pending sync`}
+          </div>
+        ) : null}
+
+        {rejectedTotal > 0 ? (
+          <div className="flex items-center justify-center gap-2 bg-destructive px-4 py-2 text-xs font-bold uppercase tracking-wide text-destructive-foreground">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            {`${rejectedTotal} couldn't be saved — needs review`}
+            <button
+              onClick={() => {
+                void discardRejected();
+                void discardRejectedMutations();
+              }}
+              className="ml-1 shrink-0 rounded-full bg-destructive-foreground/15 px-2 py-0.5 normal-case tracking-normal"
+            >
+              {t("Discard")}
+            </button>
+          </div>
+        ) : null}
+      </div>
 
       {installEvent && !hidden ? (
         <div className="mb-safe-nav fixed inset-x-3 bottom-20 z-[70] flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-raised)] lg:bottom-6 lg:left-auto lg:right-6 lg:w-80">
           <div className="min-w-0 flex-1">
             <p className="font-display text-sm font-extrabold">{t("Install Suffa MS")}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {t("Add to your home screen for offline access.")}</p>
+              {t("Add to your home screen for offline access.")}
+            </p>
           </div>
           <button
             onClick={async () => {
@@ -87,7 +116,8 @@ export function PwaLayer() {
             className="gradient-emerald inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 font-display text-xs font-extrabold uppercase tracking-wide text-primary-foreground"
           >
             <Download className="h-3.5 w-3.5" />
-            {t("Install")}</button>
+            {t("Install")}
+          </button>
           <button
             aria-label="Dismiss install prompt"
             onClick={() => setHidden(true)}
